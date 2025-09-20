@@ -1,0 +1,38 @@
+<template>
+  <PageContainer title="Настройки" subtitle="Доступ только суперадмину">
+    <SettingsTabs :tabs="tabs" v-model="activeTab" />
+    <div class="tab-content">
+      <UserManagementPanel v-if="activeTab === 'users'" />
+      <InvitationsPanel v-else-if="activeTab === 'invitations'" />
+    </div>
+  </PageContainer>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+import PageContainer from '../components/PageContainer.vue';
+import SettingsTabs from '../components/settings/SettingsTabs.vue';
+import InvitationsPanel from '../components/invitations/InvitationsPanel.vue';
+import UserManagementPanel from '../components/settings/UserManagementPanel.vue';
+
+const tabs = [
+  { value: 'users', label: 'Пользователи' },
+  { value: 'invitations', label: 'Приглашения' }
+];
+
+const activeTab = ref('users');
+</script>
+
+<style scoped>
+.tab-content {
+  margin-top: 16px;
+}
+
+.placeholder {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  text-align: center;
+  color: var(--tg-theme-hint-color, #6f7a8b);
+}
+</style>
