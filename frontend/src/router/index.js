@@ -5,6 +5,11 @@ import InviteView from '../views/InviteView.vue';
 import ProfileView from '../views/ProfileView.vue';
 import ComingSoonView from '../views/ComingSoonView.vue';
 import SettingsView from '../views/SettingsView.vue';
+import AssessmentEditorView from '../views/AssessmentEditorView.vue';
+import AssessmentDetailView from '../views/AssessmentDetailView.vue';
+import AssessmentsView from '../views/AssessmentsView.vue';
+import AssessmentRunView from '../views/AssessmentRunView.vue';
+import AssessmentResultView from '../views/AssessmentResultView.vue';
 import { useAppStore } from '../store/appStore';
 import { hideBackButton } from '../services/telegram';
 
@@ -14,13 +19,43 @@ const routes = [
   { path: '/register', name: 'register', component: RegisterView },
   { path: '/invite', name: 'invite', component: InviteView },
   { path: '/profile', name: 'profile', component: ProfileView, meta: { requiresAuth: true } },
-  { path: '/assessments', name: 'assessments', component: ComingSoonView, meta: { requiresAuth: true } },
+  { path: '/assessments', name: 'assessments', component: AssessmentsView, meta: { requiresAuth: true } },
   { path: '/leaderboard', name: 'leaderboard', component: ComingSoonView, meta: { requiresAuth: true } },
   {
     path: '/settings',
     name: 'settings',
     component: SettingsView,
     meta: { requiresAuth: true, requiresSuperAdmin: true }
+  },
+  {
+    path: '/assessments/new',
+    name: 'assessment-create',
+    component: AssessmentEditorView,
+    meta: { requiresAuth: true, allowedRoles: ['superadmin', 'manager'] }
+  },
+  {
+    path: '/assessments/:id/edit',
+    name: 'assessment-edit',
+    component: AssessmentEditorView,
+    meta: { requiresAuth: true, allowedRoles: ['superadmin', 'manager'] }
+  },
+  {
+    path: '/assessments/:id',
+    name: 'assessment-detail',
+    component: AssessmentDetailView,
+    meta: { requiresAuth: true, allowedRoles: ['superadmin', 'manager'] }
+  },
+  {
+    path: '/assessments/:id/start',
+    name: 'assessment-start',
+    component: AssessmentRunView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/assessments/:id/results/:attemptId',
+    name: 'assessment-result',
+    component: AssessmentResultView,
+    meta: { requiresAuth: true }
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
 ];
@@ -61,6 +96,9 @@ router.beforeEach(async (to, from, next) => {
       return next({ name: 'invite' });
     }
     if (to.meta.requiresSuperAdmin && !appStore.isSuperAdmin) {
+      return next({ name: 'dashboard' });
+    }
+    if (to.meta.allowedRoles && !to.meta.allowedRoles.includes(appStore.user?.roleName)) {
       return next({ name: 'dashboard' });
     }
     if (['register', 'invite'].includes(to.name)) {

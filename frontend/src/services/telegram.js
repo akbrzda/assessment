@@ -153,6 +153,39 @@ export function hideBackButton() {
   }
 }
 
+export function setSwipeBehavior({ allowVertical = true, allowHorizontal = true } = {}) {
+  const webApp = resolveWebApp();
+  if (!webApp) {
+    return;
+  }
+
+  if (typeof webApp.setSwipeBehavior === 'function') {
+    webApp.setSwipeBehavior({
+      allow_vertical: allowVertical,
+      allow_horizontal: allowHorizontal,
+      allowVertical,
+      allowHorizontal
+    });
+    return;
+  }
+
+  if (!allowVertical && typeof webApp.disableVerticalSwipes === 'function') {
+    webApp.disableVerticalSwipes();
+  }
+
+  if (allowVertical && typeof webApp.enableVerticalSwipes === 'function') {
+    webApp.enableVerticalSwipes();
+  }
+}
+
+export function disableVerticalSwipes() {
+  setSwipeBehavior({ allowVertical: false });
+}
+
+export function enableVerticalSwipes() {
+  setSwipeBehavior({ allowVertical: true });
+}
+
 export function showAlert(message) {
   const webApp = resolveWebApp();
   if (webApp?.showAlert) {

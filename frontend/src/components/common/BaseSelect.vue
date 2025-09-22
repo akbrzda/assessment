@@ -79,7 +79,7 @@ function handleChange(event) {
 .base-control {
   width: 100%;
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid #444;
   padding: 10px 14px;
   padding-right: 34px;
   font-size: 14px;

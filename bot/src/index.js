@@ -52,13 +52,6 @@ async function launchBot() {
   try {
     await bot.launch();
     console.log('[bot] started');
-
-    if (miniAppUrl && ADMIN_CHAT_ID) {
-      await bot.telegram.sendMessage(
-        ADMIN_CHAT_ID,
-        'Бот запущен и готов отправлять ссылку на MiniApp.'
-      );
-    }
   } catch (error) {
     console.error('[bot] Launch failed:', error.message);
     process.exit(1);

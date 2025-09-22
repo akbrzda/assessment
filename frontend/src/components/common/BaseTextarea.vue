@@ -1,9 +1,8 @@
 <template>
-  <input
-    :type="type"
+  <textarea
     :value="modelValue ?? ''"
     @input="handleInput"
-    v-bind="inputAttrs"
+    v-bind="textareaAttrs"
   />
 </template>
 
@@ -14,12 +13,8 @@ defineOptions({ inheritAttrs: false });
 
 const props = defineProps({
   modelValue: {
-    type: [String, Number, null],
+    type: [String, null],
     default: ''
-  },
-  type: {
-    type: String,
-    default: 'text'
   },
   modelModifiers: {
     type: Object,
@@ -30,9 +25,9 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue']);
 const attrs = useAttrs();
 
-const inputAttrs = computed(() => {
-  const { class: className, type: attrType, ...rest } = attrs;
-  const classes = ['base-control'];
+const textareaAttrs = computed(() => {
+  const { class: className, ...rest } = attrs;
+  const classes = ['base-control', 'base-control--textarea'];
   if (className) {
     classes.push(className);
   }
@@ -47,18 +42,11 @@ function transform(value) {
   if (props.modelModifiers.trim && typeof next === 'string') {
     next = next.trim();
   }
-  if (props.modelModifiers.number) {
-    const numeric = parseFloat(next);
-    if (!Number.isNaN(numeric)) {
-      next = numeric;
-    }
-  }
   return next;
 }
 
 function handleInput(event) {
-  const { value } = event.target;
-  emit('update:modelValue', transform(value));
+  emit('update:modelValue', transform(event.target.value));
 }
 </script>
 
@@ -73,18 +61,13 @@ function handleInput(event) {
   background: var(--tg-theme-bg-color, #ffffff);
   color: var(--tg-theme-text-color, #0a0a0a);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  resize: vertical;
+  min-height: 96px;
 }
 
 .base-control:focus {
   outline: none;
   border-color: var(--tg-theme-button-color, #0a84ff);
   box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.12);
-}
-
-.base-control:disabled,
-.base-control[readonly] {
-  background: rgba(0, 0, 0, 0.03);
-  color: var(--tg-theme-hint-color, #6f7a8b);
-  cursor: not-allowed;
 }
 </style>

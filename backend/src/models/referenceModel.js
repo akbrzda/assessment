@@ -25,6 +25,15 @@ async function getBranchById(id) {
   return rows[0] || null;
 }
 
+async function getBranchesByIds(ids) {
+  if (!ids || ids.length === 0) {
+    return [];
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  const [rows] = await pool.execute(`SELECT id, name FROM branches WHERE id IN (${placeholders})`, ids);
+  return rows;
+}
+
 async function getPositionById(id) {
   const [rows] = await pool.execute('SELECT id, name FROM positions WHERE id = ? LIMIT 1', [id]);
   return rows[0] || null;
@@ -33,6 +42,15 @@ async function getPositionById(id) {
 async function getPositionByName(name) {
   const [rows] = await pool.execute('SELECT id, name FROM positions WHERE name = ? LIMIT 1', [name]);
   return rows[0] || null;
+}
+
+async function getPositionsByIds(ids) {
+  if (!ids || ids.length === 0) {
+    return [];
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  const [rows] = await pool.execute(`SELECT id, name FROM positions WHERE id IN (${placeholders})`, ids);
+  return rows;
 }
 
 async function getRoleById(id) {
@@ -46,7 +64,9 @@ module.exports = {
   getRoles,
   getRoleByName,
   getBranchById,
+  getBranchesByIds,
   getPositionById,
+  getPositionsByIds,
   getPositionByName,
   getRoleById
 };

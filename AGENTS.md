@@ -22,8 +22,8 @@
   ├── frontend/ # Vue MiniApp
   └── backend/database/ # миграции и SQL-скрипты
 - **Дизайн:** Находится в папке design/
-- **Техническое задание:** Находится в файле TЗ.md
-- **Документация:** https://docs.telegram-mini-apps.com, https://docs.ton.org/v3/guidelines/dapps/tma/tutorials/step-by-step-guide, 
+- **Техническое задание:** Находится в файле TЗ.md. Каждый раз проверять при выполнении задачи.
+- **Документация:** https://docs.telegram-mini-apps.com, https://docs.ton.org/v3/guidelines/dapps/tma/tutorials/step-by-step-guide,
 
 ---
 

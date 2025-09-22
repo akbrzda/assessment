@@ -77,6 +77,57 @@ export const apiClient = {
       method: 'DELETE'
     });
   },
+  listAssessmentsAdmin() {
+    return request('/assessments/admin');
+  },
+  getAssessmentTargets() {
+    return request('/assessments/admin/targets');
+  },
+  createAssessment(payload) {
+    return request('/assessments/admin', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+  getAssessmentDetail(id) {
+    return request(`/assessments/admin/${id}`);
+  },
+  updateAssessment(id, payload) {
+    return request(`/assessments/admin/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+  },
+  deleteAssessment(id) {
+    return request(`/assessments/admin/${id}`, {
+      method: 'DELETE'
+    });
+  },
+  listUserAssessments() {
+    return request('/assessments/user');
+  },
+  getUserAssessment(id) {
+    return request(`/assessments/user/${id}`);
+  },
+  startAssessmentAttempt(id) {
+    return request(`/assessments/${id}/attempts`, {
+      method: 'POST'
+    });
+  },
+  submitAssessmentAnswer(assessmentId, attemptId, payload) {
+    return request(`/assessments/${assessmentId}/attempts/${attemptId}/answers`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+  completeAssessmentAttempt(assessmentId, attemptId) {
+    return request(`/assessments/${assessmentId}/attempts/${attemptId}/complete`, {
+      method: 'POST'
+    });
+  },
+  getAssessmentAttemptResult(assessmentId, attemptId) {
+    return request(`/assessments/${assessmentId}/attempts/${attemptId}`);
+  },
   listUsers() {
     return request('/admin/users');
   },

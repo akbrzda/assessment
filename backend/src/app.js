@@ -4,6 +4,7 @@ const errorHandler = require("./middleware/errorHandler");
 const authRoutes = require("./routes/authRoutes");
 const invitationRoutes = require("./routes/invitationRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const assessmentRoutes = require("./routes/assessmentRoutes");
 const { healthCheck } = require("./config/database");
 
 const app = express();
@@ -23,6 +24,7 @@ app.get("/health", async (req, res, next) => {
 app.use("/auth", authRoutes);
 app.use("/invitations", invitationRoutes);
 app.use("/admin", adminRoutes);
+app.use("/assessments", assessmentRoutes);
 
 app.use(errorHandler);
 

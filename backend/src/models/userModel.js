@@ -136,6 +136,27 @@ async function updateAvatar(userId, avatarUrl) {
   );
 }
 
+async function findByIds(ids) {
+  if (!ids || ids.length === 0) {
+    return [];
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  const [rows] = await pool.execute(
+    `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
+            u.role_id, u.level, u.points, u.created_at, u.updated_at,
+            r.name AS role_name,
+            b.name AS branch_name,
+            p.name AS position_name
+     FROM users u
+     LEFT JOIN roles r ON r.id = u.role_id
+     LEFT JOIN branches b ON b.id = u.branch_id
+     LEFT JOIN positions p ON p.id = u.position_id
+     WHERE u.id IN (${placeholders})`
+    , ids
+  );
+  return rows.map(mapUserRow);
+}
+
 module.exports = {
   findByTelegramId,
   createUser,
@@ -145,5 +166,6 @@ module.exports = {
   findById,
   updateUserByAdmin,
   deleteUser,
-  updateAvatar
+  updateAvatar,
+  findByIds
 };
