@@ -2,6 +2,15 @@ let webAppInstance = null;
 const themeListeners = new Set();
 const viewportListeners = new Set();
 
+const envBaseUrl =
+  typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL
+    ? import.meta.env.VITE_API_BASE_URL.trim()
+    : '';
+const runtimeBaseUrl =
+  typeof window !== 'undefined' && window.location ? window.location.origin : '';
+const API_BASE_URL = (envBaseUrl || runtimeBaseUrl || '').replace(/\/$/, '');
+const CLOUD_STORAGE_ENDPOINT = '/cloud-storage';
+
 function resolveWebApp() {
   if (webAppInstance) {
     return webAppInstance;
@@ -24,6 +33,7 @@ export function ensureReady() {
   }
   webApp.ready();
   webApp.expand();
+  setSwipeBehavior({ allowVertical: false, allowHorizontal: true });
   return webApp;
 }
 
@@ -73,6 +83,149 @@ export function onViewportChanged(handler) {
 export function getInitData() {
   const webApp = resolveWebApp();
   return webApp?.initData || '';
+}
+
+function getCloudStorage() {
+  const webApp = resolveWebApp();
+  return webApp?.cloudStorage || null;
+}
+
+function callCloudStorage(method, key, value) {
+  const storage = getCloudStorage();
+  if (!storage || typeof storage[method] !== 'function') {
+    throw new Error('CloudStorage API not available');
+  }
+  return new Promise((resolve, reject) => {
+    const done = (err, result) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(result);
+      }
+    };
+
+    if (value === undefined) {
+      storage[method](key, done);
+    } else {
+      storage[method](key, value, done);
+    }
+  });
+}
+
+async function requestCloudStorageFallback(path, { method = 'POST', body } = {}) {
+  if (!API_BASE_URL) {
+    throw new Error('API base URL is not configured');
+  }
+  if (typeof fetch !== 'function') {
+    throw new Error('Fetch API is not available');
+  }
+
+  const url = `${API_BASE_URL}${path}`;
+  const headers = new Headers({ 'Content-Type': 'application/json' });
+  const initData = getInitData();
+  if (initData) {
+    headers.set('x-telegram-init-data', initData);
+  }
+
+  const response = await fetch(url, {
+    method,
+    headers,
+    credentials: 'include',
+    body: body ? JSON.stringify(body) : undefined
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    const message = errorBody?.error || 'Cloud storage fallback request failed';
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  return response.json().catch(() => null);
+}
+
+function serializeCloudValue(value) {
+  if (value === undefined) {
+    throw new Error('Value must be defined for cloudStorage');
+  }
+  return typeof value === 'string' ? value : JSON.stringify(value);
+}
+
+export async function setCloudItem(key, value, { fallback = true } = {}) {
+  const serializedValue = serializeCloudValue(value);
+
+  try {
+    await callCloudStorage('setItem', key, serializedValue);
+    return true;
+  } catch (error) {
+    if (!fallback) {
+      throw error;
+    }
+    console.warn('Telegram cloudStorage setItem failed, fallback to backend', error);
+  }
+
+  try {
+    await requestCloudStorageFallback(CLOUD_STORAGE_ENDPOINT, {
+      method: 'POST',
+      body: { key, value: serializedValue }
+    });
+    return true;
+  } catch (fallbackError) {
+    console.error('Backend fallback setCloudItem failed', fallbackError);
+    throw fallbackError;
+  }
+}
+
+export async function getCloudItem(key, { fallback = true } = {}) {
+  try {
+    const raw = await callCloudStorage('getItem', key);
+    return typeof raw === 'string' ? raw : raw ?? null;
+  } catch (error) {
+    if (!fallback) {
+      throw error;
+    }
+    console.warn('Telegram cloudStorage getItem failed, fallback to backend', error);
+  }
+
+  try {
+    const data = await requestCloudStorageFallback(
+      `${CLOUD_STORAGE_ENDPOINT}/${encodeURIComponent(key)}`,
+      { method: 'GET' }
+    );
+    const value = data?.value;
+    return typeof value === 'string' ? value : value ?? null;
+  } catch (fallbackError) {
+    console.error('Backend fallback getCloudItem failed', fallbackError);
+    throw fallbackError;
+  }
+}
+
+export async function removeCloudItem(key, { fallback = true } = {}) {
+  try {
+    await callCloudStorage('removeItem', key);
+    return true;
+  } catch (error) {
+    if (!fallback) {
+      throw error;
+    }
+    console.warn('Telegram cloudStorage removeItem failed, fallback to backend', error);
+  }
+
+  try {
+    await requestCloudStorageFallback(
+      `${CLOUD_STORAGE_ENDPOINT}/${encodeURIComponent(key)}`,
+      { method: 'DELETE' }
+    );
+    return true;
+  } catch (fallbackError) {
+    console.error('Backend fallback removeCloudItem failed', fallbackError);
+    throw fallbackError;
+  }
 }
 
 export function setMainButton({ text, isVisible = true, color, textColor, onClick }) {
@@ -159,23 +312,24 @@ export function setSwipeBehavior({ allowVertical = true, allowHorizontal = true 
     return;
   }
 
+  const verticalAllowed = false;
+  const horizontalAllowed = allowHorizontal;
+
   if (typeof webApp.setSwipeBehavior === 'function') {
     webApp.setSwipeBehavior({
-      allow_vertical: allowVertical,
-      allow_horizontal: allowHorizontal,
-      allowVertical,
-      allowHorizontal
+      allow_vertical: verticalAllowed,
+      allow_horizontal: horizontalAllowed,
+      allowVertical: verticalAllowed,
+      allowHorizontal: horizontalAllowed
     });
     return;
   }
 
-  if (!allowVertical && typeof webApp.disableVerticalSwipes === 'function') {
+  if (!verticalAllowed && typeof webApp.disableVerticalSwipes === 'function') {
     webApp.disableVerticalSwipes();
   }
 
-  if (allowVertical && typeof webApp.enableVerticalSwipes === 'function') {
-    webApp.enableVerticalSwipes();
-  }
+  // Вертикальные свайпы всегда запрещены, поэтому обратное включение не требуется.
 }
 
 export function disableVerticalSwipes() {
@@ -203,6 +357,59 @@ export function showConfirm(message) {
     });
   }
   return Promise.resolve(window.confirm(message));
+}
+
+export function showPopup({ title = '', message = '', buttons = [] } = {}) {
+  const webApp = resolveWebApp();
+  const configuredButtons = buttons.map(({ onClick, ...rest }) => rest);
+
+  if (webApp?.showPopup) {
+    return new Promise((resolve) => {
+      webApp.showPopup({ title, message, buttons: configuredButtons }, (buttonId) => {
+        const selected = buttons.find((button) => button.id === buttonId);
+        if (selected?.onClick) {
+          try {
+            selected.onClick();
+          } catch (error) {
+            console.error('Popup button handler threw an error', error);
+          }
+        }
+        resolve(buttonId ?? null);
+      });
+    });
+  }
+
+  if (typeof window === 'undefined') {
+    return Promise.resolve(null);
+  }
+
+  if (buttons.length <= 1) {
+    if (message) {
+      window.alert(message);
+    }
+    const single = buttons[0];
+    if (single?.onClick) {
+      try {
+        single.onClick();
+      } catch (error) {
+        console.error('Popup button handler threw an error', error);
+      }
+    }
+    return Promise.resolve(single?.id ?? null);
+  }
+
+  const primary = buttons.find((button) => button.type !== 'cancel') || buttons[0];
+  const cancel = buttons.find((button) => button.type === 'cancel');
+  const confirmed = window.confirm(message);
+  const chosen = confirmed ? primary : cancel || (confirmed ? primary : null);
+  if (chosen?.onClick) {
+    try {
+      chosen.onClick();
+    } catch (error) {
+      console.error('Popup button handler threw an error', error);
+    }
+  }
+  return Promise.resolve(chosen?.id ?? null);
 }
 
 export function hapticImpact(style = 'light') {

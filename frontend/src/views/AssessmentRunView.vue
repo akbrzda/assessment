@@ -19,6 +19,44 @@
           </div>
         </InfoCard>
 
+        <InfoCard v-if="attemptResult.gamification" title="Игровой результат">
+          <div class="gamification-summary">
+            <div class="gamification-summary__item">
+              <span class="gamification-summary__label">Начислено</span>
+              <span class="gamification-summary__value">+{{ attemptResult.gamification.awardedPoints }}</span>
+            </div>
+            <div class="gamification-summary__item">
+              <span class="gamification-summary__label">Уровень</span>
+              <span class="gamification-summary__value">
+                {{ attemptResult.gamification.totals.currentLevel }}
+              </span>
+            </div>
+            <div class="gamification-summary__item">
+              <span class="gamification-summary__label">Очки всего</span>
+              <span class="gamification-summary__value">{{ attemptResult.gamification.totals.currentPoints }}</span>
+            </div>
+          </div>
+          <ul v-if="attemptResult.gamification.breakdown?.length" class="gamification-breakdown">
+            <li v-for="item in attemptResult.gamification.breakdown" :key="item.type + item.points">
+              <span>{{ item.description }}</span>
+              <span>+{{ item.points }}</span>
+            </li>
+          </ul>
+          <div v-if="attemptResult.gamification.badges?.length" class="gamification-badges">
+            <span class="gamification-badges__label">Новые бейджи:</span>
+            <div class="gamification-badges__list">
+              <span
+                v-for="badge in attemptResult.gamification.badges"
+                :key="badge.code"
+                class="gamification-badges__item"
+              >
+                <span class="gamification-badges__icon">{{ badge.icon || '🎖' }}</span>
+                <span>{{ badge.name }}</span>
+              </span>
+            </div>
+          </div>
+        </InfoCard>
+
         <InfoCard title="Вопросы" v-if="formattedResultQuestions.length">
           <ol class="question-list">
             <li
@@ -85,13 +123,14 @@ import InfoCard from "../components/InfoCard.vue";
 import LoadingState from "../components/LoadingState.vue";
 import { apiClient } from "../services/apiClient";
 import { useUserAssessmentsStore } from "../store/userAssessmentsStore";
+import { useGamificationStore } from "../store/gamificationStore";
+import { useAppStore } from "../store/appStore";
 import {
   showAlert,
   showBackButton,
   hideBackButton,
   hapticImpact,
   disableVerticalSwipes,
-  enableVerticalSwipes,
   showConfirm,
   getInitData,
 } from "../services/telegram";
@@ -99,6 +138,8 @@ import {
 const route = useRoute();
 const router = useRouter();
 const userAssessmentsStore = useUserAssessmentsStore();
+const gamificationStore = useGamificationStore();
+const appStore = useAppStore();
 
 const BASE_API_URL = (import.meta.env.VITE_API_BASE_URL?.trim() || (typeof window !== "undefined" && window.location ? window.location.origin : "")).replace(/\/$/, "");
 
@@ -156,6 +197,7 @@ watch(currentQuestion, (question) => {
 onMounted(async () => {
   cleanupBack = showBackButton(goBack);
   registerUnloadHandler();
+  disableVerticalSwipes();
   if (!assessmentId.value) {
     showAlert("Аттестация недоступна");
     router.replace({ name: "assessments" });
@@ -179,7 +221,7 @@ onUnmounted(() => {
   cleanupUnload();
   hideBackButton();
   clearTimer();
-  enableVerticalSwipes();
+  disableVerticalSwipes();
 });
 
 watch(
@@ -187,8 +229,6 @@ watch(
   (value) => {
     if (value) {
       disableVerticalSwipes();
-    } else {
-      enableVerticalSwipes();
     }
   }
 );
@@ -422,14 +462,20 @@ async function completeAssessment() {
   }
   isSubmitting.value = true;
   try {
-    const { assessment: assessmentSummary, attempt: attemptSummary } = await apiClient.completeAssessmentAttempt(
+    const {
+      assessment: assessmentSummary,
+      attempt: attemptSummary,
+      gamification
+    } = await apiClient.completeAssessmentAttempt(
       assessmentId.value,
       attempt.value.id
     );
+    const gamificationData = gamification && !gamification.skipped ? gamification : null;
     attemptResult.value = {
       assessment: assessmentSummary,
       attempt: attemptSummary,
       questions: [],
+      gamification: gamificationData,
     };
     assessment.value.latestAttempt = {
       id: attemptSummary.id,
@@ -439,9 +485,23 @@ async function completeAssessment() {
       completedAt: new Date().toISOString(),
     };
     attempt.value = null;
+    const gamificationSnapshot = gamificationData;
     await fetchAttemptResult(attemptSummary.id).catch(() => {
       // Оставляем краткие данные, если подробный результат недоступен
     });
+    if (gamificationSnapshot) {
+      gamificationStore.applyGamificationUpdate(gamificationSnapshot);
+      if (appStore.user) {
+        appStore.user = {
+          ...appStore.user,
+          points: gamificationSnapshot.totals?.currentPoints ?? appStore.user.points,
+          level: gamificationSnapshot.totals?.currentLevel ?? appStore.user.level
+        };
+      }
+      if (attemptResult.value) {
+        attemptResult.value.gamification = gamificationSnapshot;
+      }
+    }
     hapticImpact("medium");
     userAssessmentsStore.fetchAssessments().catch(() => {});
   } catch (completeError) {
@@ -465,7 +525,11 @@ async function fetchAttemptResult(attemptId) {
     return null;
   }
   const { result } = await apiClient.getAssessmentAttemptResult(assessmentId.value, attemptId);
-  attemptResult.value = result;
+  const existingGamification = attemptResult.value?.gamification || null;
+  attemptResult.value = {
+    ...result,
+    gamification: existingGamification
+  };
   userAssessmentsStore.applyAssessmentResult({
     assessment: result.assessment,
     attempt: result.attempt,
@@ -660,6 +724,72 @@ function finish() {
   gap: 6px;
   font-size: 13px;
   color: var(--tg-theme-hint-color, #6f7a8b);
+}
+
+.gamification-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.gamification-summary__label {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color, #6f7a8b);
+}
+
+.gamification-summary__value {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.gamification-breakdown {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.gamification-breakdown li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--tg-theme-text-color, #0a0a0a);
+}
+
+.gamification-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gamification-badges__label {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color, #6f7a8b);
+}
+
+.gamification-badges__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gamification-badges__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(10, 132, 255, 0.12);
+  font-size: 13px;
+}
+
+.gamification-badges__icon {
+  font-size: 16px;
 }
 
 .result__actions {

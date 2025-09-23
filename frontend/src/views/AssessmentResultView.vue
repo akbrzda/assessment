@@ -97,7 +97,7 @@ import InfoCard from '../components/InfoCard.vue';
 import LoadingState from '../components/LoadingState.vue';
 import { apiClient } from '../services/apiClient';
 import { useUserAssessmentsStore } from '../store/userAssessmentsStore';
-import { showAlert, disableVerticalSwipes, enableVerticalSwipes } from '../services/telegram';
+import { showAlert, disableVerticalSwipes } from '../services/telegram';
 
 const route = useRoute();
 const router = useRouter();
@@ -244,7 +244,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  enableVerticalSwipes();
+  disableVerticalSwipes();
 });
 
 function attemptStatusLabel(status) {

@@ -5,6 +5,7 @@ const userModel = require('../models/userModel');
 const logger = require('../utils/logger');
 const { sendTelegramLog } = require('../services/telegramLogger');
 const { sendUserNotification } = require('../services/telegramNotifier');
+const gamificationService = require('../services/gamificationService');
 
 const optionSchema = Joi.object({
   text: Joi.string().trim().min(1).max(512).required(),
@@ -367,6 +368,18 @@ async function completeAttempt(req, res, next) {
     const passScore = summary.assessment.passScorePercent || 0;
     const passed = scorePercent >= passScore;
 
+    let gamification = null;
+    try {
+      gamification = await gamificationService.processAttemptCompletion({
+        userId: req.currentUser.id,
+        attemptId,
+        assessment: summary.assessment,
+        attempt: summary.attempt
+      });
+    } catch (gamificationError) {
+      logger.error('Failed to process gamification for attempt %s: %s', attemptId, gamificationError.message);
+    }
+
     if (summary.assessment.createdBy && summary.assessment.createdBy !== req.currentUser.id) {
       try {
         const creator = await userModel.findById(summary.assessment.createdBy);
@@ -397,7 +410,8 @@ async function completeAttempt(req, res, next) {
         timeSpentSeconds: summary.attempt.timeSpentSeconds,
         attemptNumber: summary.attempt.attemptNumber,
         passed
-      }
+      },
+      gamification
     });
   } catch (error) {
     next(error);

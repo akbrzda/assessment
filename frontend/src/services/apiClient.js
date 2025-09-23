@@ -128,6 +128,30 @@ export const apiClient = {
   getAssessmentAttemptResult(assessmentId, attemptId) {
     return request(`/assessments/${assessmentId}/attempts/${attemptId}`);
   },
+  getGamificationOverview() {
+    return request('/gamification/overview');
+  },
+  getGamificationBadges() {
+    return request('/gamification/badges');
+  },
+  getTeamChallenges() {
+    return request('/gamification/team');
+  },
+  getLeaderboardUsers(params = {}) {
+    const searchParams = new URLSearchParams();
+    if (params.branchId && Number.isFinite(Number(params.branchId))) {
+      searchParams.set('branchId', String(params.branchId));
+    }
+    if (params.positionId && Number.isFinite(Number(params.positionId))) {
+      searchParams.set('positionId', String(params.positionId));
+    }
+    if (params.limit && Number.isFinite(Number(params.limit))) {
+      searchParams.set('limit', String(params.limit));
+    }
+    const query = searchParams.toString();
+    const path = query ? `/leaderboard/users?${query}` : '/leaderboard/users';
+    return request(path);
+  },
   listUsers() {
     return request('/admin/users');
   },

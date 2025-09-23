@@ -126,7 +126,24 @@ async function updateUserByAdmin(userId, { firstName, lastName, positionId, bran
 }
 
 async function deleteUser(userId) {
-  await pool.execute('DELETE FROM users WHERE id = ?', [userId]);
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    await connection.execute(
+      'UPDATE invitations SET used_by = NULL, used_at = NULL WHERE used_by = ?'
+      , [userId]
+    );
+
+    await connection.execute('DELETE FROM users WHERE id = ?', [userId]);
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 async function updateAvatar(userId, avatarUrl) {

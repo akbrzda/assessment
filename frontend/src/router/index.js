@@ -3,7 +3,7 @@ import DashboardView from '../views/DashboardView.vue';
 import RegisterView from '../views/RegisterView.vue';
 import InviteView from '../views/InviteView.vue';
 import ProfileView from '../views/ProfileView.vue';
-import ComingSoonView from '../views/ComingSoonView.vue';
+import GamificationView from '../views/GamificationView.vue';
 import SettingsView from '../views/SettingsView.vue';
 import AssessmentEditorView from '../views/AssessmentEditorView.vue';
 import AssessmentDetailView from '../views/AssessmentDetailView.vue';
@@ -20,7 +20,7 @@ const routes = [
   { path: '/invite', name: 'invite', component: InviteView },
   { path: '/profile', name: 'profile', component: ProfileView, meta: { requiresAuth: true } },
   { path: '/assessments', name: 'assessments', component: AssessmentsView, meta: { requiresAuth: true } },
-  { path: '/leaderboard', name: 'leaderboard', component: ComingSoonView, meta: { requiresAuth: true } },
+  { path: '/leaderboard', name: 'leaderboard', component: GamificationView, meta: { requiresAuth: true } },
   {
     path: '/settings',
     name: 'settings',

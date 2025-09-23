@@ -6,6 +6,8 @@ const invitationRoutes = require("./routes/invitationRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const assessmentRoutes = require("./routes/assessmentRoutes");
 const { healthCheck } = require("./config/database");
+const gamificationRoutes = require("./routes/gamificationRoutes");
+const leaderboardRoutes = require("./routes/leaderboardRoutes");
 
 const app = express();
 
@@ -25,6 +27,8 @@ app.use("/auth", authRoutes);
 app.use("/invitations", invitationRoutes);
 app.use("/admin", adminRoutes);
 app.use("/assessments", assessmentRoutes);
+app.use("/gamification", gamificationRoutes);
+app.use("/leaderboard", leaderboardRoutes);
 
 app.use(errorHandler);
 
