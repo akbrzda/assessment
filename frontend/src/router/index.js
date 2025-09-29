@@ -1,68 +1,75 @@
-import { createRouter, createWebHashHistory } from 'vue-router';
-import DashboardView from '../views/DashboardView.vue';
-import RegisterView from '../views/RegisterView.vue';
-import InviteView from '../views/InviteView.vue';
-import ProfileView from '../views/ProfileView.vue';
-import GamificationView from '../views/GamificationView.vue';
-import SettingsView from '../views/SettingsView.vue';
-import AssessmentEditorView from '../views/AssessmentEditorView.vue';
-import AssessmentDetailView from '../views/AssessmentDetailView.vue';
-import AssessmentsView from '../views/AssessmentsView.vue';
-import AssessmentRunView from '../views/AssessmentRunView.vue';
-import AssessmentResultView from '../views/AssessmentResultView.vue';
-import { useAppStore } from '../store/appStore';
-import { hideBackButton } from '../services/telegram';
+import { createRouter, createWebHashHistory } from "vue-router";
+import DashboardView from "../views/DashboardView.vue";
+import RegisterView from "../views/RegisterView.vue";
+import InviteView from "../views/InviteView.vue";
+import ProfileView from "../views/ProfileView.vue";
+import GamificationView from "../views/GamificationView.vue";
+import SettingsView from "../views/SettingsView.vue";
+import AnalyticsView from "../views/AnalyticsView.vue";
+import AssessmentEditorView from "../views/AssessmentEditorView.vue";
+import AssessmentDetailView from "../views/AssessmentDetailView.vue";
+import AssessmentsView from "../views/AssessmentsView.vue";
+import AssessmentRunView from "../views/AssessmentRunView.vue";
+import AssessmentResultView from "../views/AssessmentResultView.vue";
+import { useAppStore } from "../store/appStore";
+import { hideBackButton } from "../services/telegram";
 
 const routes = [
-  { path: '/', redirect: '/dashboard' },
-  { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { requiresAuth: true } },
-  { path: '/register', name: 'register', component: RegisterView },
-  { path: '/invite', name: 'invite', component: InviteView },
-  { path: '/profile', name: 'profile', component: ProfileView, meta: { requiresAuth: true } },
-  { path: '/assessments', name: 'assessments', component: AssessmentsView, meta: { requiresAuth: true } },
-  { path: '/leaderboard', name: 'leaderboard', component: GamificationView, meta: { requiresAuth: true } },
+  { path: "/", redirect: "/dashboard" },
+  { path: "/dashboard", name: "dashboard", component: DashboardView, meta: { requiresAuth: true } },
+  { path: "/register", name: "register", component: RegisterView },
+  { path: "/invite", name: "invite", component: InviteView },
+  { path: "/profile", name: "profile", component: ProfileView, meta: { requiresAuth: true } },
+  { path: "/assessments", name: "assessments", component: AssessmentsView, meta: { requiresAuth: true } },
+  { path: "/leaderboard", name: "leaderboard", component: GamificationView, meta: { requiresAuth: true } },
   {
-    path: '/settings',
-    name: 'settings',
+    path: "/analytics",
+    name: "analytics",
+    component: AnalyticsView,
+    meta: { requiresAuth: true, allowedRoles: ["superadmin", "manager"] },
+  },
+  {
+    path: "/settings",
+    name: "settings",
     component: SettingsView,
-    meta: { requiresAuth: true, requiresSuperAdmin: true }
+    meta: { requiresAuth: true, requiresSuperAdmin: true },
   },
   {
-    path: '/assessments/new',
-    name: 'assessment-create',
+    path: "/assessments/new",
+    name: "assessment-create",
     component: AssessmentEditorView,
-    meta: { requiresAuth: true, allowedRoles: ['superadmin', 'manager'] }
+    meta: { requiresAuth: true, allowedRoles: ["superadmin", "manager"] },
   },
   {
-    path: '/assessments/:id/edit',
-    name: 'assessment-edit',
+    path: "/assessments/:id/edit",
+    name: "assessment-edit",
     component: AssessmentEditorView,
-    meta: { requiresAuth: true, allowedRoles: ['superadmin', 'manager'] }
+    meta: { requiresAuth: true, allowedRoles: ["superadmin", "manager"] },
   },
   {
-    path: '/assessments/:id',
-    name: 'assessment-detail',
+    path: "/assessments/:id",
+    name: "assessment-detail",
     component: AssessmentDetailView,
-    meta: { requiresAuth: true, allowedRoles: ['superadmin', 'manager'] }
+    meta: { requiresAuth: true, allowedRoles: ["superadmin", "manager"] },
   },
   {
-    path: '/assessments/:id/start',
-    name: 'assessment-start',
+    path: "/assessments/:id/start",
+    name: "assessment-start",
     component: AssessmentRunView,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true },
   },
   {
-    path: '/assessments/:id/results/:attemptId',
-    name: 'assessment-result',
+    path: "/assessments/:id/results/:attemptId",
+    name: "assessment-result",
     component: AssessmentResultView,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true },
   },
-  { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
+  { path: "/:pathMatch(.*)*", redirect: "/dashboard" },
 ];
 
 const router = createRouter({
   history: createWebHashHistory(),
-  routes
+  routes,
 });
 
 let isGuardRegistered = false;
@@ -85,24 +92,24 @@ router.beforeEach(async (to, from, next) => {
   const isAuthenticated = appStore.isAuthenticated;
 
   if (!isAuthenticated) {
-    if (appStore.invitation && !appStore.invitationAccepted && to.name !== 'invite') {
-      return next({ name: 'invite' });
+    if (appStore.invitation && !appStore.invitationAccepted && to.name !== "invite") {
+      return next({ name: "invite" });
     }
     if (to.meta.requiresAuth) {
-      return next({ name: appStore.invitation ? 'invite' : 'register' });
+      return next({ name: appStore.invitation ? "invite" : "register" });
     }
   } else {
-    if (appStore.invitation && !appStore.invitationAccepted && to.name !== 'invite') {
-      return next({ name: 'invite' });
+    if (appStore.invitation && !appStore.invitationAccepted && to.name !== "invite") {
+      return next({ name: "invite" });
     }
     if (to.meta.requiresSuperAdmin && !appStore.isSuperAdmin) {
-      return next({ name: 'dashboard' });
+      return next({ name: "dashboard" });
     }
     if (to.meta.allowedRoles && !to.meta.allowedRoles.includes(appStore.user?.roleName)) {
-      return next({ name: 'dashboard' });
+      return next({ name: "dashboard" });
     }
-    if (['register', 'invite'].includes(to.name)) {
-      return next({ name: 'dashboard' });
+    if (["register", "invite"].includes(to.name)) {
+      return next({ name: "dashboard" });
     }
   }
 

@@ -6,21 +6,13 @@
         <div class="filters__row">
           <BaseSelect v-model.number="selectedBranch" class="filters__control">
             <option value="">Все филиалы</option>
-            <option
-              v-for="branch in branchOptions"
-              :key="branch.id"
-              :value="branch.id"
-            >
+            <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">
               {{ branch.name }}
             </option>
           </BaseSelect>
           <BaseSelect v-model.number="selectedPosition" class="filters__control">
             <option value="">Все должности</option>
-            <option
-              v-for="position in positionOptions"
-              :key="position.id"
-              :value="position.id"
-            >
+            <option v-for="position in positionOptions" :key="position.id" :value="position.id">
               {{ position.name }}
             </option>
           </BaseSelect>
@@ -28,8 +20,9 @@
         <div class="filters__row">
           <input v-model="dateFrom" type="date" class="filters__date" />
           <input v-model="dateTo" type="date" class="filters__date" />
-          <button class="secondary-button" type="button" @click="resetFilters">
-            Сбросить
+          <button class="secondary-button" type="button" @click="resetFilters">Сбросить</button>
+          <button class="primary-button" type="button" :disabled="isExporting" @click="exportData">
+            {{ isExporting ? "Экспорт..." : "Экспорт Excel" }}
           </button>
         </div>
       </section>
@@ -135,20 +128,22 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
-import PageContainer from '../components/PageContainer.vue';
-import InfoCard from '../components/InfoCard.vue';
-import LoadingState from '../components/LoadingState.vue';
-import BaseSelect from '../components/common/BaseSelect.vue';
-import { useAnalyticsStore } from '../store/analyticsStore';
-import { showAlert } from '../services/telegram';
+import { computed, onMounted, ref, watch } from "vue";
+import PageContainer from "../components/PageContainer.vue";
+import InfoCard from "../components/InfoCard.vue";
+import LoadingState from "../components/LoadingState.vue";
+import BaseSelect from "../components/common/BaseSelect.vue";
+import { useAnalyticsStore } from "../store/analyticsStore";
+import { showAlert } from "../services/telegram";
+import { apiClient } from "../services/apiClient";
 
 const analyticsStore = useAnalyticsStore();
 
-const selectedBranch = ref('');
-const selectedPosition = ref('');
-const dateFrom = ref('');
-const dateTo = ref('');
+const selectedBranch = ref("");
+const selectedPosition = ref("");
+const dateFrom = ref("");
+const dateTo = ref("");
+const isExporting = ref(false);
 
 const isInitialLoading = computed(() => analyticsStore.isLoading && !analyticsStore.summary);
 const summary = computed(() => analyticsStore.summary);
@@ -158,50 +153,50 @@ const branchOptions = computed(() => analyticsStore.branchesReference || []);
 const positionOptions = computed(() => analyticsStore.positionsReference || []);
 
 const sortOptions = [
-  { value: 'score', label: 'По проценту' },
-  { value: 'attempts', label: 'По попыткам' },
-  { value: 'passrate', label: 'По успеху' },
-  { value: 'time', label: 'По времени' }
+  { value: "score", label: "По проценту" },
+  { value: "attempts", label: "По попыткам" },
+  { value: "passrate", label: "По успеху" },
+  { value: "time", label: "По времени" },
 ];
 
 function formatPercent(value) {
   if (value == null) {
-    return '—';
+    return "—";
   }
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
-    return '—';
+    return "—";
   }
   return `${Math.max(0, numeric).toFixed(0)}%`;
 }
 
 function formatDuration(seconds) {
   if (seconds == null) {
-    return '—';
+    return "—";
   }
   const total = Math.max(0, Math.round(Number(seconds)));
   const minutes = Math.floor(total / 60);
   const secs = total % 60;
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }
 
 function branchBarWidth(branch) {
   if (!branchRows.value.length) {
-    return '0%';
+    return "0%";
   }
   const maxAttempts = Math.max(...branchRows.value.map((item) => item.attempts));
   if (!maxAttempts) {
-    return '0%';
+    return "0%";
   }
   const percent = (branch.attempts / maxAttempts) * 100;
   return `${Math.max(8, Math.round(percent))}%`;
 }
 
 function resetFilters() {
-  selectedBranch.value = '';
-  selectedPosition.value = '';
-  dateFrom.value = '';
-  dateTo.value = '';
+  selectedBranch.value = "";
+  selectedPosition.value = "";
+  dateFrom.value = "";
+  dateTo.value = "";
   applyFilters();
 }
 
@@ -211,11 +206,11 @@ async function applyFilters() {
       branchId: selectedBranch.value || null,
       positionId: selectedPosition.value || null,
       from: dateFrom.value || null,
-      to: dateTo.value || null
+      to: dateTo.value || null,
     });
     await analyticsStore.refreshAll();
   } catch (error) {
-    showAlert(error.message || 'Не удалось обновить аналитику');
+    showAlert(error.message || "Не удалось обновить аналитику");
   }
 }
 
@@ -225,8 +220,47 @@ function changeSort(value) {
   }
   analyticsStore.setSort(value);
   analyticsStore.fetchEmployees().catch((error) => {
-    showAlert(error.message || 'Не удалось обновить сотрудников');
+    showAlert(error.message || "Не удалось обновить сотрудников");
   });
+}
+
+async function exportData() {
+  isExporting.value = true;
+  try {
+    const filters = {
+      branchId: selectedBranch.value || null,
+      positionId: selectedPosition.value || null,
+      dateFrom: dateFrom.value || null,
+      dateTo: dateTo.value || null,
+      sort: analyticsStore.sortBy,
+      format: "excel",
+    };
+
+    const response = await apiClient.exportAnalyticsReport(filters, "excel");
+
+    // Создаем blob из ответа
+    const blob = new Blob([response], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    // Создаем ссылку для скачивания
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+
+    const timestamp = new Date().toISOString().slice(0, 10);
+    link.download = `analytics_employees_${timestamp}.xlsx`;
+
+    document.body.appendChild(link);
+    link.click();
+
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    showAlert(error.message || "Не удалось экспортировать данные");
+  } finally {
+    isExporting.value = false;
+  }
 }
 
 watch([selectedBranch, selectedPosition, dateFrom, dateTo], () => {
@@ -236,7 +270,7 @@ watch([selectedBranch, selectedPosition, dateFrom, dateTo], () => {
 
 onMounted(() => {
   analyticsStore.refreshAll().catch((error) => {
-    showAlert(error.message || 'Не удалось загрузить аналитику');
+    showAlert(error.message || "Не удалось загрузить аналитику");
   });
 });
 </script>

@@ -15,18 +15,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
-import LoadingState from './components/LoadingState.vue';
-import BottomNav from './components/BottomNav.vue';
-import { useAppStore } from './store/appStore';
-import {
-  ensureReady,
-  onViewportChanged,
-  onThemeChange,
-  getThemeParams,
-  getColorScheme
-} from './services/telegram';
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
+import LoadingState from "./components/LoadingState.vue";
+import BottomNav from "./components/BottomNav.vue";
+import { useAppStore } from "./store/appStore";
+import { ensureReady, onViewportChanged, onThemeChange, getThemeParams, getColorScheme } from "./services/telegram";
 
 const appStore = useAppStore();
 const route = useRoute();
@@ -38,29 +32,35 @@ const isBooting = computed(() => !appStore.isInitialized && appStore.isLoading);
 const isBusy = computed(() => appStore.isInitialized && appStore.isLoading);
 
 const classes = computed(() => ({
-  'app--loading': isBooting.value
+  "app--loading": isBooting.value,
 }));
 
-const showNav = computed(() => appStore.isAuthenticated && !['register', 'invite'].includes(route.name));
+const showNav = computed(() => appStore.isAuthenticated && !["register", "invite"].includes(route.name));
 const navItems = computed(() => {
   const user = appStore.user;
   const items = [
-    { name: 'dashboard', label: 'Главная', icon: '🏠' },
-    { name: 'assessments', label: 'Аттестации', icon: '📝' },
-    { name: 'leaderboard', label: 'Лидеры', icon: '🏆' },
+    { name: "dashboard", label: "Главная", icon: "🏠" },
+    { name: "assessments", label: "Аттестации", icon: "📝" },
+    { name: "leaderboard", label: "Лидеры", icon: "🏆" },
     {
-      name: 'profile',
-      label: 'Профиль',
+      name: "profile",
+      label: "Профиль",
       avatar: user
         ? {
             url: user.avatarUrl,
             firstName: user.firstName,
-            lastName: user.lastName
+            lastName: user.lastName,
           }
         : null,
-      icon: user ? null : '👤'
-    }
+      icon: user ? null : "👤",
+    },
   ];
+
+  // Добавляем аналитику для управляющих и суперадминов
+  if (appStore.isManager || appStore.isSuperAdmin) {
+    items.splice(3, 0, { name: "analytics", label: "Аналитика", icon: "📊" });
+  }
+
   return items;
 });
 
@@ -81,12 +81,12 @@ onMounted(() => {
 watch(
   theme,
   (params) => {
-    if (typeof document === 'undefined') {
+    if (typeof document === "undefined") {
       return;
     }
     const root = document.documentElement;
     Object.entries(params || {}).forEach(([key, value]) => {
-      root.style.setProperty(`--tg-theme-${key.replace(/_/g, '-')}`, value);
+      root.style.setProperty(`--tg-theme-${key.replace(/_/g, "-")}`, value);
     });
   },
   { immediate: true }
@@ -95,10 +95,10 @@ watch(
 watch(
   colorScheme,
   (scheme) => {
-    if (typeof document === 'undefined') {
+    if (typeof document === "undefined") {
       return;
     }
-    document.documentElement.dataset.colorScheme = scheme || 'light';
+    document.documentElement.dataset.colorScheme = scheme || "light";
   },
   { immediate: true }
 );

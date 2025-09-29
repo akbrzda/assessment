@@ -1,5 +1,5 @@
-import { defineStore } from 'pinia';
-import { apiClient } from '../services/apiClient';
+import { defineStore } from "pinia";
+import { apiClient } from "../services/apiClient";
 
 function normalizeDateInput(value) {
   if (!value) {
@@ -9,7 +9,7 @@ function normalizeDateInput(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
 }
 
-export const useAnalyticsStore = defineStore('analytics', {
+export const useAnalyticsStore = defineStore("analytics", {
   state: () => ({
     isLoading: false,
     summary: null,
@@ -20,12 +20,12 @@ export const useAnalyticsStore = defineStore('analytics', {
     positionFilter: null,
     dateFrom: null,
     dateTo: null,
-    sortBy: 'score'
+    sortBy: "score",
   }),
   getters: {
     hasDateFilter(state) {
       return Boolean(state.dateFrom || state.dateTo);
-    }
+    },
   },
   actions: {
     setFilters({ branchId = null, positionId = null, from = null, to = null }) {
@@ -38,21 +38,20 @@ export const useAnalyticsStore = defineStore('analytics', {
       this.isLoading = true;
       this.error = null;
       try {
-        const params = new URLSearchParams();
+        const filters = {};
         if (this.branchFilter) {
-          params.set('branchId', this.branchFilter);
+          filters.branchId = this.branchFilter;
         }
         if (this.positionFilter) {
-          params.set('positionId', this.positionFilter);
+          filters.positionId = this.positionFilter;
         }
         if (this.dateFrom) {
-          params.set('from', this.dateFrom);
+          filters.dateFrom = this.dateFrom;
         }
         if (this.dateTo) {
-          params.set('to', this.dateTo);
+          filters.dateTo = this.dateTo;
         }
-        const query = params.toString();
-        const response = await apiClient.getAnalyticsSummary(query ? `?${query}` : '');
+        const response = await apiClient.getAnalyticsSummary(filters);
         this.summary = response.summary;
         this.branchesReference = response.filters?.branches || [];
         this.positionsReference = response.filters?.positions || [];
@@ -64,40 +63,39 @@ export const useAnalyticsStore = defineStore('analytics', {
       }
     },
     async fetchBranches() {
-      const params = new URLSearchParams();
+      const filters = {};
       if (this.branchFilter) {
-        params.set('branchId', this.branchFilter);
+        filters.branchId = this.branchFilter;
       }
       if (this.positionFilter) {
-        params.set('positionId', this.positionFilter);
+        filters.positionId = this.positionFilter;
       }
       if (this.dateFrom) {
-        params.set('from', this.dateFrom);
+        filters.dateFrom = this.dateFrom;
       }
       if (this.dateTo) {
-        params.set('to', this.dateTo);
+        filters.dateTo = this.dateTo;
       }
-      const response = await apiClient.getAnalyticsBranches(params.toString() ? `?${params.toString()}` : '');
+      const response = await apiClient.getAnalyticsBranches(filters);
       this.branches = response.branches || [];
     },
     async fetchEmployees() {
-      const params = new URLSearchParams();
+      const filters = {
+        sort: this.sortBy,
+      };
       if (this.branchFilter) {
-        params.set('branchId', this.branchFilter);
+        filters.branchId = this.branchFilter;
       }
       if (this.positionFilter) {
-        params.set('positionId', this.positionFilter);
+        filters.positionId = this.positionFilter;
       }
       if (this.dateFrom) {
-        params.set('from', this.dateFrom);
+        filters.dateFrom = this.dateFrom;
       }
       if (this.dateTo) {
-        params.set('to', this.dateTo);
+        filters.dateTo = this.dateTo;
       }
-      if (this.sortBy) {
-        params.set('sortBy', this.sortBy);
-      }
-      const response = await apiClient.getAnalyticsEmployees(params.toString() ? `?${params.toString()}` : '');
+      const response = await apiClient.getAnalyticsEmployees(filters);
       this.employees = response.employees || [];
     },
     async refreshAll() {
@@ -106,6 +104,6 @@ export const useAnalyticsStore = defineStore('analytics', {
     },
     setSort(sort) {
       this.sortBy = sort;
-    }
-  }
+    },
+  },
 });

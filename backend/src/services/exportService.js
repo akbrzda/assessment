@@ -1,138 +1,132 @@
-const ExcelJS = require('exceljs');
-const PDFDocument = require('pdfkit');
-const stream = require('stream');
+const ExcelJS = require("exceljs");
+const PDFDocument = require("pdfkit");
+const stream = require("stream");
 
 function formatDate(value) {
   if (!value) {
-    return '—';
+    return "—";
   }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return '—';
+    return "—";
   }
-  return date.toLocaleString('ru-RU');
+  return date.toLocaleString("ru-RU");
 }
 
 function formatPercent(value) {
   if (value == null) {
-    return '—';
+    return "—";
   }
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? `${numeric.toFixed(2)}%` : '—';
+  return Number.isFinite(numeric) ? `${numeric.toFixed(2)}%` : "—";
 }
 
 function formatDuration(seconds) {
   if (seconds == null) {
-    return '—';
+    return "—";
   }
   const total = Math.max(0, Math.round(Number(seconds)));
   const minutes = Math.floor(total / 60);
   const secs = total % 60;
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }
 
 async function buildExcelReport({ assessment, participants }) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Assessment System';
+  workbook.creator = "Assessment System";
   workbook.created = new Date();
-  const sheet = workbook.addWorksheet('Результаты');
+  const sheet = workbook.addWorksheet("Результаты");
 
   sheet.columns = [
-    { header: 'Сотрудник', key: 'fullName', width: 28 },
-    { header: 'Филиал', key: 'branch', width: 18 },
-    { header: 'Должность', key: 'position', width: 18 },
-    { header: 'Статус', key: 'status', width: 16 },
-    { header: 'Результат', key: 'score', width: 14 },
-    { header: 'Правильные', key: 'correct', width: 16 },
-    { header: 'Время', key: 'time', width: 12 },
-    { header: 'Завершено', key: 'completed', width: 24 }
+    { header: "Сотрудник", key: "fullName", width: 28 },
+    { header: "Филиал", key: "branch", width: 18 },
+    { header: "Должность", key: "position", width: 18 },
+    { header: "Статус", key: "status", width: 16 },
+    { header: "Результат", key: "score", width: 14 },
+    { header: "Правильные", key: "correct", width: 16 },
+    { header: "Время", key: "time", width: 12 },
+    { header: "Завершено", key: "completed", width: 24 },
   ];
 
   participants.forEach((participant) => {
     sheet.addRow({
       fullName: `${participant.lastName} ${participant.firstName}`.trim(),
-      branch: participant.branchName || '—',
-      position: participant.positionName || '—',
+      branch: participant.branchName || "—",
+      position: participant.positionName || "—",
       status: statusLabel(participant.status),
       score: formatPercent(participant.scorePercent),
-      correct: participant.correctAnswers != null && participant.totalQuestions != null
-        ? `${participant.correctAnswers}/${participant.totalQuestions}`
-        : '—',
+      correct:
+        participant.correctAnswers != null && participant.totalQuestions != null
+          ? `${participant.correctAnswers}/${participant.totalQuestions}`
+          : "—",
       time: formatDuration(participant.timeSpentSeconds),
-      completed: formatDate(participant.completedAt)
+      completed: formatDate(participant.completedAt),
     });
   });
 
   const buffer = await workbook.xlsx.writeBuffer();
   return {
     filename: `${sanitizeFileName(assessment.title)}.xlsx`,
-    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    buffer
+    contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer,
   };
 }
 
 function statusLabel(status) {
-  switch ((status || '').toLowerCase()) {
-    case 'completed':
-      return 'Завершил';
-    case 'in_progress':
-      return 'В процессе';
-    case 'cancelled':
-      return 'Отменено';
+  switch ((status || "").toLowerCase()) {
+    case "completed":
+      return "Завершил";
+    case "in_progress":
+      return "В процессе";
+    case "cancelled":
+      return "Отменено";
     default:
-      return 'Не начинал';
+      return "Не начинал";
   }
 }
 
 function sanitizeFileName(name) {
-  return (name || 'report')
-    .replace(/\s+/g, '_')
-    .replace(/[^а-яА-Яa-zA-Z0-9_\-]/g, '')
-    .slice(0, 64) || 'report';
+  return (
+    (name || "report")
+      .replace(/\s+/g, "_")
+      .replace(/[^а-яА-Яa-zA-Z0-9_\-]/g, "")
+      .slice(0, 64) || "report"
+  );
 }
 
 function buildPdfReport({ assessment, participants }) {
-  const doc = new PDFDocument({ margin: 40, size: 'A4' });
-  const passThreshold = assessment.passScorePercent != null ? `${assessment.passScorePercent}%` : '—';
+  const doc = new PDFDocument({ margin: 40, size: "A4" });
+  const passThreshold = assessment.passScorePercent != null ? `${assessment.passScorePercent}%` : "—";
 
-  doc.fontSize(18).text(`Аттестация: ${assessment.title}`, { align: 'left' });
+  doc.fontSize(18).text(`Аттестация: ${assessment.title}`, { align: "left" });
   doc.moveDown(0.5);
   doc.fontSize(12).text(`Порог прохождения: ${passThreshold}`);
   doc.text(`Открытие: ${formatDate(assessment.openAt)}`);
   doc.text(`Закрытие: ${formatDate(assessment.closeAt)}`);
   doc.moveDown(1);
 
-  const tableHeaders = [
-    'Сотрудник',
-    'Филиал',
-    'Должность',
-    'Статус',
-    'Результат',
-    'Правильные',
-    'Время',
-    'Завершено'
-  ];
+  const tableHeaders = ["Сотрудник", "Филиал", "Должность", "Статус", "Результат", "Правильные", "Время", "Завершено"];
 
   const columnWidths = [120, 90, 90, 70, 70, 80, 60, 100];
 
-  doc.fontSize(11).font('Helvetica-Bold');
+  doc.fontSize(11).font("Helvetica-Bold");
   renderTableRow(doc, tableHeaders, columnWidths);
-  doc.font('Helvetica');
+  doc.font("Helvetica");
 
   participants.forEach((participant) => {
     renderTableRow(
       doc,
       [
         `${participant.lastName} ${participant.firstName}`.trim(),
-        participant.branchName || '—',
-        participant.positionName || '—',
+        participant.branchName || "—",
+        participant.positionName || "—",
         statusLabel(participant.status),
         formatPercent(participant.scorePercent),
         participant.correctAnswers != null && participant.totalQuestions != null
           ? `${participant.correctAnswers}/${participant.totalQuestions}`
-          : '—',
+          : "—",
         formatDuration(participant.timeSpentSeconds),
-        formatDate(participant.completedAt)
+        formatDate(participant.completedAt),
       ],
       columnWidths
     );
@@ -142,16 +136,16 @@ function buildPdfReport({ assessment, participants }) {
 
   const chunks = [];
   return new Promise((resolve, reject) => {
-    doc.on('data', (chunk) => chunks.push(chunk));
-    doc.on('end', () => {
+    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("end", () => {
       const buffer = Buffer.concat(chunks);
       resolve({
         filename: `${sanitizeFileName(assessment.title)}.pdf`,
-        contentType: 'application/pdf',
-        buffer
+        contentType: "application/pdf",
+        buffer,
       });
     });
-    doc.on('error', reject);
+    doc.on("error", reject);
   });
 }
 
@@ -160,7 +154,7 @@ function renderTableRow(doc, columns, widths) {
   columns.forEach((text, index) => {
     const width = widths[index] || 80;
     const x = doc.page.margins.left + widths.slice(0, index).reduce((acc, cur) => acc + cur, 0);
-    doc.text(String(text || '—'), x, y, { width, continued: false });
+    doc.text(String(text || "—"), x, y, { width, continued: false });
   });
   doc.moveDown(0.6);
   if (doc.y > doc.page.height - doc.page.margins.bottom - 40) {
@@ -169,15 +163,82 @@ function renderTableRow(doc, columns, widths) {
 }
 
 async function buildAssessmentReport(format, payload) {
-  if (format === 'excel') {
+  if (format === "excel") {
     return buildExcelReport(payload);
   }
-  if (format === 'pdf') {
+  if (format === "pdf") {
     return buildPdfReport(payload);
   }
-  throw new Error('Unsupported export format');
+  throw new Error("Unsupported export format");
+}
+
+async function createAnalyticsReport({ data, reportType, format, filters }) {
+  const timestamp = new Date().toISOString().slice(0, 10);
+
+  if (format === "excel") {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Assessment System";
+    workbook.created = new Date();
+
+    const sheet = workbook.addWorksheet(reportType === "branches" ? "По филиалам" : "По сотрудникам");
+
+    if (reportType === "branches") {
+      sheet.columns = [
+        { header: "Филиал", key: "branchName", width: 25 },
+        { header: "Сотрудников", key: "totalEmployees", width: 15 },
+        { header: "Участников", key: "participants", width: 15 },
+        { header: "Успешных", key: "passed", width: 15 },
+        { header: "Успех %", key: "passRate", width: 12 },
+        { header: "Средний балл", key: "avgScore", width: 15 },
+      ];
+
+      data.forEach((item) => {
+        sheet.addRow({
+          branchName: item.branchName || "Не указан",
+          totalEmployees: item.totalEmployees || 0,
+          participants: item.participants || 0,
+          passed: item.passed || 0,
+          passRate: item.passRate ? `${item.passRate.toFixed(1)}%` : "0%",
+          avgScore: item.avgScore ? `${item.avgScore.toFixed(1)}%` : "0%",
+        });
+      });
+    } else {
+      sheet.columns = [
+        { header: "Сотрудник", key: "fullName", width: 25 },
+        { header: "Филиал", key: "branchName", width: 20 },
+        { header: "Должность", key: "positionName", width: 20 },
+        { header: "Попытки", key: "attempts", width: 12 },
+        { header: "Средний балл", key: "avgScore", width: 15 },
+        { header: "Лучший балл", key: "bestScore", width: 15 },
+        { header: "Успешных", key: "passedAttempts", width: 12 },
+      ];
+
+      data.forEach((item) => {
+        sheet.addRow({
+          fullName: `${item.firstName} ${item.lastName}`,
+          branchName: item.branchName || "Не указан",
+          positionName: item.positionName || "Не указана",
+          attempts: item.attempts || 0,
+          avgScore: item.avgScore ? `${item.avgScore.toFixed(1)}%` : "0%",
+          bestScore: item.bestScore ? `${item.bestScore.toFixed(1)}%` : "0%",
+          passedAttempts: item.passedAttempts || 0,
+        });
+      });
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const filename = sanitizeFileName(`analytics_${reportType}_${timestamp}.xlsx`);
+    return {
+      buffer,
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      filename,
+    };
+  }
+
+  throw new Error("Unsupported export format");
 }
 
 module.exports = {
-  buildAssessmentReport
+  buildAssessmentReport,
+  createAnalyticsReport,
 };

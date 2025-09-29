@@ -9,8 +9,8 @@
 
 ## Контекст
 
-- **Back-end:** Node.js (Express, MVC)
-- **Front-end:** Vue 3 (JavaScript) + Telegram MiniApp
+- **Back-end:** Node.js (Express, MVC) на порту 3001
+- **Front-end:** Vue 3 (JavaScript) + Telegram MiniApp на порту 5173
 - **База данных:** MySQL (нормализованная схема)
 - **Telegram Bot:** Bot API для уведомлений, ссылок-приглашений и авторизации
 - **Интеграция:** initData для входа, CloudStorage/DeviceStorage для данных
