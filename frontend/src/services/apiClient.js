@@ -17,6 +17,13 @@ async function request(path, options = {}) {
     headers.set("x-telegram-init-data", initData);
   }
 
+  // Добавляем код приглашения через отдельный заголовок
+  const inviteCode = typeof window !== "undefined" ? window.__telegramInviteCode : null;
+  if (inviteCode) {
+    headers.set("x-invite-code", inviteCode);
+    console.log("📤 Отправляем код приглашения:", inviteCode);
+  }
+
   const targetUrl = BASE_URL ? `${BASE_URL}${path}` : path;
   const response = await fetch(targetUrl, {
     ...options,
@@ -73,6 +80,12 @@ export const apiClient = {
   },
   listInvitations() {
     return request("/invitations");
+  },
+  updateInvitation(id, payload) {
+    return request(`/invitations/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
   },
   extendInvitation(id, payload) {
     return request(`/invitations/${id}/extend`, {
@@ -217,6 +230,28 @@ export const apiClient = {
     const path = query ? `/analytics/export?${query}` : `/analytics/export?format=${format}`;
     return request(path, {
       responseType: "blob",
+    });
+  },
+
+  // Branches management
+  listBranches() {
+    return request("/admin/branches");
+  },
+  createBranch(payload) {
+    return request("/admin/branches", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  updateBranch(id, payload) {
+    return request(`/admin/branches/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+  deleteBranch(id) {
+    return request(`/admin/branches/${id}`, {
+      method: "DELETE",
     });
   },
 };

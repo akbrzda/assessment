@@ -1,368 +1,426 @@
 <template>
-  <PageContainer title="Аттестации" subtitle="Ваши тесты и история">
-    <LoadingState v-if="store.isLoading" />
-    <template v-else>
-      <p v-if="store.error" class="error">{{ store.error }}</p>
-      <p v-if="!assessments.length" class="hint">Аттестации пока не назначены.</p>
-      <ul v-else class="assessment-list">
-        <li v-for="item in assessments" :key="item.id" class="assessment-item">
-          <div class="assessment-item__header">
-            <div>
-              <h3 class="assessment-item__title">{{ item.title }}</h3>
-              <p class="assessment-item__description">{{ item.description || "Описание отсутствует" }}</p>
+  <div class="page-container">
+    <div class="container">
+      <!-- Page Header -->
+      <div class="page-header mb-16">
+        <h1 class="title-large">Аттестации</h1>
+      </div>
+
+      <!-- Filter Tabs -->
+      <div class="filter-tabs mb-12">
+        <button
+          v-for="filter in filters"
+          :key="filter.key"
+          class="filter-tab"
+          :class="{ active: activeFilter === filter.key }"
+          @click="setFilter(filter.key)"
+        >
+          {{ filter.label }}
+        </button>
+      </div>
+
+      <!-- Assessments List -->
+      <div v-if="filteredAssessments.length" class="assessments-list">
+        <div v-for="assessment in filteredAssessments" :key="assessment.id" class="card assessment-card" @click="handleAssessmentClick(assessment)">
+          <div class="assessment-header">
+            <h3 class="title-small mb-8">{{ assessment.title }}</h3>
+            <span class="badge" :class="getStatusClass(assessment.status)">
+              {{ getStatusText(assessment.status) }}
+            </span>
+          </div>
+
+          <div class="assessment-info mb-12">
+            <div class="info-item">
+              <span class="label">Срок:</span>
+              <span class="value">{{ formatDateRange(assessment.startDate, assessment.endDate) }}</span>
             </div>
-            <div class="assessment-item__header-state">
-              <span class="status" :class="`status--${item.status}`">{{ statusLabel(item.status) }}</span>
-              <span class="badge" :class="`badge--${passOutcome(item).type}`">{{ passOutcome(item).label }}</span>
+            <div class="info-item">
+              <span class="label">Порог:</span>
+              <span class="value">{{ assessment.threshold }}%</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Попытки:</span>
+              <span class="value">{{ assessment.attemptsUsed || 0 }} из {{ assessment.maxAttempts }}</span>
             </div>
           </div>
-          <div class="assessment-item__meta">
-            <span>Открытие: {{ formatDate(item.openAt) }}</span>
-            <span>Закрытие: {{ formatDate(item.closeAt) }}</span>
-            <span>Порог: {{ formatPercent(item.passScorePercent) }}</span>
-            <span v-if="item.bestScorePercent != null">Лучший результат: {{ formatPercent(item.bestScorePercent) }}</span>
-            <span v-if="timeRemainingLabel(item)" class="countdown">{{ timeRemainingLabel(item) }}</span>
-            <span v-if="item.lastAttemptNumber">Попытка: {{ item.lastAttemptNumber }} / {{ item.maxAttempts ?? "—" }}</span>
+
+          <div v-if="assessment.bestResult" class="best-result mb-12">
+            <div class="info-item">
+              <span class="label">Лучший результат:</span>
+              <span class="value" :class="assessment.bestResult.passed ? 'success' : 'error'"> {{ assessment.bestResult.score }}% </span>
+            </div>
           </div>
-          <div class="assessment-item__actions">
+
+          <div class="assessment-actions">
             <button
-              v-if="item.lastAttemptId && item.lastAttemptStatus === 'completed'"
-              class="secondary-button"
-              type="button"
-              @click="viewResult(item)"
+              v-if="assessment.status === 'open' && assessment.attemptsUsed < assessment.maxAttempts"
+              class="btn btn-primary btn-full"
+              @click.stop="startAssessment(assessment.id)"
             >
-              Просмотреть результат
+              {{ assessment.attemptsUsed > 0 ? "Пройти ещё раз" : "Начать" }}
             </button>
-            <button class="primary-button" type="button" :disabled="!canStart(item)" @click="startAssessment(item)">
-              {{ actionLabel(item) }}
+
+            <button
+              v-else-if="assessment.status === 'completed' || assessment.attemptsUsed >= assessment.maxAttempts"
+              class="btn btn-secondary btn-full"
+              @click.stop="viewResults(assessment.id)"
+            >
+              Посмотреть результаты
+            </button>
+
+            <button v-else class="btn btn-primary btn-full" disabled>
+              {{ getActionButtonText(assessment.status) }}
             </button>
           </div>
-        </li>
-      </ul>
-    </template>
-  </PageContainer>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div v-else class="empty-state">
+        <div class="empty-icon">📄</div>
+        <h3 class="title-small mb-8">{{ getEmptyStateTitle() }}</h3>
+        <p class="body-small text-secondary">{{ getEmptyStateDescription() }}</p>
+      </div>
+    </div>
+  </div>
 </template>
 
-<script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+<script>
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import PageContainer from "../components/PageContainer.vue";
-import LoadingState from "../components/LoadingState.vue";
-import { useUserAssessmentsStore } from "../store/userAssessmentsStore";
-import { showAlert } from "../services/telegram";
+import { useTelegramStore } from "../stores/telegram";
+import { useUserStore } from "../stores/user";
+import { apiClient } from "../services/apiClient";
 
-const store = useUserAssessmentsStore();
-const router = useRouter();
+export default {
+  name: "AssessmentsView",
+  setup() {
+    const router = useRouter();
+    const telegramStore = useTelegramStore();
+    const userStore = useUserStore();
 
-const assessments = computed(() => store.assessments || []);
-const now = ref(Date.now());
-let timerId = null;
+    const assessments = ref([]);
+    const activeFilter = ref("all");
+    const isLoading = ref(false);
 
-function formatDate(value) {
-  if (!value) {
-    return "—";
-  }
-  return new Date(value).toLocaleString("ru-RU");
-}
+    const filters = [
+      { key: "all", label: "Все" },
+      { key: "open", label: "Открытые" },
+      { key: "completed", label: "Пройденные" },
+      { key: "closed", label: "Закрытые" },
+    ];
 
-function formatPercent(value) {
-  const number = normalizePercent(value);
-  if (number == null) {
-    return "—";
-  }
-  return `${number}%`;
-}
+    const filteredAssessments = computed(() => {
+      if (activeFilter.value === "all") return assessments.value;
 
-function statusLabel(status) {
-  switch (status) {
-    case "pending":
-      return "Ожидает запуска";
-    case "active":
-      return "Доступна";
-    case "closed":
-      return "Завершена";
-    default:
-      return status;
-  }
-}
+      return assessments.value.filter((assessment) => {
+        switch (activeFilter.value) {
+          case "open":
+            return assessment.status === "open";
+          case "completed":
+            return assessment.status === "completed" || assessment.bestResult;
+          case "closed":
+            return assessment.status === "closed";
+          default:
+            return true;
+        }
+      });
+    });
 
-function passOutcome(item) {
-  if (item?.hasPassed) {
-    return { label: "Пройдена", type: "success" };
-  }
-  const passScore = normalizePercent(item.passScorePercent);
-  const candidateScores = [normalizePercent(item.bestScorePercent), normalizePercent(item.lastScorePercent)].filter((value) => value != null);
-  if (!candidateScores.length) {
-    return { label: "Не пройдена", type: "danger" };
-  }
-  const maxScore = Math.max(...candidateScores);
-  const threshold = passScore != null ? passScore : 0;
-  const passed = maxScore >= threshold;
-  return passed ? { label: "Пройдена", type: "success" } : { label: "Не пройдена", type: "danger" };
-}
-
-function normalizePercent(value) {
-  if (value == null) {
-    return null;
-  }
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? Number(value) : null;
-  }
-  if (typeof value === "string") {
-    const match = value.replace(/,/g, ".").match(/-?\d+(?:\.\d+)?/);
-    if (!match) {
-      return null;
+    function setFilter(filter) {
+      activeFilter.value = filter;
+      telegramStore.hapticFeedback("selection");
     }
-    const parsed = Number.parseFloat(match[0]);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
-}
 
-function canStart(item) {
-  if (item.status !== "active") {
-    return false;
-  }
-  if (item.hasActiveAttempt) {
-    return true;
-  }
-  const attemptsUsed = item.lastAttemptNumber ? Number(item.lastAttemptNumber) : 0;
-  const maxAttempts = item.maxAttempts != null ? Number(item.maxAttempts) : Infinity;
-  if (attemptsUsed >= maxAttempts) {
-    return false;
-  }
-  const score = normalizePercent(item.lastScorePercent);
-  const passScore = normalizePercent(item.passScorePercent) ?? 0;
-  if (item.lastAttemptStatus === "completed") {
-    if (score === null) {
-      return attemptsUsed < maxAttempts;
+    function getStatusClass(status) {
+      switch (status) {
+        case "open":
+          return "badge-primary";
+        case "completed":
+          return "badge-success";
+        case "pending":
+          return "badge-neutral";
+        case "closed":
+          return "badge-neutral";
+        default:
+          return "badge-neutral";
+      }
     }
-    if (score >= 100 && attemptsUsed >= maxAttempts) {
-      return false;
+
+    function getStatusText(status) {
+      switch (status) {
+        case "open":
+          return "Открыта";
+        case "completed":
+          return "Завершена";
+        case "pending":
+          return "Ожидает";
+        case "closed":
+          return "Закрыта";
+        default:
+          return "Неизвестно";
+      }
     }
-    if (attemptsUsed >= maxAttempts) {
-      return false;
+
+    function getActionButtonText(status) {
+      switch (status) {
+        case "pending":
+          return "Ожидает открытия";
+        case "closed":
+          return "Завершена";
+        default:
+          return "Недоступна";
+      }
     }
-  }
-  return true;
-}
 
-function startAssessment(item) {
-  if (!canStart(item)) {
-    return;
-  }
-  router.push({ name: "assessment-start", params: { id: item.id } });
-}
+    function getEmptyStateTitle() {
+      switch (activeFilter.value) {
+        case "open":
+          return "Нет открытых аттестаций";
+        case "completed":
+          return "Нет пройденных аттестаций";
+        case "closed":
+          return "Нет закрытых аттестаций";
+        default:
+          return "Нет аттестаций";
+      }
+    }
 
-function actionLabel(item) {
-  if (item.hasActiveAttempt) {
-    return "Продолжить";
-  }
-  if (item.lastAttemptStatus === "completed") {
-    return "Пройти ещё раз";
-  }
-  return "Начать";
-}
+    function getEmptyStateDescription() {
+      switch (activeFilter.value) {
+        case "open":
+          return "Активные аттестации появятся здесь";
+        case "completed":
+          return "Пройденные аттестации появятся здесь";
+        case "closed":
+          return "Завершённые аттестации появятся здесь";
+        default:
+          return "Аттестации появятся здесь";
+      }
+    }
 
-function timeRemainingLabel(item) {
-  if (!item.hasActiveAttempt || item.timeLimitMinutes == null) {
-    return null;
-  }
-  const expiry = item.expectedEndAt;
-  if (!expiry) {
-    return null;
-  }
-  const diffMs = expiry - now.value;
-  if (diffMs <= 0) {
-    return 'Время истекло';
-  }
-  const totalSeconds = Math.ceil(diffMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `Осталось: ${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
+    function formatDateRange(startDate, endDate) {
+      const start = new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "short",
+      }).format(new Date(startDate));
 
-function viewResult(item) {
-  if (!item.lastAttemptId) {
-    return;
-  }
-  router.push({ name: "assessment-result", params: { id: item.id, attemptId: item.lastAttemptId } });
-}
+      const end = new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "short",
+      }).format(new Date(endDate));
 
-onMounted(async () => {
-  try {
-    await store.fetchAssessments();
-  } catch (error) {
-    showAlert(error.message || "Не удалось загрузить аттестации");
-  }
-  ensureTimer();
-});
+      return `${start} - ${end}`;
+    }
 
-onUnmounted(() => {
-  if (timerId) {
-    clearInterval(timerId);
-    timerId = null;
-  }
-});
+    function handleAssessmentClick(assessment) {
+      telegramStore.hapticFeedback("impact", "light");
+    }
 
-watch(
-  () => store.assessments,
-  () => {
-    ensureTimer();
+    function startAssessment(id) {
+      telegramStore.hapticFeedback("impact", "medium");
+      router.push(`/assessment/${id}`);
+    }
+
+    function viewResults(id) {
+      telegramStore.hapticFeedback("impact", "light");
+      router.push(`/assessment-results/${id}`);
+    }
+
+    function normalizeAssessment(item) {
+      if (!item) {
+        return null;
+      }
+
+      const threshold = Number.isFinite(item.passScorePercent) ? Math.round(item.passScorePercent) : 0;
+      const bestScore = Number.isFinite(item.bestScorePercent) ? Math.round(item.bestScorePercent) : null;
+      const attemptsUsed = Number.isFinite(item.lastAttemptNumber) ? Number(item.lastAttemptNumber) : 0;
+      const maxAttempts = Number.isFinite(item.maxAttempts) ? Number(item.maxAttempts) : 1;
+      const statusMap = {
+        active: "open",
+        pending: "pending",
+        closed: "closed",
+      };
+      let status = statusMap[item.status] || "pending";
+      if (bestScore != null || item.lastAttemptStatus === "completed") {
+        status = "completed";
+      }
+
+      return {
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        status,
+        startDate: item.openAt,
+        endDate: item.closeAt,
+        threshold,
+        maxAttempts,
+        attemptsUsed,
+        bestResult:
+          bestScore != null
+            ? {
+                score: bestScore,
+                passed: threshold ? bestScore >= threshold : true,
+              }
+            : null,
+      };
+    }
+
+    async function loadAssessments() {
+      if (!userStore.isInitialized) {
+        await userStore.ensureStatus();
+      }
+
+      isLoading.value = true;
+      try {
+        const { assessments: response } = await apiClient.listUserAssessments();
+        assessments.value = (response || []).map((item) => normalizeAssessment(item)).filter(Boolean);
+      } catch (error) {
+        console.error("Не удалось загрузить список аттестаций", error);
+        assessments.value = [];
+      } finally {
+        isLoading.value = false;
+      }
+    }
+
+    onMounted(() => {
+      loadAssessments();
+    });
+
+    return {
+      assessments,
+      activeFilter,
+      filters,
+      isLoading,
+      filteredAssessments,
+      setFilter,
+      getStatusClass,
+      getStatusText,
+      getActionButtonText,
+      getEmptyStateTitle,
+      getEmptyStateDescription,
+      formatDateRange,
+      handleAssessmentClick,
+      startAssessment,
+      viewResults,
+    };
   },
-  { deep: true, immediate: true }
-);
-
-function ensureTimer() {
-  const hasActive = (store.assessments || []).some((item) => item.hasActiveAttempt && item.expectedEndAt);
-  if (hasActive && !timerId) {
-    timerId = setInterval(() => {
-      now.value = Date.now();
-    }, 1000);
-  } else if (!hasActive && timerId) {
-    clearInterval(timerId);
-    timerId = null;
-  }
-}
+};
 </script>
 
 <style scoped>
-.assessment-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.page-header {
+  padding-top: 20px;
 }
 
-.assessment-item {
-  border-radius: 14px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: var(--tg-theme-bg-color, #ffffff);
-  padding: 16px;
+.filter-tabs {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  gap: 8px;
+  padding: 4px;
+  background-color: var(--bg-secondary);
+  border-radius: 10px;
 }
 
-.assessment-item__header {
+.filter-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-tab.active {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px var(--card-shadow);
+}
+
+.assessments-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.assessment-card {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.assessment-card:hover {
+  transform: translateY(-2px);
+}
+
+.assessment-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
+  margin-bottom: 12px;
 }
 
-.assessment-item__header-state {
+.assessment-info {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  align-items: flex-end;
+  gap: 4px;
 }
 
-.assessment-item__header-state .status {
-  margin: 0;
-}
-
-.assessment-item__title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.assessment-item__description {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--tg-theme-hint-color, #6f7a8b);
-}
-
-.assessment-item__meta {
+.info-item {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--tg-theme-hint-color, #6f7a8b);
+  justify-content: space-between;
+  align-items: center;
 }
 
-.countdown {
-  font-weight: 600;
-  color: var(--tg-theme-text-color, #0a0a0a);
-}
-
-.badge {
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--tg-theme-text-color, #0a0a0a);
-}
-
-.badge--success {
-  background: rgba(10, 132, 255, 0.16);
-  color: var(--tg-theme-button-color, #0a84ff);
-}
-
-.badge--danger {
-  background: rgba(214, 45, 48, 0.18);
-  color: #d62d30;
-}
-
-.assessment-item__actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.primary-button {
-  border-radius: 12px;
-  border: none;
-  padding: 10px 14px;
+.label {
   font-size: 14px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  background: var(--tg-theme-button-color, #0a84ff);
-  color: var(--tg-theme-button-text-color, #ffffff);
-  transition: opacity 0.2s ease;
+  color: var(--text-secondary);
 }
 
-.primary-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.value {
+  font-size: 14px;
+  font-weight: 500;
 }
 
-.status {
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  background: var(--tg-theme-secondary-bg-color, #f5f7fb);
-  color: var(--tg-theme-hint-color, #6f7a8b);
+.value.success {
+  color: var(--success);
 }
 
-.status--active {
-  background: rgba(10, 132, 255, 0.12);
-  color: var(--tg-theme-button-color, #0a84ff);
+.value.error {
+  color: var(--error);
 }
 
-.status--pending {
-  background: rgba(255, 171, 0, 0.12);
-  color: #d18d0f;
+.best-result {
+  padding: 8px 12px;
+  background-color: var(--bg-primary);
+  border-radius: 8px;
 }
 
-.status--closed {
-  background: rgba(110, 122, 139, 0.12);
-  color: rgba(110, 122, 139, 1);
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
 }
 
-.error {
-  color: #d62d30;
-  font-size: 13px;
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
 }
 
-.hint {
-  margin: 0;
-  color: var(--tg-theme-hint-color, #6f7a8b);
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 480px) {
+  .filter-tab {
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+
+  .assessment-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
 }
 </style>

@@ -2,20 +2,16 @@ let webAppInstance = null;
 const themeListeners = new Set();
 const viewportListeners = new Set();
 
-const envBaseUrl =
-  typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL
-    ? import.meta.env.VITE_API_BASE_URL.trim()
-    : '';
-const runtimeBaseUrl =
-  typeof window !== 'undefined' && window.location ? window.location.origin : '';
-const API_BASE_URL = (envBaseUrl || runtimeBaseUrl || '').replace(/\/$/, '');
-const CLOUD_STORAGE_ENDPOINT = '/cloud-storage';
+const envBaseUrl = typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL.trim() : "";
+const runtimeBaseUrl = typeof window !== "undefined" && window.location ? window.location.origin : "";
+const API_BASE_URL = (envBaseUrl || runtimeBaseUrl || "").replace(/\/$/, "");
+const CLOUD_STORAGE_ENDPOINT = "/cloud-storage";
 
 function resolveWebApp() {
   if (webAppInstance) {
     return webAppInstance;
   }
-  if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+  if (typeof window !== "undefined" && window.Telegram?.WebApp) {
     webAppInstance = window.Telegram.WebApp;
   }
   return webAppInstance;
@@ -28,7 +24,7 @@ export function getWebApp() {
 export function ensureReady() {
   const webApp = resolveWebApp();
   if (!webApp) {
-    console.warn('Telegram WebApp is not available.');
+    console.warn("Telegram WebApp is not available.");
     return null;
   }
   webApp.ready();
@@ -45,9 +41,9 @@ export function onThemeChange(handler) {
 
   const wrapper = () => handler(webApp.themeParams || {});
   themeListeners.add(wrapper);
-  webApp.onEvent('themeChanged', wrapper);
+  webApp.onEvent("themeChanged", wrapper);
   return () => {
-    webApp.offEvent('themeChanged', wrapper);
+    webApp.offEvent("themeChanged", wrapper);
     themeListeners.delete(wrapper);
   };
 }
@@ -59,7 +55,7 @@ export function getThemeParams() {
 
 export function getColorScheme() {
   const webApp = resolveWebApp();
-  return webApp?.colorScheme || 'light';
+  return webApp?.colorScheme || "light";
 }
 
 export function onViewportChanged(handler) {
@@ -73,16 +69,47 @@ export function onViewportChanged(handler) {
     }
   };
   viewportListeners.add(wrapper);
-  webApp.onEvent('viewportChanged', wrapper);
+  webApp.onEvent("viewportChanged", wrapper);
   return () => {
-    webApp.offEvent('viewportChanged', wrapper);
+    webApp.offEvent("viewportChanged", wrapper);
     viewportListeners.delete(wrapper);
   };
 }
 
 export function getInitData() {
+  // Приоритет отдаём данным, которые обновил telegramStore (учитывает start_param приглашения)
+  if (typeof window !== "undefined" && window.__telegramInitDataOverride) {
+    return window.__telegramInitDataOverride;
+  }
+
   const webApp = resolveWebApp();
-  return webApp?.initData || '';
+  return webApp?.initData || "";
+}
+
+export function getStartParam() {
+  if (typeof window !== "undefined" && window.__telegramStartParam) {
+    return window.__telegramStartParam;
+  }
+
+  const webApp = resolveWebApp();
+  return webApp?.initDataUnsafe?.start_param || "";
+}
+
+export function getInvitationCode() {
+  // Проверяем start параметр из Telegram
+  const startParam = getStartParam();
+  if (startParam && startParam.startsWith('invite_')) {
+    return startParam.replace('invite_', '');
+  }
+  
+  // Проверяем URL параметры (fallback)
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('invite') || urlParams.get('code');
+  if (code) {
+    return code;
+  }
+  
+  return null;
 }
 
 function getCloudStorage() {
@@ -92,8 +119,8 @@ function getCloudStorage() {
 
 function callCloudStorage(method, key, value) {
   const storage = getCloudStorage();
-  if (!storage || typeof storage[method] !== 'function') {
-    throw new Error('CloudStorage API not available');
+  if (!storage || typeof storage[method] !== "function") {
+    throw new Error("CloudStorage API not available");
   }
   return new Promise((resolve, reject) => {
     const done = (err, result) => {
@@ -112,31 +139,31 @@ function callCloudStorage(method, key, value) {
   });
 }
 
-async function requestCloudStorageFallback(path, { method = 'POST', body } = {}) {
+async function requestCloudStorageFallback(path, { method = "POST", body } = {}) {
   if (!API_BASE_URL) {
-    throw new Error('API base URL is not configured');
+    throw new Error("API base URL is not configured");
   }
-  if (typeof fetch !== 'function') {
-    throw new Error('Fetch API is not available');
+  if (typeof fetch !== "function") {
+    throw new Error("Fetch API is not available");
   }
 
   const url = `${API_BASE_URL}${path}`;
-  const headers = new Headers({ 'Content-Type': 'application/json' });
+  const headers = new Headers({ "Content-Type": "application/json" });
   const initData = getInitData();
   if (initData) {
-    headers.set('x-telegram-init-data', initData);
+    headers.set("x-telegram-init-data", initData);
   }
 
   const response = await fetch(url, {
     method,
     headers,
-    credentials: 'include',
-    body: body ? JSON.stringify(body) : undefined
+    credentials: "include",
+    body: body ? JSON.stringify(body) : undefined,
   });
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    const message = errorBody?.error || 'Cloud storage fallback request failed';
+    const message = errorBody?.error || "Cloud storage fallback request failed";
     const error = new Error(message);
     error.status = response.status;
     throw error;
@@ -151,79 +178,73 @@ async function requestCloudStorageFallback(path, { method = 'POST', body } = {})
 
 function serializeCloudValue(value) {
   if (value === undefined) {
-    throw new Error('Value must be defined for cloudStorage');
+    throw new Error("Value must be defined for cloudStorage");
   }
-  return typeof value === 'string' ? value : JSON.stringify(value);
+  return typeof value === "string" ? value : JSON.stringify(value);
 }
 
 export async function setCloudItem(key, value, { fallback = true } = {}) {
   const serializedValue = serializeCloudValue(value);
 
   try {
-    await callCloudStorage('setItem', key, serializedValue);
+    await callCloudStorage("setItem", key, serializedValue);
     return true;
   } catch (error) {
     if (!fallback) {
       throw error;
     }
-    console.warn('Telegram cloudStorage setItem failed, fallback to backend', error);
+    console.warn("Telegram cloudStorage setItem failed, fallback to backend", error);
   }
 
   try {
     await requestCloudStorageFallback(CLOUD_STORAGE_ENDPOINT, {
-      method: 'POST',
-      body: { key, value: serializedValue }
+      method: "POST",
+      body: { key, value: serializedValue },
     });
     return true;
   } catch (fallbackError) {
-    console.error('Backend fallback setCloudItem failed', fallbackError);
+    console.error("Backend fallback setCloudItem failed", fallbackError);
     throw fallbackError;
   }
 }
 
 export async function getCloudItem(key, { fallback = true } = {}) {
   try {
-    const raw = await callCloudStorage('getItem', key);
-    return typeof raw === 'string' ? raw : raw ?? null;
+    const raw = await callCloudStorage("getItem", key);
+    return typeof raw === "string" ? raw : raw ?? null;
   } catch (error) {
     if (!fallback) {
       throw error;
     }
-    console.warn('Telegram cloudStorage getItem failed, fallback to backend', error);
+    console.warn("Telegram cloudStorage getItem failed, fallback to backend", error);
   }
 
   try {
-    const data = await requestCloudStorageFallback(
-      `${CLOUD_STORAGE_ENDPOINT}/${encodeURIComponent(key)}`,
-      { method: 'GET' }
-    );
+    const data = await requestCloudStorageFallback(`${CLOUD_STORAGE_ENDPOINT}/${encodeURIComponent(key)}`, { method: "GET" });
     const value = data?.value;
-    return typeof value === 'string' ? value : value ?? null;
+    return typeof value === "string" ? value : value ?? null;
   } catch (fallbackError) {
-    console.error('Backend fallback getCloudItem failed', fallbackError);
+    console.error("Backend fallback getCloudItem failed", fallbackError);
     throw fallbackError;
   }
 }
 
 export async function removeCloudItem(key, { fallback = true } = {}) {
   try {
-    await callCloudStorage('removeItem', key);
+    await callCloudStorage("removeItem", key);
     return true;
   } catch (error) {
     if (!fallback) {
       throw error;
     }
-    console.warn('Telegram cloudStorage removeItem failed, fallback to backend', error);
+    console.warn("Telegram cloudStorage removeItem failed, fallback to backend", error);
   }
 
   try {
-    await requestCloudStorageFallback(
-      `${CLOUD_STORAGE_ENDPOINT}/${encodeURIComponent(key)}`,
-      { method: 'DELETE' }
-    );
+    await requestCloudStorageFallback(`${CLOUD_STORAGE_ENDPOINT}/${encodeURIComponent(key)}`, { method: "DELETE" });
     return true;
   } catch (fallbackError) {
-    console.error('Backend fallback removeCloudItem failed', fallbackError);
+    console.error("Backend fallback removeCloudItem failed", fallbackError);
     throw fallbackError;
   }
 }
@@ -287,9 +308,9 @@ export function showBackButton(handler) {
 
   webApp.BackButton.show();
   if (handler) {
-    webApp.onEvent('backButtonClicked', handler);
+    webApp.onEvent("backButtonClicked", handler);
     return () => {
-      webApp.offEvent('backButtonClicked', handler);
+      webApp.offEvent("backButtonClicked", handler);
       webApp.BackButton.hide();
     };
   }
@@ -315,17 +336,17 @@ export function setSwipeBehavior({ allowVertical = true, allowHorizontal = true 
   const verticalAllowed = false;
   const horizontalAllowed = allowHorizontal;
 
-  if (typeof webApp.setSwipeBehavior === 'function') {
+  if (typeof webApp.setSwipeBehavior === "function") {
     webApp.setSwipeBehavior({
       allow_vertical: verticalAllowed,
       allow_horizontal: horizontalAllowed,
       allowVertical: verticalAllowed,
-      allowHorizontal: horizontalAllowed
+      allowHorizontal: horizontalAllowed,
     });
     return;
   }
 
-  if (!verticalAllowed && typeof webApp.disableVerticalSwipes === 'function') {
+  if (!verticalAllowed && typeof webApp.disableVerticalSwipes === "function") {
     webApp.disableVerticalSwipes();
   }
 
@@ -359,7 +380,7 @@ export function showConfirm(message) {
   return Promise.resolve(window.confirm(message));
 }
 
-export function showPopup({ title = '', message = '', buttons = [] } = {}) {
+export function showPopup({ title = "", message = "", buttons = [] } = {}) {
   const webApp = resolveWebApp();
   const configuredButtons = buttons.map(({ onClick, ...rest }) => rest);
 
@@ -371,7 +392,7 @@ export function showPopup({ title = '', message = '', buttons = [] } = {}) {
           try {
             selected.onClick();
           } catch (error) {
-            console.error('Popup button handler threw an error', error);
+            console.error("Popup button handler threw an error", error);
           }
         }
         resolve(buttonId ?? null);
@@ -379,7 +400,7 @@ export function showPopup({ title = '', message = '', buttons = [] } = {}) {
     });
   }
 
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return Promise.resolve(null);
   }
 
@@ -392,27 +413,27 @@ export function showPopup({ title = '', message = '', buttons = [] } = {}) {
       try {
         single.onClick();
       } catch (error) {
-        console.error('Popup button handler threw an error', error);
+        console.error("Popup button handler threw an error", error);
       }
     }
     return Promise.resolve(single?.id ?? null);
   }
 
-  const primary = buttons.find((button) => button.type !== 'cancel') || buttons[0];
-  const cancel = buttons.find((button) => button.type === 'cancel');
+  const primary = buttons.find((button) => button.type !== "cancel") || buttons[0];
+  const cancel = buttons.find((button) => button.type === "cancel");
   const confirmed = window.confirm(message);
   const chosen = confirmed ? primary : cancel || (confirmed ? primary : null);
   if (chosen?.onClick) {
     try {
       chosen.onClick();
     } catch (error) {
-      console.error('Popup button handler threw an error', error);
+      console.error("Popup button handler threw an error", error);
     }
   }
   return Promise.resolve(chosen?.id ?? null);
 }
 
-export function hapticImpact(style = 'light') {
+export function hapticImpact(style = "light") {
   const webApp = resolveWebApp();
   if (webApp?.HapticFeedback) {
     webApp.HapticFeedback.impactOccurred(style);

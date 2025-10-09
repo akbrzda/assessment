@@ -1,157 +1,74 @@
 <template>
-  <div class="app" :class="classes">
-    <LoadingState v-if="isBooting" message="Загружаем данные" />
-    <div v-else class="app__content">
-      <RouterView />
-    </div>
-    <BottomNav v-if="showNav" :items="navItems" />
-    <div v-if="appStore.error" class="error-banner">{{ appStore.error }}</div>
-    <transition name="fade">
-      <div v-if="isBusy" class="app__overlay">
-        <LoadingState message="Обрабатываем запрос" />
-      </div>
-    </transition>
+  <div id="app" :data-theme="theme" :class="platformClass">
+    <router-view />
+    <BottomNavigation v-if="showBottomNav" />
+    <Preloader v-if="isLoading" />
   </div>
 </template>
 
-<script setup>
-import { computed, onMounted, ref, watch } from "vue";
+<script>
+import { computed, onMounted } from "vue";
+import { storeToRefs } from "pinia";
 import { useRoute } from "vue-router";
-import LoadingState from "./components/LoadingState.vue";
-import BottomNav from "./components/BottomNav.vue";
-import { useAppStore } from "./store/appStore";
-import { ensureReady, onViewportChanged, onThemeChange, getThemeParams, getColorScheme } from "./services/telegram";
+import { useTelegramStore } from "./stores/telegram";
+import { useThemeStore } from "./stores/theme";
+import { useUserStore } from "./stores/user";
+import { useBackButton } from "./composables/useBackButton";
+import BottomNavigation from "./components/BottomNavigation.vue";
+import Preloader from "./components/Preloader.vue";
 
-const appStore = useAppStore();
-const route = useRoute();
-
-const theme = ref(getThemeParams());
-const colorScheme = ref(getColorScheme());
-
-const isBooting = computed(() => !appStore.isInitialized && appStore.isLoading);
-const isBusy = computed(() => appStore.isInitialized && appStore.isLoading);
-
-const classes = computed(() => ({
-  "app--loading": isBooting.value,
-}));
-
-const showNav = computed(() => appStore.isAuthenticated && !["register", "invite"].includes(route.name));
-const navItems = computed(() => {
-  const user = appStore.user;
-  const items = [
-    { name: "dashboard", label: "Главная", icon: "🏠" },
-    { name: "assessments", label: "Аттестации", icon: "📝" },
-    { name: "leaderboard", label: "Лидеры", icon: "🏆" },
-    {
-      name: "profile",
-      label: "Профиль",
-      avatar: user
-        ? {
-            url: user.avatarUrl,
-            firstName: user.firstName,
-            lastName: user.lastName,
-          }
-        : null,
-      icon: user ? null : "👤",
-    },
-  ];
-
-  // Добавляем аналитику для управляющих и суперадминов
-  if (appStore.isManager || appStore.isSuperAdmin) {
-    items.splice(3, 0, { name: "analytics", label: "Аналитика", icon: "📊" });
-  }
-
-  return items;
-});
-
-onMounted(() => {
-  const webApp = ensureReady();
-  if (webApp) {
-    onThemeChange((params) => {
-      theme.value = params;
-      colorScheme.value = getColorScheme();
-    });
-    onViewportChanged(() => {
-      // В этой версии только фиксируем событие; тяжелые пересчеты не требуются
-    });
-  }
-  appStore.ensureReady();
-});
-
-watch(
-  theme,
-  (params) => {
-    if (typeof document === "undefined") {
-      return;
-    }
-    const root = document.documentElement;
-    Object.entries(params || {}).forEach(([key, value]) => {
-      root.style.setProperty(`--tg-theme-${key.replace(/_/g, "-")}`, value);
-    });
+export default {
+  name: "App",
+  components: {
+    BottomNavigation,
+    Preloader,
   },
-  { immediate: true }
-);
+  setup() {
+    const route = useRoute();
+    const telegramStore = useTelegramStore();
+    const themeStore = useThemeStore();
+    const userStore = useUserStore();
 
-watch(
-  colorScheme,
-  (scheme) => {
-    if (typeof document === "undefined") {
-      return;
-    }
-    document.documentElement.dataset.colorScheme = scheme || "light";
+    const { platform } = storeToRefs(telegramStore);
+
+    // Инициализируем управление кнопкой назад
+    useBackButton();
+
+    const theme = computed(() => themeStore.theme);
+    const isLoading = computed(() => userStore.isLoading);
+
+    const platformClass = computed(() => {
+      const value = (platform.value || "").toLowerCase();
+      const mobilePlatforms = ["android", "android_x", "ios", "iphone", "ipad"];
+
+      if (mobilePlatforms.some((name) => value.includes(name))) {
+        return "platform-mobile";
+      }
+
+      return "platform-desktop";
+    });
+
+    const showBottomNav = computed(() => {
+      const hideRoutes = ["registration", "invitation", "assessment-process"];
+      return !hideRoutes.includes(route.name) && userStore.isAuthenticated;
+    });
+
+    onMounted(async () => {
+      telegramStore.initTelegram();
+      themeStore.initTheme();
+      try {
+        await userStore.ensureStatus();
+      } catch (error) {
+        console.error("Не удалось инициализировать пользователя", error);
+      }
+    });
+
+    return {
+      theme,
+      isLoading,
+      showBottomNav,
+      platformClass,
+    };
   },
-  { immediate: true }
-);
+};
 </script>
-
-<style scoped>
-.app {
-  min-height: 100vh;
-  background: var(--tg-theme-secondary-bg-color, #f5f7fb);
-  position: relative;
-}
-
-.app__content {
-  padding-bottom: 100px;
-  overflow-y: auto;
-}
-
-.app--loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.app__overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(2px);
-  z-index: 20;
-}
-
-.error-banner {
-  position: fixed;
-  bottom: 80px;
-  left: 16px;
-  right: 16px;
-  background: rgba(214, 45, 48, 0.92);
-  color: #ffffff;
-  padding: 10px 14px;
-  border-radius: 12px;
-  text-align: center;
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-</style>

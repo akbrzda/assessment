@@ -1,4 +1,4 @@
-const { pool } = require('../config/database');
+const { pool } = require("../config/database");
 
 async function createInvitation({ code, roleId, branchId, firstName, lastName, expiresAt, createdBy }) {
   const [result] = await pool.execute(
@@ -55,7 +55,8 @@ async function listInvitationsByCreator(userId) {
             inv.used_by, inv.branch_id,
             b.name AS branch_name,
             r.name AS role_name,
-            CONCAT(used_user.first_name, ' ', used_user.last_name) AS used_by_name
+            CONCAT(used_user.first_name, ' ', used_user.last_name) AS used_by_name,
+            used_user.telegram_id AS used_by_telegram_id
      FROM invitations inv
      LEFT JOIN branches b ON b.id = inv.branch_id
      LEFT JOIN roles r ON r.id = inv.role_id
@@ -68,14 +69,20 @@ async function listInvitationsByCreator(userId) {
 }
 
 async function updateExpiration(invitationId, expiresAt) {
-  await pool.execute(
-    `UPDATE invitations SET expires_at = ?, updated_at = NOW() WHERE id = ?`,
-    [expiresAt, invitationId]
-  );
+  await pool.execute(`UPDATE invitations SET expires_at = ?, updated_at = NOW() WHERE id = ?`, [expiresAt, invitationId]);
 }
 
 async function deleteInvitation(invitationId) {
-  await pool.execute('DELETE FROM invitations WHERE id = ?', [invitationId]);
+  await pool.execute("DELETE FROM invitations WHERE id = ?", [invitationId]);
+}
+
+async function updateInvitation(invitationId, { firstName, lastName, branchId }) {
+  await pool.execute(`UPDATE invitations SET first_name = ?, last_name = ?, branch_id = ?, updated_at = NOW() WHERE id = ?`, [
+    firstName,
+    lastName,
+    branchId,
+    invitationId,
+  ]);
 }
 
 module.exports = {
@@ -85,5 +92,6 @@ module.exports = {
   markUsed,
   listInvitationsByCreator,
   updateExpiration,
-  deleteInvitation
+  deleteInvitation,
+  updateInvitation,
 };

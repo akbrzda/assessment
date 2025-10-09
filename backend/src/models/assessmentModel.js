@@ -1,5 +1,31 @@
 const { pool } = require('../config/database');
 
+function toIsoUtc(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  const str = String(value).trim();
+  if (!str) {
+    return null;
+  }
+
+  const normalized = str.replace(' ', 'T');
+  const hasZone = /[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized);
+  const source = hasZone ? normalized : `${normalized}Z`;
+  const date = new Date(source);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString();
+}
+
 function mapAssessmentRow(row) {
   if (!row) {
     return null;
@@ -8,15 +34,15 @@ function mapAssessmentRow(row) {
     id: row.id,
     title: row.title,
     description: row.description,
-    openAt: row.open_at,
-    closeAt: row.close_at,
+    openAt: toIsoUtc(row.open_at),
+    closeAt: toIsoUtc(row.close_at),
     timeLimitMinutes: row.time_limit_minutes,
     passScorePercent: row.pass_score_percent,
     maxAttempts: row.max_attempts,
     createdBy: row.created_by,
     updatedBy: row.updated_by,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: toIsoUtc(row.created_at),
+    updatedAt: toIsoUtc(row.updated_at),
     status: row.status || null,
     assignedCount: row.assigned_count != null ? Number(row.assigned_count) : null,
     completedCount: row.completed_count != null ? Number(row.completed_count) : null
@@ -221,8 +247,8 @@ async function listAssessmentsForManager({ userId, roleName }) {
        a.created_at,
        a.updated_at,
        CASE
-         WHEN NOW() < a.open_at THEN 'pending'
-         WHEN NOW() BETWEEN a.open_at AND a.close_at THEN 'active'
+         WHEN UTC_TIMESTAMP() < a.open_at THEN 'pending'
+         WHEN UTC_TIMESTAMP() BETWEEN a.open_at AND a.close_at THEN 'active'
          ELSE 'closed'
        END AS status,
        COALESCE((
@@ -281,8 +307,8 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) 
        a.created_at,
        a.updated_at,
        CASE
-         WHEN NOW() < a.open_at THEN 'pending'
-         WHEN NOW() BETWEEN a.open_at AND a.close_at THEN 'active'
+         WHEN UTC_TIMESTAMP() < a.open_at THEN 'pending'
+         WHEN UTC_TIMESTAMP() BETWEEN a.open_at AND a.close_at THEN 'active'
          ELSE 'closed'
        END AS status,
        COALESCE((
@@ -351,15 +377,24 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) 
         id: row.id,
         order: row.order_index,
         text: row.question_text,
-        options: []
+        options: [],
+        correctIndex: null
       });
     }
     if (row.option_id) {
-      questionMap.get(row.id).options.push({
+      const option = {
         id: row.option_id,
         order: row.option_order,
-        text: row.option_text
-      });
+        text: row.option_text,
+        isCorrect: Boolean(row.is_correct)
+      };
+
+      const question = questionMap.get(row.id);
+      question.options.push(option);
+
+      if (option.isCorrect) {
+        question.correctIndex = option.order != null ? Number(option.order) : question.options.length - 1;
+      }
     }
   });
 
@@ -500,7 +535,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) 
       scorePercent: row.score_percent != null ? Number(row.score_percent) : null,
       correctAnswers: row.correct_answers != null ? Number(row.correct_answers) : null,
       totalQuestions: row.total_questions != null ? Number(row.total_questions) : null,
-      completedAt: row.completed_at,
+      completedAt: toIsoUtc(row.completed_at),
       timeSpentSeconds: row.time_spent_seconds != null ? Number(row.time_spent_seconds) : null
     };
   });
@@ -614,8 +649,8 @@ async function listAssessmentsForUser(userId) {
        a.pass_score_percent,
        a.max_attempts,
        CASE
-         WHEN NOW() < a.open_at THEN 'pending'
-         WHEN NOW() BETWEEN a.open_at AND a.close_at THEN 'active'
+         WHEN UTC_TIMESTAMP() < a.open_at THEN 'pending'
+         WHEN UTC_TIMESTAMP() BETWEEN a.open_at AND a.close_at THEN 'active'
          ELSE 'closed'
        END AS status,
        aa.id AS attempt_id,
@@ -668,8 +703,8 @@ async function listAssessmentsForUser(userId) {
     id: row.id,
     title: row.title,
     description: row.description,
-    openAt: row.open_at,
-    closeAt: row.close_at,
+    openAt: toIsoUtc(row.open_at),
+    closeAt: toIsoUtc(row.close_at),
     timeLimitMinutes: row.time_limit_minutes != null ? Number(row.time_limit_minutes) : null,
     passScorePercent: row.pass_score_percent != null ? Number(row.pass_score_percent) : null,
     maxAttempts: row.max_attempts != null ? Number(row.max_attempts) : null,
@@ -678,15 +713,19 @@ async function listAssessmentsForUser(userId) {
     lastAttemptNumber: row.attempt_number ? Number(row.attempt_number) : null,
     lastAttemptStatus: row.attempt_status || null,
     lastScorePercent: row.score_percent != null ? Number(row.score_percent) : null,
-    lastCompletedAt: row.completed_at,
-    lastStartedAt: row.started_at,
+    lastCompletedAt: toIsoUtc(row.completed_at),
+    lastStartedAt: toIsoUtc(row.started_at),
     bestScorePercent: row.best_score_percent != null ? Number(row.best_score_percent) : null,
     timeRemainingSeconds: (() => {
       const timeLimitMinutes = row.time_limit_minutes != null ? Number(row.time_limit_minutes) : null;
-      if (row.attempt_status !== 'in_progress' || timeLimitMinutes == null || !row.started_at) {
+      const startedAtIso = toIsoUtc(row.started_at);
+      if (row.attempt_status !== 'in_progress' || timeLimitMinutes == null || !startedAtIso) {
         return null;
       }
-      const startedAtMs = new Date(row.started_at).getTime();
+      if (!startedAtIso) {
+        return null;
+      }
+      const startedAtMs = Date.parse(startedAtIso);
       if (!Number.isFinite(startedAtMs)) {
         return null;
       }
@@ -709,8 +748,8 @@ async function getAssessmentForUser(assessmentId, userId) {
        a.pass_score_percent,
        a.max_attempts,
        CASE
-         WHEN NOW() < a.open_at THEN 'pending'
-         WHEN NOW() BETWEEN a.open_at AND a.close_at THEN 'active'
+         WHEN UTC_TIMESTAMP() < a.open_at THEN 'pending'
+         WHEN UTC_TIMESTAMP() BETWEEN a.open_at AND a.close_at THEN 'active'
          ELSE 'closed'
        END AS status
      FROM assessments a
@@ -740,8 +779,8 @@ async function getAssessmentForUser(assessmentId, userId) {
     id: rows[0].id,
     title: rows[0].title,
     description: rows[0].description,
-    openAt: rows[0].open_at,
-    closeAt: rows[0].close_at,
+    openAt: toIsoUtc(rows[0].open_at),
+    closeAt: toIsoUtc(rows[0].close_at),
     timeLimitMinutes: rows[0].time_limit_minutes != null ? Number(rows[0].time_limit_minutes) : null,
     passScorePercent: rows[0].pass_score_percent != null ? Number(rows[0].pass_score_percent) : null,
     maxAttempts: rows[0].max_attempts != null ? Number(rows[0].max_attempts) : null,
@@ -798,8 +837,9 @@ async function getAssessmentForUser(assessmentId, userId) {
     const attempt = attemptRows[0];
     const timeLimitMinutes = base.timeLimitMinutes;
     let remainingSeconds = null;
-    if (attempt.status === 'in_progress' && timeLimitMinutes != null && attempt.started_at) {
-      const startedAtMs = new Date(attempt.started_at).getTime();
+    const attemptStartedAt = toIsoUtc(attempt.started_at);
+    if (attempt.status === 'in_progress' && timeLimitMinutes != null && attemptStartedAt) {
+      const startedAtMs = Date.parse(attemptStartedAt);
       if (Number.isFinite(startedAtMs)) {
         const limitSeconds = Number(timeLimitMinutes) * 60;
         const elapsedSeconds = Math.floor((Date.now() - startedAtMs) / 1000);
@@ -810,8 +850,8 @@ async function getAssessmentForUser(assessmentId, userId) {
       id: attempt.id,
       attemptNumber: Number(attempt.attempt_number),
       status: attempt.status,
-      startedAt: attempt.started_at,
-      completedAt: attempt.completed_at,
+      startedAt: attemptStartedAt,
+      completedAt: toIsoUtc(attempt.completed_at),
       scorePercent: attempt.score_percent != null ? Number(attempt.score_percent) : null,
       remainingSeconds
     };
@@ -855,7 +895,7 @@ async function createAttempt(assessment, userId) {
         maxAttempts: assessment.maxAttempts != null ? Number(assessment.maxAttempts) : null,
         createdBy: assessment.created_by,
         title: assessment.title,
-        startedAt: existing.started_at
+        startedAt: toIsoUtc(existing.started_at)
       };
     }
 
@@ -872,12 +912,14 @@ async function createAttempt(assessment, userId) {
 
     const row = assessmentRow[0];
     const now = new Date();
-    if (new Date(row.open_at) > now) {
+    const openAtIso = toIsoUtc(row.open_at);
+    const closeAtIso = toIsoUtc(row.close_at);
+    if (openAtIso && new Date(openAtIso) > now) {
       const error = new Error('Аттестация ещё не открыта');
       error.status = 400;
       throw error;
     }
-    if (new Date(row.close_at) < now) {
+    if (closeAtIso && new Date(closeAtIso) < now) {
       const error = new Error('Аттестация уже закрыта');
       error.status = 400;
       throw error;
@@ -896,7 +938,7 @@ async function createAttempt(assessment, userId) {
 
     const [insertResult] = await connection.execute(
       `INSERT INTO assessment_attempts (assessment_id, user_id, attempt_number, status, started_at, created_at, updated_at)
-       VALUES (?, ?, ?, 'in_progress', NOW(), NOW(), NOW())`,
+       VALUES (?, ?, ?, 'in_progress', UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
       [assessment.id, userId, attemptNumber]
     );
 
@@ -967,8 +1009,8 @@ async function saveAnswer({ attemptId, userId, questionId, optionId }) {
 
     await connection.execute(
       `INSERT INTO assessment_answers (attempt_id, question_id, option_id, is_correct, answered_at, created_at)
-       VALUES (?, ?, ?, ?, NOW(), NOW())
-       ON DUPLICATE KEY UPDATE option_id = VALUES(option_id), is_correct = VALUES(is_correct), answered_at = NOW()`
+       VALUES (?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+       ON DUPLICATE KEY UPDATE option_id = VALUES(option_id), is_correct = VALUES(is_correct), answered_at = UTC_TIMESTAMP()`
       , [attemptId, questionId, optionId, isCorrect]
     );
 
@@ -1033,9 +1075,9 @@ async function completeAttempt(attemptId, userId) {
              score_percent = ?,
              correct_answers = ?,
              total_questions = ?,
-             time_spent_seconds = TIMESTAMPDIFF(SECOND, started_at, NOW()),
-             completed_at = NOW(),
-             updated_at = NOW()
+             time_spent_seconds = TIMESTAMPDIFF(SECOND, started_at, UTC_TIMESTAMP()),
+             completed_at = UTC_TIMESTAMP(),
+             updated_at = UTC_TIMESTAMP()
        WHERE id = ?`,
       [scorePercent, correctAnswers, totalQuestions, attemptId]
     );
@@ -1168,8 +1210,8 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
     correctAnswers: row.correct_answers != null ? Number(row.correct_answers) : null,
     totalQuestions: row.total_questions != null ? Number(row.total_questions) : null,
     timeSpentSeconds: row.time_spent_seconds != null ? Number(row.time_spent_seconds) : null,
-    startedAt: row.started_at,
-    completedAt: row.completed_at
+    startedAt: toIsoUtc(row.started_at),
+    completedAt: toIsoUtc(row.completed_at)
   }));
 
   return {
@@ -1187,8 +1229,8 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
       correctAnswers: attempt.correct_answers != null ? Number(attempt.correct_answers) : null,
       totalQuestions: attempt.total_questions != null ? Number(attempt.total_questions) : null,
       timeSpentSeconds: attempt.time_spent_seconds != null ? Number(attempt.time_spent_seconds) : null,
-      startedAt: attempt.started_at,
-      completedAt: attempt.completed_at,
+      startedAt: toIsoUtc(attempt.started_at),
+      completedAt: toIsoUtc(attempt.completed_at),
       passed:
         attempt.score_percent != null && attempt.pass_score_percent != null
           ? Number(attempt.score_percent) >= Number(attempt.pass_score_percent)

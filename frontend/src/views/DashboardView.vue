@@ -1,176 +1,430 @@
 <template>
-  <PageContainer title="Добро пожаловать" :subtitle="userName">
-    <LoadingState v-if="isLoading" />
-    <InfoCard v-else-if="participationAllowed" title="Ваш прогресс">
-      <div class="progress">
-        <div>
-          <span class="progress__label">Уровень</span>
-          <span class="progress__value">{{ level }}</span>
-        </div>
-        <div>
-          <span class="progress__label">Очки</span>
-          <span class="progress__value">{{ points }}</span>
-        </div>
+  <div class="page-container">
+    <div class="container">
+      <!-- Welcome Section -->
+      <div class="welcome-section mb-24">
+        <h1 class="title-large">Привет, {{ userStore.user?.firstName }} 👋</h1>
       </div>
-      <div class="progress-bar">
-        <div class="progress-bar__inner" :style="progressStyle" />
-      </div>
-      <p class="hint">{{ nextLevelHint }}</p>
-      <div class="stats">
-        <div>
-          <span class="stats__label">Стрик</span>
-          <span class="stats__value">{{ streakText }}</span>
-        </div>
-        <div>
-          <span class="stats__label">Очки за месяц</span>
-          <span class="stats__value">{{ monthlyPoints }}</span>
-        </div>
-      </div>
-    </InfoCard>
-    <InfoCard v-else title="Геймификация">
-      <p class="hint">Игровые элементы доступны только сотрудникам. Вы можете контролировать их прогресс и награды из других разделов.</p>
-    </InfoCard>
 
-    <InfoCard title="Ближайшие действия">
-      <ul class="todo">
-        <li>Следите за новыми аттестациями — раздел откроется на втором этапе.</li>
-        <li>Проверяйте прогресс коллег в лидербордах, как только появятся данные.</li>
-        <li>Дополняйте профиль, чтобы управляющий видел актуальную информацию.</li>
-      </ul>
-    </InfoCard>
-  </PageContainer>
+      <!-- Next Assessment Card -->
+      <div class="card card-large mb-12">
+        <div v-if="nextAssessment" class="assessment-card">
+          <h3 class="title-medium mb-8">{{ nextAssessment.title }}</h3>
+          <p class="body-small mb-12">{{ formatDateRange(nextAssessment.startDate, nextAssessment.endDate) }}</p>
+
+          <div class="assessment-status mb-16">
+            <span class="badge" :class="getStatusClass(nextAssessment.status)">
+              {{ getStatusText(nextAssessment.status) }}
+            </span>
+          </div>
+
+          <button v-if="nextAssessment.status === 'open'" class="btn btn-primary btn-full" @click="startAssessment(nextAssessment.id)">Начать</button>
+          <button v-else class="btn btn-primary btn-full" disabled>
+            {{ nextAssessment.status === "pending" ? "Ожидает открытия" : "Завершена" }}
+          </button>
+        </div>
+
+        <div v-else class="no-assessment">
+          <div class="empty-icon mb-16">📄</div>
+          <h3 class="title-small mb-8">Нет активных аттестаций</h3>
+          <p class="body-small text-secondary">Новые аттестации появятся здесь</p>
+        </div>
+      </div>
+
+      <!-- Progress Section -->
+      <div class="card card-large mb-12">
+        <h3 class="title-small mb-16">Ваш прогресс</h3>
+
+        <div class="level-info mb-16">
+          <div class="flex flex-between mb-8">
+            <span class="body-medium">Текущий уровень: {{ userStore.user?.level }}</span>
+          </div>
+
+          <div class="progress-bar mb-8">
+            <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
+          </div>
+
+          <div class="progress-text">
+            <span class="body-small">{{ userStore.user?.points }} / {{ userStore.user?.nextLevelPoints }} очков до следующего уровня</span>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value">{{ userStats.completed }}</div>
+            <div class="stat-label">Пройдено</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">{{ userStats.average }}%</div>
+            <div class="stat-label">Средний балл</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">{{ userStats.badges }}</div>
+            <div class="stat-label">Бейджей</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="card">
+        <h3 class="title-small mb-16">Последняя активность</h3>
+
+        <div v-if="recentActivity.length" class="activity-list">
+          <div v-for="activity in recentActivity" :key="activity.id" class="activity-item">
+            <div class="activity-icon">{{ activity.icon }}</div>
+            <div class="activity-content">
+              <div class="activity-title">{{ activity.title }}</div>
+              <div class="activity-date">{{ formatDate(activity.date) }}</div>
+            </div>
+            <div class="activity-result" v-if="activity.result">
+              <span class="badge" :class="activity.result.success ? 'badge-success' : 'badge-error'"> {{ activity.result.score }}% </span>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="empty-state">
+          <p class="body-small text-secondary">Активность отсутствует</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
-<script setup>
-import { computed, onMounted } from 'vue';
-import { storeToRefs } from 'pinia';
-import PageContainer from '../components/PageContainer.vue';
-import InfoCard from '../components/InfoCard.vue';
-import LoadingState from '../components/LoadingState.vue';
-import { useAppStore } from '../store/appStore';
-import { useGamificationStore } from '../store/gamificationStore';
+<script>
+import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { useUserStore } from "../stores/user";
+import { useTelegramStore } from "../stores/telegram";
+import { apiClient } from "../services/apiClient";
 
-const appStore = useAppStore();
-const { user } = storeToRefs(appStore);
-const gamificationStore = useGamificationStore();
+export default {
+  name: "DashboardView",
+  setup() {
+    const router = useRouter();
+    const userStore = useUserStore();
+    const telegramStore = useTelegramStore();
 
-const isLoading = computed(
-  () => (appStore.isLoading && !appStore.user) || gamificationStore.isLoading
-);
+    const nextAssessment = ref(null);
+    const userStats = ref({
+      completed: 0,
+      average: 0,
+      badges: 0,
+    });
+    const recentActivity = ref([]);
+    const isDataLoading = ref(false);
 
-const participationAllowed = computed(() => gamificationStore.participationAllowed);
+    const progressPercentage = computed(() => {
+      const user = userStore.user;
+      if (!user) return 0;
+      return Math.min((user.points / user.nextLevelPoints) * 100, 100);
+    });
 
-const userName = computed(() => {
-  if (!user.value) {
-    return 'Пройдите регистрацию';
-  }
-  return `${user.value.firstName} ${user.value.lastName}`;
-});
+    function getStatusClass(status) {
+      switch (status) {
+        case "open":
+          return "badge-primary";
+        case "pending":
+          return "badge-neutral";
+        case "closed":
+          return "badge-neutral";
+        default:
+          return "badge-neutral";
+      }
+    }
 
-const progressStyle = computed(() => {
-  const percent = gamificationStore.progressPercent;
-  const safePercent = Number.isFinite(percent) ? Math.max(0, Math.min(percent, 100)) : 0;
-  return { width: `${safePercent}%` };
-});
+    function getStatusText(status) {
+      switch (status) {
+        case "open":
+          return "Открыта";
+        case "pending":
+          return "Ожидает";
+        case "closed":
+          return "Закрыта";
+        default:
+          return "Неизвестно";
+      }
+    }
 
-const nextLevelHint = computed(() => {
-  const nextLevel = gamificationStore.nextLevel;
-  if (!nextLevel) {
-    return 'Максимальный уровень достигнут';
-  }
-  return `До ${nextLevel.name}: ещё ${nextLevel.pointsToReach} очков`;
-});
+    function formatDate(date) {
+      return new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date(date));
+    }
 
-const streakText = computed(() => {
-  const stats = gamificationStore.overview?.stats;
-  const current = stats?.currentStreak || 0;
-  const longest = stats?.longestStreak || 0;
-  if (!current && !longest) {
-    return 'нет серии';
-  }
-  if (current) {
-    return `${current} подряд (макс. ${longest})`;
-  }
-  return `макс. серия ${longest}`;
-});
+    function formatDateRange(startDate, endDate) {
+      const start = new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "short",
+      }).format(new Date(startDate));
 
-const monthlyPoints = computed(() => gamificationStore.overview?.monthlyPoints || 0);
+      const end = new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "short",
+      }).format(new Date(endDate));
 
-const points = computed(() => gamificationStore.userPoints || user.value?.points || 0);
-const level = computed(() => gamificationStore.userLevel || user.value?.level || 1);
+      return `${start} - ${end}`;
+    }
 
-onMounted(() => {
-  if (appStore.isAuthenticated) {
-    appStore.refreshProfile();
-    gamificationStore.loadOverview().catch(() => {});
-  }
-});
+    async function startAssessment(id) {
+      telegramStore.hapticFeedback("impact", "light");
+      router.push(`/assessment/${id}`);
+    }
+
+    function normalizeAssessment(item) {
+      if (!item) {
+        return null;
+      }
+
+      const threshold = Number.isFinite(item.passScorePercent) ? Math.round(item.passScorePercent) : null;
+      const bestScore = Number.isFinite(item.bestScorePercent) ? Math.round(item.bestScorePercent) : null;
+      const lastScore = Number.isFinite(item.lastScorePercent) ? Math.round(item.lastScorePercent) : null;
+      const hasPassed = bestScore != null && threshold != null ? bestScore >= threshold : false;
+      const attemptsUsed = Number.isFinite(item.lastAttemptNumber) ? Number(item.lastAttemptNumber) : 0;
+      const maxAttempts = Number.isFinite(item.maxAttempts) ? Number(item.maxAttempts) : 1;
+
+      let status = "pending";
+      if (item.status === "active") {
+        status = "open";
+      } else if (item.status === "closed") {
+        status = "closed";
+      } else if (item.status === "pending") {
+        status = "pending";
+      }
+
+      if (hasPassed || item.lastAttemptStatus === "completed") {
+        status = "completed";
+      }
+
+      return {
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        status,
+        startDate: item.openAt,
+        endDate: item.closeAt,
+        threshold: threshold ?? 0,
+        maxAttempts,
+        attemptsUsed,
+        lastAttemptStatus: item.lastAttemptStatus,
+        lastCompletedAt: item.lastCompletedAt,
+        lastStartedAt: item.lastStartedAt,
+        bestResult:
+          bestScore != null
+            ? {
+                score: bestScore,
+                passed: hasPassed,
+              }
+            : lastScore != null
+              ? {
+                  score: lastScore,
+                  passed: threshold != null ? lastScore >= threshold : false,
+                }
+              : null,
+      };
+    }
+
+    async function loadDashboardData() {
+      if (!userStore.isInitialized) {
+        await userStore.ensureStatus();
+      }
+
+      isDataLoading.value = true;
+      try {
+        await userStore.loadOverview();
+
+        const [{ assessments }] = await Promise.all([
+          apiClient.listUserAssessments(),
+        ]);
+
+        const normalized = (assessments || []).map((item) => normalizeAssessment(item)).filter(Boolean);
+
+        // Вычисляем ближайшую аттестацию
+        const upcoming = normalized
+          .filter((assessment) => assessment.status === "open" || assessment.status === "pending")
+          .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+
+        nextAssessment.value = upcoming.length ? upcoming[0] : null;
+
+        const completedAssessments = normalized.filter((assessment) => assessment.bestResult != null);
+        const averageScore = completedAssessments.length
+          ? Math.round(
+              completedAssessments.reduce((acc, assessment) => acc + (assessment.bestResult?.score || 0), 0) /
+                completedAssessments.length
+            )
+          : 0;
+
+        const earnedBadges = Array.isArray(userStore.overview?.badges)
+          ? userStore.overview.badges.filter((badge) => badge.earned).length
+          : 0;
+
+        userStats.value = {
+          completed: completedAssessments.length,
+          average: averageScore,
+          badges: earnedBadges,
+        };
+
+        recentActivity.value = normalized
+          .filter((assessment) => assessment.lastCompletedAt || assessment.lastStartedAt)
+          .sort((a, b) => {
+            const left = a.lastCompletedAt || a.lastStartedAt;
+            const right = b.lastCompletedAt || b.lastStartedAt;
+            return new Date(right).getTime() - new Date(left).getTime();
+          })
+          .slice(0, 5)
+          .map((assessment) => {
+            const timestamp = assessment.lastCompletedAt || assessment.lastStartedAt;
+            return {
+              id: `${assessment.id}-${timestamp}`,
+              icon: assessment.bestResult?.passed ? "✅" : assessment.bestResult ? "❌" : "📄",
+              title: assessment.title,
+              date: timestamp,
+              result: assessment.bestResult
+                ? {
+                    success: assessment.bestResult.passed,
+                    score: assessment.bestResult.score,
+                  }
+                : null,
+            };
+          });
+      } catch (error) {
+        console.error("Не удалось загрузить данные дашборда", error);
+        recentActivity.value = [];
+      } finally {
+        isDataLoading.value = false;
+      }
+    }
+
+    onMounted(() => {
+      loadDashboardData();
+    });
+
+    return {
+      userStore,
+      nextAssessment,
+      userStats,
+      recentActivity,
+      progressPercentage,
+      isDataLoading,
+      getStatusClass,
+      getStatusText,
+      formatDate,
+      formatDateRange,
+      startAssessment,
+    };
+  },
+};
 </script>
 
 <style scoped>
-.progress {
+.welcome-section {
+  padding-top: 20px;
+}
+
+.assessment-card {
+  text-align: center;
+}
+
+.no-assessment {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.level-info {
+  background-color: var(--bg-primary);
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.stats-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
 }
 
-.progress__label {
-  color: var(--tg-theme-hint-color, #6f7a8b);
-  font-size: 12px;
+.stat-item {
+  text-align: center;
+  padding: 12px 8px;
+  background-color: var(--bg-primary);
+  border-radius: 8px;
 }
 
-.progress__value {
+.stat-value {
   font-size: 20px;
   font-weight: 700;
+  color: var(--accent-blue);
+  margin-bottom: 4px;
 }
 
-.progress-bar {
-  width: 100%;
-  height: 8px;
-  background: rgba(0, 0, 0, 0.08);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.progress-bar__inner {
-  height: 100%;
-  background: var(--tg-theme-button-color, #0a84ff);
-  transition: width 0.3s ease;
-}
-
-.hint {
-  margin: 0;
-  color: var(--tg-theme-hint-color, #6f7a8b);
-  font-size: 13px;
-}
-
-.stats {
-  margin-top: 16px;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-
-.stats__label {
-  color: var(--tg-theme-hint-color, #6f7a8b);
+.stat-label {
   font-size: 12px;
+  color: var(--text-secondary);
 }
 
-.stats__value {
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.todo {
-  margin: 0;
-  padding-left: 18px;
+.activity-item {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  color: var(--tg-theme-text-color, #0a0a0a);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--divider);
 }
 
-.todo li {
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 14px;
+}
+
+.activity-content {
+  flex: 1;
+}
+
+.activity-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.activity-date {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.empty-state {
+  padding: 20px 0;
+  text-align: center;
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    gap: 12px;
+  }
+
+  .stat-item {
+    padding: 10px 6px;
+  }
+
+  .stat-value {
+    font-size: 18px;
+  }
 }
 </style>

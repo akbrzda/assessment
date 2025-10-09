@@ -1,120 +1,176 @@
-import { createRouter, createWebHashHistory } from "vue-router";
-import DashboardView from "../views/DashboardView.vue";
-import RegisterView from "../views/RegisterView.vue";
-import InviteView from "../views/InviteView.vue";
-import ProfileView from "../views/ProfileView.vue";
-import GamificationView from "../views/GamificationView.vue";
-import SettingsView from "../views/SettingsView.vue";
-import AnalyticsView from "../views/AnalyticsView.vue";
-import AssessmentEditorView from "../views/AssessmentEditorView.vue";
-import AssessmentDetailView from "../views/AssessmentDetailView.vue";
-import AssessmentsView from "../views/AssessmentsView.vue";
-import AssessmentRunView from "../views/AssessmentRunView.vue";
-import AssessmentResultView from "../views/AssessmentResultView.vue";
-import { useAppStore } from "../store/appStore";
-import { hideBackButton } from "../services/telegram";
+import { createRouter, createWebHistory } from "vue-router";
+import { useUserStore } from "../stores/user";
 
 const routes = [
-  { path: "/", redirect: "/dashboard" },
-  { path: "/dashboard", name: "dashboard", component: DashboardView, meta: { requiresAuth: true } },
-  { path: "/register", name: "register", component: RegisterView },
-  { path: "/invite", name: "invite", component: InviteView },
-  { path: "/profile", name: "profile", component: ProfileView, meta: { requiresAuth: true } },
-  { path: "/assessments", name: "assessments", component: AssessmentsView, meta: { requiresAuth: true } },
-  { path: "/leaderboard", name: "leaderboard", component: GamificationView, meta: { requiresAuth: true } },
   {
-    path: "/analytics",
-    name: "analytics",
-    component: AnalyticsView,
-    meta: { requiresAuth: true, allowedRoles: ["superadmin", "manager"] },
+    path: "/",
+    redirect: "/dashboard",
   },
   {
-    path: "/settings",
-    name: "settings",
-    component: SettingsView,
-    meta: { requiresAuth: true, requiresSuperAdmin: true },
+    path: "/registration",
+    name: "registration",
+    component: () => import("../views/RegistrationView.vue"),
   },
   {
-    path: "/assessments/new",
+    path: "/invitation",
+    name: "invitation",
+    component: () => import("../views/InvitationView.vue"),
+  },
+  {
+    path: "/dashboard",
+    name: "dashboard",
+    component: () => import("../views/DashboardView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/assessments",
+    name: "assessments",
+    component: () => import("../views/AssessmentsView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/assessment/:id",
+    name: "assessment-process",
+    component: () => import("../views/AssessmentProcessView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/assessment-results/:id",
+    name: "assessment-results",
+    component: () => import("../views/AssessmentResultsView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/leaderboard",
+    name: "leaderboard",
+    component: () => import("../views/LeaderboardView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/profile",
+    name: "profile",
+    component: () => import("../views/ProfileView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/statistics",
+    name: "statistics",
+    component: () => import("../views/admin/StatisticsView.vue"),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: "/admin",
+    name: "admin",
+    component: () => import("../views/AdminDashboard.vue"),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: "/admin/dashboard",
+    name: "admin-dashboard",
+    component: () => import("../views/AdminDashboard.vue"),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: "/admin/users",
+    name: "admin-users",
+    component: () => import("../views/admin/UsersView.vue"),
+    meta: { requiresAuth: true, requiresAdmin: true, requiresSuperAdmin: true },
+  },
+  {
+    path: "/admin/assessments",
+    name: "admin-assessments",
+    component: () => import("../views/admin/AssessmentsView.vue"),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: "/admin/branches",
+    name: "admin-branches",
+    component: () => import("../views/admin/BranchesView.vue"),
+    meta: { requiresAuth: true, requiresAdmin: true, requiresSuperAdmin: true },
+  },
+  {
+    path: "/admin/invitations",
+    name: "admin-invitations",
+    component: () => import("../views/admin/InvitationsView.vue"),
+    meta: { requiresAuth: true, requiresAdmin: true, requiresSuperAdmin: true },
+  },
+  {
+    path: "/admin/assessments/create",
     name: "assessment-create",
-    component: AssessmentEditorView,
-    meta: { requiresAuth: true, allowedRoles: ["superadmin", "manager"] },
+    component: () => import("../views/AssessmentEditorView.vue"),
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
-    path: "/assessments/:id/edit",
+    path: "/admin/assessments/:id/edit",
     name: "assessment-edit",
-    component: AssessmentEditorView,
-    meta: { requiresAuth: true, allowedRoles: ["superadmin", "manager"] },
+    component: () => import("../views/AssessmentEditorView.vue"),
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
-  {
-    path: "/assessments/:id",
-    name: "assessment-detail",
-    component: AssessmentDetailView,
-    meta: { requiresAuth: true, allowedRoles: ["superadmin", "manager"] },
-  },
-  {
-    path: "/assessments/:id/start",
-    name: "assessment-start",
-    component: AssessmentRunView,
-    meta: { requiresAuth: true },
-  },
-  {
-    path: "/assessments/:id/results/:attemptId",
-    name: "assessment-result",
-    component: AssessmentResultView,
-    meta: { requiresAuth: true },
-  },
-  { path: "/:pathMatch(.*)*", redirect: "/dashboard" },
 ];
 
 const router = createRouter({
-  history: createWebHashHistory(),
+  history: createWebHistory(),
   routes,
 });
 
-let isGuardRegistered = false;
-
 router.beforeEach(async (to, from, next) => {
-  const appStore = useAppStore();
+  const userStore = useUserStore();
 
-  if (!isGuardRegistered) {
-    isGuardRegistered = true;
+  // Инициализируем стор если нужно - ВСЕГДА ждем инициализации
+  try {
+    await userStore.ensureStatus();
+  } catch (error) {
+    console.error("Не удалось проверить авторизацию", error);
+    // При ошибке авторизации стараемся отправить пользователя в регистрацию
+    if (to.meta.requiresAuth && to.name !== "registration") {
+      return next("/registration");
+    }
   }
 
-  if (!appStore.isInitialized && !appStore.isLoading) {
-    await appStore.ensureReady();
-  }
-
-  if (appStore.error) {
+  // Если есть ошибка авторизации, но это не защищенная страница - пропускаем
+  if (userStore.error && !to.meta.requiresAuth) {
     return next();
   }
 
-  const isAuthenticated = appStore.isAuthenticated;
+  const isAuthenticated = userStore.isAuthenticated;
+  const hasInvitation = Boolean(userStore.invitation);
 
+  // Если пользователь не авторизован
   if (!isAuthenticated) {
-    if (appStore.invitation && !appStore.invitationAccepted && to.name !== "invite") {
-      return next({ name: "invite" });
+    // Если есть приглашение - направляем на страницу приглашения
+    if (hasInvitation) {
+      if (to.name !== "invitation") {
+        return next({ name: "invitation" });
+      }
+      return next();
     }
-    if (to.meta.requiresAuth) {
-      return next({ name: appStore.invitation ? "invite" : "register" });
+
+    // Если нет приглашения - направляем на регистрацию
+    if (to.name !== "registration") {
+      return next({ name: "registration" });
     }
+
+    return next();
   } else {
-    if (appStore.invitation && !appStore.invitationAccepted && to.name !== "invite") {
-      return next({ name: "invite" });
-    }
-    if (to.meta.requiresSuperAdmin && !appStore.isSuperAdmin) {
+    // Пользователь авторизован
+    const currentRoute = to.name;
+    // Защищаем от повторного попадания на страницы регистрации/приглашения
+    if (["registration", "invitation"].includes(currentRoute)) {
       return next({ name: "dashboard" });
     }
-    if (to.meta.allowedRoles && !to.meta.allowedRoles.includes(appStore.user?.roleName)) {
+
+    // Проверка прав администратора
+    if (to.meta.requiresAdmin && !userStore.isAdmin) {
       return next({ name: "dashboard" });
     }
-    if (["register", "invite"].includes(to.name)) {
-      return next({ name: "dashboard" });
+
+    // Проверка прав суперадмина
+    if (to.meta.requiresSuperAdmin && !userStore.isSuperAdmin) {
+      return next({ name: "admin-dashboard" });
     }
   }
 
-  hideBackButton();
-  return next();
+  next();
 });
 
 export default router;

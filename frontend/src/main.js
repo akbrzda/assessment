@@ -1,18 +1,18 @@
-import { createApp } from 'vue';
-import { createPinia } from 'pinia';
-import App from './App.vue';
-import router from './router';
-import './style.css';
-
-if (typeof window !== 'undefined') {
-  const { pathname, hash } = window.location;
-  if (pathname.startsWith('/tgWebAppData')) {
-    const normalizedHash = hash && hash.length > 1 ? hash : '#/';
-    window.history.replaceState({}, '', `${window.location.origin}/${normalizedHash}`);
-  }
-}
+import { createApp } from "vue";
+import { createPinia } from "pinia";
+import "./style.css";
+import App from "./App.vue";
+import router from "./router/index.js";
 
 const app = createApp(App);
-app.use(createPinia());
+const pinia = createPinia();
+
+app.use(pinia);
 app.use(router);
-app.mount('#app');
+
+// Инициализируем Telegram store после создания Pinia
+import { useTelegramStore } from "./stores/telegram.js";
+const telegramStore = useTelegramStore();
+telegramStore.initTelegram();
+
+app.mount("#app");

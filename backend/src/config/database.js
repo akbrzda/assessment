@@ -8,7 +8,8 @@ const pool = mysql.createPool({
   password: config.db.password,
   database: config.db.database,
   connectionLimit: 10,
-  dateStrings: true
+  dateStrings: true,
+  timezone: 'Z'
 });
 
 async function healthCheck() {

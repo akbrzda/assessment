@@ -1,450 +1,535 @@
 <template>
-  <PageContainer title="Профиль" subtitle="Личные данные">
-    <div class="profile-header">
-      <AvatarCircle :avatar-url="avatarUrl" :first-name="profileUser.firstName" :last-name="profileUser.lastName" :size="72" />
-      <div class="profile-header__text">
-        <h2 class="profile-header__name">{{ fullName }}</h2>
-        <span class="profile-header__role">{{ roleLabel }}</span>
-      </div>
-    </div>
+  <div class="page-container">
+    <div class="container">
+      <!-- User Avatar and Info -->
+      <div class="profile-header">
+        <div class="avatar-section mb-20">
+          <div class="avatar-large">
+            <img v-if="user?.avatar" :src="user.avatar" :alt="user?.firstName" />
+            <span v-else class="initials">{{ userStore.initials }}</span>
+          </div>
+        </div>
 
-    <InfoCard title="Основная информация">
-      <div class="info-row">
-        <span class="info-label">ФИО</span>
-        <span v-if="!isEditing" class="info-value">{{ fullName }}</span>
-        <div v-else class="edit-group">
-          <label class="edit-field">
-            <span class="edit-field__label">Имя</span>
-            <BaseInput v-model="form.firstName" placeholder="Имя" />
-          </label>
-          <label class="edit-field">
-            <span class="edit-field__label">Фамилия</span>
-            <BaseInput v-model="form.lastName" placeholder="Фамилия" />
-          </label>
+        <div class="user-info mb-24">
+          <h1 class="title-large mb-8">{{ userStore.fullName }}</h1>
+          <p class="body-medium text-secondary">{{ user?.position }} • {{ getBranchName(user?.branch) }}</p>
         </div>
-      </div>
-      <div class="info-row">
-        <span class="info-label">Должность</span>
-        <span class="info-value">{{ user?.positionName }}</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">Филиал</span>
-        <span class="info-value">{{ user?.branchName }}</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">Роль</span>
-        <span class="info-value">{{ roleLabel }}</span>
-      </div>
-      <button v-if="!isEditing" class="edit-button" type="button" @click="startEdit">
-        Редактировать
-      </button>
-    </InfoCard>
 
-    <InfoCard v-if="participationAllowed" title="Статистика">
-      <div class="stats">
-        <div class="stats__item">
-          <span class="stats__label">Уровень</span>
-          <span class="stats__value">{{ gamificationStore.userLevel || user?.level }}</span>
-        </div>
-        <div class="stats__item">
-          <span class="stats__label">Очки</span>
-          <span class="stats__value">{{ gamificationStore.userPoints || user?.points }}</span>
-        </div>
-        <div class="stats__item">
-          <span class="stats__label">Текущая серия</span>
-          <span class="stats__value">{{ gamificationStore.overview?.stats?.currentStreak || 0 }}</span>
-        </div>
-        <div class="stats__item">
-          <span class="stats__label">Максимальная серия</span>
-          <span class="stats__value">{{ gamificationStore.overview?.stats?.longestStreak || 0 }}</span>
+        <!-- Action Buttons -->
+        <div class="action-buttons mb-24">
+          <button class="btn-icon" @click="editProfile">
+            <EditIcon />
+          </button>
+          <button v-if="userStore.isAdmin" class="btn-icon" @click="openSettings">
+            <SettingsIcon />
+          </button>
         </div>
       </div>
-    </InfoCard>
-    <InfoCard v-else title="Статистика">
-      <p class="hint">Геймификация и накопление очков доступны только сотрудникам. Вы можете управлять наградами и видеть информацию коллег через админ-панель.</p>
-    </InfoCard>
 
-    <InfoCard title="Бейджи">
-      <div v-if="participationAllowed && badges.length" class="badges">
-        <div
-          v-for="badge in badges"
-          :key="badge.code"
-          class="badge"
-          :class="{ 'badge--locked': !badge.earned }"
-        >
-          <span class="badge__icon">{{ badge.icon || (badge.earned ? '🎖' : '⬜️') }}</span>
-          <div class="badge__info">
-            <span class="badge__name">{{ badge.name }}</span>
-            <span class="badge__desc">{{ badge.description }}</span>
-            <span v-if="badge.earned && badge.awardedAt" class="badge__date">
-              Получен {{ formatAwardDate(badge.awardedAt) }}
-            </span>
-            <span v-else class="badge__date badge__date--muted">Пока не получен</span>
+      <!-- Level Progress -->
+      <div class="card mb-12">
+        <h3 class="title-small mb-16">Уровень: {{ user?.level }}</h3>
+
+        <div class="progress-section">
+          <div class="progress-bar mb-8">
+            <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
+          </div>
+
+          <div class="progress-info">
+            <span class="body-small">{{ user?.points }} / {{ user?.nextLevelPoints }} очков</span>
           </div>
         </div>
       </div>
-      <p v-else-if="participationAllowed" class="hint">Первые награды появятся после прохождения аттестаций.</p>
-      <p v-else class="hint">Бейджи начисляются только сотрудникам. Используйте админ-панель, чтобы управлять наградами для команды.</p>
-    </InfoCard>
 
-    <InfoCard v-if="isSuperAdmin" title="Администрирование">
-      <div class="admin-actions">
-        <button class="primary-button" type="button" @click="goToSettings">
-          Настройки
-        </button>
+      <!-- Badges -->
+      <div class="card mb-12">
+        <h3 class="title-small mb-16">Бейджи</h3>
+
+        <div v-if="badges.length" class="badges-grid">
+          <div v-for="badge in badges" :key="badge.id" class="badge-item" :class="{ earned: badge.earned }" @click="showBadgeDetails(badge)">
+            <div class="badge-icon">{{ badge.icon }}</div>
+            <div class="badge-name">{{ badge.name }}</div>
+          </div>
+        </div>
+
+        <div v-else class="empty-state">
+          <p class="body-small text-secondary">Бейджи появятся здесь</p>
+        </div>
       </div>
-    </InfoCard>
-  </PageContainer>
+
+      <!-- Statistics -->
+      <div class="card">
+        <h3 class="title-small mb-16">Статистика</h3>
+
+        <div class="stats-list">
+          <div class="stat-row">
+            <span class="stat-label">Пройдено аттестаций</span>
+            <span class="stat-value">{{ userStats.completed }}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Средний балл</span>
+            <span class="stat-value">{{ userStats.averageScore }}%</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Успешных прохождений</span>
+            <span class="stat-value">{{ userStats.successful }}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Место в рейтинге</span>
+            <span class="stat-value">{{ userStats.rank !== null ? "#" + userStats.rank : "—" }}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Общее время</span>
+            <span class="stat-value">{{ userStats.totalTime }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div v-if="showEditModal" class="modal-overlay" @click="closeEditModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h2 class="title-medium">Редактировать профиль</h2>
+          <button class="btn-icon" @click="closeEditModal">
+            <CloseIcon />
+          </button>
+        </div>
+
+        <form @submit.prevent="saveProfile" class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Имя</label>
+            <input v-model="editForm.firstName" type="text" class="form-input" required />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Фамилия</label>
+            <input v-model="editForm.lastName" type="text" class="form-input" required />
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-full" :disabled="isLoading || !hasChanges">
+              {{ isLoading ? "Сохранение..." : "Сохранить" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 </template>
 
-<script setup>
-import { computed, reactive, ref, watch, onBeforeUnmount, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import PageContainer from '../components/PageContainer.vue';
-import InfoCard from '../components/InfoCard.vue';
-import AvatarCircle from '../components/common/AvatarCircle.vue';
-import { useAppStore } from '../store/appStore';
-import { useGamificationStore } from '../store/gamificationStore';
-import {
-  setMainButton,
-  hideMainButton,
-  showAlert,
-  showBackButton,
-  showMainButtonProgress,
-  hideMainButtonProgress
-} from '../services/telegram';
-import BaseInput from '../components/common/BaseInput.vue';
+<script>
+import { ref, computed, reactive, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { useUserStore } from "../stores/user";
+import { useTelegramStore } from "../stores/telegram";
+import { apiClient } from "../services/apiClient";
+import EditIcon from "../components/icons/EditIcon.vue";
+import SettingsIcon from "../components/icons/SettingsIcon.vue";
+import CloseIcon from "../components/icons/CloseIcon.vue";
 
-const appStore = useAppStore();
-const gamificationStore = useGamificationStore();
-const user = computed(() => appStore.user);
-const router = useRouter();
+export default {
+  name: "ProfileView",
+  components: {
+    EditIcon,
+    SettingsIcon,
+    CloseIcon,
+  },
+  setup() {
+    const router = useRouter();
+    const userStore = useUserStore();
+    const telegramStore = useTelegramStore();
 
-const defaults = computed(() => appStore.defaults || {});
+    const user = computed(() => userStore.user);
+    const isLoading = computed(() => userStore.isLoading);
 
-const form = reactive({
-  firstName: user.value?.firstName || '',
-  lastName: user.value?.lastName || ''
-});
-
-const isEditing = ref(false);
-const isSaving = ref(false);
-let cleanupButton = () => {};
-let cleanupBack = () => {};
-
-const isSuperAdmin = computed(() => appStore.isSuperAdmin);
-const avatarUrl = computed(() => user.value?.avatarUrl || defaults.value?.avatarUrl);
-const profileUser = computed(() => ({
-  firstName: user.value?.firstName || defaults.value?.firstName || '',
-  lastName: user.value?.lastName || defaults.value?.lastName || ''
-}));
-
-const participationAllowed = computed(() => gamificationStore.participationAllowed);
-
-const fullName = computed(() => {
-  const first = user.value?.firstName || defaults.value?.firstName || '';
-  const last = user.value?.lastName || defaults.value?.lastName || '';
-  return `${first} ${last}`.trim();
-});
-const roleLabel = computed(() => {
-  switch (user.value?.roleName) {
-    case 'superadmin':
-      return 'Суперадмин';
-    case 'manager':
-      return 'Управляющий';
-    default:
-      return 'Сотрудник';
-  }
-});
-
-const badges = computed(() => gamificationStore.overview?.badges || []);
-const hasBadges = computed(() => badges.value.some((badge) => badge.earned));
-
-function formatAwardDate(value) {
-  if (!value) {
-    return '';
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  return date.toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  });
-}
-
-function startEdit() {
-  form.firstName = user.value?.firstName || '';
-  form.lastName = user.value?.lastName || '';
-  isEditing.value = true;
-  isSaving.value = false;
-  syncActionButton();
-  cleanupBack = showBackButton(cancelEdit);
-}
-
-function cancelEdit() {
-  isEditing.value = false;
-  isSaving.value = false;
-  hideMainButtonProgress();
-  cleanupButton();
-  cleanupBack();
-  hideMainButton();
-}
-
-async function saveProfile() {
-  if (!form.firstName || form.firstName.length < 2) {
-    showAlert('Введите корректное имя');
-    return;
-  }
-  if (!form.lastName || form.lastName.length < 2) {
-    showAlert('Введите корректную фамилию');
-    return;
-  }
-  if (isSaving.value) {
-    return;
-  }
-  isSaving.value = true;
-  syncActionButton();
-  try {
-    await appStore.updateProfile({
-      firstName: form.firstName,
-      lastName: form.lastName
+    const showEditModal = ref(false);
+    const badges = ref([]);
+    const userStats = ref({
+      completed: 0,
+      averageScore: 0,
+      successful: 0,
+      rank: null,
+      totalTime: "--:--",
     });
-    hideMainButtonProgress();
-    isSaving.value = false;
-    cancelEdit();
-  } catch (error) {
-    showAlert(error.message || 'Не удалось сохранить');
-    isSaving.value = false;
-    hideMainButtonProgress();
-    if (isEditing.value) {
-      syncActionButton();
+
+    const editForm = reactive({
+      firstName: "",
+      lastName: "",
+    });
+
+    const progressPercentage = computed(() => {
+      if (!user.value) return 0;
+      return Math.min((user.value.points / user.value.nextLevelPoints) * 100, 100);
+    });
+
+    const hasChanges = computed(() => {
+      return editForm.firstName !== user.value?.firstName || editForm.lastName !== user.value?.lastName;
+    });
+
+    function getBranchName(branch) {
+      return branch || "—";
     }
-  }
-}
 
-function syncActionButton() {
-  cleanupButton();
-  if (!isEditing.value) {
-    cleanupButton = () => {};
-    return;
-  }
-  cleanupButton = setMainButton({
-    text: isSaving.value ? 'Сохраняем...' : 'Сохранить',
-    isVisible: true,
-    onClick: saveProfile
-  });
-  if (isSaving.value) {
-    showMainButtonProgress();
-  } else {
-    hideMainButtonProgress();
-  }
-}
-
-watch(
-  () => user.value,
-  (newUser) => {
-    if (newUser && !isEditing.value) {
-      form.firstName = newUser.firstName;
-      form.lastName = newUser.lastName;
+    function editProfile() {
+      editForm.firstName = user.value?.firstName || "";
+      editForm.lastName = user.value?.lastName || "";
+      showEditModal.value = true;
+      telegramStore.hapticFeedback("impact", "light");
     }
-  }
-);
 
-watch(isEditing, (editing) => {
-  if (!editing) {
-    return;
-  }
-  syncActionButton();
-});
+    function openSettings() {
+      telegramStore.hapticFeedback("impact", "light");
+      router.push("/admin");
+    }
 
-function goToSettings() {
-  router.push({ name: 'settings' });
-}
+    function closeEditModal() {
+      showEditModal.value = false;
+    }
 
-onBeforeUnmount(() => {
-  cleanupButton();
-  cleanupBack();
-  hideMainButton();
-  hideMainButtonProgress();
-});
+    async function saveProfile() {
+      const result = await userStore.updateProfile({
+        firstName: editForm.firstName,
+        lastName: editForm.lastName,
+      });
 
-onMounted(() => {
-  if (appStore.isAuthenticated) {
-    gamificationStore.loadOverview().catch(() => {});
-  }
-});
+      if (result.success) {
+        telegramStore.hapticFeedback("notification", "success");
+        telegramStore.showAlert("Профиль обновлён!");
+        showEditModal.value = false;
+      } else {
+        telegramStore.hapticFeedback("notification", "error");
+        telegramStore.showAlert(result.error || "Ошибка сохранения");
+      }
+    }
+
+    function showBadgeDetails(badge) {
+      telegramStore.hapticFeedback("impact", "light");
+      const message = badge.earned
+        ? `Бейдж "${badge.name}" получен!\n\n${badge.description}`
+        : `Бейдж "${badge.name}"\n\n${badge.description}\n\nТребования: ${badge.requirements}`;
+
+      telegramStore.showAlert(message);
+    }
+
+    function formatDuration(seconds) {
+      if (!Number.isFinite(seconds) || seconds <= 0) {
+        return "--:--";
+      }
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      if (hours > 0) {
+        return `${hours}ч ${minutes}м`;
+      }
+      const secs = seconds % 60;
+      return `${minutes}:${String(secs).padStart(2, "0")}`;
+    }
+
+    async function loadProfileData() {
+      if (!userStore.isInitialized) {
+        await userStore.ensureStatus();
+      }
+
+      await userStore.loadOverview();
+      const overview = userStore.overview;
+
+      badges.value = Array.isArray(overview?.badges)
+        ? overview.badges.map((badge) => ({
+            id: badge.code,
+            name: badge.name,
+            icon: badge.icon || "🏅",
+            earned: Boolean(badge.earned),
+            description: badge.description,
+            requirements: badge.description,
+          }))
+        : [];
+
+      try {
+        const { assessments } = await apiClient.listUserAssessments();
+        const normalized = (assessments || []).map((item) => {
+          const threshold = Number.isFinite(item.passScorePercent) ? Number(item.passScorePercent) : null;
+          const bestScore = Number.isFinite(item.bestScorePercent) ? Number(item.bestScorePercent) : null;
+          const passed = bestScore != null && threshold != null ? bestScore >= threshold : false;
+          const lastCompletedAt = item.lastCompletedAt || null;
+          return {
+            id: item.id,
+            bestScore,
+            passed,
+            lastCompletedAt,
+          };
+        });
+
+        const completed = normalized.filter((item) => item.bestScore != null).length;
+        const successful = normalized.filter((item) => item.passed).length;
+        const averageScore = completed ? Math.round(normalized.reduce((total, item) => total + (item.bestScore || 0), 0) / completed) : 0;
+
+        let userRank = "—";
+        try {
+          const leaderboard = await apiClient.getLeaderboardUsers();
+          if (leaderboard.currentUser?.rank) {
+            userRank = Number(leaderboard.currentUser.rank);
+          }
+        } catch (error) {
+          console.warn("Не удалось получить позицию в рейтинге", error);
+        }
+
+        userStats.value = {
+          completed,
+          averageScore,
+          successful,
+          rank: typeof userRank === "number" ? userRank : null,
+          totalTime: "--:--",
+        };
+      } catch (error) {
+        console.warn("Не удалось загрузить статистику аттестаций", error);
+      }
+    }
+
+    onMounted(() => {
+      loadProfileData();
+    });
+
+    return {
+      userStore,
+      user,
+      isLoading,
+      showEditModal,
+      badges,
+      userStats,
+      editForm,
+      progressPercentage,
+      hasChanges,
+      getBranchName,
+      editProfile,
+      openSettings,
+      closeEditModal,
+      saveProfile,
+      showBadgeDetails,
+    };
+  },
+};
 </script>
 
 <style scoped>
-.info-row {
+.profile-header {
+  text-align: center;
+  padding-top: 20px;
+}
+
+.avatar-section {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  justify-content: center;
 }
 
-.info-label {
-  font-size: 12px;
-  color: var(--tg-theme-hint-color, #6f7a8b);
-}
-
-.info-value {
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.edit-group {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.edit-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.edit-field__label {
-  font-size: 12px;
-  color: var(--tg-theme-hint-color, #6f7a8b);
-}
-
-.edit-group :deep(.base-control) {
-  border-radius: 10px;
-  font-size: 15px;
-}
-
-.edit-button {
-  margin-top: 12px;
-  align-self: flex-start;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: var(--tg-theme-button-color, #0a84ff);
-  color: var(--tg-theme-button-text-color, #ffffff);
-  border: none;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.stats {
-  display: flex;
-  gap: 16px;
-}
-
-.stats__item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.stats__label {
-  font-size: 12px;
-  color: var(--tg-theme-hint-color, #6f7a8b);
-}
-
-.stats__value {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.badges {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.badge {
-  display: grid;
-  grid-template-columns: 56px 1fr;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 14px;
-  background: var(--tg-theme-bg-color, #ffffff);
-}
-
-.badge--locked {
-  opacity: 0.65;
-}
-
-.badge__icon {
+.avatar-large {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background-color: var(--accent-blue);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  color: white;
+  font-weight: 700;
+  font-size: 32px;
+  overflow: hidden;
 }
 
-.badge__info {
+.avatar-large img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.action-buttons {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  justify-content: center;
+  gap: 16px;
 }
 
-.badge__name {
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.badge__desc {
-  font-size: 13px;
-  color: var(--tg-theme-hint-color, #6f7a8b);
-}
-
-.badge__date {
-  font-size: 12px;
-  color: var(--tg-theme-link-color, #0a84ff);
-}
-
-.badge__date--muted {
-  color: var(--tg-theme-hint-color, #6f7a8b);
-}
-
-.hint {
-  margin: 0;
-  color: var(--tg-theme-hint-color, #6f7a8b);
-  font-size: 14px;
-}
-
-.admin-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.primary-button {
+.progress-section {
+  background-color: var(--bg-primary);
+  padding: 16px;
   border-radius: 12px;
-  border: none;
-  padding: 10px 14px;
+}
+
+.badges-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.badge-item {
+  padding: 16px 12px;
+  background-color: var(--bg-primary);
+  border-radius: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0.4;
+  border: 1px solid var(--divider);
+}
+
+.badge-item.earned {
+  opacity: 1;
+  transform: scale(1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: transparent;
+}
+
+.badge-item.earned:nth-child(1) {
+  background: linear-gradient(135deg, #ffd700, #ffa500);
+}
+.badge-item.earned:nth-child(2) {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+}
+.badge-item.earned:nth-child(3) {
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+}
+.badge-item.earned:nth-child(4) {
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
+}
+.badge-item.earned:nth-child(5) {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+.badge-item.earned:nth-child(6) {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.badge-item:hover {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.badge-item.earned:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.badge-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.badge-item.earned .badge-icon {
+  filter: drop-shadow(0 2px 4px rgba(255, 255, 255, 0.3));
+}
+
+.badge-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.badge-item.earned .badge-name {
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.stat-row:last-child {
+  border-bottom: none;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.stat-value {
   font-size: 14px;
   font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  background: var(--tg-theme-button-color, #0a84ff);
-  color: var(--tg-theme-button-text-color, #ffffff);
-  transition: opacity 0.2s ease;
+  color: var(--accent-blue);
 }
 
-.primary-button:active {
-  opacity: 0.85;
-}
-
-.profile-header {
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
+  align-items: flex-end;
+  z-index: 1000;
+}
+
+.modal-content {
+  width: 100%;
+  max-height: 70vh;
+  background-color: var(--bg-primary);
+  border-radius: 16px 16px 0 0;
+  overflow: hidden;
+  margin-bottom: 76px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
+  padding: 20px;
+  border-bottom: 1px solid var(--divider);
 }
 
-.profile-header__text h2 {
-  margin: 0;
-  font-size: 20px;
+.modal-body {
+  padding: 20px;
+  max-height: calc(70vh - 80px);
+  overflow-y: auto;
 }
 
-.profile-header__role {
-  font-size: 13px;
-  color: var(--tg-theme-hint-color, #6f7a8b);
+.empty-state {
+  padding: 20px 0;
+  text-align: center;
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 480px) {
+  .badges-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .badge-item {
+    padding: 12px 8px;
+  }
+
+  .badge-icon {
+    font-size: 20px;
+    margin-bottom: 6px;
+  }
+
+  .badge-name {
+    font-size: 11px;
+  }
+}
+
+@media (min-width: 768px) {
+  .modal-overlay {
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-content {
+    width: 400px;
+    max-height: 600px;
+    border-radius: 16px;
+    margin-bottom: 76px;
+  }
 }
 </style>

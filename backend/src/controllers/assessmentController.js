@@ -39,7 +39,8 @@ const baseSchema = Joi.object({
   branchIds: Joi.array().items(Joi.number().integer().positive()).unique().default([]),
   userIds: Joi.array().items(Joi.number().integer().positive()).unique().default([]),
   positionIds: Joi.array().items(Joi.number().integer().positive()).unique().default([]),
-  questions: Joi.array().items(questionSchema).min(1).required()
+  questions: Joi.array().items(questionSchema).min(1).required(),
+  clientTimezoneOffsetMinutes: Joi.number().integer().min(-720).max(840).optional()
 }).custom((value, helpers) => {
   if (!value.userIds.length && !value.positionIds.length && !value.branchIds.length) {
     return helpers.message('Необходимо выбрать хотя бы одного сотрудника, должность или филиал');

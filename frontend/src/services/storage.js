@@ -1,5 +1,3 @@
-import { getWebApp } from './telegram';
-
 const FALLBACK_PREFIX = 'assessment_app_';
 
 function getFallbackStorage() {
@@ -12,6 +10,10 @@ function getFallbackStorage() {
     console.warn('LocalStorage is not accessible', error);
     return null;
   }
+}
+
+function getWebApp() {
+  return window.Telegram?.WebApp || null;
 }
 
 function withCloudStorage(method, key, value) {

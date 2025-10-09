@@ -1,730 +1,815 @@
 <template>
-  <PageContainer :title="pageTitle" :subtitle="pageSubtitle">
-    <LoadingState v-if="isInitialLoading" />
-    <template v-else>
-      <form class="form" @submit.prevent="handleSubmit">
-      <InfoCard title="Основная информация">
-        <div class="form-grid">
-          <label class="form__field">
-            <span>Название</span>
-            <BaseInput v-model="form.title" placeholder="Например, Проверка знаний меню" />
-          </label>
-          <label class="form__field">
-            <span>Дата открытия</span>
-            <BaseInput v-model="form.openAt" type="datetime-local" />
-          </label>
-          <label class="form__field">
-            <span>Дата закрытия</span>
-            <BaseInput v-model="form.closeAt" type="datetime-local" />
-          </label>
-        </div>
-        <label class="form__field">
-          <span>Описание</span>
-          <BaseTextarea v-model="form.description" placeholder="Краткое описание" rows="4" />
-        </label>
-        <div class="form-grid">
-          <label class="form__field">
-            <span>Таймер (мин)</span>
-            <BaseInput v-model.number="form.timeLimitMinutes" type="number" min="1" max="240" />
-          </label>
-          <label class="form__field">
-            <span>Порог (%)</span>
-            <BaseInput v-model.number="form.passScorePercent" type="number" min="0" max="100" />
-          </label>
-          <label class="form__field">
-            <span>Попыток</span>
-            <BaseInput v-model.number="form.maxAttempts" type="number" min="1" max="3" />
-          </label>
-        </div>
-      </InfoCard>
+  <div class="page-container">
+    <div class="container">
+      <!-- Page Header -->
+      <div class="page-header mb-24">
+        <h1 class="title-large">{{ isEdit ? 'Редактировать аттестацию' : 'Создать аттестацию' }}</h1>
+        <p class="body-medium text-secondary">{{ isEdit ? 'Измените параметры аттестации' : 'Заполните данные для новой аттестации' }}</p>
+      </div>
 
-      <InfoCard title="Назначение">
-        <p class="hint">Выберите филиалы, сотрудников и/или должности для назначения аттестации.</p>
-        <div class="targets">
-          <div class="targets__column">
-            <h4>Филиалы</h4>
-            <template v-if="isSuperAdmin">
-              <div class="list" v-if="targets.branches?.length">
-                <label v-for="branch in targets.branches" :key="branch.id" class="list__item">
-                  <input type="checkbox" :value="branch.id" v-model="form.branchIds" />
+      <form @submit.prevent="handleSubmit" class="assessment-form">
+        <!-- Основная информация -->
+        <div class="card form-section">
+          <h2 class="section-title">Основная информация</h2>
+          
+          <div class="form-group">
+            <label class="form-label">Название аттестации</label>
+            <input
+              v-model="form.title"
+              type="text"
+              class="form-input"
+              :class="{ error: errors.title }"
+              placeholder="Например, Проверка знаний меню"
+              required
+            />
+            <div v-if="errors.title" class="form-error">{{ errors.title }}</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Описание</label>
+            <textarea
+              v-model="form.description"
+              class="form-textarea"
+              :class="{ error: errors.description }"
+              placeholder="Краткое описание аттестации"
+              rows="4"
+            ></textarea>
+            <div v-if="errors.description" class="form-error">{{ errors.description }}</div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Дата открытия</label>
+              <input
+                v-model="form.openAt"
+                type="datetime-local"
+                class="form-input"
+                :class="{ error: errors.openAt }"
+                required
+              />
+              <div v-if="errors.openAt" class="form-error">{{ errors.openAt }}</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Дата закрытия</label>
+              <input
+                v-model="form.closeAt"
+                type="datetime-local"
+                class="form-input"
+                :class="{ error: errors.closeAt }"
+                required
+              />
+              <div v-if="errors.closeAt" class="form-error">{{ errors.closeAt }}</div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Таймер (минуты)</label>
+              <input
+                v-model.number="form.timeLimitMinutes"
+                type="number"
+                class="form-input"
+                :class="{ error: errors.timeLimitMinutes }"
+                min="1"
+                max="240"
+                required
+              />
+              <div v-if="errors.timeLimitMinutes" class="form-error">{{ errors.timeLimitMinutes }}</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Порог прохождения (%)</label>
+              <input
+                v-model.number="form.passScorePercent"
+                type="number"
+                class="form-input"
+                :class="{ error: errors.passScorePercent }"
+                min="0"
+                max="100"
+                required
+              />
+              <div v-if="errors.passScorePercent" class="form-error">{{ errors.passScorePercent }}</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Максимум попыток</label>
+              <input
+                v-model.number="form.maxAttempts"
+                type="number"
+                class="form-input"
+                :class="{ error: errors.maxAttempts }"
+                min="1"
+                max="5"
+                required
+              />
+              <div v-if="errors.maxAttempts" class="form-error">{{ errors.maxAttempts }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Назначение -->
+        <div class="card form-section">
+          <h2 class="section-title">Назначение</h2>
+          <p class="body-small text-secondary mb-16">Выберите филиалы, сотрудников и/или должности для назначения аттестации</p>
+
+          <div class="assignment-grid">
+            <!-- Филиалы -->
+            <div class="assignment-column">
+              <h3 class="column-title">Филиалы</h3>
+              <div v-if="userStore.isSuperAdmin" class="checkbox-list">
+                <label
+                  v-for="branch in references.branches"
+                  :key="branch.id"
+                  class="checkbox-item"
+                >
+                  <input
+                    type="checkbox"
+                    :value="branch.id"
+                    v-model="form.branchIds"
+                  />
                   <span>{{ branch.name }}</span>
                 </label>
               </div>
-              <p v-else class="hint">Справочник филиалов не загружен.</p>
-            </template>
-            <template v-else>
-              <p class="hint">Аттестация доступна в филиале: {{ managerBranchName || '—' }}</p>
-            </template>
-          </div>
-          <div class="targets__column">
-            <h4>Сотрудники</h4>
-            <div class="list" v-if="targets.users.length">
-              <label v-for="user in targets.users" :key="user.id" class="list__item">
-                <input type="checkbox" :value="user.id" v-model="form.userIds" />
-                <span>{{ user.lastName }} {{ user.firstName }} • {{ user.positionName }}</span>
-              </label>
+              <div v-else class="info-text">
+                <p>Аттестация доступна в вашем филиале: {{ userStore.user?.branchName }}</p>
+              </div>
             </div>
-            <p v-else class="hint">Нет доступных сотрудников.</p>
-          </div>
-          <div class="targets__column">
-            <h4>Должности</h4>
-            <div class="list" v-if="targets.positions.length">
-              <label v-for="position in targets.positions" :key="position.id" class="list__item">
-                <input type="checkbox" :value="position.id" v-model="form.positionIds" />
-                <span>{{ position.name }}</span>
-              </label>
-            </div>
-            <p v-else class="hint">Справочник должностей не загружен.</p>
-          </div>
-        </div>
-      </InfoCard>
 
-      <InfoCard title="Вопросы">
-        <div class="questions__header">
-          <h3>Список вопросов</h3>
-          <button class="secondary-button" type="button" @click="addQuestion">Добавить вопрос</button>
-        </div>
-        <p v-if="!form.questions.length" class="hint">Добавьте хотя бы один вопрос.</p>
-        <div v-for="(question, qIndex) in form.questions" :key="question.uid" class="question-card">
-          <div class="question-card__header">
-            <h4>Вопрос {{ qIndex + 1 }}</h4>
-            <button class="danger-link" type="button" @click="removeQuestion(qIndex)">Удалить</button>
+            <!-- Сотрудники -->
+            <div class="assignment-column">
+              <h3 class="column-title">Сотрудники</h3>
+              <div v-if="availableUsers.length" class="checkbox-list">
+                <label
+                  v-for="user in availableUsers"
+                  :key="user.id"
+                  class="checkbox-item"
+                >
+                  <input
+                    type="checkbox"
+                    :value="user.id"
+                    v-model="form.userIds"
+                  />
+                  <span>{{ user.lastName }} {{ user.firstName }} • {{ user.positionName }}</span>
+                </label>
+              </div>
+              <div v-else class="info-text">
+                <p>Нет доступных сотрудников</p>
+              </div>
+            </div>
+
+            <!-- Должности -->
+            <div class="assignment-column">
+              <h3 class="column-title">Должности</h3>
+              <div v-if="filteredPositions.length" class="checkbox-list">
+                <label
+                  v-for="position in filteredPositions"
+                  :key="position.id"
+                  class="checkbox-item"
+                >
+                  <input
+                    type="checkbox"
+                    :value="position.id"
+                    v-model="form.positionIds"
+                  />
+                  <span>{{ position.name }}</span>
+                </label>
+              </div>
+              <div v-else class="info-text">
+                <p>Справочник должностей не загружен</p>
+              </div>
+            </div>
           </div>
-          <BaseTextarea v-model="question.text" placeholder="Текст вопроса" rows="3" />
-          <div class="options">
-            <div
-              v-for="(option, oIndex) in question.options"
-              :key="option.uid"
-              class="option-item"
-            >
-              <label class="option-item__radio">
-                <input
-                  type="radio"
-                  :name="`question-${question.uid}-answer`"
-                  :checked="option.isCorrect"
-                  @change="markCorrect(qIndex, oIndex)"
-                />
-                <span>Правильный ответ</span>
-              </label>
-              <BaseInput v-model="option.text" placeholder="Вариант ответа" />
-              <button
-                class="danger-link"
-                type="button"
-                :disabled="question.options.length <= 2"
-                @click="removeOption(qIndex, oIndex)"
-              >
+        </div>
+
+        <!-- Вопросы -->
+        <div class="card form-section">
+          <div class="section-header">
+            <h2 class="section-title">Вопросы</h2>
+            <button type="button" class="btn btn-secondary" @click="addQuestion">
+              Добавить вопрос
+            </button>
+          </div>
+
+          <div v-if="!form.questions.length" class="empty-questions">
+            <p class="body-small text-secondary">Добавьте хотя бы один вопрос для аттестации</p>
+          </div>
+
+          <div v-for="(question, questionIndex) in form.questions" :key="question.uid" class="question-card">
+            <div class="question-header">
+              <h3 class="question-title">Вопрос {{ questionIndex + 1 }}</h3>
+              <button type="button" class="btn-danger-text" @click="removeQuestion(questionIndex)">
                 Удалить
               </button>
             </div>
-            <button class="secondary-button" type="button" @click="addOption(qIndex)">Добавить вариант</button>
+
+            <div class="form-group">
+              <textarea
+                v-model="question.text"
+                class="form-textarea"
+                placeholder="Введите текст вопроса"
+                rows="3"
+                required
+              ></textarea>
+            </div>
+
+            <div class="options-section">
+              <h4 class="options-title">Варианты ответов</h4>
+              
+              <div v-for="(option, optionIndex) in question.options" :key="option.uid" class="option-item">
+                <label class="option-radio">
+                  <input
+                    type="radio"
+                    :name="`question-${question.uid}`"
+                    :value="optionIndex"
+                    v-model="question.correctIndex"
+                  />
+                  <span class="radio-label">Правильный</span>
+                </label>
+                
+                <input
+                  v-model="option.text"
+                  type="text"
+                  class="form-input option-input"
+                  placeholder="Введите вариант ответа"
+                  required
+                />
+                
+                <button
+                  v-if="question.options.length > 2"
+                  type="button"
+                  class="btn-remove"
+                  @click="removeOption(questionIndex, optionIndex)"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <button
+                v-if="question.options.length < 6"
+                type="button"
+                class="btn btn-outline"
+                @click="addOption(questionIndex)"
+              >
+                Добавить вариант
+              </button>
+            </div>
           </div>
         </div>
-      </InfoCard>
-    </form>
 
-    <div class="actions">
-      <button class="secondary-button" type="button" @click="cancelEditing">Отмена</button>
-      <button class="primary-button" type="button" :disabled="submitDisabled" @click="handleSubmit">
-        <span v-if="assessmentsStore.isSubmitting" class="button-loader" />
-        {{ isEditMode ? 'Сохранить' : 'Создать' }}
-      </button>
+        <!-- Actions -->
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" @click="handleCancel">
+            Отмена
+          </button>
+          <button type="submit" class="btn btn-primary" :disabled="!isFormValid || isLoading">
+            {{ isLoading ? 'Сохранение...' : (isEdit ? 'Сохранить изменения' : 'Создать аттестацию') }}
+          </button>
+        </div>
+      </form>
     </div>
-    <p v-if="draftSavedAt && !isEditMode" class="draft-hint">Черновик сохранён {{ draftSavedAt }}</p>
-    </template>
-  </PageContainer>
+  </div>
 </template>
 
-<script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import PageContainer from '../components/PageContainer.vue';
-import InfoCard from '../components/InfoCard.vue';
-import LoadingState from '../components/LoadingState.vue';
-import BaseInput from '../components/common/BaseInput.vue';
-import BaseTextarea from '../components/common/BaseTextarea.vue';
-import { useAssessmentsStore } from '../store/assessmentsStore';
-import { useAppStore } from '../store/appStore';
-import { showAlert, hapticImpact, showBackButton, hideBackButton } from '../services/telegram';
-import { getItem, setItem, removeItem } from '../services/storage';
+<script>
+import { ref, reactive, computed, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useUserStore } from "../stores/user";
+import { useTelegramStore } from "../stores/telegram";
+import { apiClient } from "../services/apiClient";
 
-const DRAFT_STORAGE_KEY = 'assessment_draft';
+export default {
+  name: "AssessmentEditorView",
+  setup() {
+    const route = useRoute();
+    const router = useRouter();
+    const userStore = useUserStore();
+    const telegramStore = useTelegramStore();
 
-const assessmentsStore = useAssessmentsStore();
-const appStore = useAppStore();
-const route = useRoute();
-const router = useRouter();
-
-const assessmentId = computed(() => (route.params.id ? Number(route.params.id) : null));
-const isEditMode = computed(() => Boolean(assessmentId.value));
-
-const form = reactive(createEmptyForm());
-const targets = computed(() => assessmentsStore.targets || { users: [], positions: [], branches: [] });
-const draftSavedAt = ref(null);
-let draftTimer = null;
-let suppressAutosave = false;
-let cleanupBack = () => {};
-
-const pageTitle = computed(() => (isEditMode.value ? 'Редактирование аттестации' : 'Новая аттестация'));
-const pageSubtitle = computed(() => (isEditMode.value ? 'Измените данные аттестации' : 'Заполните информацию об аттестации'));
-const isInitialLoading = computed(() => assessmentsStore.targetsLoading || (isEditMode.value && assessmentsStore.isLoading));
-const isSuperAdmin = computed(() => appStore.isSuperAdmin);
-const isManager = computed(() => appStore.isManager);
-const managerBranchName = computed(() => targets.value.branches?.[0]?.name || appStore.user?.branchName || '');
-
-function createUid() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).slice(2, 10);
-}
-
-function createEmptyForm() {
-  return {
-    title: '',
-    description: '',
-    openAt: '',
-    closeAt: '',
-    timeLimitMinutes: 30,
-    passScorePercent: 80,
-    maxAttempts: 1,
-    branchIds: [],
-    userIds: [],
-    positionIds: [],
-    questions: []
-  };
-}
-
-function resetForm() {
-  Object.assign(form, createEmptyForm());
-}
-
-function toDateTimeLocal(value) {
-  if (!value) {
-    return '';
-  }
-  const date = new Date(value);
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-  return date.toISOString().slice(0, 16);
-}
-
-function fromDateTimeLocal(value) {
-  if (!value) {
-    return null;
-  }
-  const date = new Date(value);
-  return date.toISOString();
-}
-
-function addQuestion(prefill) {
-  form.questions.push({
-    uid: createUid(),
-    text: prefill?.text || '',
-    options: (prefill?.options || [
-      { text: '', isCorrect: true },
-      { text: '', isCorrect: false }
-    ]).map((option, index) => ({
-      uid: createUid(),
-      text: option.text || '',
-      isCorrect: index === 0 ? true : Boolean(option.isCorrect)
-    }))
-  });
-}
-
-function removeQuestion(index) {
-  form.questions.splice(index, 1);
-}
-
-function addOption(questionIndex) {
-  const question = form.questions[questionIndex];
-  question.options.push({ uid: createUid(), text: '', isCorrect: false });
-}
-
-function removeOption(questionIndex, optionIndex) {
-  const question = form.questions[questionIndex];
-  if (question.options.length <= 2) {
-    return;
-  }
-  const removed = question.options.splice(optionIndex, 1);
-  if (removed[0]?.isCorrect && question.options.length) {
-    question.options[0].isCorrect = true;
-  }
-}
-
-function markCorrect(questionIndex, optionIndex) {
-  const question = form.questions[questionIndex];
-  question.options.forEach((option, index) => {
-    option.isCorrect = index === optionIndex;
-  });
-}
-
-function validateForm() {
-  if (!form.title.trim()) {
-    return 'Введите название аттестации';
-  }
-  if (!form.openAt || !form.closeAt) {
-    return 'Укажите даты открытия и закрытия';
-  }
-  const openDate = new Date(form.openAt);
-  const closeDate = new Date(form.closeAt);
-  if (closeDate <= openDate) {
-    return 'Дата закрытия должна быть позже даты открытия';
-  }
-  if (!form.userIds.length && !form.positionIds.length && !form.branchIds.length) {
-    return 'Выберите хотя бы одного сотрудника, должность или филиал';
-  }
-  if (!form.questions.length) {
-    return 'Добавьте хотя бы один вопрос';
-  }
-  for (const [index, question] of form.questions.entries()) {
-    if (!question.text.trim()) {
-      return `Заполните текст вопроса №${index + 1}`;
-    }
-    if (question.options.length < 2) {
-      return `Добавьте минимум два варианта в вопросе №${index + 1}`;
-    }
-    const correctCount = question.options.filter((option) => option.isCorrect).length;
-    if (correctCount !== 1) {
-      return `Выберите ровно один правильный ответ в вопросе №${index + 1}`;
-    }
-    if (question.options.some((option) => !option.text.trim())) {
-      return `Заполните текст всех вариантов в вопросе №${index + 1}`;
-    }
-  }
-  return null;
-}
-
-const submitDisabled = computed(() => assessmentsStore.isSubmitting || Boolean(validateForm()));
-
-function normalizeQuestions() {
-  return form.questions.map((question) => ({
-    text: question.text.trim(),
-    options: question.options.map((option) => ({
-      text: option.text.trim(),
-      isCorrect: Boolean(option.isCorrect)
-    }))
-  }));
-}
-
-function buildPayload() {
-  return {
-    title: form.title.trim(),
-    description: form.description || '',
-    openAt: fromDateTimeLocal(form.openAt),
-    closeAt: fromDateTimeLocal(form.closeAt),
-    timeLimitMinutes: Number(form.timeLimitMinutes),
-    passScorePercent: Number(form.passScorePercent),
-    maxAttempts: Number(form.maxAttempts),
-    branchIds: form.branchIds.map((value) => Number(value)),
-    userIds: form.userIds.map((value) => Number(value)),
-    positionIds: form.positionIds.map((value) => Number(value)),
-    questions: normalizeQuestions()
-  };
-}
-
-function serializeForm() {
-  return JSON.parse(JSON.stringify({
-    ...form,
-    branchIds: [...form.branchIds],
-    questions: form.questions.map((question) => ({
-      text: question.text,
-      options: question.options.map((option) => ({
-        text: option.text,
-        isCorrect: option.isCorrect
-      }))
-    }))
-  }));
-}
-
-async function saveDraft() {
-  if (isEditMode.value) {
-    return;
-  }
-  try {
-    const snapshot = serializeForm();
-    await setItem(DRAFT_STORAGE_KEY, snapshot);
-    draftSavedAt.value = new Date().toLocaleString('ru-RU');
-  } catch (error) {
-    // silent
-  }
-}
-
-function scheduleDraftSave() {
-  if (isEditMode.value || suppressAutosave) {
-    return;
-  }
-  if (draftTimer) {
-    clearTimeout(draftTimer);
-  }
-  draftTimer = setTimeout(saveDraft, 600);
-}
-
-async function loadDraft() {
-  if (isEditMode.value) {
-    return;
-  }
-  try {
-    const draft = await getItem(DRAFT_STORAGE_KEY);
-    if (draft) {
-      suppressAutosave = true;
-      Object.assign(form, createEmptyForm());
-      form.title = draft.title || '';
-      form.description = draft.description || '';
-      form.openAt = draft.openAt || '';
-      form.closeAt = draft.closeAt || '';
-      form.timeLimitMinutes = draft.timeLimitMinutes || 30;
-      form.passScorePercent = draft.passScorePercent || 80;
-      form.maxAttempts = draft.maxAttempts || 1;
-      form.branchIds = (draft.branchIds || []).map((id) => Number(id));
-      form.userIds = draft.userIds || [];
-      form.positionIds = draft.positionIds || [];
-      form.questions = [];
-      (draft.questions || []).forEach((question) => {
-        addQuestion({
-          text: question.text,
-          options: question.options
-        });
-      });
-      suppressAutosave = false;
-      draftSavedAt.value = new Date().toLocaleString('ru-RU');
-    } else {
-      populateDefaultDates();
-    }
-  } catch (error) {
-    populateDefaultDates();
-  }
-}
-
-function populateDefaultDates() {
-  if (form.openAt && form.closeAt) {
-    return;
-  }
-  suppressAutosave = true;
-  const now = new Date();
-  const openAt = new Date(now.getTime() + 15 * 60 * 1000);
-  const closeAt = new Date(openAt.getTime() + 24 * 60 * 60 * 1000);
-  form.openAt = toDateTimeLocal(openAt);
-  form.closeAt = toDateTimeLocal(closeAt);
-  suppressAutosave = false;
-}
-
-async function clearDraft() {
-  if (isEditMode.value) {
-    return;
-  }
-  try {
-    await removeItem(DRAFT_STORAGE_KEY);
-    draftSavedAt.value = null;
-  } catch (error) {
-    // silent
-  }
-}
-
-async function loadAssessment(id) {
-  const assessment = await assessmentsStore.fetchAssessment(id);
-  suppressAutosave = true;
-  Object.assign(form, createEmptyForm());
-  form.title = assessment.title;
-  form.description = assessment.description || '';
-  form.openAt = toDateTimeLocal(assessment.openAt);
-  form.closeAt = toDateTimeLocal(assessment.closeAt);
-  form.timeLimitMinutes = assessment.timeLimitMinutes;
-  form.passScorePercent = assessment.passScorePercent;
-  form.maxAttempts = assessment.maxAttempts;
-  form.branchIds = (assessment.branches || []).map((branch) => Number(branch.id));
-  form.userIds = (assessment.users || []).map((user) => user.id);
-  form.positionIds = (assessment.positions || []).map((position) => position.id);
-  form.questions = [];
-  (assessment.questions || []).forEach((question) => {
-    addQuestion({
-      text: question.text,
-      options: question.options
+    const isLoading = ref(false);
+    const isEdit = computed(() => Boolean(route.params.id));
+    const assessmentId = computed(() => route.params.id);
+    
+    const form = reactive({
+      title: "",
+      description: "",
+      openAt: "",
+      closeAt: "",
+      timeLimitMinutes: 30,
+      passScorePercent: 70,
+      maxAttempts: 1,
+      branchIds: [],
+      userIds: [],
+      positionIds: [],
+      questions: []
     });
-  });
-  suppressAutosave = false;
-}
 
-async function handleSubmit() {
-  const validationError = validateForm();
-  if (validationError) {
-    showAlert(validationError);
-    return;
+    const errors = reactive({});
+    const references = ref({ branches: [], positions: [] });
+    const availableUsers = ref([]);
+
+    // Фильтруем должности - управляющие не могут назначать аттестации на должность "Управляющий"
+    const filteredPositions = computed(() => {
+      const allPositions = references.value.positions || [];
+      
+      // Суперадмин видит все должности
+      if (userStore.isSuperAdmin) {
+        return allPositions;
+      }
+      
+      // Остальные не видят должность "Управляющий"
+      return allPositions.filter((position) => {
+        const name = position.name.toLowerCase();
+        return name !== 'управляющий' && name !== 'manager';
+      });
+    });
+
+    const isFormValid = computed(() => {
+      return (
+        form.title.trim() &&
+        form.description.trim() &&
+        form.openAt &&
+        form.closeAt &&
+        form.timeLimitMinutes > 0 &&
+        form.passScorePercent >= 0 &&
+        form.passScorePercent <= 100 &&
+        form.maxAttempts > 0 &&
+        form.questions.length > 0 &&
+        form.questions.every(q => 
+          q.text.trim() && 
+          q.options.length >= 2 && 
+          q.options.every(o => o.text.trim()) &&
+          q.correctIndex !== null
+        )
+      );
+    });
+
+    function generateUID() {
+      return Math.random().toString(36).substring(2) + Date.now().toString(36);
+    }
+
+    function addQuestion() {
+      form.questions.push({
+        uid: generateUID(),
+        text: "",
+        options: [
+          { uid: generateUID(), text: "" },
+          { uid: generateUID(), text: "" }
+        ],
+        correctIndex: null
+      });
+    }
+
+    function removeQuestion(index) {
+      form.questions.splice(index, 1);
+    }
+
+    function addOption(questionIndex) {
+      form.questions[questionIndex].options.push({
+        uid: generateUID(),
+        text: ""
+      });
+    }
+
+    function removeOption(questionIndex, optionIndex) {
+      const question = form.questions[questionIndex];
+      question.options.splice(optionIndex, 1);
+      
+      // Корректируем индекс правильного ответа если нужно
+      if (question.correctIndex === optionIndex) {
+        question.correctIndex = null;
+      } else if (question.correctIndex > optionIndex) {
+        question.correctIndex--;
+      }
+    }
+
+    function validateForm() {
+      const newErrors = {};
+
+      if (!form.title.trim()) {
+        newErrors.title = "Введите название аттестации";
+      }
+
+      if (!form.description.trim()) {
+        newErrors.description = "Введите описание";
+      }
+
+      if (!form.openAt) {
+        newErrors.openAt = "Выберите дату открытия";
+      }
+
+      if (!form.closeAt) {
+        newErrors.closeAt = "Выберите дату закрытия";
+      }
+
+      if (form.openAt && form.closeAt && new Date(form.openAt) >= new Date(form.closeAt)) {
+        newErrors.closeAt = "Дата закрытия должна быть позже даты открытия";
+      }
+
+      if (form.timeLimitMinutes <= 0) {
+        newErrors.timeLimitMinutes = "Таймер должен быть больше 0";
+      }
+
+      if (form.passScorePercent < 0 || form.passScorePercent > 100) {
+        newErrors.passScorePercent = "Порог должен быть от 0 до 100";
+      }
+
+      if (form.maxAttempts <= 0) {
+        newErrors.maxAttempts = "Количество попыток должно быть больше 0";
+      }
+
+      Object.assign(errors, newErrors);
+      return Object.keys(newErrors).length === 0;
+    }
+
+    function toUtcIso(value) {
+      if (!value) {
+        return null;
+      }
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return null;
+      }
+      return date.toISOString();
+    }
+
+    function toLocalInputValue(value) {
+      if (!value) {
+        return "";
+      }
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return "";
+      }
+      const localMs = date.getTime() - date.getTimezoneOffset() * 60000;
+      return new Date(localMs).toISOString().slice(0, 16);
+    }
+
+    async function handleSubmit() {
+      if (!validateForm()) {
+        telegramStore.showAlert("Проверьте правильность заполнения формы");
+        return;
+      }
+
+      isLoading.value = true;
+
+      try {
+        const payload = {
+          ...form,
+          openAt: toUtcIso(form.openAt),
+          closeAt: toUtcIso(form.closeAt),
+          clientTimezoneOffsetMinutes: -new Date().getTimezoneOffset(),
+          questions: form.questions.map((question) => ({
+            text: question.text.trim(),
+            options: question.options.map((option, index) => ({
+              text: option.text.trim(),
+              isCorrect: question.correctIndex === index
+            }))
+          }))
+        };
+
+        if (isEdit.value) {
+          await apiClient.updateAssessment(assessmentId.value, payload);
+          telegramStore.showAlert("Аттестация обновлена");
+        } else {
+          await apiClient.createAssessment(payload);
+          telegramStore.showAlert("Аттестация создана");
+        }
+
+        telegramStore.hapticFeedback("notification", "success");
+        router.push("/admin/assessments");
+      } catch (error) {
+        console.error("Ошибка сохранения аттестации", error);
+        telegramStore.showAlert(error.message || "Ошибка сохранения");
+        telegramStore.hapticFeedback("notification", "error");
+      } finally {
+        isLoading.value = false;
+      }
+    }
+
+    function handleCancel() {
+      router.back();
+    }
+
+    async function loadData() {
+      try {
+        isLoading.value = true;
+
+        // Загружаем справочники
+        await userStore.loadReferences();
+        references.value = userStore.references;
+
+        // Загружаем пользователей
+        if (userStore.isAdmin) {
+          const response = await apiClient.listUsers();
+          const users = Array.isArray(response) ? response : (response.users || []);
+          availableUsers.value = users.filter(u => u.roleName === "employee");
+        }
+
+        // Если редактирование, загружаем данные аттестации
+        if (isEdit.value) {
+          const response = await apiClient.getAssessmentDetail(assessmentId.value);
+          const assessment = response?.assessment || response || null;
+
+          if (!assessment) {
+            throw new Error("Аттестация не найдена");
+          }
+          
+          Object.assign(form, {
+            title: assessment.title || "",
+            description: assessment.description || "",
+            openAt: toLocalInputValue(assessment.openAt),
+            closeAt: toLocalInputValue(assessment.closeAt),
+            timeLimitMinutes: assessment.timeLimitMinutes || 30,
+            passScorePercent: assessment.passScorePercent || 70,
+            maxAttempts: assessment.maxAttempts || 1,
+            branchIds: assessment.branchIds || [],
+            userIds: assessment.userIds || [],
+            positionIds: assessment.positionIds || [],
+            questions: (assessment.questions || []).map((question) => {
+              const options = Array.isArray(question.options) ? question.options : [];
+
+              let detectedCorrectIndex = null;
+              const normalizedOptions = options.map((option, index) => {
+                const text = typeof option === "string" ? option : option?.text;
+                const isCorrect = typeof option === "object" ? Boolean(option.isCorrect) : false;
+
+                if (isCorrect) {
+                  detectedCorrectIndex = index;
+                }
+
+                return {
+                  uid: generateUID(),
+                  text: text || ""
+                };
+              });
+
+              return {
+                uid: generateUID(),
+                text: question.text || "",
+                options: normalizedOptions.length
+                  ? normalizedOptions
+                  : [
+                      { uid: generateUID(), text: "" },
+                      { uid: generateUID(), text: "" }
+                    ],
+                correctIndex:
+                  detectedCorrectIndex != null
+                    ? detectedCorrectIndex
+                    : typeof question.correctIndex === "number"
+                    ? question.correctIndex
+                    : null
+              };
+            })
+          });
+        } else {
+          // Для нового создания добавляем один вопрос
+          addQuestion();
+          
+          // Если не суперадмин, автоматически выбираем текущий филиал
+          if (!userStore.isSuperAdmin && userStore.user?.branchId) {
+            form.branchIds = [userStore.user.branchId];
+          }
+        }
+      } catch (error) {
+        console.error("Ошибка загрузки данных", error);
+        telegramStore.showAlert("Ошибка загрузки данных");
+      } finally {
+        isLoading.value = false;
+      }
+    }
+
+    onMounted(() => {
+      loadData();
+    });
+
+    return {
+      isEdit,
+      isLoading,
+      form,
+      errors,
+      references,
+      availableUsers,
+      isFormValid,
+      userStore,
+      filteredPositions,
+      addQuestion,
+      removeQuestion,
+      addOption,
+      removeOption,
+      handleSubmit,
+      handleCancel
+    };
   }
-
-  const payload = buildPayload();
-  try {
-    if (isEditMode.value && assessmentId.value) {
-      await assessmentsStore.updateAssessment(assessmentId.value, payload);
-    } else {
-      await assessmentsStore.createAssessment(payload);
-      await clearDraft();
-    }
-    hapticImpact('medium');
-    redirectToSettings();
-  } catch (error) {
-    showAlert(error.message || 'Не удалось сохранить аттестацию');
-  }
-}
-
-function redirectToSettings() {
-  router.replace({ name: 'settings', query: { tab: 'assessments' } });
-}
-
-function cancelEditing() {
-  redirectToSettings();
-}
-
-function goBack() {
-  const fallback = { name: 'settings', query: { tab: 'assessments' } };
-  if (window.history.length > 1) {
-    router.back();
-  } else {
-    router.replace(fallback);
-  }
-}
-
-watch(form, () => {
-  if (!suppressAutosave) {
-    scheduleDraftSave();
-  }
-}, { deep: true });
-
-watch(
-  () => targets.value.branches,
-  (branches) => {
-    if (!isManager.value) {
-      return;
-    }
-    const branchId = branches?.[0]?.id || appStore.user?.branchId;
-    const normalized = branchId != null ? Number(branchId) : null;
-    if (!normalized) {
-      return;
-    }
-    if (form.branchIds.length === 1 && form.branchIds[0] === normalized) {
-      return;
-    }
-    suppressAutosave = true;
-    form.branchIds = [normalized];
-    suppressAutosave = false;
-  },
-  { immediate: true }
-);
-
-watch(
-  () => targets.value.branches,
-  (branches) => {
-    if (!isManager.value) {
-      return;
-    }
-    const branchId = branches?.[0]?.id || appStore.user?.branchId;
-    const normalized = branchId != null ? Number(branchId) : null;
-    if (!normalized) {
-      return;
-    }
-    if (form.branchIds.length === 1 && form.branchIds[0] === normalized) {
-      return;
-    }
-    suppressAutosave = true;
-    form.branchIds = [normalized];
-    suppressAutosave = false;
-  },
-  { immediate: true }
-);
-
-onMounted(async () => {
-  try {
-    cleanupBack = showBackButton(goBack);
-    await assessmentsStore.fetchTargets();
-    if (isEditMode.value && assessmentId.value) {
-      await loadAssessment(assessmentId.value);
-    } else {
-      await loadDraft();
-    }
-  } catch (error) {
-    showAlert(error.message || 'Не удалось подготовить форму аттестации');
-  }
-});
-
-onBeforeUnmount(() => {
-  if (draftTimer) {
-    clearTimeout(draftTimer);
-  }
-  cleanupBack();
-  hideBackButton();
-});
+};
 </script>
 
 <style scoped>
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.assessment-form {
+  max-width: 800px;
+  margin: 0 auto;
 }
 
-.form-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+.form-section {
+  margin-bottom: 24px;
+  padding: 24px;
 }
 
-.form__field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--tg-theme-hint-color, #6f7a8b);
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text-primary);
 }
 
-.targets {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.targets__column {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 220px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-.list__item {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 13px;
-}
-
-.questions__header {
+.section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 16px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.assignment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+}
+
+.assignment-column {
+  min-height: 200px;
+}
+
+.column-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.checkbox-item:hover {
+  background-color: var(--bg-secondary);
+}
+
+.info-text {
+  padding: 16px;
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+  color: var(--text-secondary);
+}
+
+.empty-questions {
+  text-align: center;
+  padding: 32px;
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+  margin-bottom: 24px;
 }
 
 .question-card {
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  background-color: var(--bg-secondary);
 }
 
-.question-card__header {
+.question-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 16px;
 }
 
-.options {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.question-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.btn-danger-text {
+  background: none;
+  border: none;
+  color: var(--error);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.btn-danger-text:hover {
+  background-color: var(--error-bg);
+}
+
+.options-section {
+  margin-top: 16px;
+}
+
+.options-title {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 12px;
+  color: var(--text-primary);
 }
 
 .option-item {
   display: flex;
-  gap: 8px;
   align-items: center;
-}
-
-.option-item__radio {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  font-size: 12px;
-  color: var(--tg-theme-hint-color, #6f7a8b);
-}
-
-.actions {
-  display: flex;
   gap: 12px;
-  justify-content: flex-end;
-  margin-top: 12px;
+  margin-bottom: 12px;
 }
 
-.primary-button,
-.secondary-button {
-  border-radius: 12px;
-  border: none;
-  padding: 10px 14px;
-  font-size: 14px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-  display: inline-flex;
+.option-radio {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
+  gap: 4px;
+  min-width: 80px;
 }
 
-.primary-button {
-  background: var(--tg-theme-button-color, #0a84ff);
-  color: var(--tg-theme-button-text-color, #ffffff);
+.radio-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
 }
 
-.secondary-button {
-  background: var(--tg-theme-secondary-bg-color, #f5f7fb);
-  color: var(--tg-theme-text-color, #0a0a0a);
+.option-input {
+  flex: 1;
 }
 
-.primary-button:disabled,
-.secondary-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.danger-link {
+.btn-remove {
+  background: none;
   border: none;
-  background: transparent;
-  color: #ef4343;
+  color: var(--error);
   cursor: pointer;
-  font-size: 13px;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 16px;
+  line-height: 1;
+  transition: background-color 0.2s;
 }
 
-.button-loader {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: rgba(255, 255, 255, 0.9);
-  animation: spin 0.8s linear infinite;
+.btn-remove:hover {
+  background-color: var(--error-bg);
 }
 
-.secondary-button .button-loader {
-  border-color: rgba(0, 0, 0, 0.15);
-  border-top-color: rgba(0, 0, 0, 0.55);
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 24px 0;
+  border-top: 1px solid var(--border-color);
+  margin-top: 32px;
 }
 
-.hint {
-  margin: 0;
-  font-size: 12px;
-  color: var(--tg-theme-hint-color, #6f7a8b);
-}
-
-.draft-hint {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: var(--tg-theme-hint-color, #6f7a8b);
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
   }
-  100% {
-    transform: rotate(360deg);
+  
+  .assignment-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .question-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .option-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .option-radio {
+    min-width: auto;
   }
 }
 </style>
-const isSuperAdmin = computed(() => appStore.isSuperAdmin);
-const isManager = computed(() => appStore.isManager);
-const managerBranchName = computed(() => targets.value.branches?.[0]?.name || appStore.user?.branchName || '');
