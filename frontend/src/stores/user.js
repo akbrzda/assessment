@@ -72,14 +72,6 @@ export const useUserStore = defineStore("user", () => {
   const error = ref(null);
 
   const isAuthenticated = computed(() => Boolean(user.value));
-  const isAdmin = computed(() => {
-    const role = user.value?.roleName || user.value?.role;
-    return role === "manager" || role === "superadmin" || role === "admin";
-  });
-  const isSuperAdmin = computed(() => {
-    const role = user.value?.roleName || user.value?.role;
-    return role === "superadmin";
-  });
   const fullName = computed(() => user.value?.fullName || "");
   const initials = computed(() => computeInitials(user.value));
 
@@ -277,8 +269,6 @@ export const useUserStore = defineStore("user", () => {
 
     // getters
     isAuthenticated,
-    isAdmin,
-    isSuperAdmin,
     fullName,
     initials,
 

@@ -3,12 +3,11 @@
     <!-- Header -->
     <div class="page-header">
       <div>
-        <h2 class="page-heading">Управление пользователями</h2>
         <p class="page-subtitle">{{ stats.total }} пользователей • суперадминов {{ stats.superadmin }}, управляющих {{ stats.manager }}</p>
       </div>
       <div class="header-actions">
-        <Button icon="📊" variant="ghost" size="sm" @click="handleExportExcel" class="hide-mobile"> Экспорт Excel </Button>
-        <Button v-if="authStore.isSuperAdmin" icon="➕" @click="openCreateModal">
+        <Button icon="file-chart-column" variant="ghost" size="sm" @click="handleExportExcel" class="hide-mobile">Экспорт Excel</Button>
+        <Button v-if="authStore.isSuperAdmin" icon="plus" @click="openCreateModal">
           <span class="hide-mobile">Добавить пользователя</span>
           <span class="show-mobile">Добавить</span>
         </Button>
@@ -18,12 +17,12 @@
     <!-- Filters -->
     <Card class="filters-card">
       <div class="filters-grid">
-        <Input v-model="filters.search" placeholder="Поиск по имени или логину..." icon="🔍" @input="handleSearch" />
+        <Input v-model="filters.search" placeholder="Поиск по имени или логину..." @input="handleSearch" />
         <Select v-model="filters.branch" :options="branchOptions" placeholder="Все филиалы" @change="handleFilterChange" />
         <Select v-model="filters.position" :options="positionOptions" placeholder="Все должности" @change="handleFilterChange" />
         <Select v-model="filters.role" :options="roleOptions" placeholder="Все роли" @change="handleFilterChange" />
         <Select v-model="filters.level" :options="levelOptions" placeholder="Все уровни" @change="handleFilterChange" />
-        <Button variant="ghost" fullWidth @click="resetFilters">Сбросить фильтры</Button>
+        <Button variant="secondary" fullWidth @click="resetFilters" icon="refresh-ccw">Сбросить</Button>
       </div>
 
       <!-- Активные фильтры -->
@@ -36,7 +35,7 @@
     </Card>
 
     <!-- Content -->
-    <Card class="users-card" :no-padding="true">
+    <Card class="users-card" padding="none">
       <Preloader v-if="loading" />
 
       <div v-else-if="users.length === 0" class="empty-state">
@@ -55,7 +54,6 @@
                 <th>Должность</th>
                 <th>Филиал</th>
                 <th>Роль</th>
-                <th>Уровень</th>
                 <th>Очки</th>
                 <th>Создан</th>
                 <th class="actions-col">Действия</th>
@@ -76,16 +74,18 @@
                     {{ getRoleLabel(user.role_name) }}
                   </Badge>
                 </td>
-                <td>
-                  <span class="level-badge">{{ user.level ?? 1 }}</span>
-                </td>
                 <td>{{ user.points ?? 0 }}</td>
                 <td class="date-cell">{{ formatDate(user.created_at) }}</td>
                 <td class="actions-cell">
                   <div class="actions-buttons">
-                    <button class="action-btn action-btn-edit" title="Редактировать" @click="openEditModal(user)">✏️</button>
-                    <button class="action-btn action-btn-secondary" title="Сбросить пароль" @click="openResetPasswordModal(user)">🔑</button>
-                    <button class="action-btn action-btn-delete" title="Удалить" @click="openDeleteModal(user)">🗑️</button>
+                    <Button class="action-btn action-btn-edit" icon="pencil" title="Редактировать" @click="openEditModal(user)"></Button>
+                    <Button
+                      class="action-btn action-btn-secondary"
+                      icon="key-round"
+                      title="Сбросить пароль"
+                      @click="openResetPasswordModal(user)"
+                    ></Button>
+                    <Button class="action-btn action-btn-delete" title="Удалить" icon="trash" @click="openDeleteModal(user)"></Button>
                   </div>
                 </td>
               </tr>
@@ -130,9 +130,9 @@
             </div>
 
             <div class="user-card-actions">
-              <Button size="sm" variant="secondary" icon="✏️" fullWidth @click="openEditModal(user)">Редактировать</Button>
-              <Button size="sm" variant="ghost" icon="🔑" fullWidth @click="openResetPasswordModal(user)">Сбросить пароль</Button>
-              <Button size="sm" variant="danger" icon="🗑️" fullWidth @click="openDeleteModal(user)">Удалить</Button>
+              <Button size="sm" variant="secondary" icon="pencil" fullWidth @click="openEditModal(user)">Редактировать</Button>
+              <Button size="sm" variant="secondary" icon="key-round" fullWidth @click="openResetPasswordModal(user)">Сбросить пароль</Button>
+              <Button size="sm" variant="danger" icon="trash" fullWidth @click="openDeleteModal(user)">Удалить</Button>
             </div>
           </div>
         </div>
@@ -199,13 +199,13 @@
               </Badge>
             </div>
             <div class="profile-meta">
-              <span class="profile-badge">⭐ Уровень {{ userProfile.user.level }}</span>
-              <span class="profile-badge">💎 {{ userProfile.user.points }} очков</span>
+              <span class="profile-badge">Уровень {{ userProfile.user.level }}</span>
+              <span class="profile-badge">{{ userProfile.user.points }} очков</span>
             </div>
             <div class="profile-details">
-              <span>📍 {{ userProfile.user.branch_name || "—" }}</span>
+              <span>{{ userProfile.user.branch_name || "—" }}</span>
               <span>•</span>
-              <span>💼 {{ userProfile.user.position_name || "—" }}</span>
+              <span>{{ userProfile.user.position_name || "—" }}</span>
             </div>
           </div>
         </div>
@@ -213,22 +213,30 @@
         <!-- Статистика -->
         <div class="profile-stats">
           <div class="stat-card">
-            <div class="stat-icon">📝</div>
+            <div class="stat-icon">
+              <Icon name="ClipboardList" />
+            </div>
             <div class="stat-value">{{ userProfile.stats.total_assessments || 0 }}</div>
             <div class="stat-label">Аттестаций</div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon">✅</div>
+            <div class="stat-icon">
+              <Icon name="square-check" />
+            </div>
             <div class="stat-value">{{ userProfile.stats.completed_attempts || 0 }}</div>
             <div class="stat-label">Завершено</div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon">📊</div>
+            <div class="stat-icon">
+              <Icon name="chart-line" />
+            </div>
             <div class="stat-value">{{ formatScore(userProfile.stats.avg_score) }}%</div>
             <div class="stat-label">Средний балл</div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon">🏆</div>
+            <div class="stat-icon">
+              <Icon name="trophy" />
+            </div>
             <div class="stat-value">{{ userProfile.rank.user_rank || "—" }}</div>
             <div class="stat-label">Место в рейтинге</div>
           </div>
@@ -236,7 +244,7 @@
 
         <!-- Прогресс до следующего уровня -->
         <div v-if="userProfile.nextLevel" class="profile-section">
-          <h3>📈 Прогресс до следующего уровня</h3>
+          <h3>Прогресс до следующего уровня</h3>
           <div class="progress-container">
             <div class="progress-bar">
               <div class="progress-fill" :style="{ width: `${userProfile.progressToNextLevel}%` }"></div>
@@ -250,7 +258,7 @@
 
         <!-- Бейджи -->
         <div class="profile-section">
-          <h3>🏆 Достижения {{ userProfile.badges && userProfile.badges.length > 0 ? `(${userProfile.badges.length})` : "" }}</h3>
+          <h3>Достижения {{ userProfile.badges && userProfile.badges.length > 0 ? `(${userProfile.badges.length})` : "" }}</h3>
           <div v-if="userProfile.badges && userProfile.badges.length > 0" class="badges-grid">
             <div v-for="badge in userProfile.badges" :key="badge.id" class="badge-item" :title="badge.description">
               <div class="badge-icon">{{ badge.icon }}</div>
@@ -259,14 +267,16 @@
             </div>
           </div>
           <div v-else class="empty-badges">
-            <div class="empty-icon">🎖️</div>
+            <div class="empty-icon">
+              <Icon name="medal" size="96" />
+            </div>
             <p>Пока нет заработанных достижений</p>
           </div>
         </div>
 
         <!-- История аттестаций -->
         <div class="profile-section">
-          <h3>📋 История аттестаций {{ userProfile.history && userProfile.history.length > 0 ? `(${userProfile.history.length})` : "" }}</h3>
+          <h3>История аттестаций {{ userProfile.history && userProfile.history.length > 0 ? `(${userProfile.history.length})` : "" }}</h3>
           <div v-if="userProfile.history && userProfile.history.length > 0" class="history-list">
             <div v-for="attempt in userProfile.history" :key="attempt.id" class="history-item">
               <div class="history-info">
@@ -282,7 +292,9 @@
             </div>
           </div>
           <div v-else class="empty-history">
-            <div class="empty-icon">📝</div>
+            <div class="empty-icon">
+              <Icon name="ClipboardList" size="96" />
+            </div>
             <p>История аттестаций пуста</p>
           </div>
         </div>
@@ -308,6 +320,7 @@ import Badge from "../components/ui/Badge.vue";
 import Modal from "../components/ui/Modal.vue";
 import Preloader from "../components/ui/Preloader.vue";
 import UserForm from "../components/UserForm.vue";
+import Icon from "../components/ui/Icon.vue";
 
 const authStore = useAuthStore();
 const loading = ref(false);
@@ -708,7 +721,7 @@ const getRoleBadgeVariant = (roleName) => {
     case "superadmin":
       return "primary";
     case "manager":
-      return "info";
+      return "warning";
     case "employee":
       return "success";
     default:
@@ -758,25 +771,21 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 2rem;
+  gap: 16px;
+  margin-bottom: 32px;
 }
 
 .page-heading {
-  font-size: 1.875rem;
+  font-size: 30px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
 }
 
 .page-subtitle {
-  margin: 0.5rem 0 0;
-  font-size: 0.95rem;
+  margin: 8px 0 0;
+  font-size: 15.2px;
   color: var(--text-secondary);
-}
-
-.hide-mobile {
-  display: inline;
 }
 
 .show-mobile {
@@ -784,13 +793,13 @@ onMounted(async () => {
 }
 
 .filters-card {
-  margin-bottom: 2rem;
+  margin-bottom: 32px;
 }
 
 .filters-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 1rem;
+  gap: 8px;
   align-items: center;
 }
 
@@ -809,14 +818,13 @@ onMounted(async () => {
 }
 
 .users-table thead {
-  background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--divider);
 }
 
 .users-table th {
-  padding: 1rem;
+  padding: 16px;
   text-align: left;
-  font-size: 0.75rem;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -829,13 +837,9 @@ onMounted(async () => {
   transition: background-color 0.2s ease;
 }
 
-.users-table tbody tr:hover {
-  background-color: var(--bg-secondary);
-}
-
 .users-table td {
-  padding: 1rem;
-  font-size: 0.95rem;
+  padding: 16px;
+  font-size: 15.2px;
   color: var(--text-primary);
   vertical-align: middle;
   white-space: nowrap;
@@ -861,9 +865,9 @@ onMounted(async () => {
 }
 
 .name-cell .name-secondary {
-  font-size: 0.8rem;
+  font-size: 12.8px;
   color: var(--text-secondary);
-  margin-top: 0.25rem;
+  margin-top: 4px;
 }
 
 .level-badge {
@@ -872,24 +876,24 @@ onMounted(async () => {
   justify-content: center;
   min-width: 36px;
   height: 36px;
-  padding: 0 0.5rem;
+  padding: 0 8px;
   border-radius: 50%;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   font-weight: 700;
-  font-size: 0.875rem;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  font-size: 14px;
+  box-shadow: 0 2px 8px #667eea4d;
   transition: all 0.2s;
 }
 
 .level-badge:hover {
   transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px #667eea66;
 }
 
 .date-cell {
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: 13.6px;
 }
 
 .actions-col {
@@ -904,25 +908,20 @@ onMounted(async () => {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 0.375rem;
+  gap: 6px;
 }
 
 .action-btn {
-  padding: 0.5rem;
+  padding: 8px;
   border: 1px solid transparent;
   background: var(--color-background-soft);
   cursor: pointer;
-  border-radius: 0.5rem;
-  font-size: 1.1rem;
+  border-radius: 8px;
+  font-size: 17.6px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.action-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .action-btn-edit:hover {
@@ -940,62 +939,74 @@ onMounted(async () => {
   border-color: #f44336;
 }
 
+.action-btn-edit {
+  color: #2196f3;
+}
+
+.action-btn-secondary {
+  color: #9c27b0;
+}
+
+.action-btn-delete {
+  color: #f44336;
+}
+
 .mobile-cards {
   display: none;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
+  gap: 16px;
+  padding: 16px;
 }
 
 .user-card {
   background-color: var(--bg-secondary);
   border-radius: 12px;
   border: 1px solid var(--divider);
-  padding: 1rem;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 16px;
 }
 
 .user-card-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 16px;
 }
 
 .user-card-name {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .user-card-subtitle {
-  margin: 0.25rem 0 0;
-  font-size: 0.875rem;
+  margin: 4px 0 0;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 
 .user-card-body {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .user-card-row {
   display: flex;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .user-card-label {
-  font-size: 0.875rem;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 
 .user-card-value {
-  font-size: 0.9375rem;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -1003,27 +1014,27 @@ onMounted(async () => {
 .user-card-actions {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .empty-state {
-  padding: 3rem 1.5rem;
+  padding: 48px 24px;
   text-align: center;
   color: var(--text-secondary);
-  font-size: 1rem;
+  font-size: 16px;
 }
 
 .modal-actions {
-  margin-top: 1.5rem;
+  margin-top: 24px;
   display: flex;
   justify-content: flex-end;
-  gap: 0.75rem;
+  gap: 12px;
 }
 
 .modal-text {
-  font-size: 0.95rem;
+  font-size: 15.2px;
   color: var(--text-secondary);
-  margin-bottom: 1.5rem;
+  margin-bottom: 24px;
 }
 
 @media (max-width: 1280px) {
@@ -1039,6 +1050,9 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
+  .mobile-cards {
+    display: flex;
+  }
   .page-header {
     flex-direction: column;
     align-items: stretch;
@@ -1049,33 +1063,12 @@ onMounted(async () => {
   }
 
   .show-mobile {
-    display: inline;
+    display: flex;
+    gap: 8px;
   }
 
   .filters-grid {
     grid-template-columns: 1fr;
-  }
-
-  .hide-mobile {
-    display: none;
-  }
-
-  .show-mobile {
-    display: inline;
-  }
-}
-
-@media (max-width: 640px) {
-  .mobile-cards {
-    display: flex;
-  }
-
-  .hide-mobile {
-    display: none;
-  }
-
-  .show-mobile {
-    display: inline;
   }
 }
 
@@ -1083,26 +1076,26 @@ onMounted(async () => {
 
 .header-actions {
   display: flex;
-  gap: 0.75rem;
+  gap: 12px;
   align-items: center;
 }
 
 .active-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 .filter-tag {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.375rem 0.75rem;
+  gap: 8px;
+  padding: 6px 12px;
   background: var(--color-background-mute);
   border: 1px solid var(--color-border);
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
+  border-radius: 8px;
+  font-size: 14px;
   color: var(--color-text);
   transition: all 0.2s;
 }
@@ -1118,7 +1111,7 @@ onMounted(async () => {
   border: none;
   color: var(--color-text-secondary);
   cursor: pointer;
-  font-size: 1.125rem;
+  font-size: 18px;
   line-height: 1;
   transition: color 0.2s;
 }
@@ -1145,11 +1138,11 @@ onMounted(async () => {
 .profile-header {
   display: flex;
   align-items: flex-start;
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-  padding: 1.5rem;
+  gap: 24px;
+  margin-bottom: 32px;
+  padding: 24px;
   background: var(--color-background-soft);
-  border-radius: 1rem;
+  border-radius: 16px;
 }
 
 .profile-avatar {
@@ -1160,11 +1153,11 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  font-size: 32px;
   font-weight: bold;
   color: white;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px #667eea4d;
 }
 
 .profile-info {
@@ -1174,13 +1167,13 @@ onMounted(async () => {
 .profile-name-row {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
+  gap: 16px;
+  margin-bottom: 12px;
 }
 
 .profile-name {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 24px;
   font-weight: 600;
   color: var(--color-heading);
 }
@@ -1188,16 +1181,16 @@ onMounted(async () => {
 .profile-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 12px;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: 12px;
 }
 
 .profile-badge {
-  padding: 0.375rem 0.75rem;
+  padding: 6px 12px;
   background: var(--color-background-mute);
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
+  border-radius: 8px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--color-text);
   border: 1px solid var(--color-border);
@@ -1205,69 +1198,69 @@ onMounted(async () => {
 
 .profile-details {
   display: flex;
-  gap: 0.5rem;
+  gap: 8px;
   align-items: center;
-  font-size: 0.875rem;
+  font-size: 14px;
   color: var(--color-text-secondary);
 }
 
 .profile-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
+  gap: 16px;
+  margin-bottom: 32px;
 }
 
 .stat-card {
-  padding: 1.25rem;
+  padding: 20px;
   background: var(--color-background-soft);
   border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
+  border-radius: 12px;
   text-align: center;
   transition: all 0.2s;
 }
 
 .stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px #00000014;
   border-color: var(--color-primary);
 }
 
 .stat-card .stat-icon {
-  font-size: 1.75rem;
-  margin-bottom: 0.5rem;
+  font-size: 28px;
+  margin-bottom: 8px;
 }
 
 .stat-card .stat-value {
   display: block;
-  font-size: 2rem;
+  font-size: 32px;
   font-weight: bold;
   color: var(--color-primary);
-  margin-bottom: 0.25rem;
+  margin-bottom: 4px;
 }
 
 .stat-card .stat-label {
   display: block;
-  font-size: 0.875rem;
+  font-size: 14px;
   color: var(--color-text-secondary);
   font-weight: 500;
 }
 
 .profile-section {
-  margin-bottom: 2rem;
+  margin-bottom: 32px;
 }
 
 .profile-section h3 {
-  margin: 0 0 1rem 0;
-  font-size: 1.125rem;
+  margin: 0 0 16px 0;
+  font-size: 18px;
   font-weight: 600;
   color: var(--color-heading);
 }
 
 .progress-container {
-  padding: 1rem;
+  padding: 16px;
   background: var(--color-background-soft);
-  border-radius: 0.75rem;
+  border-radius: 12px;
 }
 
 .progress-bar {
@@ -1275,7 +1268,7 @@ onMounted(async () => {
   background: var(--color-background-mute);
   border-radius: 7px;
   overflow: hidden;
-  margin-bottom: 0.75rem;
+  margin-bottom: 12px;
   border: 1px solid var(--color-border);
 }
 
@@ -1294,7 +1287,7 @@ onMounted(async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background: linear-gradient(90deg, transparent, #ffffff33, transparent);
   animation: shimmer 2s infinite;
 }
 
@@ -1308,7 +1301,7 @@ onMounted(async () => {
 }
 
 .progress-text {
-  font-size: 0.875rem;
+  font-size: 14px;
   color: var(--color-text);
   text-align: center;
   font-weight: 500;
@@ -1318,17 +1311,17 @@ onMounted(async () => {
 .badges-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 1rem;
+  gap: 16px;
 }
 
 .badge-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.25rem;
+  padding: 20px;
   background: var(--color-background-soft);
   border: 2px solid var(--color-border);
-  border-radius: 0.75rem;
+  border-radius: 12px;
   text-align: center;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: default;
@@ -1336,25 +1329,25 @@ onMounted(async () => {
 
 .badge-item:hover {
   transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 24px #0000001f;
   border-color: var(--color-primary);
 }
 
 .badge-icon {
-  font-size: 3rem;
-  margin-bottom: 0.75rem;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  font-size: 48px;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 2px 4px #0000001a);
 }
 
 .badge-name {
-  font-size: 0.875rem;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-heading);
-  margin-bottom: 0.375rem;
+  margin-bottom: 6px;
 }
 
 .badge-date {
-  font-size: 0.75rem;
+  font-size: 12px;
   color: var(--color-text-secondary);
   font-weight: 500;
 }
@@ -1362,17 +1355,17 @@ onMounted(async () => {
 .history-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 12px;
 }
 
 .history-item {
   display: flex;
-  gap: 1rem;
+  gap: 16px;
   align-items: center;
-  padding: 1.25rem;
+  padding: 20px;
   background: var(--color-background-soft);
   border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
+  border-radius: 12px;
   transition: all 0.2s;
 }
 
@@ -1389,35 +1382,35 @@ onMounted(async () => {
 .history-title {
   font-weight: 600;
   color: var(--color-heading);
-  margin-bottom: 0.375rem;
-  font-size: 0.9375rem;
+  margin-bottom: 6px;
+  font-size: 15px;
 }
 
 .history-date {
-  font-size: 0.8125rem;
+  font-size: 13px;
   color: var(--color-text-secondary);
   font-weight: 500;
 }
 
 .history-score {
-  font-size: 1.5rem;
+  font-size: 24px;
   font-weight: bold;
   color: var(--color-primary);
-  margin-right: 0.75rem;
+  margin-right: 12px;
 }
 
 .empty-badges,
 .empty-history {
   text-align: center;
-  padding: 3rem 2rem;
+  padding: 48px 32px;
   background: var(--color-background-soft);
-  border-radius: 0.75rem;
+  border-radius: 12px;
   border: 2px dashed var(--color-border);
 }
 
 .empty-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
+  font-size: 64px;
+  margin-bottom: 16px;
   opacity: 0.5;
 }
 
@@ -1425,6 +1418,12 @@ onMounted(async () => {
 .empty-history p {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: 0.9375rem;
+  font-size: 15px;
+}
+@media (min-width: 976px) {
+  .filters-grid .input-group {
+    grid-column-end: 6;
+    grid-column-start: 1;
+  }
 }
 </style>

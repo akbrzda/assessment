@@ -61,7 +61,7 @@ const pageTitle = computed(() => {
   const titles = {
     dashboard: "Дашборд",
     users: "Управление пользователями",
-    invitations: "Приглашения",
+    invitations: "Приглашения для управляющих",
     assessments: "Управление аттестациями",
     questions: "Банк вопросов",
     reports: "Отчёты и аналитика",
@@ -85,7 +85,7 @@ const handleLogout = async () => {
 <style scoped>
 .topbar {
   height: 72px;
-  background: var(--surface-card);
+  background: var(--nav-bg);
   border-bottom: 1px solid var(--divider);
   position: fixed;
   top: 0;
@@ -191,21 +191,8 @@ const handleLogout = async () => {
   border-left: 1px solid var(--border-color);
 }
 
-@media (max-width: 640px) {
-  .user-profile {
-    border-left: none;
-    padding-left: 0;
-  }
-}
-
 .user-info {
   text-align: right;
-}
-
-@media (max-width: 640px) {
-  .user-info {
-    display: none;
-  }
 }
 
 .user-name {
@@ -223,7 +210,7 @@ const handleLogout = async () => {
 
 .logout-btn {
   padding: 10px 18px;
-  background: rgba(255, 255, 255, 0.08);
+  background: #ffffff14;
   color: var(--text-primary);
   border: 1px solid var(--divider);
   border-radius: 14px;
@@ -235,14 +222,26 @@ const handleLogout = async () => {
 }
 
 .logout-btn:hover {
-  background: var(--bg-secondary);
-  transform: translateY(-1px);
+  opacity: 0.6;
+}
+
+@media (max-width: 1024px) {
+  .topbar-content {
+    padding: 0 12px;
+  }
 }
 
 @media (max-width: 640px) {
   .logout-btn {
     padding: 8px 12px;
     font-size: 13px;
+  }
+  .user-info {
+    display: none;
+  }
+  .user-profile {
+    border-left: none;
+    padding-left: 0;
   }
 }
 </style>

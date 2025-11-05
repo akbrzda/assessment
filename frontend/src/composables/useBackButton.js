@@ -4,7 +4,7 @@ import { useTelegramStore } from "../stores/telegram";
 
 /**
  * Композабл для управления нативной кнопкой назад Telegram WebApp
- * Автоматически показывает/скрывает кнопку в зависимости от маршрута
+ * Использует чёткую иерархию страниц вместо браузерной истории
  */
 export function useBackButton() {
   const route = useRoute();
@@ -18,18 +18,27 @@ export function useBackButton() {
     "assessment-process", // Во время аттестации кнопка назад управляется вручную
   ];
 
-  // Список маршрутов с кастомной логикой навигации назад
-  const CUSTOM_BACK_ROUTES = {
-    "assessment-results": () => router.push("/assessments"),
-    profile: () => router.push("/dashboard"),
-    leaderboard: () => router.push("/dashboard"),
-    assessments: () => router.push("/dashboard"),
-    "admin-users": () => router.push("/admin"),
-    "admin-assessments": () => router.push("/admin"),
-    "admin-questions": () => router.push("/admin"),
-    "admin-branches": () => router.push("/admin"),
-    "admin-invitations": () => router.push("/admin"),
-    statistics: () => router.push("/admin"),
+  /**
+   * Иерархическая карта навигации
+   * Ключ - текущий маршрут, значение - родительский маршрут
+   */
+  const NAVIGATION_HIERARCHY = {
+    // Пользовательские страницы
+    profile: "/dashboard",
+    leaderboard: "/dashboard",
+    assessments: "/dashboard",
+    "assessment-results": "/assessments",
+
+    // Админские страницы
+    admin: "/dashboard",
+    "admin-dashboard": "/dashboard",
+    "admin-statistics": "/admin",
+    "admin-users": "/admin",
+    "admin-assessments": "/admin",
+    "admin-branches": "/admin",
+    "admin-invitations": "/admin",
+    "assessment-create": "/admin/assessments",
+    "assessment-edit": "/admin/assessments",
   };
 
   /**
@@ -41,23 +50,20 @@ export function useBackButton() {
 
   /**
    * Обработчик нажатия кнопки назад
+   * Использует иерархическую навигацию
    */
   function handleBackButton() {
     const routeName = route.name;
 
-    // Если есть кастомная логика для маршрута
-    if (CUSTOM_BACK_ROUTES[routeName]) {
-      console.log(`🔙 Custom back navigation for route: ${routeName}`);
-      CUSTOM_BACK_ROUTES[routeName]();
-      return;
-    }
+    // Проверяем есть ли в иерархии родительский маршрут
+    const parentRoute = NAVIGATION_HIERARCHY[routeName];
 
-    // Иначе стандартная навигация назад
-    console.log(`🔙 Standard back navigation from route: ${routeName}`);
-    if (window.history.length > 1) {
-      router.go(-1);
+    if (parentRoute) {
+      console.log(`🔙 Navigating from ${routeName} to ${parentRoute}`);
+      router.push(parentRoute);
     } else {
-      // Если нет истории, идем на главную
+      // Если не определено - возвращаемся на dashboard
+      console.log(`🔙 No parent route defined for ${routeName}, going to dashboard`);
       router.push("/dashboard");
     }
   }

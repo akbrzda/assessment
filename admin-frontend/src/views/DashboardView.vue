@@ -1,13 +1,5 @@
 <template>
   <div class="dashboard">
-    <!-- Заголовок и быстрые действия -->
-    <div class="page-header">
-      <div>
-        <h2 class="page-heading">Dashboard</h2>
-        <p class="page-subtitle">Обзор системы аттестаций</p>
-      </div>
-    </div>
-
     <Preloader v-if="loading" />
 
     <div v-else class="dashboard-content">
@@ -18,7 +10,7 @@
             <div class="metric-icon metric-icon-blue"><Icon name="ClipboardList" size="32" aria-hidden="true" /></div>
             <div class="metric-info">
               <h3 class="metric-label">Активные аттестации</h3>
-              <p class="metric-value metric-value-blue">{{ metrics.activeAssessments }}</p>
+              <p class="metric-value">{{ metrics.activeAssessments }}</p>
             </div>
           </div>
         </Card>
@@ -28,7 +20,7 @@
             <div class="metric-icon metric-icon-green"><Icon name="Users" size="32" aria-hidden="true" /></div>
             <div class="metric-info">
               <h3 class="metric-label">Всего сотрудников</h3>
-              <p class="metric-value metric-value-green">{{ metrics.totalUsers }}</p>
+              <p class="metric-value">{{ metrics.totalUsers }}</p>
             </div>
           </div>
         </Card>
@@ -38,7 +30,7 @@
             <div class="metric-icon metric-icon-purple"><Icon name="Building2" size="32" aria-hidden="true" /></div>
             <div class="metric-info">
               <h3 class="metric-label">Филиалы</h3>
-              <p class="metric-value metric-value-purple">{{ metrics.totalBranches }}</p>
+              <p class="metric-value">{{ metrics.totalBranches }}</p>
             </div>
           </div>
         </Card>
@@ -48,48 +40,45 @@
             <div class="metric-icon metric-icon-orange"><Icon name="briefcase-business" size="32" aria-hidden="true" /></div>
             <div class="metric-info">
               <h3 class="metric-label">Должности</h3>
-              <p class="metric-value metric-value-orange">{{ metrics.totalPositions }}</p>
+              <p class="metric-value">{{ metrics.totalPositions }}</p>
             </div>
           </div>
         </Card>
       </div>
-
+      <!-- Топ-3 сотрудников -->
+      <Card title="Топ-3 сотрудников по очкам" icon="Trophy" class="top-users-card">
+        <div v-if="metrics.topUsers && metrics.topUsers.length > 0" class="top-users-list">
+          <div v-for="(user, index) in metrics.topUsers" :key="user.id" class="top-user-item">
+            <div class="top-user-info">
+              <span class="medal">{{ getMedalEmoji(index) }}</span>
+              <div class="user-details">
+                <p class="user-name">{{ user.first_name }} {{ user.last_name }}</p>
+                <p class="user-meta">{{ user.position_name }} • {{ user.branch_name }}</p>
+              </div>
+            </div>
+            <div class="user-stats">
+              <Badge variant="primary" size="lg">{{ user.points }} очков</Badge>
+              <span class="user-level">Уровень {{ user.level }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-else class="empty-state">
+          <p>Нет данных о сотрудниках</p>
+        </div>
+      </Card>
       <!-- Первая строка: Успешность, Топ сотрудников, График активности -->
       <div class="dashboard-row-three">
         <!-- Средняя успешность -->
-        <Card title="🎯 Средний процент успешности" class="success-rate-card">
+        <Card title="Средний процент успешности" icon="ChartPie" class="success-rate-card">
           <div class="success-rate-content">
             <div class="success-rate-value">{{ formatScore(metrics.avgSuccessRate) }}%</div>
             <p class="success-rate-label">Взвешенная средняя по всем филиалам</p>
           </div>
         </Card>
-
-        <!-- Топ-3 сотрудников -->
-        <Card title="🏆 Топ-3 сотрудников по очкам" class="top-users-card">
-          <div v-if="metrics.topUsers && metrics.topUsers.length > 0" class="top-users-list">
-            <div v-for="(user, index) in metrics.topUsers" :key="user.id" class="top-user-item">
-              <div class="top-user-info">
-                <span class="medal">{{ getMedalEmoji(index) }}</span>
-                <div class="user-details">
-                  <p class="user-name">{{ user.first_name }} {{ user.last_name }}</p>
-                  <p class="user-meta">{{ user.position_name }} • {{ user.branch_name }}</p>
-                </div>
-              </div>
-              <div class="user-stats">
-                <Badge variant="primary" size="lg">{{ user.points }} очков</Badge>
-                <span class="user-level">Уровень {{ user.level }}</span>
-              </div>
-            </div>
-          </div>
-          <div v-else class="empty-state">
-            <p>Нет данных о сотрудниках</p>
-          </div>
-        </Card>
-
         <!-- Динамика активности -->
-        <Card title="📈 Динамика активности" class="activity-chart-card">
+        <Card title="Динамика активности" icon="ChartLine" class="activity-chart-card">
           <div v-if="activityData && activityData.length > 0" class="chart-container">
-            <LineChart :data="activityData" :datasets="activityDatasets" labelKey="date" height="250" />
+            <LineChart :data="activityData" :datasets="activityDatasets" labelKey="date" :height="250" />
           </div>
           <div v-else class="chart-empty">
             <p>Нет данных</p>
@@ -98,23 +87,23 @@
       </div>
 
       <!-- Вторая строка: Статистика аттестаций -->
-      <Card title="📊 Статистика аттестаций" class="stats-card">
+      <Card title="Статистика аттестаций" icon="ChartBar" class="stats-card">
         <div class="stats-grid">
           <div class="stat-item">
             <p class="stat-label">Всего попыток</p>
-            <p class="stat-value stat-value-gray">{{ metrics.assessmentStats?.total_attempts || 0 }}</p>
+            <p class="stat-value">{{ metrics.assessmentStats?.total_attempts || 0 }}</p>
           </div>
           <div class="stat-item">
             <p class="stat-label">Завершено</p>
-            <p class="stat-value stat-value-green">{{ metrics.assessmentStats?.completed_attempts || 0 }}</p>
+            <p class="stat-value">{{ metrics.assessmentStats?.completed_attempts || 0 }}</p>
           </div>
           <div class="stat-item">
             <p class="stat-label">Средний балл</p>
-            <p class="stat-value stat-value-blue">{{ formatScore(metrics.assessmentStats?.avg_score) }}%</p>
+            <p class="stat-value">{{ formatScore(metrics.assessmentStats?.avg_score) }}%</p>
           </div>
           <div class="stat-item">
             <p class="stat-label">Уникальных пользователей</p>
-            <p class="stat-value stat-value-purple">{{ metrics.assessmentStats?.unique_users || 0 }}</p>
+            <p class="stat-value">{{ metrics.assessmentStats?.unique_users || 0 }}</p>
           </div>
         </div>
       </Card>
@@ -122,7 +111,7 @@
       <!-- Третья строка: KPI филиалов -->
       <div class="dashboard-row-full">
         <!-- KPI филиалов -->
-        <Card title="🏢 KPI филиалов" class="branch-kpi-card">
+        <Card title="KPI филиалов" icon="Building2" class="branch-kpi-card">
           <div v-if="branchKPI && branchKPI.length > 0" class="branch-kpi-list">
             <div v-for="branch in sortedBranchKPI" :key="branch.id" class="branch-kpi-item">
               <div class="branch-header">
@@ -158,7 +147,7 @@
       <!-- Четвертая строка: Активность по аттестациям -->
       <div class="dashboard-row-full">
         <!-- Активность по аттестациям -->
-        <Card title="⚡ Активность по аттестациям" class="activities-card">
+        <Card title="Активность по аттестациям" icon="Activity" class="activities-card">
           <div v-if="latestActivities && latestActivities.length > 0" class="activities-list">
             <div v-for="activity in latestActivities" :key="activity.id" class="activity-item">
               <div class="activity-content">
@@ -218,22 +207,22 @@ const activityDatasets = computed(() => {
     {
       label: "Начато",
       data: activityData.value.map((d) => d.started_count || 0),
-      borderColor: "rgba(54, 162, 235, 0.8)",
-      backgroundColor: "rgba(54, 162, 235, 0.1)",
+      borderColor: "#36a2ebcc",
+      backgroundColor: "#36a2eb1a",
       tension: 0.3,
     },
     {
       label: "Завершено",
       data: activityData.value.map((d) => d.completed_count || 0),
-      borderColor: "rgba(75, 192, 192, 0.8)",
-      backgroundColor: "rgba(75, 192, 192, 0.1)",
+      borderColor: "#4bc0c0cc",
+      backgroundColor: "#4bc0c01a",
       tension: 0.3,
     },
     {
       label: "Всего попыток",
       data: activityData.value.map((d) => d.total_attempts || 0),
-      borderColor: "rgba(255, 159, 64, 0.8)",
-      backgroundColor: "rgba(255, 159, 64, 0.1)",
+      borderColor: "#ff9f40cc",
+      backgroundColor: "#ff9f401a",
       tension: 0.3,
     },
   ];
@@ -350,20 +339,20 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 2rem;
-  gap: 1rem;
+  margin-bottom: 32px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
 .page-heading {
-  font-size: 1.875rem;
+  font-size: 30px;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 4px 0;
 }
 
 .page-subtitle {
-  font-size: 0.9375rem;
+  font-size: 15px;
   color: var(--text-secondary);
   margin: 0;
 }
@@ -371,47 +360,42 @@ onMounted(async () => {
 /* Фильтры */
 .quick-actions {
   display: flex;
-  gap: 0.75rem;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .btn-icon {
-  margin-right: 0.5rem;
+  margin-right: 8px;
 }
 
 .dashboard-content {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 24px;
 }
 
 /* Metrics Grid */
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.5rem;
+  gap: 24px;
 }
 
 .metric-card {
-  transition: all 0.2s ease;
-  cursor: pointer;
+  display: flex;
+  height: 115px;
+  align-items: center;
 }
-
-.metric-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
 .metric-content {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 16px;
 }
 
 .metric-icon {
-  font-size: 2.5rem;
-  width: 4rem;
-  height: 4rem;
+  font-size: 40px;
+  width: 64px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -441,16 +425,16 @@ onMounted(async () => {
 }
 
 .metric-label {
-  font-size: 0.875rem;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-secondary);
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 8px 0;
 }
 
 .metric-value {
-  font-size: 2rem;
+  font-size: 32px;
   font-weight: 700;
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 4px 0;
   line-height: 1;
 }
 
@@ -471,23 +455,21 @@ onMounted(async () => {
 }
 
 /* Success Rate */
-.success-rate-card {
+
+.success-rate-content {
+  padding: 32px 0;
   text-align: center;
 }
 
-.success-rate-content {
-  padding: 2rem 0;
-}
-
 .success-rate-value {
-  font-size: 3rem;
+  font-size: 48px;
   font-weight: 700;
-  color: var(--accent-blue);
-  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+  margin-bottom: 8px;
 }
 
 .success-rate-label {
-  font-size: 1rem;
+  font-size: 16px;
   color: var(--text-primary);
   margin: 0;
 }
@@ -495,45 +477,45 @@ onMounted(async () => {
 /* Dashboard Row Three (Успешность, Топ пользователей, График) */
 .dashboard-row-three {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.2fr;
-  gap: 2rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
 }
 
 /* Dashboard Row Two (KPI и Активность) */
 .dashboard-row-two {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2rem;
+  gap: 32px;
 }
 
 /* Dashboard Row Full (Full Width) */
 .dashboard-row-full {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 2rem;
+  gap: 32px;
 }
 .branch-kpi-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
 .branch-kpi-item {
-  padding: 1rem;
+  padding: 16px;
   background: var(--bg-secondary);
   border-radius: 12px;
   transition: all 0.2s ease;
 }
 
 .branch-kpi-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px #0000001a;
 }
 
 .branch-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 0.75rem;
+  margin-bottom: 12px;
 }
 
 .branch-info {
@@ -541,22 +523,22 @@ onMounted(async () => {
 }
 
 .branch-name {
-  font-size: 1rem;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 4px 0;
 }
 
 .branch-city {
-  font-size: 0.875rem;
+  font-size: 14px;
   color: var(--text-secondary);
   margin: 0;
 }
 
 .branch-score {
-  font-size: 1.5rem;
+  font-size: 24px;
   font-weight: 700;
-  padding: 0.25rem 0.75rem;
+  padding: 4px 12px;
   border-radius: 8px;
 }
 
@@ -577,18 +559,18 @@ onMounted(async () => {
 
 .score-poor {
   color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
+  background: #ef44441a;
 }
 
 .branch-sparkline {
-  margin: 0.75rem 0;
+  margin: 12px 0;
 }
 
 .branch-stats {
   display: flex;
   justify-content: space-around;
-  gap: 1rem;
-  padding-top: 0.75rem;
+  gap: 16px;
+  padding-top: 12px;
   border-top: 1px solid var(--border-color);
 }
 
@@ -596,17 +578,17 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: 4px;
 }
 
 .branch-stat .stat-label {
-  font-size: 0.75rem;
+  font-size: 12px;
   color: var(--text-secondary);
   margin: 0;
 }
 
 .branch-stat .stat-value {
-  font-size: 1rem;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -623,18 +605,18 @@ onMounted(async () => {
 .top-users-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 16px;
 }
 
 .top-user-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem;
+  padding: 16px;
   background-color: var(--bg-secondary);
   border-radius: 12px;
   transition: all 0.2s ease;
-  gap: 1rem;
+  gap: 16px;
 }
 
 .top-user-item:hover {
@@ -644,13 +626,13 @@ onMounted(async () => {
 .top-user-info {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 16px;
   flex: 1;
   min-width: 0;
 }
 
 .medal {
-  font-size: 2rem;
+  font-size: 32px;
   flex-shrink: 0;
 }
 
@@ -662,12 +644,12 @@ onMounted(async () => {
 .user-name {
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 0.25rem 0;
-  font-size: 0.9375rem;
+  margin: 0 0 4px 0;
+  font-size: 15px;
 }
 
 .user-meta {
-  font-size: 0.875rem;
+  font-size: 14px;
   color: var(--text-secondary);
   margin: 0;
   overflow: hidden;
@@ -679,11 +661,11 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .user-level {
-  font-size: 0.75rem;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -691,25 +673,28 @@ onMounted(async () => {
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
+  gap: 12px;
 }
 
 .stat-item {
   text-align: center;
-  padding: 1.5rem 1rem;
+  padding: 24px 16px;
   background-color: var(--bg-secondary);
   border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
 }
 
 .stat-label {
-  font-size: 0.875rem;
+  font-size: 14px;
   color: var(--text-secondary);
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 12px 0;
   font-weight: 500;
 }
 
 .stat-value {
-  font-size: 2rem;
+  font-size: 32px;
   font-weight: 700;
   margin: 0;
   line-height: 1;
@@ -737,11 +722,11 @@ onMounted(async () => {
 }
 
 .chart-container {
-  padding: 1rem 0;
+  padding: 16px 0;
 }
 
 .chart-empty {
-  padding: 3rem 1rem;
+  padding: 48px 16px;
   text-align: center;
 }
 
@@ -754,14 +739,14 @@ onMounted(async () => {
 .dashboard-grid-three {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
+  gap: 32px;
 }
 
 /* Latest Activities */
 .activities-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 16px;
   max-height: 500px;
   overflow-y: auto;
 }
@@ -770,11 +755,11 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 0.75rem;
+  padding: 12px;
   background: var(--bg-secondary);
   border-radius: 8px;
   transition: all 0.2s ease;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .activity-item:hover {
@@ -787,9 +772,9 @@ onMounted(async () => {
 }
 
 .activity-text {
-  font-size: 0.875rem;
+  font-size: 14px;
   color: var(--text-primary);
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 4px 0;
   line-height: 1.4;
 }
 
@@ -799,13 +784,13 @@ onMounted(async () => {
 }
 
 .activity-meta {
-  font-size: 0.8125rem;
+  font-size: 13px;
   color: var(--text-secondary);
   margin: 0;
 }
 
 .activity-time {
-  font-size: 0.75rem;
+  font-size: 12px;
   color: var(--text-secondary);
   margin: 0;
   white-space: nowrap;
@@ -813,7 +798,7 @@ onMounted(async () => {
 
 /* Empty State */
 .empty-state {
-  padding: 2rem 1rem;
+  padding: 32px 16px;
   text-align: center;
 }
 
@@ -839,30 +824,30 @@ onMounted(async () => {
 
 @media (max-width: 768px) {
   .page-heading {
-    font-size: 1.5rem;
+    font-size: 24px;
   }
 
   .metrics-grid {
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 1rem;
+    gap: 16px;
   }
 
   .metric-icon {
-    font-size: 2rem;
-    width: 3rem;
-    height: 3rem;
+    font-size: 32px;
+    width: 48px;
+    height: 48px;
   }
 
   .metric-value {
-    font-size: 1.5rem;
+    font-size: 24px;
   }
 
   .metric-label {
-    font-size: 0.8125rem;
+    font-size: 13px;
   }
 
   .success-rate-value {
-    font-size: 2rem;
+    font-size: 32px;
   }
 
   .dashboard-row-three {
@@ -887,10 +872,12 @@ onMounted(async () => {
 
   .stats-grid {
     grid-template-columns: 1fr;
-    gap: 1rem;
   }
 
   .combined-activities-content {
+    grid-template-columns: 1fr;
+  }
+  .branch-kpi-list {
     grid-template-columns: 1fr;
   }
 }
@@ -901,7 +888,7 @@ onMounted(async () => {
   }
 
   .branch-score {
-    font-size: 1.25rem;
+    font-size: 20px;
   }
 }
 </style>

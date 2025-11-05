@@ -57,29 +57,3 @@ CREATE TABLE IF NOT EXISTS invitations (
   CONSTRAINT fk_inv_used_by FOREIGN KEY (used_by) REFERENCES users(id),
   CONSTRAINT fk_inv_created_by FOREIGN KEY (created_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Наполнение справочников (roles, branches, positions)
-INSERT INTO roles (name, description) VALUES
-  ('employee', 'Сотрудник'),
-  ('manager', 'Управляющий'),
-  ('superadmin', 'Суперадмин')
-ON DUPLICATE KEY UPDATE description = VALUES(description);
-
-INSERT INTO branches (name, city) VALUES
-  ('Сургут-1 (30 лет Победы)', 'Сургут'),
-  ('Сургут-2 (Усольцева)', 'Сургут'),
-  ('Сургут-3 (Магистральная)', 'Сургут'),
-  ('Парковая (Нефтеюганск)', 'Нефтеюганск')
-ON DUPLICATE KEY UPDATE city = VALUES(city);
-
-INSERT INTO positions (name) VALUES
-  ('Официант'),
-  ('Повар'),
-  ('Старший повар'),
-  ('Шеф повар'),
-  ('Администратор'),
-  ('Бармен'),
-  ('Логист'),
-  ('Курьер'),
-  ('Управляющий')
-ON DUPLICATE KEY UPDATE name = VALUES(name);

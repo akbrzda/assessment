@@ -37,7 +37,7 @@ const authStore = useAuthStore();
 
 const menuItems = computed(() => {
   const items = [
-    { path: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" },
+    { path: "/dashboard", label: "Дашборд", icon: "LayoutDashboard" },
     { path: "/users", label: "Пользователи", icon: "Users" },
     { path: "/assessments", label: "Аттестации", icon: "ClipboardList" },
     { path: "/questions", label: "Банк вопросов", icon: "FileQuestion" },
@@ -47,8 +47,8 @@ const menuItems = computed(() => {
   // Разделы только для superadmin
   if (authStore.isSuperAdmin) {
     items.splice(2, 0, { path: "/invitations", label: "Приглашения", icon: "Link2" });
-    items.push({ path: "/logs", label: "Журнал", icon: "ScrollText" });
     items.push({ path: "/branches", label: "Филиалы", icon: "Building2" });
+    items.push({ path: "/logs", label: "Журнал", icon: "ScrollText" });
     items.push({ path: "/settings", label: "Настройки", icon: "Settings" });
   }
 
@@ -66,7 +66,7 @@ const handleNavClick = () => {
 <style scoped>
 .sidebar {
   width: 264px;
-  background: var(--surface-card);
+  background: var(--nav-bg);
   height: 100vh;
   position: fixed;
   left: 0;

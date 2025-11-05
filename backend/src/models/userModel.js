@@ -1,4 +1,4 @@
-const { pool } = require('../config/database');
+const { pool } = require("../config/database");
 
 function mapUserRow(row) {
   if (!row) {
@@ -19,7 +19,7 @@ function mapUserRow(row) {
     level: row.level,
     points: row.points,
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
   };
 }
 
@@ -51,10 +51,7 @@ async function createUser({ telegramId, firstName, lastName, avatarUrl, position
 }
 
 async function updateProfile(userId, { firstName, lastName }) {
-  await pool.execute(
-    `UPDATE users SET first_name = ?, last_name = ?, updated_at = NOW() WHERE id = ?`,
-    [firstName, lastName, userId]
-  );
+  await pool.execute(`UPDATE users SET first_name = ?, last_name = ?, updated_at = NOW() WHERE id = ?`, [firstName, lastName, userId]);
 }
 
 async function getDashboardData(userId) {
@@ -109,20 +106,32 @@ async function findById(userId) {
   return mapUserRow(rows[0]);
 }
 
-async function updateUserByAdmin(userId, { firstName, lastName, positionId, branchId, roleId, level, points }) {
-  await pool.execute(
-    `UPDATE users
-     SET first_name = ?,
-         last_name = ?,
-         position_id = ?,
-         branch_id = ?,
-         role_id = ?,
-         level = ?,
-         points = ?,
-         updated_at = NOW()
-     WHERE id = ?`,
-    [firstName, lastName, positionId, branchId, roleId, level, points, userId]
-  );
+async function updateUserByAdmin(userId, { firstName, lastName, positionId, branchId, roleId, login, level, points }) {
+  const fields = [];
+  const values = [];
+
+  fields.push("first_name = ?", "last_name = ?", "position_id = ?", "branch_id = ?", "role_id = ?");
+  values.push(firstName, lastName, positionId, branchId, roleId);
+
+  if (login !== undefined) {
+    fields.push("login = ?");
+    values.push(login);
+  }
+
+  if (level !== undefined) {
+    fields.push("level = ?");
+    values.push(level);
+  }
+
+  if (points !== undefined) {
+    fields.push("points = ?");
+    values.push(points);
+  }
+
+  fields.push("updated_at = NOW()");
+  values.push(userId);
+
+  await pool.execute(`UPDATE users SET ${fields.join(", ")} WHERE id = ?`, values);
 }
 
 async function deleteUser(userId) {
@@ -130,12 +139,9 @@ async function deleteUser(userId) {
   try {
     await connection.beginTransaction();
 
-    await connection.execute(
-      'UPDATE invitations SET used_by = NULL, used_at = NULL WHERE used_by = ?'
-      , [userId]
-    );
+    await connection.execute("UPDATE invitations SET used_by = NULL, used_at = NULL WHERE used_by = ?", [userId]);
 
-    await connection.execute('DELETE FROM users WHERE id = ?', [userId]);
+    await connection.execute("DELETE FROM users WHERE id = ?", [userId]);
 
     await connection.commit();
   } catch (error) {
@@ -147,17 +153,14 @@ async function deleteUser(userId) {
 }
 
 async function updateAvatar(userId, avatarUrl) {
-  await pool.execute(
-    'UPDATE users SET avatar_url = ?, updated_at = NOW() WHERE id = ?',
-    [avatarUrl, userId]
-  );
+  await pool.execute("UPDATE users SET avatar_url = ?, updated_at = NOW() WHERE id = ?", [avatarUrl, userId]);
 }
 
 async function findByIds(ids) {
   if (!ids || ids.length === 0) {
     return [];
   }
-  const placeholders = ids.map(() => '?').join(',');
+  const placeholders = ids.map(() => "?").join(",");
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
             u.role_id, u.level, u.points, u.created_at, u.updated_at,
@@ -168,8 +171,8 @@ async function findByIds(ids) {
      LEFT JOIN roles r ON r.id = u.role_id
      LEFT JOIN branches b ON b.id = u.branch_id
      LEFT JOIN positions p ON p.id = u.position_id
-     WHERE u.id IN (${placeholders})`
-    , ids
+     WHERE u.id IN (${placeholders})`,
+    ids
   );
   return rows.map(mapUserRow);
 }
@@ -184,5 +187,5 @@ module.exports = {
   updateUserByAdmin,
   deleteUser,
   updateAvatar,
-  findByIds
+  findByIds,
 };

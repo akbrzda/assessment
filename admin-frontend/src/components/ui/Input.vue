@@ -1,30 +1,32 @@
 <template>
   <div class="input-group">
-    <label v-if="label" class="input-label">
-      {{ label }}
-      <span v-if="required" class="input-required">*</span>
+    <label v-if="props.label" class="input-label">
+      {{ props.label }}
+      <span v-if="props.required" class="input-required">*</span>
     </label>
     <div class="input-wrapper">
       <slot name="prefix"></slot>
       <input
-        :value="modelValue"
-        :type="type"
-        :placeholder="placeholder"
-        :disabled="disabled"
-        :readonly="readonly"
-        :required="required"
-        :class="['input', `input-${size}`, { 'input-error': !!error }]"
+        :value="props.modelValue"
+        :type="props.type"
+        :placeholder="props.placeholder"
+        :disabled="props.disabled"
+        :readonly="props.readonly"
+        :required="props.required"
+        :min="props.min"
+        :max="props.max"
+        :class="['input', `input-${props.size}`, { 'input-error': !!props.error }]"
         @input="$emit('update:modelValue', $event.target.value)"
       />
       <slot name="suffix"></slot>
     </div>
-    <p v-if="error" class="input-error-text">{{ error }}</p>
-    <p v-else-if="hint" class="input-hint-text">{{ hint }}</p>
+    <p v-if="props.error" class="input-error-text">{{ props.error }}</p>
+    <p v-else-if="props.hint" class="input-hint-text">{{ props.hint }}</p>
   </div>
 </template>
 
 <script setup>
-defineProps({
+const props = defineProps({
   modelValue: {
     type: [String, Number],
     default: "",
@@ -40,6 +42,14 @@ defineProps({
   disabled: Boolean,
   readonly: Boolean,
   required: Boolean,
+  min: {
+    type: [String, Number],
+    default: undefined,
+  },
+  max: {
+    type: [String, Number],
+    default: undefined,
+  },
   size: {
     type: String,
     default: "md",
@@ -54,16 +64,15 @@ defineEmits(["update:modelValue"]);
 .input-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 8px;
 }
-
 .input-label {
-  font-size: 0.9375rem;
+  font-size: 15px;
   font-weight: 500;
   color: var(--text-primary);
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 4px;
 }
 
 .input-required {
@@ -71,43 +80,40 @@ defineEmits(["update:modelValue"]);
 }
 
 .input-wrapper {
-  display: flex;
-  align-items: center;
   position: relative;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  transition: all 0.2s ease;
-  background-color: var(--bg-primary);
-}
 
-.input-wrapper:focus-within {
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px var(--accent-blue-soft);
-}
+  .input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    outline: none;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
 
-.input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  font-family: inherit;
-  outline: none;
-  padding: 0.625rem 1rem;
+    width: 100%;
+    border: 1px solid var(--divider);
+    border-radius: 12px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+  }
 }
 
 .input-sm {
-  font-size: 0.875rem;
-  padding: 0.5rem 0.75rem;
+  font-size: 14px;
+  padding: 8px 12px;
 }
 
 .input-md {
-  font-size: 0.9375rem;
-  padding: 0.625rem 1rem;
+  font-size: 15px;
+  padding: 10px 16px;
 }
 
 .input-lg {
-  font-size: 1rem;
-  padding: 0.75rem 1.25rem;
+  font-size: 16px;
+  padding: 12px 20px;
 }
 
 .input::placeholder {
@@ -124,17 +130,17 @@ defineEmits(["update:modelValue"]);
 }
 
 .input:focus.input-error {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  box-shadow: 0 0 0 3px #ef44441a;
 }
 
 .input-error-text {
-  font-size: 0.8125rem;
+  font-size: 13px;
   color: #ef4444;
   margin: 0;
 }
 
 .input-hint-text {
-  font-size: 0.8125rem;
+  font-size: 13px;
   color: var(--text-secondary);
   margin: 0;
 }

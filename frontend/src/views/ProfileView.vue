@@ -20,9 +20,6 @@
           <button class="btn-icon" @click="editProfile">
             <EditIcon />
           </button>
-          <button v-if="userStore.isAdmin" class="btn-icon" @click="openSettings">
-            <SettingsIcon />
-          </button>
         </div>
       </div>
 
@@ -125,14 +122,12 @@ import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 import { apiClient } from "../services/apiClient";
 import EditIcon from "../components/icons/EditIcon.vue";
-import SettingsIcon from "../components/icons/SettingsIcon.vue";
 import CloseIcon from "../components/icons/CloseIcon.vue";
 
 export default {
   name: "ProfileView",
   components: {
     EditIcon,
-    SettingsIcon,
     CloseIcon,
   },
   setup() {
@@ -176,11 +171,6 @@ export default {
       editForm.lastName = user.value?.lastName || "";
       showEditModal.value = true;
       telegramStore.hapticFeedback("impact", "light");
-    }
-
-    function openSettings() {
-      telegramStore.hapticFeedback("impact", "light");
-      router.push("/admin");
     }
 
     function closeEditModal() {
@@ -301,7 +291,6 @@ export default {
       hasChanges,
       getBranchName,
       editProfile,
-      openSettings,
       closeEditModal,
       saveProfile,
       showBadgeDetails,

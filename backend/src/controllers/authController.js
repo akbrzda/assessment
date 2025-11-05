@@ -150,7 +150,9 @@ async function register(req, res, next) {
       return res.status(422).json({ error: "Position is required for registration without invitation" });
     }
 
-    if (!targetRoleId && config.superAdminIds.includes(telegramId)) {
+    const superAdminIds = config.superAdminIds || [];
+
+    if (!targetRoleId && superAdminIds.includes(telegramId)) {
       const superRole = await referenceModel.getRoleByName("superadmin");
       if (!superRole) {
         return res.status(500).json({ error: "Superadmin role not configured" });
@@ -262,10 +264,25 @@ async function getReferences(req, res, next) {
   }
 }
 
+async function getAdminReferences(req, res, next) {
+  try {
+    const [branches, positions, roles] = await Promise.all([
+      referenceModel.getBranches(),
+      referenceModel.getAllPositions(),
+      referenceModel.getRoles(),
+    ]);
+
+    res.json({ branches, positions, roles });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getStatus,
   register,
   getProfile,
   updateProfile,
   getReferences,
+  getAdminReferences,
 };

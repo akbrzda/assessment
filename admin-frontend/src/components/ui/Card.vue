@@ -2,7 +2,10 @@
   <div class="card" :class="{ 'card-hoverable': hoverable }">
     <div v-if="title || $slots.header" class="card-header">
       <slot name="header">
-        <h3 class="card-title">{{ title }}</h3>
+        <div class="card-header-content">
+          <Icon v-if="icon" :name="icon" class="card-header-icon" />
+          <h3 class="card-title">{{ title }}</h3>
+        </div>
       </slot>
     </div>
     <div class="card-content" :class="`card-padding-${padding}`">
@@ -15,11 +18,14 @@
 </template>
 
 <script setup>
+import Icon from "./Icon.vue";
+
 defineProps({
   title: String,
+  icon: String,
   padding: {
     type: String,
-    default: "md",
+    default: "sm",
     validator: (value) => ["none", "sm", "md", "lg"].includes(value),
   },
   hoverable: Boolean,
@@ -42,17 +48,29 @@ defineProps({
 
 .card-hoverable:hover {
   border-color: var(--accent-blue);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .card-header {
-  padding: 1.25rem 1.5rem;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border-color);
   background-color: var(--bg-secondary);
 }
 
+.card-header-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.card-header-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--text-primary);
+}
+
 .card-title {
-  font-size: 1rem;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
@@ -60,7 +78,7 @@ defineProps({
 }
 
 .card-content {
-  padding: 1.5rem;
+  padding: 24px;
 }
 
 .card-padding-none {
@@ -68,19 +86,19 @@ defineProps({
 }
 
 .card-padding-sm {
-  padding: 0.75rem;
+  padding: 12px;
 }
 
 .card-padding-md {
-  padding: 1.5rem;
+  padding: 24px;
 }
 
 .card-padding-lg {
-  padding: 2rem;
+  padding: 32px;
 }
 
 .card-footer {
-  padding: 1rem 1.5rem;
+  padding: 16px 24px;
   border-top: 1px solid var(--border-color);
   background-color: var(--bg-secondary);
 }

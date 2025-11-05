@@ -1,0 +1,144 @@
+import { createRouter, createWebHistory } from "vue-router";
+import { useAuthStore } from "../stores/auth";
+import LoginView from "../views/LoginView.vue";
+import MainLayout from "../components/layout/MainLayout.vue";
+
+const routes = [
+  {
+    path: "/login",
+    name: "Login",
+    component: LoginView,
+    meta: { requiresAuth: false, title: "Вход" },
+  },
+  {
+    path: "/",
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: "",
+        redirect: "/dashboard",
+      },
+      {
+        path: "dashboard",
+        name: "Dashboard",
+        component: () => import("../views/DashboardView.vue"),
+        meta: { roles: ["superadmin", "manager"], title: "Панель управления" },
+      },
+      {
+        path: "users",
+        name: "Users",
+        component: () => import("../views/UsersView.vue"),
+        meta: { roles: ["superadmin", "manager"], title: "Пользователи" },
+      },
+      {
+        path: "invitations",
+        name: "Invitations",
+        component: () => import("../views/InvitationsView.vue"),
+        meta: { roles: ["superadmin"], title: "Приглашения" },
+      },
+      {
+        path: "assessments",
+        name: "Assessments",
+        component: () => import("../views/AssessmentsView.vue"),
+        meta: { roles: ["superadmin", "manager"], title: "Аттестации" },
+      },
+      {
+        path: "assessments/create",
+        name: "CreateAssessment",
+        component: () => import("../views/CreateAssessmentView.vue"),
+        meta: { roles: ["superadmin", "manager"], title: "Создать аттестацию" },
+      },
+      {
+        path: "assessments/:id/edit",
+        name: "EditAssessment",
+        component: () => import("../views/EditAssessmentView.vue"),
+        meta: { roles: ["superadmin", "manager"], title: "Редактировать аттестацию" },
+      },
+      {
+        path: "assessments/:id",
+        name: "AssessmentDetails",
+        component: () => import("../views/AssessmentDetailsView.vue"),
+        meta: { roles: ["superadmin", "manager"], title: "Детали аттестации" },
+      },
+      {
+        path: "questions",
+        name: "Questions",
+        component: () => import("../views/QuestionsView.vue"),
+        meta: { roles: ["superadmin", "manager"], title: "Банк вопросов" },
+      },
+      {
+        path: "questions/create",
+        name: "CreateQuestion",
+        component: () => import("../views/CreateQuestionView.vue"),
+        meta: { roles: ["superadmin", "manager"], title: "Создать вопрос" },
+      },
+      {
+        path: "questions/:id/edit",
+        name: "EditQuestion",
+        component: () => import("../views/EditQuestionView.vue"),
+        meta: { roles: ["superadmin", "manager"], title: "Редактировать вопрос" },
+      },
+      {
+        path: "questions/:id",
+        name: "QuestionDetails",
+        component: () => import("../views/QuestionDetailsView.vue"),
+        meta: { roles: ["superadmin", "manager"], title: "Детали вопроса" },
+      },
+      {
+        path: "reports",
+        name: "Reports",
+        component: () => import("../views/ReportsView.vue"),
+        meta: { roles: ["superadmin", "manager"], title: "Отчёты и аналитика" },
+      },
+      {
+        path: "branches",
+        name: "Branches",
+        component: () => import("../views/BranchesView.vue"),
+        meta: { roles: ["superadmin"], title: "Филиалы и должности" },
+      },
+      {
+        path: "settings",
+        name: "Settings",
+        component: () => import("../views/SettingsView.vue"),
+        meta: { roles: ["superadmin"], title: "Настройки" },
+      },
+      {
+        path: "logs",
+        name: "Logs",
+        component: () => import("../views/LogsView.vue"),
+        meta: { roles: ["superadmin"], title: "Логи действий" },
+      },
+    ],
+  },
+];
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+});
+
+// Защита маршрутов
+router.beforeEach((to, from, next) => {
+  const authStore = useAuthStore();
+
+  // Обновить title страницы
+  const baseTitle = "Система аттестаций";
+  if (to.meta.title) {
+    document.title = `${to.meta.title} | ${baseTitle}`;
+  } else {
+    document.title = baseTitle;
+  }
+
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    next("/login");
+  } else if (to.path === "/login" && authStore.isAuthenticated) {
+    next("/dashboard");
+  } else if (to.meta.roles && !to.meta.roles.includes(authStore.user?.role)) {
+    next("/dashboard");
+  } else {
+    next();
+  }
+});
+
+export default router;

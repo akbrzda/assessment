@@ -3,6 +3,7 @@ const invitationModel = require("../models/invitationModel");
 const referenceModel = require("../models/referenceModel");
 const { generateInviteCode } = require("../utils/tokenGenerator");
 const { sendTelegramLog } = require("../services/telegramLogger");
+const { createLog } = require("./adminLogsController");
 const config = require("../config/env");
 
 const createSchema = Joi.object({
@@ -45,8 +46,10 @@ async function create(req, res, next) {
       return res.status(500).json({ error: "Manager role not configured" });
     }
 
+    // Читаем срок действия из настроек БД
+    const expirationDays = config.inviteExpirationDays;
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + Number(config.inviteExpirationDays || 7));
+    expiresAt.setDate(expiresAt.getDate() + expirationDays);
 
     const code = await ensureUniqueCode();
 

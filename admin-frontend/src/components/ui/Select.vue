@@ -52,16 +52,16 @@ defineEmits(["update:modelValue"]);
 .select-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .select-label {
-  font-size: 0.9375rem;
+  font-size: 15px;
   font-weight: 500;
   color: var(--text-primary);
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 4px;
 }
 
 .select-required {
@@ -74,40 +74,35 @@ defineEmits(["update:modelValue"]);
 
 .select {
   width: 100%;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border: 1px solid var(--divider);
+  border-radius: 12px;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: inherit;
   outline: none;
   appearance: none;
-  padding-right: 2.5rem;
+  padding-right: 40px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .select-sm {
-  font-size: 0.875rem;
-  padding: 0.5rem 0.75rem;
+  font-size: 14px;
+  padding: 8px 12px;
 }
 
 .select-md {
-  font-size: 0.9375rem;
-  padding: 0.625rem 1rem;
+  font-size: 15px;
+  padding: 10px 16px;
 }
 
 .select-lg {
-  font-size: 1rem;
-  padding: 0.75rem 1.25rem;
+  font-size: 16px;
+  padding: 12px 20px;
 }
 
 .select:hover:not(:disabled) {
   border-color: var(--accent-blue);
-}
-
-.select:focus {
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px var(--accent-blue-soft);
 }
 
 .select:disabled {
@@ -117,12 +112,12 @@ defineEmits(["update:modelValue"]);
 
 .select-arrow {
   position: absolute;
-  right: 0.75rem;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
   color: var(--text-secondary);
-  font-size: 0.75rem;
+  font-size: 12px;
 }
 
 .select-error {
@@ -130,11 +125,11 @@ defineEmits(["update:modelValue"]);
 }
 
 .select:focus.select-error {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  box-shadow: 0 0 0 3px #ef44441a;
 }
 
 .select-error-text {
-  font-size: 0.8125rem;
+  font-size: 13px;
   color: #ef4444;
   margin: 0;
 }

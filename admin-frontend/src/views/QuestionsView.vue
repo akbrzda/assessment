@@ -2,12 +2,11 @@
   <div class="questions-view">
     <!-- Header -->
     <div class="page-header">
-      <h2 class="page-heading">Банк вопросов</h2>
       <div class="header-buttons">
-        <Button icon="📁" variant="secondary" @click="showCategoryModal = true">
+        <Button icon="folder" variant="secondary" @click="showCategoryModal = true">
           <span class="hide-mobile">Категории</span>
         </Button>
-        <Button icon="➕" @click="goToCreate">
+        <Button icon="plus" @click="goToCreate">
           <span class="hide-mobile">Добавить вопрос</span>
           <span class="show-mobile">Добавить</span>
         </Button>
@@ -17,94 +16,111 @@
     <!-- Фильтры -->
     <Card class="filters-card">
       <div class="filters-grid">
-        <Input v-model="filters.search" placeholder="Поиск по тексту вопроса..." icon="🔍" @input="loadQuestions" />
+        <Input v-model="filters.search" placeholder="Поиск по тексту вопроса..." @input="loadQuestions" />
 
         <Select v-model="filters.category" :options="categoryOptions" placeholder="Все категории" @change="loadQuestions" />
 
         <Select v-model="filters.type" :options="typeOptions" placeholder="Все типы" @change="loadQuestions" />
 
-        <Button variant="ghost" @click="resetFilters" fullWidth> Сбросить </Button>
+        <Button variant="secondary" @click="resetFilters" fullWidth icon="refresh-ccw">Сбросить</Button>
       </div>
 
       <!-- Переключатель группировки -->
-      <div class="flex items-center justify-end mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-        <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
-          <input
-            type="checkbox"
-            v-model="groupByAssessment"
-            @change="loadQuestions"
-            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span>Группировать по аттестациям</span>
-        </label>
+      <div class="grouping-toggle">
+        <Checkbox v-model="groupByAssessment" label="Группировать по аттестациям" @update:modelValue="loadQuestions" />
       </div>
     </Card>
 
     <!-- Список вопросов -->
     <Preloader v-if="loading" />
-    <div v-else class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead class="bg-gray-50 dark:bg-gray-900">
+    <Card v-else padding="none" class="questions-card">
+      <div v-if="questions.length === 0" class="empty-state">Вопросы не найдены</div>
+
+      <div v-else class="table-wrapper hide-mobile">
+        <table class="questions-table">
+          <thead>
             <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Вопрос</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Категория</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Тип</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Вариантов</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Автор</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Дата создания</th>
-              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Действия</th>
+              <th>Вопрос</th>
+              <th>Категория</th>
+              <th>Тип</th>
+              <th>Вариантов</th>
+              <th>Автор</th>
+              <th>Дата создания</th>
+              <th class="actions-col">Действия</th>
             </tr>
           </thead>
-          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            <tr v-for="question in questions" :key="question.id" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-              <td class="px-6 py-4">
-                <div class="text-sm text-gray-900 dark:text-white max-w-md truncate">
-                  {{ question.question_text }}
-                </div>
+          <tbody>
+            <tr v-for="question in questions" :key="question.id">
+              <td class="question-cell">
+                <div class="question-text">{{ question.question_text }}</div>
               </td>
-              <td class="px-6 py-4">
-                <span class="badge badge-category">
+              <td>
+                <Badge variant="default" size="sm" rounded>
                   {{ question.category_name || "Без категории" }}
-                </span>
+                </Badge>
               </td>
-              <td class="px-6 py-4">
-                <span class="badge badge-type">
+              <td>
+                <Badge variant="secondary" size="sm" rounded>
                   {{ getQuestionTypeLabel(question.question_type) }}
-                </span>
+                </Badge>
               </td>
-              <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
-                {{ question.question_type === "text" ? "—" : question.options_count }}
-              </td>
-              <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{{ question.first_name }} {{ question.last_name }}</td>
-              <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
-                {{ formatDate(question.created_at) }}
-              </td>
-              <td class="px-6 py-4 text-right text-sm font-medium space-x-2">
-                <button
-                  @click="goToDetails(question.id)"
-                  class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition"
-                >
-                  Просмотр
-                </button>
-                <button
-                  @click="goToEdit(question.id)"
-                  class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 transition"
-                >
-                  Редактировать
-                </button>
-                <button @click="confirmDelete(question)" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition">
-                  Удалить
-                </button>
+              <td>{{ question.question_type === "text" ? "—" : question.options_count }}</td>
+              <td>{{ question.first_name }} {{ question.last_name }}</td>
+              <td class="date-cell">{{ formatDate(question.created_at) }}</td>
+              <td class="actions-cell">
+                <div class="actions-buttons">
+                  <Button @click="goToDetails(question.id)" class="action-btn action-btn-info" title="Просмотр" icon="eye"></Button>
+                  <Button @click="goToEdit(question.id)" class="action-btn action-btn-edit" title="Редактировать" icon="pencil"></Button>
+                  <Button @click="confirmDelete(question)" class="action-btn action-btn-delete" title="Удалить" icon="trash"></Button>
+                </div>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Пустое состояние -->
-      <div v-if="!loading && questions.length === 0" class="p-8 text-center text-gray-500 dark:text-gray-400">Вопросы не найдены</div>
-    </div>
+      <!-- Mobile cards -->
+      <div class="show-mobile mobile-cards">
+        <div v-for="question in questions" :key="question.id" class="question-card">
+          <div class="question-card-header">
+            <h3 class="question-card-title">{{ question.question_text }}</h3>
+            <div class="question-card-badges">
+              <Badge variant="default" size="sm" rounded>
+                {{ question.category_name || "Без категории" }}
+              </Badge>
+              <Badge variant="secondary" size="sm" rounded>
+                {{ getQuestionTypeLabel(question.question_type) }}
+              </Badge>
+            </div>
+          </div>
+
+          <div class="question-card-body">
+            <div class="question-card-row">
+              <span class="question-card-label">Тип:</span>
+              <span class="question-card-value">{{ getQuestionTypeLabel(question.question_type) }}</span>
+            </div>
+            <div v-if="question.question_type !== 'text'" class="question-card-row">
+              <span class="question-card-label">Вариантов:</span>
+              <span class="question-card-value">{{ question.options_count }}</span>
+            </div>
+            <div class="question-card-row">
+              <span class="question-card-label">Автор:</span>
+              <span class="question-card-value">{{ question.first_name }} {{ question.last_name }}</span>
+            </div>
+            <div class="question-card-row">
+              <span class="question-card-label">Дата создания:</span>
+              <span class="question-card-value">{{ formatDate(question.created_at) }}</span>
+            </div>
+          </div>
+
+          <div class="question-card-actions">
+            <Button size="sm" variant="secondary" icon="eye" @click="goToDetails(question.id)" fullWidth>Просмотр</Button>
+            <Button size="sm" variant="secondary" icon="pencil" @click="goToEdit(question.id)" fullWidth>Редактировать</Button>
+            <Button size="sm" variant="danger" icon="trash" @click="confirmDelete(question)" fullWidth>Удалить</Button>
+          </div>
+        </div>
+      </div>
+    </Card>
 
     <!-- Модальное окно управления категориями -->
     <Modal :show="showCategoryModal" @close="showCategoryModal = false" title="Управление категориями" size="lg">
@@ -123,6 +139,8 @@ import Card from "../components/ui/Card.vue";
 import Button from "../components/ui/Button.vue";
 import Input from "../components/ui/Input.vue";
 import Select from "../components/ui/Select.vue";
+import Badge from "../components/ui/Badge.vue";
+import Checkbox from "../components/ui/Checkbox.vue";
 import CategoryManager from "../components/CategoryManager.vue";
 
 const router = useRouter();
@@ -243,13 +261,13 @@ onMounted(async () => {
 .page-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 2rem;
+  justify-content: end;
+  gap: 16px;
+  margin-bottom: 32px;
 }
 
 .page-heading {
-  font-size: 1.875rem;
+  font-size: 24px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
@@ -257,27 +275,212 @@ onMounted(async () => {
 
 .header-buttons {
   display: flex;
-  gap: 0.75rem;
-}
-
-.hide-mobile {
-  display: inline;
+  gap: 12px;
 }
 
 .show-mobile {
-  display: none;
+  display: none !important;
 }
 
 .filters-card {
-  margin-bottom: 2rem;
+  margin-bottom: 32px;
 }
 
 .filters-grid {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1fr;
-  gap: 1rem;
+  gap: 16px;
 }
 
+/* Переключатель группировки */
+.grouping-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--divider);
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+/* Таблица */
+.questions-card {
+  margin-bottom: 32px;
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.questions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.questions-table thead {
+  border-bottom: 1px solid var(--divider);
+}
+
+.questions-table th {
+  padding: 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.questions-table td {
+  padding: 16px;
+  color: var(--text-primary);
+}
+
+.question-cell {
+  max-width: 300px;
+}
+
+.question-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.date-cell {
+  white-space: nowrap;
+}
+
+.actions-col {
+  text-align: right;
+  width: 150px;
+}
+
+.actions-cell {
+  text-align: right;
+}
+
+.actions-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+}
+
+.action-btn:hover {
+  background-color: var(--divider);
+  color: var(--text-primary);
+}
+
+.action-btn-delete:hover {
+  background-color: #d4183d;
+  color: white;
+}
+
+/* Mobile cards */
+.mobile-cards {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.question-card {
+  background: var(--surface-card);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.question-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.question-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  word-break: break-word;
+}
+
+.question-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.question-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--divider);
+  border-bottom: 1px solid var(--divider);
+}
+
+.question-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.question-card-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.question-card-value {
+  color: var(--text-primary);
+  text-align: right;
+  flex: 1;
+}
+
+.question-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Empty state */
+.empty-state {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* Responsive design */
 @media (max-width: 1024px) {
   .hide-mobile {
     display: none !important;
@@ -290,11 +493,20 @@ onMounted(async () => {
   .filters-grid {
     grid-template-columns: 1fr 1fr;
   }
+
+  .questions-table {
+    font-size: 13px;
+  }
+
+  .questions-table th,
+  .questions-table td {
+    padding: 12px;
+  }
 }
 
 @media (max-width: 768px) {
   .page-heading {
-    font-size: 1.5rem;
+    font-size: 20px;
   }
 
   .filters-grid {
@@ -304,6 +516,11 @@ onMounted(async () => {
   .header-buttons {
     flex-direction: column;
   }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 @media (max-width: 480px) {
@@ -311,36 +528,9 @@ onMounted(async () => {
     flex-direction: column;
     align-items: stretch;
   }
-}
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.375rem 0.875rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  border-radius: 12px;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.badge-category {
-  background: rgba(147, 51, 234, 0.1);
-  color: #9333ea;
-}
-
-.badge-type {
-  background: rgba(0, 136, 204, 0.1);
-  color: var(--accent-blue);
-}
-
-:global(.dark) .badge-category {
-  background: rgba(147, 51, 234, 0.2);
-  color: #c084fc;
-}
-
-:global(.dark) .badge-type {
-  background: rgba(0, 136, 204, 0.2);
-  color: #60a5fa;
+  .grouping-toggle {
+    justify-content: flex-start;
+  }
 }
 </style>

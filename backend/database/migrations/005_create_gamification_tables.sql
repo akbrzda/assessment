@@ -82,12 +82,11 @@ CREATE TABLE IF NOT EXISTS gamification_events (
   CONSTRAINT fk_gamification_events_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_gamification_events_attempt FOREIGN KEY (attempt_id) REFERENCES assessment_attempts(id) ON DELETE SET NULL,
   CONSTRAINT fk_gamification_events_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
-  CONSTRAINT fk_gamification_events_position FOREIGN KEY (position_id) REFERENCES positions(id) ON DELETE SET NULL
+  CONSTRAINT fk_gamification_events_position FOREIGN KEY (position_id) REFERENCES positions(id) ON DELETE SET NULL,
+  INDEX idx_gamification_events_user_created_at (user_id, created_at),
+  INDEX idx_gamification_events_attempt (attempt_id),
+  INDEX idx_gamification_events_branch_created_at (branch_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE INDEX idx_gamification_events_user_created_at ON gamification_events (user_id, created_at);
-CREATE INDEX idx_gamification_events_attempt ON gamification_events (attempt_id);
-CREATE INDEX idx_gamification_events_branch_created_at ON gamification_events (branch_id, created_at);
 
 CREATE TABLE IF NOT EXISTS team_challenges (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -113,16 +112,3 @@ CREATE TABLE IF NOT EXISTS team_challenge_branch_scores (
   CONSTRAINT fk_team_challenge_branch_scores_challenge FOREIGN KEY (challenge_id) REFERENCES team_challenges(id) ON DELETE CASCADE,
   CONSTRAINT fk_team_challenge_branch_scores_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-INSERT INTO team_challenges (title, description, period_start, period_end, status)
-VALUES (
-  'Командный челлендж месяца',
-  'Суммарные очки филиалов за текущий месяц',
-  DATE_FORMAT(CURDATE(), '%Y-%m-01'),
-  LAST_DAY(CURDATE()),
-  'active'
-)
-ON DUPLICATE KEY UPDATE
-  title = VALUES(title),
-  description = VALUES(description),
-  status = 'active';

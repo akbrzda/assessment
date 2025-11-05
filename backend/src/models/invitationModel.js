@@ -48,7 +48,26 @@ async function markUsed(invitationId, userId) {
   );
 }
 
-async function listInvitationsByCreator(userId) {
+async function findAll() {
+  const [rows] = await pool.execute(
+    `SELECT inv.id, inv.code, inv.first_name, inv.last_name,
+            inv.expires_at, inv.created_at, inv.used_at,
+            inv.used_by, inv.branch_id,
+            b.name AS branch_name,
+            r.name AS role_name,
+            CONCAT(used_user.first_name, ' ', used_user.last_name) AS used_by_name,
+            CONCAT(creator.first_name, ' ', creator.last_name) AS created_by_name
+     FROM invitations inv
+     LEFT JOIN branches b ON b.id = inv.branch_id
+     LEFT JOIN roles r ON r.id = inv.role_id
+     LEFT JOIN users used_user ON used_user.id = inv.used_by
+     LEFT JOIN users creator ON creator.id = inv.created_by
+     ORDER BY inv.created_at DESC`
+  );
+  return rows;
+}
+
+async function findByCreator(userId) {
   const [rows] = await pool.execute(
     `SELECT inv.id, inv.code, inv.first_name, inv.last_name,
             inv.expires_at, inv.created_at, inv.used_at,
@@ -67,6 +86,9 @@ async function listInvitationsByCreator(userId) {
   );
   return rows;
 }
+
+// Алиас для обратной совместимости
+const listInvitationsByCreator = findByCreator;
 
 async function updateExpiration(invitationId, expiresAt) {
   await pool.execute(`UPDATE invitations SET expires_at = ?, updated_at = NOW() WHERE id = ?`, [expiresAt, invitationId]);
@@ -90,6 +112,8 @@ module.exports = {
   findActiveByCode,
   findById,
   markUsed,
+  findAll,
+  findByCreator,
   listInvitationsByCreator,
   updateExpiration,
   deleteInvitation,

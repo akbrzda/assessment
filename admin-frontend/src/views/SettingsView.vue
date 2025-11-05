@@ -1,113 +1,126 @@
 <template>
   <div class="settings-view">
+    <!-- Header -->
     <div class="page-header">
-      <h1 class="page-title">Настройки системы</h1>
-      <p class="page-description">Управление параметрами геймификации и бейджами</p>
+      <div>
+        <h2 class="page-heading">Настройки системы</h2>
+        <p class="page-subtitle">Управление параметрами геймификации и бейджами</p>
+      </div>
     </div>
 
-    <!-- Контент -->
+    <!-- Content -->
     <div class="settings-content">
+      <!-- Геймификация -->
       <div class="settings-section">
-        <div class="section-header">
-          <h2 class="section-title">Геймификация</h2>
-          <p class="section-description">Управление очками, уровнями и бейджами для мотивации сотрудников</p>
-        </div>
+        <h3 class="section-title">Геймификация</h3>
 
-        <!-- Настройки очков -->
-        <div class="settings-card">
-          <h3 class="card-title">Начисление очков</h3>
+        <!-- Начисление очков -->
+        <Card title="Начисление очков" icon="Settings">
           <div class="form-grid">
-            <div class="form-group">
-              <label>Очки за прохождение аттестации</label>
-              <input v-model.number="gamificationSettings.points_per_assessment" type="number" class="form-input" placeholder="10" />
-              <small>Базовое количество очков за любую завершённую аттестацию</small>
-            </div>
-            <div class="form-group">
-              <label>Множитель за высокий результат (90%+)</label>
-              <input v-model.number="gamificationSettings.high_score_multiplier" type="number" step="0.1" class="form-input" placeholder="1.5" />
-              <small>Коэффициент умножения очков при результате 90% и выше</small>
-            </div>
-            <div class="form-group">
-              <label>Бонус за идеальный результат (100%)</label>
-              <input v-model.number="gamificationSettings.perfect_score_bonus" type="number" class="form-input" placeholder="50" />
-              <small>Дополнительные очки за безошибочное прохождение</small>
-            </div>
-            <div class="form-group">
-              <label>Очки за активность в месяц</label>
-              <input v-model.number="gamificationSettings.monthly_activity_bonus" type="number" class="form-input" placeholder="20" />
-              <small>Бонус за регулярное участие в аттестациях</small>
-            </div>
+            <Input
+              v-model.number="gamificationSettings.points_per_assessment"
+              type="number"
+              label="Очки за прохождение аттестации"
+              placeholder="10"
+            />
+            <Input
+              v-model.number="gamificationSettings.high_score_multiplier"
+              type="number"
+              label="Множитель за высокий результат (90%+)"
+              placeholder="1.5"
+            />
+            <Input
+              v-model.number="gamificationSettings.perfect_score_bonus"
+              type="number"
+              label="Бонус за идеальный результат (100%)"
+              placeholder="50"
+            />
+            <Input v-model.number="gamificationSettings.monthly_activity_bonus" type="number" label="Очки за активность в месяц" placeholder="20" />
           </div>
-          <div class="card-actions">
-            <button @click="saveGamificationSettings" class="btn-primary" :disabled="savingGamification">
-              <svg v-if="!savingGamification" class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-              </svg>
-              <span v-if="savingGamification">Сохранение...</span>
-              <span v-else>Сохранить настройки очков</span>
-            </button>
-          </div>
-        </div>
+          <template #footer>
+            <Button @click="saveGamificationSettings" variant="primary" :loading="savingGamification" size="md">Сохранить настройки очков</Button>
+          </template>
+        </Card>
 
         <!-- Управление уровнями -->
-        <div class="settings-card">
-          <LevelsManager />
-        </div>
+        <LevelsManager />
 
         <!-- Управление бейджами -->
-        <div class="settings-card">
-          <BadgesManager />
-        </div>
+        <BadgesManager />
+      </div>
 
-        <!-- Переменные окружения (только чтение) -->
-        <div class="settings-card">
-          <h3 class="card-title">Переменные окружения (.env)</h3>
-          <div class="env-info">
-            <p class="env-description">
-              Эти переменные настраиваются в файле <code>.env</code> на сервере и не могут быть изменены через админ-панель.
-            </p>
-            <div class="env-list">
-              <div class="env-item">
-                <span class="env-key">BOT_TOKEN</span>
-                <span class="env-description">Токен основного Telegram бота</span>
-              </div>
-              <div class="env-item">
-                <span class="env-key">LOG_BOT_TOKEN</span>
-                <span class="env-description">Токен бота для отправки логов</span>
-              </div>
-              <div class="env-item">
-                <span class="env-key">LOG_CHAT_ID</span>
-                <span class="env-description">ID чата/группы для отправки логов</span>
-              </div>
-              <div class="env-item">
-                <span class="env-key">INVITE_EXPIRATION_DAYS</span>
-                <span class="env-description">Срок действия приглашений (в днях)</span>
-              </div>
-              <div class="env-item">
-                <span class="env-key">SUPERADMIN_IDS</span>
-                <span class="env-description">ID супер-администраторов (через запятую)</span>
-              </div>
-              <div class="env-item">
-                <span class="env-key">ALLOWED_ORIGINS</span>
-                <span class="env-description">Разрешённые домены для CORS (через запятую)</span>
-              </div>
-              <div class="env-item">
-                <span class="env-key">JWT_SECRET</span>
-                <span class="env-description">Секретный ключ для JWT токенов</span>
-              </div>
-              <div class="env-item">
-                <span class="env-key">JWT_REFRESH_SECRET</span>
-                <span class="env-description">Секретный ключ для refresh токенов</span>
+      <!-- Переменные окружения -->
+      <div class="settings-section">
+        <h3 class="section-title">Переменные окружения</h3>
+
+        <Card title="Конфигурация (.env)" icon="Lock">
+          <div class="env-description-block">
+            <p>Эти переменные задаются в файлах <code>.env</code> и не изменяются из админ-панели.</p>
+          </div>
+
+          <div class="env-columns">
+            <div class="env-column">
+              <h4 class="env-column-title">Backend (<code>backend/.env</code>)</h4>
+              <div class="env-list">
+                <div class="env-item">
+                  <div class="env-key">BOT_TOKEN</div>
+                  <div class="env-value">Токен основного Telegram-бота</div>
+                </div>
+                <div class="env-item">
+                  <div class="env-key">LOG_BOT_TOKEN</div>
+                  <div class="env-value">Токен бота для отправки логов</div>
+                </div>
+                <div class="env-item">
+                  <div class="env-key">LOG_CHAT_ID</div>
+                  <div class="env-value">ID чата/группы для логов</div>
+                </div>
+                <div class="env-item">
+                  <div class="env-key">INVITE_EXPIRATION_DAYS</div>
+                  <div class="env-value">Срок действия ссылок-приглашений (дни)</div>
+                </div>
+                <div class="env-item">
+                  <div class="env-key">SUPERADMIN_IDS</div>
+                  <div class="env-value">Telegram ID суперадминов (через запятую)</div>
+                </div>
+                <div class="env-item">
+                  <div class="env-key">ALLOWED_ORIGINS</div>
+                  <div class="env-value">Разрешённые домены для CORS</div>
+                </div>
+                <div class="env-item">
+                  <div class="env-key">JWT_SECRET</div>
+                  <div class="env-value">Секретный ключ для access-токенов</div>
+                </div>
+                <div class="env-item">
+                  <div class="env-key">JWT_REFRESH_SECRET</div>
+                  <div class="env-value">Секретный ключ для refresh-токенов</div>
+                </div>
               </div>
             </div>
-            <div class="env-note">
-              <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>Для изменения этих переменных необходимо отредактировать файл <code>.env</code> и перезапустить сервер.</span>
+
+            <div class="env-column">
+              <h4 class="env-column-title">Frontend (<code>admin-frontend/.env</code>)</h4>
+              <div class="env-list">
+                <div class="env-item">
+                  <div class="env-key">VITE_API_BASE_URL</div>
+                  <div class="env-value">Базовый URL API (используется axios)</div>
+                </div>
+                <div class="env-item">
+                  <div class="env-key">VITE_INVITE_EXPIRATION_DAYS</div>
+                  <div class="env-value">Срок действия приглашений, отображаемый в интерфейсе</div>
+                </div>
+                <div class="env-item">
+                  <div class="env-key">VITE_BOT_USERNAME</div>
+                  <div class="env-value">Username Telegram-бота (для ссылок без @)</div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+
+          <div class="env-note">
+            <Icon name="Info" class="env-note-icon" />
+            <span>После изменения переменных окружения необходимо обновить файл <code>.env</code> и перезагрузить соответствующий сервис.</span>
+          </div>
+        </Card>
       </div>
     </div>
   </div>
@@ -118,6 +131,10 @@ import { ref, onMounted } from "vue";
 import settingsApi from "../api/settings";
 import BadgesManager from "../components/BadgesManager.vue";
 import LevelsManager from "../components/LevelsManager.vue";
+import Card from "../components/ui/Card.vue";
+import Input from "../components/ui/Input.vue";
+import Button from "../components/ui/Button.vue";
+import Icon from "../components/ui/Icon.vue";
 import { useToast } from "../composables/useToast";
 
 const { showToast } = useToast();
@@ -186,29 +203,35 @@ onMounted(() => {
 
 <style scoped>
 .settings-view {
-  padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .page-header {
-  margin-bottom: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32px;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-.page-title {
-  font-size: 2rem;
+.page-heading {
+  font-size: 30px;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 4px 0;
 }
 
-.page-description {
-  font-size: 1rem;
+.page-subtitle {
+  font-size: 15px;
   color: var(--text-secondary);
   margin: 0;
 }
 
 .settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
   animation: fadeIn 0.3s;
 }
 
@@ -226,217 +249,142 @@ onMounted(() => {
 .settings-section {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
-}
-
-.section-header {
-  margin-bottom: 1rem;
+  gap: 24px;
 }
 
 .section-title {
-  font-size: 1.5rem;
+  font-size: 24px;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 16px 0;
 }
 
-.section-description {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin: 0;
+/* Forms */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
 
-/* Карточки */
-.settings-card {
-  background: var(--surface-card);
-  border: 1px solid var(--divider);
-  border-radius: 12px;
-  padding: 2rem;
-}
-
-.card-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 1.5rem 0;
-  padding-bottom: 1rem;
+/* Environment Variables */
+.env-description-block {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
   border-bottom: 1px solid var(--divider);
 }
 
-/* Формы */
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-group label {
-  font-weight: 500;
-  color: var(--text-primary);
-  font-size: 0.875rem;
-}
-
-.form-group small {
-  font-size: 0.75rem;
+.env-description-block p {
+  font-size: 15px;
   color: var(--text-secondary);
-}
-
-.form-input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid var(--divider);
-  border-radius: 10px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  transition: all 0.15s;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--accent-blue);
-  background: var(--surface-card);
-}
-
-/* Действия */
-.card-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--divider);
-}
-
-.card-actions .btn-primary {
-  min-width: 200px;
-}
-
-.btn-primary {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 10px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-  background: var(--accent-blue);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--accent-blue-hover);
-  transform: translateY(-1px);
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.icon {
-  width: 18px;
-  height: 18px;
-}
-
-/* Переменные окружения */
-.env-info {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.env-description {
-  color: var(--text-secondary);
+  margin: 0;
   line-height: 1.6;
 }
 
-.env-description code {
+.env-description-block code {
   background: var(--bg-secondary);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 14px;
   color: var(--accent-blue);
   font-family: "Courier New", monospace;
+}
+
+.env-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.env-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.env-column-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px 0;
 }
 
 .env-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
 .env-item {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: 1rem;
-  background: var(--bg-secondary);
-  border-radius: 10px;
+  gap: 4px;
+  padding: 16px;
+  background: var(--surface-card);
+  border-radius: 12px;
   border: 1px solid var(--divider);
 }
 
 .env-key {
   font-family: "Courier New", monospace;
-  font-size: 0.875rem;
+  font-size: 14px;
   font-weight: 600;
   color: var(--accent-blue);
 }
 
-.env-item .env-description {
-  font-size: 0.8125rem;
-  margin: 0;
+.env-value {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
 }
 
 .env-note {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
-  padding: 1rem;
+  gap: 12px;
+  padding: 16px;
   background: var(--accent-blue-soft);
-  border-radius: 10px;
+  border-radius: 12px;
   color: var(--text-primary);
 }
 
-.env-note .icon {
+.env-note-icon {
   width: 20px;
   height: 20px;
   color: var(--accent-blue);
   flex-shrink: 0;
-  margin-top: 0.125rem;
+  margin-top: 2px;
 }
 
 .env-note span {
-  font-size: 0.875rem;
+  font-size: 14px;
   line-height: 1.5;
 }
 
 .env-note code {
-  background: var(--bg-secondary);
-  padding: 0.125rem 0.375rem;
-  border-radius: 4px;
-  font-size: 0.8125rem;
+  background: #ffffff33;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: "Courier New", monospace;
 }
 
+/* Responsive */
 @media (max-width: 768px) {
-  .settings-view {
-    padding: 1rem;
-  }
-
-  .settings-card {
-    padding: 1.5rem;
+  .page-heading {
+    font-size: 24px;
   }
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-content {
+    gap: 24px;
+  }
+
+  .settings-section {
+    gap: 16px;
   }
 }
 </style>

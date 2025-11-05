@@ -9,7 +9,7 @@ defineProps({
   variant: {
     type: String,
     default: "default",
-    validator: (value) => ["default", "primary", "success", "warning", "danger"].includes(value),
+    validator: (value) => ["default", "secondary", "primary", "success", "warning", "danger", "info"].includes(value),
   },
   size: {
     type: String,
@@ -51,6 +51,12 @@ defineProps({
   color: var(--text-primary);
 }
 
+.badge-secondary {
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--divider);
+}
+
 .badge-primary {
   background-color: var(--accent-blue-soft);
   color: var(--accent-blue);
@@ -69,5 +75,10 @@ defineProps({
 .badge-danger {
   background-color: rgba(239, 68, 68, 0.1);
   color: #ef4444;
+}
+
+.badge-info {
+  background-color: var(--accent-purple-soft);
+  color: var(--accent-purple);
 }
 </style>

@@ -40,19 +40,19 @@ onUnmounted(() => {
 <style scoped>
 .app-shell {
   min-height: 100vh;
-  background: var(--bg-primary);
+  background: linear-gradient(145deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
 }
 
 .main-content {
-  margin-left: 260px;
-  margin-top: 64px;
-  padding: 2rem;
+  margin-left: 264px;
+  margin-top: 72px;
+  padding: 32px;
   transition: margin-left 0.3s ease;
-  min-height: calc(100vh - 64px);
+  min-height: calc(100vh - 72px);
 }
 
 .main-content :deep(> *) {
-  max-width: 1400px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
@@ -65,7 +65,7 @@ onUnmounted(() => {
 @media (max-width: 1023px) {
   .main-content {
     margin-left: 0;
-    padding: 1.5rem 1.25rem 5rem;
+    padding: 24px 12px;
   }
 }
 
@@ -75,7 +75,8 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: #00000073;
   z-index: 30;
+  backdrop-filter: blur(6px);
 }
 </style>

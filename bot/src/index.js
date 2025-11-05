@@ -1,7 +1,8 @@
+const path = require("path");
 const { Telegraf } = require("telegraf");
 const dotenv = require("dotenv");
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const { BOT_TOKEN, MINI_APP_URL, ADMIN_CHAT_ID } = process.env;
 

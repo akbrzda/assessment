@@ -1,15 +1,17 @@
 <template>
   <button :type="type" :disabled="disabled || loading" :class="buttonClasses" @click="handleClick">
     <span v-if="loading" class="button-spinner"></span>
-    <span v-if="icon && !loading" class="button-icon">{{ icon }}</span>
+    <Icon v-if="icon && !loading" :name="icon" class="button-icon" />
     <span v-if="$slots.default" class="button-text"><slot></slot></span>
   </button>
 </template>
 
 <script setup>
 import { computed } from "vue";
+import Icon from "./Icon.vue";
 
 const props = defineProps({
+  icon: String,
   variant: {
     type: String,
     default: "primary",
@@ -26,7 +28,6 @@ const props = defineProps({
   },
   disabled: Boolean,
   loading: Boolean,
-  icon: String,
   fullWidth: Boolean,
 });
 
@@ -55,10 +56,10 @@ const handleClick = (event) => {
 
 <style scoped>
 .button {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 8px;
   font-weight: 600;
   border-radius: 14px;
   transition: all 0.2s ease;
@@ -70,26 +71,25 @@ const handleClick = (event) => {
 
 .button:focus {
   outline: none;
-  box-shadow: 0 0 0 3px var(--accent-blue-soft);
 }
 
 /* Sizes */
 .button-sm {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
+  padding: 8px 16px;
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .button-md {
-  padding: 0.625rem 1.25rem;
-  font-size: 0.9375rem;
-  line-height: 1.5rem;
+  padding: 10px 20px;
+  font-size: 15px;
+  line-height: 24px;
 }
 
 .button-lg {
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  line-height: 1.5rem;
+  padding: 12px 24px;
+  font-size: 16px;
+  line-height: 24px;
 }
 
 /* Variants */
@@ -109,8 +109,7 @@ const handleClick = (event) => {
 }
 
 .button-secondary:hover:not(.button-disabled) {
-  background-color: var(--surface-card);
-  transform: translateY(-1px);
+  opacity: 0.7;
 }
 
 .button-danger {
@@ -119,8 +118,7 @@ const handleClick = (event) => {
 }
 
 .button-danger:hover:not(.button-disabled) {
-  background-color: #e6342a;
-  transform: translateY(-1px);
+  opacity: 0.9;
 }
 
 .button-success {
@@ -129,8 +127,7 @@ const handleClick = (event) => {
 }
 
 .button-success:hover:not(.button-disabled) {
-  background-color: #30b350;
-  transform: translateY(-1px);
+  opacity: 0.9;
 }
 
 .button-ghost {
@@ -139,8 +136,7 @@ const handleClick = (event) => {
 }
 
 .button-ghost:hover:not(.button-disabled) {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
+  opacity: 0.9;
 }
 
 /* States */
@@ -155,8 +151,8 @@ const handleClick = (event) => {
 
 /* Spinner */
 .button-spinner {
-  width: 1rem;
-  height: 1rem;
+  width: 16px;
+  height: 16px;
   border: 2px solid currentColor;
   border-top-color: transparent;
   border-radius: 50%;
@@ -170,8 +166,9 @@ const handleClick = (event) => {
 }
 
 .button-icon {
-  font-size: 1.125rem;
-  line-height: 1;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
 .button-text {

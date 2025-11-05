@@ -50,22 +50,59 @@ export const useTelegramStore = defineStore("telegram", () => {
 
     const webApp = window.Telegram.WebApp;
     tg.value = webApp;
-    user.value = webApp.initDataUnsafe?.user || null;
-    initData.value = webApp.initData || "";
+
+    // Восстанавливаем initData из sessionStorage, если он пустой
+    let currentInitData = webApp.initData || "";
+    let currentInitDataUnsafe = webApp.initDataUnsafe || {};
+
+    if (!currentInitData) {
+      // Пытаемся восстановить из sessionStorage
+      const savedInitData = sessionStorage.getItem("tg_init_data");
+      const savedInitDataUnsafe = sessionStorage.getItem("tg_init_data_unsafe");
+
+      if (savedInitData) {
+        console.log("🔄 Восстанавливаем initData из sessionStorage");
+        currentInitData = savedInitData;
+        webApp.initData = savedInitData;
+
+        if (savedInitDataUnsafe) {
+          try {
+            currentInitDataUnsafe = JSON.parse(savedInitDataUnsafe);
+            webApp.initDataUnsafe = currentInitDataUnsafe;
+          } catch (e) {
+            console.error("Ошибка при парсинге сохранённого initDataUnsafe:", e);
+          }
+        }
+      } else {
+        console.warn("⚠️ initData пустой и не найден в sessionStorage. Возможно, приложение открыто некорректно.");
+      }
+    } else {
+      // Сохраняем initData при первом запуске
+      console.log("💾 Сохраняем initData в sessionStorage");
+      sessionStorage.setItem("tg_init_data", currentInitData);
+
+      if (webApp.initDataUnsafe) {
+        sessionStorage.setItem("tg_init_data_unsafe", JSON.stringify(webApp.initDataUnsafe));
+      }
+    }
+
+    user.value = currentInitDataUnsafe?.user || null;
+    initData.value = currentInitData;
 
     let inviteCode = null;
     // Проверяем start_param (для /start команды) и startapp (для прямого открытия MiniApp)
-    const startParam = webApp.initDataUnsafe?.start_param;
-    const startApp = webApp.initDataUnsafe?.startapp;
+    const startParam = currentInitDataUnsafe?.start_param;
+    const startApp = currentInitDataUnsafe?.startapp;
 
     // Также проверяем tgWebAppStartParam (это специальный параметр для startapp)
-    const tgWebAppStartParam = webApp.initDataUnsafe?.tgWebAppStartParam;
+    const tgWebAppStartParam = currentInitDataUnsafe?.tgWebAppStartParam;
 
     console.log("🔍 Проверка параметров приглашения:", {
       startParam,
       startApp,
       tgWebAppStartParam,
-      initDataUnsafe: webApp.initDataUnsafe,
+      initDataUnsafe: currentInitDataUnsafe,
+      initDataLength: currentInitData.length,
     });
 
     if (typeof tgWebAppStartParam === "string" && tgWebAppStartParam.startsWith("invite_")) {
@@ -95,8 +132,8 @@ export const useTelegramStore = defineStore("telegram", () => {
       window.__telegramStartParam = startParam || startApp || tgWebAppStartParam || null;
     }
 
-    // Сохраняем оригинальный initData БЕЗ изменений
-    window.__telegramInitDataOverride = initData.value;
+    // Сохраняем оригинальный initData БЕЗ изменений (используем currentInitData, который может быть восстановлен)
+    window.__telegramInitDataOverride = currentInitData;
 
     webApp.ready();
     webApp.expand();
@@ -272,6 +309,15 @@ export const useTelegramStore = defineStore("telegram", () => {
     return false;
   }
 
+  function clearSavedInitData() {
+    // Очищаем сохранённые данные (например, при выходе пользователя)
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("tg_init_data");
+      sessionStorage.removeItem("tg_init_data_unsafe");
+      console.log("🗑️ Сохранённые initData очищены");
+    }
+  }
+
   return {
     // state
     tg,
@@ -299,5 +345,6 @@ export const useTelegramStore = defineStore("telegram", () => {
     setBackButtonHandler,
     enableClosingConfirmation,
     disableClosingConfirmation,
+    clearSavedInitData,
   };
 });

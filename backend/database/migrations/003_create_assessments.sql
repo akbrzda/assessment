@@ -22,10 +22,9 @@ CREATE TABLE IF NOT EXISTS assessment_questions (
   question_text TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_assessment_questions_assessment FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE
+  CONSTRAINT fk_assessment_questions_assessment FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE,
+  INDEX idx_assessment_questions_assessment_order (assessment_id, order_index)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE INDEX idx_assessment_questions_assessment_order ON assessment_questions (assessment_id, order_index);
 
 CREATE TABLE IF NOT EXISTS assessment_question_options (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -35,10 +34,9 @@ CREATE TABLE IF NOT EXISTS assessment_question_options (
   is_correct TINYINT(1) NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_assessment_options_question FOREIGN KEY (question_id) REFERENCES assessment_questions(id) ON DELETE CASCADE
+  CONSTRAINT fk_assessment_options_question FOREIGN KEY (question_id) REFERENCES assessment_questions(id) ON DELETE CASCADE,
+  INDEX idx_assessment_options_question_order (question_id, order_index)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE INDEX idx_assessment_options_question_order ON assessment_question_options (question_id, order_index);
 
 CREATE TABLE IF NOT EXISTS assessment_user_assignments (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -90,7 +88,6 @@ CREATE TABLE IF NOT EXISTS assessment_answers (
   CONSTRAINT fk_assessment_answers_attempt FOREIGN KEY (attempt_id) REFERENCES assessment_attempts(id) ON DELETE CASCADE,
   CONSTRAINT fk_assessment_answers_question FOREIGN KEY (question_id) REFERENCES assessment_questions(id) ON DELETE CASCADE,
   CONSTRAINT fk_assessment_answers_option FOREIGN KEY (option_id) REFERENCES assessment_question_options(id) ON DELETE SET NULL,
-  UNIQUE KEY uniq_attempt_question (attempt_id, question_id)
+  UNIQUE KEY uniq_attempt_question (attempt_id, question_id),
+  INDEX idx_assessment_answers_attempt (attempt_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE INDEX idx_assessment_answers_attempt ON assessment_answers (attempt_id);

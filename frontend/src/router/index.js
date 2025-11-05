@@ -52,60 +52,6 @@ const routes = [
     component: () => import("../views/ProfileView.vue"),
     meta: { requiresAuth: true },
   },
-  {
-    path: "/statistics",
-    name: "statistics",
-    component: () => import("../views/admin/StatisticsView.vue"),
-    meta: { requiresAuth: true, requiresAdmin: true },
-  },
-  {
-    path: "/admin",
-    name: "admin",
-    component: () => import("../views/AdminDashboard.vue"),
-    meta: { requiresAuth: true, requiresAdmin: true },
-  },
-  {
-    path: "/admin/dashboard",
-    name: "admin-dashboard",
-    component: () => import("../views/AdminDashboard.vue"),
-    meta: { requiresAuth: true, requiresAdmin: true },
-  },
-  {
-    path: "/admin/users",
-    name: "admin-users",
-    component: () => import("../views/admin/UsersView.vue"),
-    meta: { requiresAuth: true, requiresAdmin: true, requiresSuperAdmin: true },
-  },
-  {
-    path: "/admin/assessments",
-    name: "admin-assessments",
-    component: () => import("../views/admin/AssessmentsView.vue"),
-    meta: { requiresAuth: true, requiresAdmin: true },
-  },
-  {
-    path: "/admin/branches",
-    name: "admin-branches",
-    component: () => import("../views/admin/BranchesView.vue"),
-    meta: { requiresAuth: true, requiresAdmin: true, requiresSuperAdmin: true },
-  },
-  {
-    path: "/admin/invitations",
-    name: "admin-invitations",
-    component: () => import("../views/admin/InvitationsView.vue"),
-    meta: { requiresAuth: true, requiresAdmin: true, requiresSuperAdmin: true },
-  },
-  {
-    path: "/admin/assessments/create",
-    name: "assessment-create",
-    component: () => import("../views/AssessmentEditorView.vue"),
-    meta: { requiresAuth: true, requiresAdmin: true },
-  },
-  {
-    path: "/admin/assessments/:id/edit",
-    name: "assessment-edit",
-    component: () => import("../views/AssessmentEditorView.vue"),
-    meta: { requiresAuth: true, requiresAdmin: true },
-  },
 ];
 
 const router = createRouter({
@@ -157,16 +103,6 @@ router.beforeEach(async (to, from, next) => {
     // Защищаем от повторного попадания на страницы регистрации/приглашения
     if (["registration", "invitation"].includes(currentRoute)) {
       return next({ name: "dashboard" });
-    }
-
-    // Проверка прав администратора
-    if (to.meta.requiresAdmin && !userStore.isAdmin) {
-      return next({ name: "dashboard" });
-    }
-
-    // Проверка прав суперадмина
-    if (to.meta.requiresSuperAdmin && !userStore.isSuperAdmin) {
-      return next({ name: "admin-dashboard" });
     }
   }
 

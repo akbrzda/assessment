@@ -1,10 +1,9 @@
 const path = require("path");
 const dotenv = require("dotenv");
 
-const envPath = path.resolve(process.cwd(), ".env");
-dotenv.config({ path: envPath });
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
-const requiredVars = ["PORT", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "BOT_TOKEN"];
+const requiredVars = ["PORT", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "BOT_TOKEN", "JWT_SECRET", "JWT_REFRESH_SECRET"];
 
 for (const key of requiredVars) {
   if (!process.env[key]) {
@@ -36,6 +35,8 @@ module.exports = {
   botToken: process.env.BOT_TOKEN,
   logBotToken: process.env.LOG_BOT_TOKEN,
   logChatId: process.env.LOG_CHAT_ID,
+  jwtSecret: process.env.JWT_SECRET || "your_secret_key_here",
+  jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || "your_refresh_secret_key_here",
   inviteExpirationDays: Number(process.env.INVITE_EXPIRATION_DAYS || 7),
   allowedOrigins: parseList(process.env.ALLOWED_ORIGINS),
   superAdminIds: parseList(process.env.SUPERADMIN_IDS),

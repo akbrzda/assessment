@@ -1,7 +1,6 @@
 logs
-node_modules
+node_modules/
 .env
 .DS_Store
 .vscode
-design
-frontend-archive
+dist/

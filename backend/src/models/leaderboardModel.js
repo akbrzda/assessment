@@ -1,16 +1,17 @@
-const { pool } = require('../config/database');
+const { pool } = require("../config/database");
 
 function buildFilterClauses({ branchId = null, positionId = null } = {}) {
+  // В рейтинге участвуют только сотрудники (не управляющие и не админы)
   const clauses = ["r.name = 'employee'"];
   const params = [];
 
   if (branchId) {
-    clauses.push('u.branch_id = ?');
+    clauses.push("u.branch_id = ?");
     params.push(Number(branchId));
   }
 
   if (positionId) {
-    clauses.push('u.position_id = ?');
+    clauses.push("u.position_id = ?");
     params.push(Number(positionId));
   }
 
@@ -18,7 +19,7 @@ function buildFilterClauses({ branchId = null, positionId = null } = {}) {
 }
 
 function buildWhere(clauses) {
-  return clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  return clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
 }
 
 function mapLeaderRow(row) {
@@ -44,15 +45,18 @@ function mapLeaderRow(row) {
     points: row.points != null ? Number(row.points) : 0,
     avgScorePercent,
     avgTimeSeconds,
-    completedAttempts: row.completed_attempts != null ? Number(row.completed_attempts) : 0
+    completedAttempts: row.completed_attempts != null ? Number(row.completed_attempts) : 0,
   };
 }
 
 async function getUserLeaders({ branchId = null, positionId = null, limit = 30 } = {}) {
   const sanitizedLimit = Math.max(1, Math.min(Number(limit) || 30, 100));
   const { clauses, params } = buildFilterClauses({ branchId, positionId });
-  const where = buildWhere(clauses);
 
+  // Добавляем условие: показываем только пользователей с завершёнными попытками
+  clauses.push("stats.completed_attempts > 0");
+
+  const where = buildWhere(clauses);
   const limitClause = `LIMIT ${sanitizedLimit}`;
 
   const [rows] = await pool.execute(
@@ -75,7 +79,7 @@ async function getUserLeaders({ branchId = null, positionId = null, limit = 30 }
      LEFT JOIN roles r ON r.id = u.role_id
      LEFT JOIN branches b ON b.id = u.branch_id
      LEFT JOIN positions p ON p.id = u.position_id
-     LEFT JOIN (
+     INNER JOIN (
        SELECT
          aa.user_id,
          AVG(aa.score_percent) AS avg_score_percent,
@@ -91,8 +95,8 @@ async function getUserLeaders({ branchId = null, positionId = null, limit = 30 }
        COALESCE(stats.avg_score_percent, 0) DESC,
        COALESCE(stats.avg_time_seconds, 999999) ASC,
        u.id ASC
-     ${limitClause}`
-    , params
+     ${limitClause}`,
+    params
   );
 
   return rows.map(mapLeaderRow);
@@ -105,7 +109,7 @@ async function getUserRankAndStats({ userId, branchId = null, positionId = null 
 
   const { clauses, params } = buildFilterClauses({ branchId, positionId });
 
-  const userClauses = [...clauses, 'u.id = ?'];
+  const userClauses = [...clauses, "u.id = ?"];
   const userParams = [...params, userId];
   const userWhere = buildWhere(userClauses);
 
@@ -140,8 +144,8 @@ async function getUserRankAndStats({ userId, branchId = null, positionId = null 
        GROUP BY aa.user_id
      ) stats ON stats.user_id = u.id
      ${userWhere}
-     LIMIT 1`
-    , userParams
+     LIMIT 1`,
+    userParams
   );
 
   if (!userRows.length) {
@@ -151,7 +155,7 @@ async function getUserRankAndStats({ userId, branchId = null, positionId = null 
   const user = mapLeaderRow(userRows[0]);
   const points = user.points;
 
-  const rankClauses = [...clauses, '(u.points > ? OR (u.points = ? AND u.id < ?))'];
+  const rankClauses = [...clauses, "(u.points > ? OR (u.points = ? AND u.id < ?))"];
   const rankParams = [...params, points, points, userId];
   const rankWhere = buildWhere(rankClauses);
 
@@ -175,11 +179,11 @@ async function getUserRankAndStats({ userId, branchId = null, positionId = null 
   return {
     ...user,
     rank: Number(rankRow?.ahead || 0) + 1,
-    totalParticipants: Number(totalRow?.total || 0)
+    totalParticipants: Number(totalRow?.total || 0),
   };
 }
 
 module.exports = {
   getUserLeaders,
-  getUserRankAndStats
+  getUserRankAndStats,
 };

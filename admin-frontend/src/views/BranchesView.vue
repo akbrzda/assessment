@@ -4,11 +4,11 @@
     <div class="page-header">
       <h2 class="page-heading">Управление филиалами</h2>
       <div class="header-buttons">
-        <Button icon="👥" @click="openAssignManagerModal" variant="secondary">
+        <Button icon="users" @click="openAssignManagerModal" variant="secondary">
           <span class="hide-mobile">Назначить управляющего</span>
           <span class="show-mobile">Управляющий</span>
         </Button>
-        <Button icon="➕" @click="openCreateModal">
+        <Button icon="plus" @click="openCreateModal">
           <span class="hide-mobile">Добавить филиал</span>
           <span class="show-mobile">Добавить</span>
         </Button>
@@ -18,14 +18,14 @@
     <!-- Фильтры -->
     <Card class="filters-card">
       <div class="filters-grid">
-        <Input v-model="filters.search" placeholder="Поиск по названию филиала..." icon="🔍" @input="loadBranches" />
+        <Input v-model="filters.search" placeholder="Поиск по названию филиала..." @input="loadBranches" />
 
-        <Button variant="ghost" @click="resetFilters" fullWidth> Сбросить </Button>
+        <Button variant="secondary" @click="resetFilters" fullWidth icon="refresh-ccw">Сбросить</Button>
       </div>
     </Card>
 
     <!-- Контент -->
-    <Card :no-padding="true" class="branches-card">
+    <Card padding="none" class="branches-card">
       <Preloader v-if="loading" />
 
       <div v-else-if="branches.length === 0" class="empty-state">
@@ -65,23 +65,24 @@
                 </td>
                 <td>{{ branch.assessments_completed || 0 }}</td>
                 <td>
-                  <span v-if="branch.avg_score !== null" :class="getScoreClass(branch.avg_score)" class="score-value">
-                    {{ branch.avg_score.toFixed(1) }}%
+                  <span v-if="hasScore(branch.avg_score)" :class="getScoreClass(branch.avg_score)" class="score-value">
+                    {{ formatScore(branch.avg_score) }}
                   </span>
                   <span v-else class="no-data">—</span>
                 </td>
                 <td class="date-cell">{{ formatDate(branch.created_at) }}</td>
                 <td class="actions-cell">
                   <div class="actions-buttons">
-                    <button @click="openEditModal(branch.id)" class="action-btn action-btn-edit" title="Редактировать">✏️</button>
-                    <button
+                    <Button size="sm" variant="ghost" @click="openEditModal(branch.id)" icon="pencil" title="Редактировать"></Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       @click="confirmDelete(branch)"
                       :disabled="branch.employees_count > 0"
-                      :class="['action-btn action-btn-delete', { disabled: branch.employees_count > 0 }]"
+                      icon="trash"
                       :title="branch.employees_count > 0 ? 'Нельзя удалить филиал с сотрудниками' : 'Удалить'"
                     >
-                      🗑️
-                    </button>
+                    </Button>
                   </div>
                 </td>
               </tr>
@@ -118,8 +119,8 @@
               </div>
               <div class="branch-card-row">
                 <span class="branch-card-label">Средний балл:</span>
-                <span v-if="branch.avg_score !== null" :class="getScoreClass(branch.avg_score)" class="branch-card-value score-value">
-                  {{ branch.avg_score.toFixed(1) }}%
+                <span v-if="hasScore(branch.avg_score)" :class="getScoreClass(branch.avg_score)" class="branch-card-value score-value">
+                  {{ formatScore(branch.avg_score) }}
                 </span>
                 <span v-else class="branch-card-value no-data">—</span>
               </div>
@@ -130,8 +131,8 @@
             </div>
 
             <div class="branch-card-actions">
-              <Button size="sm" variant="secondary" icon="✏️" @click="openEditModal(branch.id)" fullWidth> Редактировать </Button>
-              <Button size="sm" variant="danger" icon="🗑️" @click="confirmDelete(branch)" :disabled="branch.employees_count > 0" fullWidth>
+              <Button size="sm" variant="secondary" icon="pencil" @click="openEditModal(branch.id)" fullWidth> Редактировать </Button>
+              <Button size="sm" variant="danger" icon="trash" @click="confirmDelete(branch)" :disabled="branch.employees_count > 0" fullWidth>
                 Удалить
               </Button>
             </div>
@@ -176,7 +177,10 @@ const loadBranches = async () => {
   loading.value = true;
   try {
     const data = await getBranches(filters.value);
-    branches.value = data.branches;
+    branches.value = (data.branches || []).map((branch) => ({
+      ...branch,
+      avg_score: toNumber(branch.avg_score),
+    }));
   } catch (error) {
     console.error("Load branches error:", error);
     alert("Ошибка загрузки филиалов");
@@ -252,8 +256,30 @@ const formatDate = (dateString) => {
   });
 };
 
+const toNumber = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const numeric = Number(value);
+  return Number.isNaN(numeric) ? null : numeric;
+};
+
+const hasScore = (value) => toNumber(value) !== null;
+
+const formatScore = (value) => {
+  const numeric = toNumber(value);
+  if (numeric === null) {
+    return "—";
+  }
+  return `${numeric.toFixed(1)}%`;
+};
+
 const getScoreClass = (score) => {
-  return score >= 70 ? "score-good" : "score-bad";
+  const numeric = toNumber(score);
+  if (numeric === null) {
+    return "score-bad";
+  }
+  return numeric >= 70 ? "score-good" : "score-bad";
 };
 
 onMounted(() => {
@@ -270,12 +296,12 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 2rem;
+  gap: 16px;
+  margin-bottom: 32px;
 }
 
 .page-heading {
-  font-size: 1.875rem;
+  font-size: 30px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
@@ -283,12 +309,8 @@ onMounted(() => {
 
 .header-buttons {
   display: flex;
-  gap: 0.75rem;
+  gap: 12px;
   align-items: center;
-}
-
-.hide-mobile {
-  display: inline;
 }
 
 .show-mobile {
@@ -297,13 +319,13 @@ onMounted(() => {
 
 /* Filters */
 .filters-card {
-  margin-bottom: 2rem;
+  margin-bottom: 32px;
 }
 
 .filters-grid {
   display: grid;
   grid-template-columns: 3fr 1fr;
-  gap: 1rem;
+  gap: 16px;
 }
 
 .branches-card {
@@ -322,14 +344,13 @@ onMounted(() => {
 }
 
 .branches-table thead {
-  background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--divider);
 }
 
 .branches-table th {
-  padding: 1rem;
+  padding: 16px;
   text-align: left;
-  font-size: 0.75rem;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -342,17 +363,13 @@ onMounted(() => {
   transition: background-color 0.2s ease;
 }
 
-.branches-table tbody tr:hover {
-  background-color: var(--bg-secondary);
-}
-
 .branches-table tbody tr.inactive-branch {
-  background-color: rgba(128, 128, 128, 0.05);
+  background-color: #8080800d;
 }
 
 .branches-table td {
-  padding: 1rem;
-  font-size: 0.9375rem;
+  padding: 16px;
+  font-size: 15px;
   color: var(--text-primary);
   white-space: nowrap;
 }
@@ -380,7 +397,7 @@ onMounted(() => {
 .no-manager {
   color: var(--text-secondary);
   font-style: italic;
-  font-size: 0.875rem;
+  font-size: 14px;
 }
 
 .score-value {
@@ -401,7 +418,7 @@ onMounted(() => {
 
 .date-cell {
   color: var(--text-secondary);
-  font-size: 0.875rem;
+  font-size: 14px;
 }
 
 .actions-col {
@@ -416,15 +433,15 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .action-btn {
-  padding: 0.5rem;
+  padding: 8px;
   background: transparent;
   border: none;
   cursor: pointer;
-  font-size: 1.125rem;
+  font-size: 18px;
   border-radius: 8px;
   transition: all 0.2s ease;
   display: flex;
@@ -441,7 +458,7 @@ onMounted(() => {
 }
 
 .action-btn-delete:hover {
-  background-color: rgba(255, 59, 48, 0.12);
+  background-color: #ff3b301f;
 }
 
 .action-btn.disabled {
@@ -457,40 +474,40 @@ onMounted(() => {
 .mobile-cards {
   display: none;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
+  gap: 16px;
+  padding: 16px;
 }
 
 .branch-card {
   background-color: var(--bg-secondary);
   border-radius: 12px;
-  padding: 1rem;
+  padding: 16px;
   border: 1px solid var(--divider);
 }
 
 .branch-card.inactive-branch {
-  background-color: rgba(128, 128, 128, 0.05);
+  background-color: #8080800d;
 }
 
 .branch-card-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  padding-bottom: 1rem;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--divider);
 }
 
 .branch-card-name {
-  font-size: 1rem;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 4px 0;
 }
 
 .branch-card-id {
-  font-size: 0.8125rem;
+  font-size: 13px;
   color: var(--text-secondary);
   margin: 0;
 }
@@ -498,25 +515,25 @@ onMounted(() => {
 .branch-card-body {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .branch-card-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .branch-card-label {
-  font-size: 0.875rem;
+  font-size: 14px;
   color: var(--text-secondary);
   font-weight: 500;
 }
 
 .branch-card-value {
-  font-size: 0.875rem;
+  font-size: 14px;
   color: var(--text-primary);
   font-weight: 600;
   text-align: right;
@@ -530,11 +547,11 @@ onMounted(() => {
 .branch-card-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .empty-state {
-  padding: 4rem 2rem;
+  padding: 64px 32px;
   text-align: center;
 }
 
@@ -568,7 +585,7 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .page-heading {
-    font-size: 1.5rem;
+    font-size: 24px;
   }
 
   .branch-card-actions {

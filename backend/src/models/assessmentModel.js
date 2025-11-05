@@ -1,4 +1,4 @@
-const { pool } = require('../config/database');
+const { pool } = require("../config/database");
 
 function toIsoUtc(value) {
   if (!value) {
@@ -14,7 +14,7 @@ function toIsoUtc(value) {
     return null;
   }
 
-  const normalized = str.replace(' ', 'T');
+  const normalized = str.replace(" ", "T");
   const hasZone = /[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized);
   const source = hasZone ? normalized : `${normalized}Z`;
   const date = new Date(source);
@@ -45,7 +45,7 @@ function mapAssessmentRow(row) {
     updatedAt: toIsoUtc(row.updated_at),
     status: row.status || null,
     assignedCount: row.assigned_count != null ? Number(row.assigned_count) : null,
-    completedCount: row.completed_count != null ? Number(row.completed_count) : null
+    completedCount: row.completed_count != null ? Number(row.completed_count) : null,
   };
 }
 
@@ -57,8 +57,8 @@ async function createAssessment({ assessment, questions, branchIds, userIds, pos
     const [assessmentResult] = await connection.execute(
       `INSERT INTO assessments
          (title, description, open_at, close_at, time_limit_minutes, pass_score_percent, max_attempts, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      , [
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
         assessment.title,
         assessment.description,
         assessment.openAt,
@@ -67,7 +67,7 @@ async function createAssessment({ assessment, questions, branchIds, userIds, pos
         assessment.passScorePercent,
         assessment.maxAttempts,
         userId,
-        userId
+        userId,
       ]
     );
 
@@ -77,47 +77,33 @@ async function createAssessment({ assessment, questions, branchIds, userIds, pos
       const question = questions[idx];
       const [questionResult] = await connection.execute(
         `INSERT INTO assessment_questions (assessment_id, order_index, question_text)
-         VALUES (?, ?, ?)`
-        , [assessmentId, idx + 1, question.text]
+         VALUES (?, ?, ?)`,
+        [assessmentId, idx + 1, question.text]
       );
       const questionId = questionResult.insertId;
 
-      const optionValues = question.options.map((option, optionIdx) => [
-        questionId,
-        optionIdx + 1,
-        option.text,
-        option.isCorrect ? 1 : 0
-      ]);
+      const optionValues = question.options.map((option, optionIdx) => [questionId, optionIdx + 1, option.text, option.isCorrect ? 1 : 0]);
 
       await connection.query(
         `INSERT INTO assessment_question_options (question_id, order_index, option_text, is_correct)
-         VALUES ?`
-        , [optionValues]
+         VALUES ?`,
+        [optionValues]
       );
     }
 
     if (Array.isArray(branchIds) && branchIds.length > 0) {
       const values = branchIds.map((id) => [assessmentId, id]);
-      await connection.query(
-        `INSERT INTO assessment_branch_assignments (assessment_id, branch_id) VALUES ?`
-        , [values]
-      );
+      await connection.query(`INSERT INTO assessment_branch_assignments (assessment_id, branch_id) VALUES ?`, [values]);
     }
 
     if (Array.isArray(userIds) && userIds.length > 0) {
       const values = userIds.map((id) => [assessmentId, id]);
-      await connection.query(
-        `INSERT INTO assessment_user_assignments (assessment_id, user_id) VALUES ?`
-        , [values]
-      );
+      await connection.query(`INSERT INTO assessment_user_assignments (assessment_id, user_id) VALUES ?`, [values]);
     }
 
     if (Array.isArray(positionIds) && positionIds.length > 0) {
       const values = positionIds.map((id) => [assessmentId, id]);
-      await connection.query(
-        `INSERT INTO assessment_position_assignments (assessment_id, position_id) VALUES ?`
-        , [values]
-      );
+      await connection.query(`INSERT INTO assessment_position_assignments (assessment_id, position_id) VALUES ?`, [values]);
     }
 
     await connection.commit();
@@ -145,8 +131,8 @@ async function updateAssessment(assessmentId, { assessment, questions, branchIds
              pass_score_percent = ?,
              max_attempts = ?,
              updated_by = ?
-       WHERE id = ?`
-      , [
+       WHERE id = ?`,
+      [
         assessment.title,
         assessment.description,
         assessment.openAt,
@@ -155,60 +141,46 @@ async function updateAssessment(assessmentId, { assessment, questions, branchIds
         assessment.passScorePercent,
         assessment.maxAttempts,
         userId,
-        assessmentId
+        assessmentId,
       ]
     );
 
-    await connection.execute('DELETE FROM assessment_questions WHERE assessment_id = ?', [assessmentId]);
-    await connection.execute('DELETE FROM assessment_branch_assignments WHERE assessment_id = ?', [assessmentId]);
-    await connection.execute('DELETE FROM assessment_user_assignments WHERE assessment_id = ?', [assessmentId]);
-    await connection.execute('DELETE FROM assessment_position_assignments WHERE assessment_id = ?', [assessmentId]);
+    await connection.execute("DELETE FROM assessment_questions WHERE assessment_id = ?", [assessmentId]);
+    await connection.execute("DELETE FROM assessment_branch_assignments WHERE assessment_id = ?", [assessmentId]);
+    await connection.execute("DELETE FROM assessment_user_assignments WHERE assessment_id = ?", [assessmentId]);
+    await connection.execute("DELETE FROM assessment_position_assignments WHERE assessment_id = ?", [assessmentId]);
 
     for (let idx = 0; idx < questions.length; idx += 1) {
       const question = questions[idx];
       const [questionResult] = await connection.execute(
         `INSERT INTO assessment_questions (assessment_id, order_index, question_text)
-         VALUES (?, ?, ?)`
-        , [assessmentId, idx + 1, question.text]
+         VALUES (?, ?, ?)`,
+        [assessmentId, idx + 1, question.text]
       );
       const questionId = questionResult.insertId;
 
-      const optionValues = question.options.map((option, optionIdx) => [
-        questionId,
-        optionIdx + 1,
-        option.text,
-        option.isCorrect ? 1 : 0
-      ]);
+      const optionValues = question.options.map((option, optionIdx) => [questionId, optionIdx + 1, option.text, option.isCorrect ? 1 : 0]);
 
       await connection.query(
         `INSERT INTO assessment_question_options (question_id, order_index, option_text, is_correct)
-         VALUES ?`
-        , [optionValues]
+         VALUES ?`,
+        [optionValues]
       );
     }
 
     if (Array.isArray(branchIds) && branchIds.length > 0) {
       const values = branchIds.map((id) => [assessmentId, id]);
-      await connection.query(
-        `INSERT INTO assessment_branch_assignments (assessment_id, branch_id) VALUES ?`
-        , [values]
-      );
+      await connection.query(`INSERT INTO assessment_branch_assignments (assessment_id, branch_id) VALUES ?`, [values]);
     }
 
     if (Array.isArray(userIds) && userIds.length > 0) {
       const values = userIds.map((id) => [assessmentId, id]);
-      await connection.query(
-        `INSERT INTO assessment_user_assignments (assessment_id, user_id) VALUES ?`
-        , [values]
-      );
+      await connection.query(`INSERT INTO assessment_user_assignments (assessment_id, user_id) VALUES ?`, [values]);
     }
 
     if (Array.isArray(positionIds) && positionIds.length > 0) {
       const values = positionIds.map((id) => [assessmentId, id]);
-      await connection.query(
-        `INSERT INTO assessment_position_assignments (assessment_id, position_id) VALUES ?`
-        , [values]
-      );
+      await connection.query(`INSERT INTO assessment_position_assignments (assessment_id, position_id) VALUES ?`, [values]);
     }
 
     await connection.commit();
@@ -221,16 +193,40 @@ async function updateAssessment(assessmentId, { assessment, questions, branchIds
 }
 
 async function deleteAssessment(assessmentId) {
-  await pool.execute('DELETE FROM assessments WHERE id = ?', [assessmentId]);
+  await pool.execute("DELETE FROM assessments WHERE id = ?", [assessmentId]);
 }
 
-async function listAssessmentsForManager({ userId, roleName }) {
+async function listAssessmentsForManager({ userId, roleName, branchId }) {
   const params = [];
-  let whereClause = '';
-  if (roleName === 'manager') {
-    whereClause = 'WHERE a.created_by = ?';
-    params.push(userId);
+  let whereClause = "";
+
+  // Управляющий видит все аттестации, связанные с его филиалом через:
+  // 1. Прямое назначение филиала
+  // 2. Назначение должностей (сотрудники его филиала)
+  // 3. Назначение конкретных пользователей (из его филиала)
+  if (roleName === "manager" && branchId) {
+    whereClause = `WHERE (
+      EXISTS (
+        SELECT 1 FROM assessment_branch_assignments aba
+        WHERE aba.assessment_id = a.id AND aba.branch_id = ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM assessment_position_assignments apa
+        JOIN users u ON u.position_id = apa.position_id
+        WHERE apa.assessment_id = a.id AND u.branch_id = ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM assessment_user_assignments aua
+        JOIN users u ON u.id = aua.user_id
+        WHERE aua.assessment_id = a.id AND u.branch_id = ?
+      )
+    )`;
+    params.push(branchId, branchId, branchId);
+    console.log("[listAssessmentsForManager] Управляющий, branchId:", branchId);
+  } else {
+    console.log("[listAssessmentsForManager] Суперадмин, без фильтров");
   }
+  // Суперадмин видит все аттестации (whereClause остается пустым)
 
   const [rows] = await pool.execute(
     `SELECT
@@ -277,20 +273,42 @@ async function listAssessmentsForManager({ userId, roleName }) {
        ), 0) AS completed_count
      FROM assessments a
      ${whereClause}
-     ORDER BY a.created_at DESC`
-    , params
+     ORDER BY a.created_at DESC`,
+    params
   );
 
+  console.log("[listAssessmentsForManager] Найдено аттестаций:", rows.length);
   return rows.map(mapAssessmentRow);
 }
 
-async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) {
+async function findAssessmentByIdForManager(assessmentId, { userId, roleName, branchId }) {
   const params = [assessmentId];
-  let whereClause = 'WHERE a.id = ?';
-  if (roleName === 'manager') {
-    whereClause += ' AND a.created_by = ?';
-    params.push(userId);
+  let whereClause = "WHERE a.id = ?";
+
+  // Управляющий может видеть только аттестации, связанные с его филиалом
+  if (roleName === "manager" && branchId) {
+    whereClause += ` AND (
+      EXISTS (
+        SELECT 1 FROM assessment_branch_assignments aba
+        WHERE aba.assessment_id = a.id AND aba.branch_id = ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM assessment_position_assignments apa
+        JOIN users u ON u.position_id = apa.position_id
+        WHERE apa.assessment_id = a.id AND u.branch_id = ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM assessment_user_assignments aua
+        JOIN users u ON u.id = aua.user_id
+        WHERE aua.assessment_id = a.id AND u.branch_id = ?
+      )
+    )`;
+    params.push(branchId, branchId, branchId);
+    console.log("[findAssessmentByIdForManager] Управляющий ищет аттестацию:", assessmentId, "branchId:", branchId);
+  } else {
+    console.log("[findAssessmentByIdForManager] Суперадмин ищет аттестацию:", assessmentId);
   }
+  // Суперадмин видит все аттестации
 
   const [rows] = await pool.execute(
     `SELECT
@@ -342,8 +360,8 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) 
        ) AS attempts_total
      FROM assessments a
      ${whereClause}
-     LIMIT 1`
-    , params
+     LIMIT 1`,
+    params
   );
 
   if (!rows.length) {
@@ -366,8 +384,8 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) 
      FROM assessment_questions q
      LEFT JOIN assessment_question_options o ON o.question_id = q.id
      WHERE q.assessment_id = ?
-     ORDER BY q.order_index ASC, o.order_index ASC`
-    , [assessmentId]
+     ORDER BY q.order_index ASC, o.order_index ASC`,
+    [assessmentId]
   );
 
   const questionMap = new Map();
@@ -378,7 +396,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) 
         order: row.order_index,
         text: row.question_text,
         options: [],
-        correctIndex: null
+        correctIndex: null,
       });
     }
     if (row.option_id) {
@@ -386,7 +404,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) 
         id: row.option_id,
         order: row.option_order,
         text: row.option_text,
-        isCorrect: Boolean(row.is_correct)
+        isCorrect: Boolean(row.is_correct),
       };
 
       const question = questionMap.get(row.id);
@@ -405,8 +423,8 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) 
        FROM assessment_position_assignments apa
        JOIN positions p ON p.id = apa.position_id
       WHERE apa.assessment_id = ?
-      ORDER BY p.name ASC`
-    , [assessmentId]
+      ORDER BY p.name ASC`,
+    [assessmentId]
   );
   base.positions = positionRows;
 
@@ -415,8 +433,8 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) 
        FROM assessment_branch_assignments aba
        JOIN branches b ON b.id = aba.branch_id
       WHERE aba.assessment_id = ?
-      ORDER BY b.name ASC`
-    , [assessmentId]
+      ORDER BY b.name ASC`,
+    [assessmentId]
   );
   base.branches = branchRows;
 
@@ -433,8 +451,8 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) 
        LEFT JOIN branches b ON b.id = u.branch_id
        LEFT JOIN positions p ON p.id = u.position_id
       WHERE aua.assessment_id = ?
-      ORDER BY u.last_name ASC, u.first_name ASC`
-    , [assessmentId]
+      ORDER BY u.last_name ASC, u.first_name ASC`,
+    [assessmentId]
   );
   base.users = userRows.map((row) => ({
     id: row.id,
@@ -443,7 +461,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) 
     branchId: row.branch_id,
     branchName: row.branch_name,
     positionId: row.position_id,
-    positionName: row.position_name
+    positionName: row.position_name,
   }));
 
   const [participantRows] = await pool.execute(
@@ -511,18 +529,18 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) 
      ) AS best
        ON best.assessment_id = ?
       AND best.user_id = assigned.user_id
-     ORDER BY u.last_name ASC, u.first_name ASC`
-    , [assessmentId, assessmentId, assessmentId, assessmentId, assessmentId, assessmentId]
+     ORDER BY u.last_name ASC, u.first_name ASC`,
+    [assessmentId, assessmentId, assessmentId, assessmentId, assessmentId, assessmentId]
   );
 
   base.participants = participantRows.map((row) => {
-    let status = 'not_started';
-    if (row.best_status === 'completed') {
-      status = 'completed';
-    } else if (row.best_status === 'in_progress') {
-      status = 'in_progress';
-    } else if (row.best_status === 'cancelled') {
-      status = 'cancelled';
+    let status = "not_started";
+    if (row.best_status === "completed") {
+      status = "completed";
+    } else if (row.best_status === "in_progress") {
+      status = "in_progress";
+    } else if (row.best_status === "cancelled") {
+      status = "cancelled";
     }
     return {
       id: row.id,
@@ -536,7 +554,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) 
       correctAnswers: row.correct_answers != null ? Number(row.correct_answers) : null,
       totalQuestions: row.total_questions != null ? Number(row.total_questions) : null,
       completedAt: toIsoUtc(row.completed_at),
-      timeSpentSeconds: row.time_spent_seconds != null ? Number(row.time_spent_seconds) : null
+      timeSpentSeconds: row.time_spent_seconds != null ? Number(row.time_spent_seconds) : null,
     };
   });
 
@@ -544,18 +562,15 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName }) 
 }
 
 async function hasAttempts(assessmentId) {
-  const [rows] = await pool.execute(
-    'SELECT COUNT(*) AS total FROM assessment_attempts WHERE assessment_id = ?'
-    , [assessmentId]
-  );
+  const [rows] = await pool.execute("SELECT COUNT(*) AS total FROM assessment_attempts WHERE assessment_id = ?", [assessmentId]);
   return Number(rows[0].total || 0) > 0;
 }
 
 async function listAssignableUsers({ roleName, branchId }) {
   const params = [];
-  let whereClause = '';
-  if (roleName === 'manager') {
-    whereClause = 'WHERE u.branch_id = ?';
+  let whereClause = "";
+  if (roleName === "manager") {
+    whereClause = "WHERE u.branch_id = ?";
     params.push(branchId);
   }
 
@@ -572,8 +587,8 @@ async function listAssignableUsers({ roleName, branchId }) {
      LEFT JOIN branches b ON b.id = u.branch_id
      LEFT JOIN positions p ON p.id = u.position_id
      ${whereClause}
-     ORDER BY u.last_name ASC, u.first_name ASC`
-    , params
+     ORDER BY u.last_name ASC, u.first_name ASC`,
+    params
   );
 
   return rows.map((row) => ({
@@ -583,34 +598,34 @@ async function listAssignableUsers({ roleName, branchId }) {
     branchId: row.branch_id,
     branchName: row.branch_name,
     positionId: row.position_id,
-    positionName: row.position_name
+    positionName: row.position_name,
   }));
 }
 
 async function listAssignablePositions({ roleName, branchId }) {
-  if (roleName === 'manager') {
+  if (roleName === "manager") {
     const [rows] = await pool.execute(
       `SELECT DISTINCT p.id, p.name
          FROM positions p
          JOIN users u ON u.position_id = p.id
         WHERE u.branch_id = ?
-        ORDER BY p.name ASC`
-      , [branchId]
+        ORDER BY p.name ASC`,
+      [branchId]
     );
     return rows;
   }
 
-  const [rows] = await pool.execute('SELECT id, name FROM positions ORDER BY name ASC');
+  const [rows] = await pool.execute("SELECT id, name FROM positions ORDER BY name ASC");
   return rows;
 }
 
 async function listAssignableBranches({ roleName, branchId }) {
-  if (roleName === 'manager') {
-    const [rows] = await pool.execute('SELECT id, name FROM branches WHERE id = ? LIMIT 1', [branchId]);
+  if (roleName === "manager") {
+    const [rows] = await pool.execute("SELECT id, name FROM branches WHERE id = ? LIMIT 1", [branchId]);
     return rows;
   }
 
-  const [rows] = await pool.execute('SELECT id, name FROM branches ORDER BY name ASC');
+  const [rows] = await pool.execute("SELECT id, name FROM branches ORDER BY name ASC");
   return rows;
 }
 
@@ -631,8 +646,8 @@ async function listAssignedUserIds(assessmentId) {
          FROM assessment_branch_assignments aba
          JOIN users u ON u.branch_id = aba.branch_id
          WHERE aba.assessment_id = ?
-       ) AS assigned`
-    , [assessmentId, assessmentId, assessmentId]
+       ) AS assigned`,
+    [assessmentId, assessmentId, assessmentId]
   );
   return rows.map((row) => row.user_id);
 }
@@ -695,8 +710,8 @@ async function listAssessmentsForUser(userId) {
         WHERE user_id = ?
         GROUP BY assessment_id
      ) best_attempts ON best_attempts.assessment_id = a.id
-      ORDER BY a.open_at ASC`
-    , [userId, userId, userId, userId, userId, userId]
+      ORDER BY a.open_at ASC`,
+    [userId, userId, userId, userId, userId, userId]
   );
 
   return rows.map((row) => ({
@@ -719,7 +734,7 @@ async function listAssessmentsForUser(userId) {
     timeRemainingSeconds: (() => {
       const timeLimitMinutes = row.time_limit_minutes != null ? Number(row.time_limit_minutes) : null;
       const startedAtIso = toIsoUtc(row.started_at);
-      if (row.attempt_status !== 'in_progress' || timeLimitMinutes == null || !startedAtIso) {
+      if (row.attempt_status !== "in_progress" || timeLimitMinutes == null || !startedAtIso) {
         return null;
       }
       if (!startedAtIso) {
@@ -732,7 +747,7 @@ async function listAssessmentsForUser(userId) {
       const limitSeconds = timeLimitMinutes * 60;
       const elapsedSeconds = Math.floor((Date.now() - startedAtMs) / 1000);
       return Math.max(limitSeconds - elapsedSeconds, 0);
-    })()
+    })(),
   }));
 }
 
@@ -767,8 +782,8 @@ async function getAssessmentForUser(assessmentId, userId) {
          JOIN users u ON u.branch_id = aba.branch_id
          WHERE aba.assessment_id = a.id AND u.id = ?
        )
-     LIMIT 1`
-    , [assessmentId, userId, userId, userId]
+     LIMIT 1`,
+    [assessmentId, userId, userId, userId]
   );
 
   if (!rows.length) {
@@ -784,7 +799,7 @@ async function getAssessmentForUser(assessmentId, userId) {
     timeLimitMinutes: rows[0].time_limit_minutes != null ? Number(rows[0].time_limit_minutes) : null,
     passScorePercent: rows[0].pass_score_percent != null ? Number(rows[0].pass_score_percent) : null,
     maxAttempts: rows[0].max_attempts != null ? Number(rows[0].max_attempts) : null,
-    status: rows[0].status
+    status: rows[0].status,
   };
 
   const [questionRows] = await pool.execute(
@@ -799,8 +814,8 @@ async function getAssessmentForUser(assessmentId, userId) {
      FROM assessment_questions q
      LEFT JOIN assessment_question_options o ON o.question_id = q.id
      WHERE q.assessment_id = ?
-     ORDER BY q.order_index ASC, o.order_index ASC`
-    , [assessmentId]
+     ORDER BY q.order_index ASC, o.order_index ASC`,
+    [assessmentId]
   );
 
   const questionMap = new Map();
@@ -810,14 +825,14 @@ async function getAssessmentForUser(assessmentId, userId) {
         id: row.id,
         order: row.order_index,
         text: row.question_text,
-        options: []
+        options: [],
       });
     }
     if (row.option_id) {
       questionMap.get(row.id).options.push({
         id: row.option_id,
         order: row.option_order,
-        text: row.option_text
+        text: row.option_text,
       });
     }
   });
@@ -829,8 +844,8 @@ async function getAssessmentForUser(assessmentId, userId) {
        FROM assessment_attempts
       WHERE assessment_id = ? AND user_id = ?
       ORDER BY attempt_number DESC
-      LIMIT 1`
-    , [assessmentId, userId]
+      LIMIT 1`,
+    [assessmentId, userId]
   );
 
   if (attemptRows.length) {
@@ -838,7 +853,7 @@ async function getAssessmentForUser(assessmentId, userId) {
     const timeLimitMinutes = base.timeLimitMinutes;
     let remainingSeconds = null;
     const attemptStartedAt = toIsoUtc(attempt.started_at);
-    if (attempt.status === 'in_progress' && timeLimitMinutes != null && attemptStartedAt) {
+    if (attempt.status === "in_progress" && timeLimitMinutes != null && attemptStartedAt) {
       const startedAtMs = Date.parse(attemptStartedAt);
       if (Number.isFinite(startedAtMs)) {
         const limitSeconds = Number(timeLimitMinutes) * 60;
@@ -853,18 +868,15 @@ async function getAssessmentForUser(assessmentId, userId) {
       startedAt: attemptStartedAt,
       completedAt: toIsoUtc(attempt.completed_at),
       scorePercent: attempt.score_percent != null ? Number(attempt.score_percent) : null,
-      remainingSeconds
+      remainingSeconds,
     };
 
-    if (attempt.status === 'in_progress') {
-      const [answerRows] = await pool.execute(
-        'SELECT question_id, option_id FROM assessment_answers WHERE attempt_id = ?'
-        , [attempt.id]
-      );
+    if (attempt.status === "in_progress") {
+      const [answerRows] = await pool.execute("SELECT question_id, option_id FROM assessment_answers WHERE attempt_id = ?", [attempt.id]);
       const answerMap = new Map(answerRows.map((row) => [row.question_id, row.option_id]));
       base.questions = base.questions.map((question) => ({
         ...question,
-        selectedOptionId: answerMap.get(question.id) || null
+        selectedOptionId: answerMap.get(question.id) || null,
       }));
     }
   }
@@ -881,8 +893,8 @@ async function createAttempt(assessment, userId) {
       `SELECT id, attempt_number, started_at
          FROM assessment_attempts
         WHERE assessment_id = ? AND user_id = ? AND status = 'in_progress'
-        LIMIT 1`
-      , [assessment.id, userId]
+        LIMIT 1`,
+      [assessment.id, userId]
     );
 
     if (existingAttemptRows.length) {
@@ -895,17 +907,17 @@ async function createAttempt(assessment, userId) {
         maxAttempts: assessment.maxAttempts != null ? Number(assessment.maxAttempts) : null,
         createdBy: assessment.created_by,
         title: assessment.title,
-        startedAt: toIsoUtc(existing.started_at)
+        startedAt: toIsoUtc(existing.started_at),
       };
     }
 
     const [assessmentRow] = await connection.execute(
-      'SELECT id, title, open_at, close_at, max_attempts, time_limit_minutes, created_by FROM assessments WHERE id = ? FOR UPDATE',
+      "SELECT id, title, open_at, close_at, max_attempts, time_limit_minutes, created_by FROM assessments WHERE id = ? FOR UPDATE",
       [assessment.id]
     );
 
     if (!assessmentRow.length) {
-      const error = new Error('Аттестация не найдена');
+      const error = new Error("Аттестация не найдена");
       error.status = 404;
       throw error;
     }
@@ -915,23 +927,23 @@ async function createAttempt(assessment, userId) {
     const openAtIso = toIsoUtc(row.open_at);
     const closeAtIso = toIsoUtc(row.close_at);
     if (openAtIso && new Date(openAtIso) > now) {
-      const error = new Error('Аттестация ещё не открыта');
+      const error = new Error("Аттестация ещё не открыта");
       error.status = 400;
       throw error;
     }
     if (closeAtIso && new Date(closeAtIso) < now) {
-      const error = new Error('Аттестация уже закрыта');
+      const error = new Error("Аттестация уже закрыта");
       error.status = 400;
       throw error;
     }
 
-    const [attemptCountRows] = await connection.execute(
-      'SELECT COUNT(*) AS total FROM assessment_attempts WHERE assessment_id = ? AND user_id = ?',
-      [assessment.id, userId]
-    );
+    const [attemptCountRows] = await connection.execute("SELECT COUNT(*) AS total FROM assessment_attempts WHERE assessment_id = ? AND user_id = ?", [
+      assessment.id,
+      userId,
+    ]);
     const attemptNumber = Number(attemptCountRows[0].total || 0) + 1;
     if (row.max_attempts != null && attemptNumber > Number(row.max_attempts)) {
-      const error = new Error('Превышено количество попыток');
+      const error = new Error("Превышено количество попыток");
       error.status = 400;
       throw error;
     }
@@ -954,7 +966,7 @@ async function createAttempt(assessment, userId) {
       maxAttempts: row.max_attempts != null ? Number(row.max_attempts) : null,
       createdBy: row.created_by,
       title: row.title,
-      startedAt: new Date().toISOString()
+      startedAt: new Date().toISOString(),
     };
   } catch (error) {
     await connection.rollback();
@@ -970,48 +982,52 @@ async function saveAnswer({ attemptId, userId, questionId, optionId }) {
     await connection.beginTransaction();
 
     const [attemptRows] = await connection.execute(
-      'SELECT id, assessment_id, status FROM assessment_attempts WHERE id = ? AND user_id = ? FOR UPDATE',
+      "SELECT id, assessment_id, status FROM assessment_attempts WHERE id = ? AND user_id = ? FOR UPDATE",
       [attemptId, userId]
     );
     if (!attemptRows.length) {
-      const error = new Error('Попытка не найдена');
+      const error = new Error("Попытка не найдена");
       error.status = 404;
       throw error;
     }
     const attempt = attemptRows[0];
-    if (attempt.status !== 'in_progress') {
-      const error = new Error('Попытка уже завершена');
+    if (attempt.status !== "in_progress") {
+      const error = new Error("Попытка уже завершена");
       error.status = 400;
       throw error;
     }
 
-    const [questionRows] = await connection.execute(
-      'SELECT id FROM assessment_questions WHERE id = ? AND assessment_id = ?',
-      [questionId, attempt.assessment_id]
-    );
+    const [questionRows] = await connection.execute("SELECT id FROM assessment_questions WHERE id = ? AND assessment_id = ?", [
+      questionId,
+      attempt.assessment_id,
+    ]);
     if (!questionRows.length) {
-      const error = new Error('Вопрос не найден');
+      const error = new Error("Вопрос не найден");
       error.status = 404;
       throw error;
     }
 
-    const [optionRows] = await connection.execute(
-      'SELECT id, is_correct FROM assessment_question_options WHERE id = ? AND question_id = ?',
-      [optionId, questionId]
-    );
+    const [optionRows] = await connection.execute("SELECT id, is_correct FROM assessment_question_options WHERE id = ? AND question_id = ?", [
+      optionId,
+      questionId,
+    ]);
     if (!optionRows.length) {
-      const error = new Error('Ответ не найден');
+      const error = new Error("Ответ не найден");
       error.status = 404;
       throw error;
     }
 
     const isCorrect = optionRows[0].is_correct ? 1 : 0;
 
+    console.log(
+      `[saveAnswer] attemptId=${attemptId}, questionId=${questionId}, optionId=${optionId}, is_correct from DB=${optionRows[0].is_correct}, converted=${isCorrect}`
+    );
+
     await connection.execute(
       `INSERT INTO assessment_answers (attempt_id, question_id, option_id, is_correct, answered_at, created_at)
        VALUES (?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
-       ON DUPLICATE KEY UPDATE option_id = VALUES(option_id), is_correct = VALUES(is_correct), answered_at = UTC_TIMESTAMP()`
-      , [attemptId, questionId, optionId, isCorrect]
+       ON DUPLICATE KEY UPDATE option_id = VALUES(option_id), is_correct = VALUES(is_correct), answered_at = UTC_TIMESTAMP()`,
+      [attemptId, questionId, optionId, isCorrect]
     );
 
     await connection.commit();
@@ -1029,43 +1045,47 @@ async function completeAttempt(attemptId, userId) {
     await connection.beginTransaction();
 
     const [attemptRows] = await connection.execute(
-      'SELECT id, assessment_id, status, started_at FROM assessment_attempts WHERE id = ? AND user_id = ? FOR UPDATE',
+      "SELECT id, assessment_id, status, started_at FROM assessment_attempts WHERE id = ? AND user_id = ? FOR UPDATE",
       [attemptId, userId]
     );
     if (!attemptRows.length) {
-      const error = new Error('Попытка не найдена');
+      const error = new Error("Попытка не найдена");
       error.status = 404;
       throw error;
     }
     const attempt = attemptRows[0];
-    if (attempt.status !== 'in_progress') {
-      const error = new Error('Попытка уже завершена');
+    if (attempt.status !== "in_progress") {
+      const error = new Error("Попытка уже завершена");
       error.status = 400;
       throw error;
     }
 
     const [assessmentRows] = await connection.execute(
-      'SELECT id, title, pass_score_percent, time_limit_minutes, created_by FROM assessments WHERE id = ?',
+      "SELECT id, title, pass_score_percent, time_limit_minutes, created_by FROM assessments WHERE id = ?",
       [attempt.assessment_id]
     );
     if (!assessmentRows.length) {
-      const error = new Error('Аттестация не найдена');
+      const error = new Error("Аттестация не найдена");
       error.status = 404;
       throw error;
     }
     const assessment = assessmentRows[0];
 
-    const [[questionRow]] = await connection.execute(
-      'SELECT COUNT(*) AS total FROM assessment_questions WHERE assessment_id = ?',
-      [assessment.id]
-    );
+    const [[questionRow]] = await connection.execute("SELECT COUNT(*) AS total FROM assessment_questions WHERE assessment_id = ?", [assessment.id]);
     const totalQuestions = Number(questionRow.total || 0);
 
-    const [[correctRow]] = await connection.execute(
-      'SELECT COUNT(*) AS total FROM assessment_answers WHERE attempt_id = ? AND is_correct = 1',
-      [attemptId]
-    );
+    const [[correctRow]] = await connection.execute("SELECT COUNT(*) AS total FROM assessment_answers WHERE attempt_id = ? AND is_correct = 1", [
+      attemptId,
+    ]);
     const correctAnswers = Number(correctRow.total || 0);
+
+    console.log(`[completeAttempt] attemptId=${attemptId}, userId=${userId}, totalQuestions=${totalQuestions}, correctAnswers=${correctAnswers}`);
+
+    // Проверим все ответы
+    const [allAnswers] = await connection.execute("SELECT question_id, option_id, is_correct FROM assessment_answers WHERE attempt_id = ?", [
+      attemptId,
+    ]);
+    console.log(`[completeAttempt] All answers:`, allAnswers);
 
     const scorePercent = totalQuestions > 0 ? Number(((correctAnswers / totalQuestions) * 100).toFixed(2)) : 0;
 
@@ -1083,7 +1103,7 @@ async function completeAttempt(attemptId, userId) {
     );
 
     const [[updatedAttempt]] = await connection.execute(
-      'SELECT score_percent, correct_answers, total_questions, time_spent_seconds FROM assessment_attempts WHERE id = ?',
+      "SELECT score_percent, correct_answers, total_questions, time_spent_seconds FROM assessment_attempts WHERE id = ?",
       [attemptId]
     );
 
@@ -1095,7 +1115,7 @@ async function completeAttempt(attemptId, userId) {
         title: assessment.title,
         passScorePercent: assessment.pass_score_percent != null ? Number(assessment.pass_score_percent) : 0,
         createdBy: assessment.created_by,
-        timeLimitMinutes: assessment.time_limit_minutes != null ? Number(assessment.time_limit_minutes) : null
+        timeLimitMinutes: assessment.time_limit_minutes != null ? Number(assessment.time_limit_minutes) : null,
       },
       attempt: {
         id: attemptId,
@@ -1103,8 +1123,8 @@ async function completeAttempt(attemptId, userId) {
         correctAnswers: updatedAttempt.correct_answers != null ? Number(updatedAttempt.correct_answers) : correctAnswers,
         totalQuestions: updatedAttempt.total_questions != null ? Number(updatedAttempt.total_questions) : totalQuestions,
         timeSpentSeconds: updatedAttempt.time_spent_seconds != null ? Number(updatedAttempt.time_spent_seconds) : null,
-        attemptNumber: Number(attempt.attempt_number)
-      }
+        attemptNumber: Number(attempt.attempt_number),
+      },
     };
   } catch (error) {
     await connection.rollback();
@@ -1135,8 +1155,8 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
       WHERE aa.id = ?
         AND aa.assessment_id = ?
         AND aa.user_id = ?
-      LIMIT 1`
-    , [attemptId, assessmentId, userId]
+      LIMIT 1`,
+    [attemptId, assessmentId, userId]
   );
 
   if (!attemptRows.length) {
@@ -1173,8 +1193,8 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
         WHERE o.is_correct = 1
      ) correct ON correct.question_id = q.id
      WHERE q.assessment_id = ?
-     ORDER BY q.order_index ASC`
-    , [attemptId, assessmentId]
+     ORDER BY q.order_index ASC`,
+    [attemptId, assessmentId]
   );
 
   const questions = questionRows.map((row) => ({
@@ -1185,7 +1205,7 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
     selectedOptionText: row.selected_option_text || null,
     correctOptionId: row.correct_option_id || null,
     correctOptionText: row.correct_option_text || null,
-    isCorrect: row.selected_is_correct != null ? Boolean(row.selected_is_correct) : null
+    isCorrect: row.selected_is_correct != null ? Boolean(row.selected_is_correct) : null,
   }));
 
   const [historyRows] = await pool.execute(
@@ -1199,8 +1219,8 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
             completed_at
        FROM assessment_attempts
       WHERE assessment_id = ? AND user_id = ?
-      ORDER BY attempt_number ASC`
-    , [assessmentId, userId]
+      ORDER BY attempt_number ASC`,
+    [assessmentId, userId]
   );
 
   const history = historyRows.map((row) => ({
@@ -1211,7 +1231,7 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
     totalQuestions: row.total_questions != null ? Number(row.total_questions) : null,
     timeSpentSeconds: row.time_spent_seconds != null ? Number(row.time_spent_seconds) : null,
     startedAt: toIsoUtc(row.started_at),
-    completedAt: toIsoUtc(row.completed_at)
+    completedAt: toIsoUtc(row.completed_at),
   }));
 
   return {
@@ -1219,7 +1239,7 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
       id: attempt.assessment_id,
       title: attempt.title,
       passScorePercent: attempt.pass_score_percent != null ? Number(attempt.pass_score_percent) : null,
-      maxAttempts: attempt.max_attempts != null ? Number(attempt.max_attempts) : null
+      maxAttempts: attempt.max_attempts != null ? Number(attempt.max_attempts) : null,
     },
     attempt: {
       id: attempt.id,
@@ -1234,11 +1254,79 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
       passed:
         attempt.score_percent != null && attempt.pass_score_percent != null
           ? Number(attempt.score_percent) >= Number(attempt.pass_score_percent)
-          : null
+          : null,
     },
     questions,
-    history
+    history,
   };
+}
+
+/**
+ * Получить аттестации, которые только что открылись (последние 5 минут)
+ * Для scheduler: проверка новых открытых аттестаций
+ */
+async function getRecentlyOpenedAssessments(now) {
+  const fiveMinAgo = new Date(new Date(now).getTime() - 5 * 60 * 1000);
+  const [rows] = await pool.query(
+    `SELECT 
+      id, title, description, open_at, close_at, 
+      time_limit_minutes, pass_score_percent, max_attempts,
+      created_by, updated_by, created_at, updated_at
+    FROM assessments
+    WHERE open_at >= ? AND open_at <= ? AND close_at > ?
+    ORDER BY open_at DESC`,
+    [fiveMinAgo, now, now]
+  );
+  return rows.map(mapAssessmentRow);
+}
+
+/**
+ * Получить все открытые аттестации (для проверки дедлайнов)
+ * Для scheduler: проверка приближающихся дедлайнов
+ */
+async function getOpenAssessments(now) {
+  const [rows] = await pool.query(
+    `SELECT 
+      id, title, description, open_at, close_at, 
+      time_limit_minutes, pass_score_percent, max_attempts,
+      created_by, updated_by, created_at, updated_at
+    FROM assessments
+    WHERE open_at <= ? AND close_at > ?
+    ORDER BY close_at ASC`,
+    [now, now]
+  );
+  return rows.map(mapAssessmentRow);
+}
+
+/**
+ * Получить пользователей, которым назначена аттестация, но не завершили её
+ * Для scheduler: отправка напоминаний о дедлайне
+ */
+async function getUsersWithIncompleteAttempts(assessmentId) {
+  const [rows] = await pool.query(
+    `SELECT DISTINCT u.telegram_id, u.first_name, u.last_name
+    FROM users u
+    WHERE EXISTS (
+      -- Назначено через ветку
+      SELECT 1 FROM assessment_branch_assignments aba
+      WHERE aba.assessment_id = ? AND aba.branch_id = u.branch_id
+    ) OR EXISTS (
+      -- Назначено через должность
+      SELECT 1 FROM assessment_position_assignments apa
+      WHERE apa.assessment_id = ? AND apa.position_id = u.position_id
+    ) OR EXISTS (
+      -- Назначено напрямую
+      SELECT 1 FROM assessment_user_assignments aua
+      WHERE aua.assessment_id = ? AND aua.user_id = u.id
+    )
+    AND NOT EXISTS (
+      -- Но ещё не завершил попытку
+      SELECT 1 FROM attempts a
+      WHERE a.user_id = u.id AND a.assessment_id = ? AND a.completed_at IS NOT NULL
+    )`,
+    [assessmentId, assessmentId, assessmentId, assessmentId]
+  );
+  return rows;
 }
 
 module.exports = {
@@ -1257,5 +1345,8 @@ module.exports = {
   createAttempt,
   saveAnswer,
   completeAttempt,
-  getAttemptResult
+  getAttemptResult,
+  getRecentlyOpenedAssessments,
+  getOpenAssessments,
+  getUsersWithIncompleteAttempts,
 };
