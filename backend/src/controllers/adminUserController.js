@@ -151,14 +151,14 @@ async function updateUser(req, res, next) {
     }
 
     // Логирование действия
-    await createLog(req.user.id, "UPDATE", `Обновлен пользователь: ${updated.firstName} ${updated.lastName} (ID: ${userId})`, "user", userId, req);
-
-    await sendTelegramLog(
-      `🛠 <b>Обновление пользователя</b>\n` +
-        `ID: ${updated.id}\n` +
-        `Имя: ${updated.firstName} ${updated.lastName}\n` +
-        `Роль: ${updated.roleName}\n` +
-        `Обновил: ${req.user.id}`
+    await createLog(
+      req.user.id,
+      "UPDATE",
+      `Обновлен пользователь: ${updated.firstName} ${updated.lastName} (ID: ${userId})`,
+      "user",
+      userId,
+      req,
+      { notify: true }
     );
 
     res.json({ user: updated });
@@ -184,10 +184,14 @@ async function deleteUser(req, res, next) {
     await userModel.deleteUser(userId);
 
     // Логирование действия
-    await createLog(req.user.id, "DELETE", `Удален пользователь: ${existing.firstName} ${existing.lastName} (ID: ${userId})`, "user", userId, req);
-
-    await sendTelegramLog(
-      `🗑️ <b>Удаление пользователя</b>\n` + `ID: ${existing.id}\n` + `Имя: ${existing.firstName} ${existing.lastName}\n` + `Удалил: ${req.user.id}`
+    await createLog(
+      req.user.id,
+      "DELETE",
+      `Удален пользователь: ${existing.firstName} ${existing.lastName} (ID: ${userId})`,
+      "user",
+      userId,
+      req,
+      { notify: true }
     );
 
     res.status(204).send();
@@ -494,15 +498,8 @@ async function createUser(req, res, next) {
       `Создан пользователь: ${newUser[0].first_name} ${newUser[0].last_name} (ID: ${newUser[0].id})`,
       "user",
       newUser[0].id,
-      req
-    );
-
-    await sendTelegramLog(
-      `➕ <b>Создан новый пользователь</b>\n` +
-        `ID: ${newUser[0].id}\n` +
-        `Имя: ${newUser[0].first_name} ${newUser[0].last_name}\n` +
-        `Роль: ${newUser[0].role_name}\n` +
-        `Создал: ${req.user.id}`
+      req,
+      { notify: true }
     );
 
     res.status(201).json({ user: newUser[0] });
@@ -532,9 +529,15 @@ async function resetPassword(req, res, next) {
     await pool.query("UPDATE users SET password = ? WHERE id = ?", [hashedPassword, userId]);
 
     // Логирование действия
-    await createLog(req.user.id, "UPDATE", `Сброшен пароль пользователя ID: ${userId}`, "user", userId, req);
-
-    await sendTelegramLog(`🔑 <b>Сброс пароля</b>\n` + `Пользователь ID: ${userId}\n` + `Сбросил: ${req.user.id}`);
+    await createLog(
+      req.user.id,
+      "UPDATE",
+      `Сброшен пароль пользователя ID: ${userId}`,
+      "user",
+      userId,
+      req,
+      { notify: true }
+    );
 
     res.json({ message: "Пароль успешно сброшен" });
   } catch (error) {

@@ -1,7 +1,10 @@
 import axios from "axios";
+import { API_BASE_URL } from "@/env";
+
+const DEFAULT_API_BASE_URL = API_BASE_URL || "http://localhost:3001/api";
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api",
+  baseURL: DEFAULT_API_BASE_URL,
 });
 
 // Добавление токена в каждый запрос
@@ -24,8 +27,7 @@ apiClient.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem("refreshToken");
-        const baseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api";
-        const { data } = await axios.post(`${baseURL}/admin/auth/refresh`, {
+        const { data } = await axios.post(`${DEFAULT_API_BASE_URL}/admin/auth/refresh`, {
           refreshToken,
         });
 

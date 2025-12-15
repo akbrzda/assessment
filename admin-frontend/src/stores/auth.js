@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import authApi from "../api/auth";
+import websocketService from "../services/websocket";
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
@@ -12,6 +13,7 @@ export const useAuthStore = defineStore("auth", {
     isAuthenticated: (state) => !!state.accessToken,
     isSuperAdmin: (state) => state.user?.role === "superadmin",
     isManager: (state) => state.user?.role === "manager",
+    token: (state) => state.accessToken,
   },
 
   actions: {
@@ -27,6 +29,9 @@ export const useAuthStore = defineStore("auth", {
         localStorage.setItem("accessToken", data.accessToken);
         localStorage.setItem("refreshToken", data.refreshToken);
 
+        // Подключаем WebSocket после успешного логина
+        websocketService.connect();
+
         return true;
       } catch (error) {
         console.error("Login failed:", error);
@@ -40,6 +45,9 @@ export const useAuthStore = defineStore("auth", {
       } catch (error) {
         console.error("Logout error:", error);
       } finally {
+        // Отключаем WebSocket перед выходом
+        websocketService.disconnect();
+
         this.user = null;
         this.accessToken = null;
         this.refreshToken = null;
