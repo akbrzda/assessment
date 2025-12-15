@@ -24,7 +24,7 @@
       </div>
 
       <!-- Level Progress -->
-      <div class="card mb-12">
+      <div v-if="overviewReady" class="card mb-12">
         <h3 class="title-small mb-16">Уровень: {{ user?.level }}</h3>
 
         <div class="progress-section">
@@ -37,9 +37,14 @@
           </div>
         </div>
       </div>
+      <div v-else class="card skeleton-card mb-12">
+        <div class="skeleton-title mb-12"></div>
+        <div class="skeleton-line mb-8"></div>
+        <div class="skeleton-line w-60"></div>
+      </div>
 
       <!-- Badges -->
-      <div class="card mb-12">
+      <div v-if="overviewReady" class="card mb-12">
         <h3 class="title-small mb-16">Бейджи</h3>
 
         <div v-if="badges.length" class="badges-grid">
@@ -53,9 +58,15 @@
           <p class="body-small text-secondary">Бейджи появятся здесь</p>
         </div>
       </div>
+      <div v-else class="card skeleton-card mb-12">
+        <div class="skeleton-title mb-12"></div>
+        <div class="skeleton-badges">
+          <div class="skeleton-badge" v-for="n in 3" :key="n"></div>
+        </div>
+      </div>
 
       <!-- Statistics -->
-      <div class="card">
+      <div v-if="overviewReady" class="card">
         <h3 class="title-small mb-16">Статистика</h3>
 
         <div class="stats-list">
@@ -78,6 +89,45 @@
           <div class="stat-row">
             <span class="stat-label">Общее время</span>
             <span class="stat-value">{{ userStats.totalTime }}</span>
+          </div>
+        </div>
+      </div>
+      <div v-else class="card skeleton-card">
+        <div class="skeleton-title mb-16"></div>
+        <div class="skeleton-line mb-8"></div>
+        <div class="skeleton-line mb-8 w-80"></div>
+        <div class="skeleton-line mb-8 w-70"></div>
+        <div class="skeleton-line mb-8 w-60"></div>
+      </div>
+
+      <!-- Notifications history -->
+      <div class="card">
+        <h3 class="title-small mb-16">Последние уведомления</h3>
+
+        <div v-if="notificationsLoading" class="notifications-skeleton">
+          <div class="skeleton-row" v-for="n in 3" :key="n">
+            <div class="skeleton-line w-70"></div>
+            <div class="skeleton-line w-40"></div>
+          </div>
+        </div>
+
+        <div v-else-if="notificationHistory.length === 0" class="empty-state">
+          <p class="body-small text-secondary">Сообщения ещё не отправлялись</p>
+        </div>
+
+        <div v-else class="notifications-list">
+          <div v-for="item in notificationHistory" :key="item.id" class="notification-row">
+            <div class="notification-info">
+              <div class="notification-meta">
+                <span :class="['status-pill', getNotificationStatusClass(item.status)]">
+                  {{ getNotificationStatusLabel(item.status) }}
+                </span>
+                <span class="notification-date">{{ formatNotificationDate(item.createdAt) }}</span>
+              </div>
+              <div class="notification-title">{{ item.templateKey || "Уведомление" }}</div>
+              <div v-if="item.message" class="notification-message">{{ item.message }}</div>
+              <div v-if="item.lastError" class="notification-error">Ошибка: {{ item.lastError }}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -137,6 +187,7 @@ export default {
 
     const user = computed(() => userStore.user);
     const isLoading = computed(() => userStore.isLoading);
+    const overviewReady = computed(() => Boolean(userStore.overview) && !userStore.overviewLoading);
 
     const showEditModal = ref(false);
     const badges = ref([]);
@@ -147,6 +198,9 @@ export default {
       rank: null,
       totalTime: "--:--",
     });
+
+    const notificationHistory = ref([]);
+    const notificationsLoading = ref(false);
 
     const editForm = reactive({
       firstName: "",
@@ -215,13 +269,70 @@ export default {
       return `${minutes}:${String(secs).padStart(2, "0")}`;
     }
 
+    function getNotificationStatusLabel(status) {
+      switch (status) {
+        case "sent":
+          return "Отправлено";
+        case "failed":
+          return "Ошибка";
+        case "retrying":
+          return "Повтор";
+        case "queued":
+          return "В очереди";
+        default:
+          return status || "Неизвестно";
+      }
+    }
+
+    function getNotificationStatusClass(status) {
+      switch (status) {
+        case "sent":
+          return "status-success";
+        case "failed":
+          return "status-danger";
+        case "retrying":
+          return "status-warning";
+        case "queued":
+        default:
+          return "status-info";
+      }
+    }
+
+    function formatNotificationDate(value) {
+      if (!value) {
+        return "";
+      }
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return "";
+      }
+      return date.toLocaleString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+
     async function loadProfileData() {
       if (!userStore.isInitialized) {
         await userStore.ensureStatus();
       }
 
-      await userStore.loadOverview();
-      const overview = userStore.overview;
+      const leaderboardPromise = apiClient
+        .getLeaderboardUsers()
+        .catch((error) => {
+          console.warn("Не удалось получить лидерборд", error);
+          return null;
+        });
+
+      const [overviewResponse, assessmentsResponse, leaderboard] = await Promise.all([
+        userStore.loadOverview(),
+        apiClient.listUserAssessments(),
+        leaderboardPromise,
+      ]);
+
+      const overview = overviewResponse || userStore.overview;
 
       badges.value = Array.isArray(overview?.badges)
         ? overview.badges.map((badge) => ({
@@ -235,8 +346,7 @@ export default {
         : [];
 
       try {
-        const { assessments } = await apiClient.listUserAssessments();
-        const normalized = (assessments || []).map((item) => {
+        const normalized = (assessmentsResponse?.assessments || []).map((item) => {
           const threshold = Number.isFinite(item.passScorePercent) ? Number(item.passScorePercent) : null;
           const bestScore = Number.isFinite(item.bestScorePercent) ? Number(item.bestScorePercent) : null;
           const passed = bestScore != null && threshold != null ? bestScore >= threshold : false;
@@ -254,13 +364,8 @@ export default {
         const averageScore = completed ? Math.round(normalized.reduce((total, item) => total + (item.bestScore || 0), 0) / completed) : 0;
 
         let userRank = "—";
-        try {
-          const leaderboard = await apiClient.getLeaderboardUsers();
-          if (leaderboard.currentUser?.rank) {
-            userRank = Number(leaderboard.currentUser.rank);
-          }
-        } catch (error) {
-          console.warn("Не удалось получить позицию в рейтинге", error);
+        if (leaderboard?.currentUser?.rank) {
+          userRank = Number(leaderboard.currentUser.rank);
         }
 
         userStats.value = {
@@ -275,14 +380,29 @@ export default {
       }
     }
 
+    async function loadNotificationHistory() {
+      notificationsLoading.value = true;
+      try {
+        const response = await apiClient.getNotificationHistory({ limit: 10 });
+        notificationHistory.value = Array.isArray(response?.notifications) ? response.notifications : [];
+      } catch (error) {
+        console.warn("Не удалось загрузить историю уведомлений", error);
+        notificationHistory.value = [];
+      } finally {
+        notificationsLoading.value = false;
+      }
+    }
+
     onMounted(() => {
       loadProfileData();
+      loadNotificationHistory();
     });
 
     return {
       userStore,
       user,
       isLoading,
+      overviewReady,
       showEditModal,
       badges,
       userStats,
@@ -294,6 +414,11 @@ export default {
       closeEditModal,
       saveProfile,
       showBadgeDetails,
+      notificationHistory,
+      notificationsLoading,
+      getNotificationStatusLabel,
+      getNotificationStatusClass,
+      formatNotificationDate,
     };
   },
 };
@@ -486,6 +611,144 @@ export default {
 
 .text-secondary {
   color: var(--text-secondary);
+}
+
+.skeleton-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-title,
+.skeleton-line,
+.skeleton-badge {
+  display: block;
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0.2), rgba(148, 163, 184, 0.35), rgba(148, 163, 184, 0.2));
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-title {
+  height: 20px;
+  width: 50%;
+}
+
+.skeleton-line {
+  height: 14px;
+  width: 100%;
+}
+
+.skeleton-badges {
+  display: flex;
+  gap: 12px;
+}
+
+.skeleton-badge {
+  width: 70px;
+  height: 70px;
+  border-radius: 16px;
+}
+
+.w-60 {
+  width: 60%;
+}
+
+.w-70 {
+  width: 70%;
+}
+
+.w-80 {
+  width: 80%;
+}
+
+.notifications-skeleton .skeleton-row {
+  margin-bottom: 12px;
+}
+
+.notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notification-row {
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 12px 16px;
+  background-color: var(--bg-secondary);
+}
+
+.notification-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notification-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.notification-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.notification-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.notification-error {
+  font-size: 13px;
+  color: var(--danger);
+}
+
+.notification-date {
+  white-space: nowrap;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: white;
+}
+
+.status-success {
+  background-color: #1db954;
+}
+
+.status-danger {
+  background-color: #ef4444;
+}
+
+.status-warning {
+  background-color: #f59e0b;
+}
+
+.status-info {
+  background-color: #3b82f6;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 @media (max-width: 480px) {

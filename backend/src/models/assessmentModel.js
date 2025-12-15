@@ -1031,6 +1031,8 @@ async function saveAnswer({ attemptId, userId, questionId, optionId }) {
     );
 
     await connection.commit();
+
+    return { isCorrect: !!isCorrect, assessmentId: attempt.assessment_id };
   } catch (error) {
     await connection.rollback();
     throw error;

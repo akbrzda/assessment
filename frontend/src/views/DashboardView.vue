@@ -233,13 +233,12 @@ export default {
 
       isDataLoading.value = true;
       try {
-        await userStore.loadOverview();
-
-        const [{ assessments }] = await Promise.all([
+        const [, assessmentsResponse] = await Promise.all([
+          userStore.loadOverview(),
           apiClient.listUserAssessments(),
         ]);
 
-        const normalized = (assessments || []).map((item) => normalizeAssessment(item)).filter(Boolean);
+        const normalized = (assessmentsResponse?.assessments || []).map((item) => normalizeAssessment(item)).filter(Boolean);
 
         // Вычисляем ближайшую аттестацию
         const upcoming = normalized

@@ -44,9 +44,35 @@
       <section class="form-section">
         <h3 class="section-heading">Назначить аттестацию</h3>
 
-        <CheckboxGroup v-model="form.branchIds" label="Филиалы" :options="branchOptions" />
+        <div class="checkbox-field">
+          <p class="checkbox-field-label">Филиалы</p>
+          <div class="checkbox-list">
+            <label v-for="branch in branchOptions" :key="branch.value" class="checkbox-item">
+              <input
+                type="checkbox"
+                :value="branch.value"
+                :checked="form.branchIds.includes(branch.value)"
+                @change="toggleBranchSelection(branch.value)"
+              />
+              <span>{{ branch.label }}</span>
+            </label>
+          </div>
+        </div>
 
-        <CheckboxGroup v-model="form.positionIds" label="Должности" :options="positionOptions" />
+        <div class="checkbox-field">
+          <p class="checkbox-field-label">Должности</p>
+          <div class="checkbox-list">
+            <label v-for="position in positionOptions" :key="position.value" class="checkbox-item">
+              <input
+                type="checkbox"
+                :value="position.value"
+                :checked="form.positionIds.includes(position.value)"
+                @change="togglePositionSelection(position.value)"
+              />
+              <span>{{ position.label }}</span>
+            </label>
+          </div>
+        </div>
       </section>
 
       <!-- Вопросы -->
@@ -118,7 +144,6 @@ import Input from "./ui/Input.vue";
 import Select from "./ui/Select.vue";
 import Button from "./ui/Button.vue";
 import Textarea from "./ui/Textarea.vue";
-import CheckboxGroup from "./ui/CheckboxGroup.vue";
 
 const props = defineProps({
   assessmentId: {
@@ -180,6 +205,19 @@ const maxDate = computed(() => {
   const currentYear = new Date().getFullYear();
   return `${currentYear + 100}-12-31`;
 });
+
+const toggleSelectionValue = (list, rawValue) => {
+  const value = Number(rawValue);
+  return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
+};
+
+const toggleBranchSelection = (branchId) => {
+  form.value.branchIds = toggleSelectionValue(form.value.branchIds, branchId);
+};
+
+const togglePositionSelection = (positionId) => {
+  form.value.positionIds = toggleSelectionValue(form.value.positionIds, positionId);
+};
 
 const loadReferences = async () => {
   try {
@@ -419,6 +457,43 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
+}
+
+.checkbox-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkbox-field-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.checkbox-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  background-color: var(--bg-secondary);
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.checkbox-item input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-blue);
 }
 
 .form-grid-3 {

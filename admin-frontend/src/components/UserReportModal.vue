@@ -230,8 +230,43 @@ const normalizeReport = (data) => {
 };
 
 const handleExport = () => {
-  // TODO: реализовать экспорт отчёта пользователя
-  alert("Экспорт в PDF будет реализован");
+  if (!report.value) return;
+
+  const content = [
+    `Имя: ${report.value.user.first_name} ${report.value.user.last_name}`,
+    `Должность: ${report.value.user.position_name || "—"}`,
+    `Филиал: ${report.value.user.branch_name || "—"}`,
+    `Всего попыток: ${report.value.stats.total_attempts}`,
+    `Средний балл: ${formatPercent(report.value.stats.avg_score, 2)}`,
+    "",
+    "История аттестаций:",
+    ...report.value.attempts.map(
+      (attempt, index) =>
+        `${index + 1}. ${attempt.assessment_title} — ${formatPercent(attempt.score_percent, 2)} (${attempt.status}) ${formatDate(attempt.completed_at)}`
+    ),
+  ].join("\n");
+
+  const html = `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Отчёт по сотруднику</title>
+      </head>
+      <body>
+        <pre style="font-family: 'Inter', Arial, sans-serif; white-space: pre-wrap;">${content}</pre>
+      </body>
+    </html>
+  `;
+
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `user_report_${report.value.user.id || "export"}.html`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
 
 const getInitials = (firstName, lastName) => {

@@ -6,7 +6,20 @@
       <Select v-model.number="selectedManager" label="Управляющий" :options="managerOptions" placeholder="Выберите управляющего" required />
 
       <!-- Выбор филиалов -->
-      <CheckboxGroup v-model="selectedBranches" label="Филиалы" :options="branchOptions" required />
+      <div class="checkbox-group">
+        <label class="group-title">Филиалы</label>
+        <div class="checkbox-container">
+          <label v-for="option in branchOptions" :key="option.value" class="checkbox-item">
+            <input
+              type="checkbox"
+              :value="option.value"
+              :checked="selectedBranches.includes(option.value)"
+              @change="handleBranchToggle(option.value, $event.target.checked)"
+            />
+            <span>{{ option.label }}</span>
+          </label>
+        </div>
+      </div>
       <div v-if="selectedBranches.length > 0" class="selected-count">Выбрано: {{ selectedBranches.length }}</div>
 
       <!-- Кнопка выбрать все / снять все -->
@@ -27,7 +40,6 @@ import { ref, watch, onMounted, computed } from "vue";
 import { getBranches, getManagers, assignManagerToBranches } from "../api/branches";
 import Modal from "./ui/Modal.vue";
 import Preloader from "./ui/Preloader.vue";
-import CheckboxGroup from "./ui/CheckboxGroup.vue";
 import Select from "./ui/Select.vue";
 import Button from "./ui/Button.vue";
 
@@ -100,6 +112,18 @@ const toggleAll = () => {
   }
 };
 
+const handleBranchToggle = (branchId, checked) => {
+  const id = Number(branchId);
+
+  if (checked) {
+    if (!selectedBranches.value.includes(id)) {
+      selectedBranches.value = [...selectedBranches.value, id];
+    }
+  } else {
+    selectedBranches.value = selectedBranches.value.filter((value) => value !== id);
+  }
+};
+
 const handleSubmit = async () => {
   if (!selectedManager.value || selectedBranches.value.length === 0) {
     alert("Выберите управляющего и хотя бы один филиал");
@@ -149,5 +173,37 @@ onMounted(() => {
   font-size: 12px;
   color: var(--text-secondary);
   margin-top: -8px;
+}
+
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.checkbox-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.checkbox-item input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-blue);
 }
 </style>

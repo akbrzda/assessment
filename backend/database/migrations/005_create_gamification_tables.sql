@@ -1,4 +1,4 @@
--- Геймификация: уровни, бейджи, события и командные челленджи (этап 6)
+-- Геймификация: уровни, бейджи и события (этап 6)
 
 CREATE TABLE IF NOT EXISTS gamification_levels (
   level_number TINYINT UNSIGNED PRIMARY KEY,
@@ -35,7 +35,6 @@ INSERT INTO badges (code, name, description, icon) VALUES
   ('speedster', 'Самый быстрый', 'Прохождение быстрее 60% таймера при успехе', '⚡️'),
   ('competence_90', 'Компетенция 90%+', 'Результат 90% и выше', '🎯'),
   ('all_tests_completed', 'Прошел все тесты', 'Все назначенные тесты успешно завершены', '🏅'),
-  ('branch_champion', 'Лучший в филиале', 'Филиал занимает первое место в челлендже', '🏆'),
   ('position_champion', 'Лучший по должности', 'Лидер среди однофамильцев по должности', '👑'),
   ('monthly_top3', 'Топ-3 месяца', 'Входит в тройку лучших по очкам за месяц', '🥉'),
   ('streak_master', 'Серия побед', 'Серия успешных тестов без поражений', '🔥')
@@ -86,29 +85,4 @@ CREATE TABLE IF NOT EXISTS gamification_events (
   INDEX idx_gamification_events_user_created_at (user_id, created_at),
   INDEX idx_gamification_events_attempt (attempt_id),
   INDEX idx_gamification_events_branch_created_at (branch_id, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS team_challenges (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  title VARCHAR(128) NOT NULL,
-  description VARCHAR(255) DEFAULT NULL,
-  period_start DATE NOT NULL,
-  period_end DATE NOT NULL,
-  status ENUM('scheduled', 'active', 'completed') NOT NULL DEFAULT 'active',
-  reward_description VARCHAR(255) DEFAULT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uniq_team_challenge_period (period_start)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS team_challenge_branch_scores (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  challenge_id INT UNSIGNED NOT NULL,
-  branch_id INT UNSIGNED NOT NULL,
-  points INT NOT NULL DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uniq_challenge_branch (challenge_id, branch_id),
-  CONSTRAINT fk_team_challenge_branch_scores_challenge FOREIGN KEY (challenge_id) REFERENCES team_challenges(id) ON DELETE CASCADE,
-  CONSTRAINT fk_team_challenge_branch_scores_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

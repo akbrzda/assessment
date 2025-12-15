@@ -41,11 +41,6 @@ WHERE code = 'all_tests_completed';
 
 UPDATE badges SET 
   condition_type = 'top_rank',
-  condition_data = JSON_OBJECT('scope', 'branch', 'rank', 1)
-WHERE code = 'branch_champion';
-
-UPDATE badges SET 
-  condition_type = 'top_rank',
   condition_data = JSON_OBJECT('scope', 'position', 'rank', 1)
 WHERE code = 'position_champion';
 

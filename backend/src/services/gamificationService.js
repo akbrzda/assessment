@@ -1,20 +1,21 @@
-const { pool } = require('../config/database');
-const gamificationModel = require('../models/gamificationModel');
-const logger = require('../utils/logger');
-const { sendTelegramLog } = require('./telegramLogger');
+const { pool } = require("../config/database");
+const gamificationModel = require("../models/gamificationModel");
+const logger = require("../utils/logger");
+const { buildAuditEntry, logAuditEvent } = require("./auditService");
+const rulesEngine = require("./gamificationRulesEngine");
 
 const BADGES = {
-  PERFECT: 'perfect_run',
-  SPEED: 'speedster',
-  COMPETENCE: 'competence_90',
-  STREAK: 'streak_master',
-  ALL_COMPLETED: 'all_tests_completed'
+  PERFECT: "perfect_run",
+  SPEED: "speedster",
+  COMPETENCE: "competence_90",
+  STREAK: "streak_master",
+  ALL_COMPLETED: "all_tests_completed",
 };
 
 const STREAK_MILESTONES = [
   { value: 3, bonus: 25 },
   { value: 5, bonus: 40 },
-  { value: 10, bonus: 75 }
+  { value: 10, bonus: 75 },
 ];
 
 const COMPETENCE_THRESHOLD = 90;
@@ -42,8 +43,8 @@ async function hasUnfinishedAssignments(connection, userId) {
 
   const [[totalRow]] = await connection.execute(
     `SELECT COUNT(*) AS total
-       FROM (${placeholderSql}) assigned`
-    , [userId, userId, userId]
+       FROM (${placeholderSql}) assigned`,
+    [userId, userId, userId]
   );
 
   const totalAssigned = Number(totalRow?.total || 0);
@@ -64,13 +65,13 @@ async function hasUnfinishedAssignments(connection, userId) {
           GROUP BY assessment_id
        ) attempts ON attempts.assessment_id = assigned.assessment_id
       WHERE attempts.best_score IS NULL
-         OR attempts.best_score < a.pass_score_percent`
-    , [userId, userId, userId, userId]
+         OR attempts.best_score < a.pass_score_percent`,
+    [userId, userId, userId, userId]
   );
 
   return {
     totalAssigned,
-    unfinished: Number(unfinishedRow?.total || 0)
+    unfinished: Number(unfinishedRow?.total || 0),
   };
 }
 
@@ -78,15 +79,122 @@ function buildEvent(type, points, description) {
   return {
     type,
     points: Math.round(points),
-    description
+    description,
   };
+}
+
+async function processAnswerEvent({ userId, attemptId, assessmentId, questionId, answerCorrect }) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    await gamificationModel.ensureUserStats(userId, connection);
+    const user = await gamificationModel.getUserContext(userId, connection, { forUpdate: true });
+    if (!user) {
+      throw new Error(`User ${userId} not found for gamification update`);
+    }
+    if (user.roleName !== "employee") {
+      await connection.rollback();
+      return { skipped: true, reason: "not_employee" };
+    }
+
+    const engineResult = await rulesEngine.evaluate({
+      connection,
+      context: {
+        event: "answer",
+        userId,
+        assessmentId,
+        attemptId,
+        questionId,
+        branchId: user.branchId,
+        positionId: user.positionId,
+        answerCorrect: !!answerCorrect,
+      },
+      combine: "additive",
+    });
+
+    if (!engineResult.usedRules || (!engineResult.events?.length && !engineResult.badges?.length)) {
+      await connection.rollback();
+      return { skipped: true, reason: "no_matching_rules" };
+    }
+
+    const totalEarned = (engineResult.events || []).reduce((s, e) => s + (e.points || 0), 0);
+
+    if (totalEarned) {
+      const newPoints = Math.max(0, (await gamificationModel.getUserContext(userId, connection)).points + totalEarned);
+      // Без изменения уровня на ответах (уровень пересчитается при завершении попытки или суммарно)
+      await gamificationModel.updateUserProgress(userId, { points: newPoints }, connection);
+    }
+
+    for (const e of engineResult.events || []) {
+      if (!e.points) continue;
+      await gamificationModel.recordEvent(
+        {
+          userId,
+          attemptId,
+          eventType: e.type,
+          pointsDelta: Math.round(e.points),
+          description: e.description || (answerCorrect ? "Верный ответ" : "Неверный ответ"),
+          branchId: user.branchId,
+          positionId: user.positionId,
+        },
+        connection
+      );
+    }
+
+    const awardedBadges = [];
+    for (const code of engineResult.badges || []) {
+      const badge = await gamificationModel.getBadgeByCode(code, connection);
+      if (!badge) continue;
+      const inserted = await gamificationModel.awardBadge(
+        {
+          userId,
+          badgeId: badge.id,
+          attemptId,
+          description: badge.description,
+        },
+        connection
+      );
+      if (inserted) {
+        awardedBadges.push({ code: badge.code, name: badge.name });
+      }
+    }
+
+    await connection.commit();
+
+    // Аудит (асинхронно)
+    const entry = buildAuditEntry({
+      scope: "system",
+      action: "gamification.answer.reward",
+      entity: "assessment_answer",
+      entityId: attemptId,
+      actor: { id: null, role: "system", name: "GamificationService" },
+      metadata: {
+        userId,
+        attemptId,
+        assessmentId,
+        questionId,
+        answerCorrect: !!answerCorrect,
+        totalEarned,
+        badges: awardedBadges,
+      },
+    });
+    logAuditEvent(entry).catch(() => {});
+
+    return { awardedPoints: totalEarned, badges: awardedBadges };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 async function processAttemptCompletion({ userId, attemptId, assessment, attempt }) {
   const connection = await pool.getConnection();
   const logContext = {
     lines: [],
-    badges: []
+    badges: [],
   };
 
   try {
@@ -99,11 +207,11 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
       throw new Error(`User ${userId} not found for gamification update`);
     }
 
-    if (user.roleName !== 'employee') {
+    if (user.roleName !== "employee") {
       await connection.rollback();
       return {
         skipped: true,
-        reason: 'not_employee'
+        reason: "not_employee",
       };
     }
 
@@ -115,42 +223,70 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
         longestStreak: 0,
         lastSuccessAt: null,
         lastAttemptAt: null,
-        lastStreakAward: 0
+        lastStreakAward: 0,
       };
     }
 
-    const passed = attempt.scorePercent != null && assessment.passScorePercent != null
-      ? Number(attempt.scorePercent) >= Number(assessment.passScorePercent)
-      : false;
+    const passed =
+      attempt.scorePercent != null && assessment.passScorePercent != null
+        ? Number(attempt.scorePercent) >= Number(assessment.passScorePercent)
+        : false;
 
-    const events = [];
+    let events = [];
     const badgesToAward = new Set();
     const now = new Date();
 
-    let totalEarned = Math.max(0, Math.round(formatNumber(attempt.scorePercent)));
-    if (totalEarned > 0) {
-      events.push(buildEvent('base', totalEarned, `Результат ${formatNumber(attempt.scorePercent)}%`));
-    }
-
-    if (attempt.totalQuestions && attempt.totalQuestions > 0 && attempt.correctAnswers === attempt.totalQuestions) {
-      const perfectBonus = 40;
-      totalEarned += perfectBonus;
-      events.push(buildEvent('perfect_bonus', perfectBonus, 'Прохождение без ошибок'));
-      badgesToAward.add(BADGES.PERFECT);
-    }
-
-    if (formatNumber(attempt.scorePercent) >= COMPETENCE_THRESHOLD) {
-      const competenceBonus = 20;
-      totalEarned += competenceBonus;
-      events.push(buildEvent('competence_bonus', competenceBonus, 'Высокий результат (90%+)'));
-      badgesToAward.add(BADGES.COMPETENCE);
-    }
-
+    // Рассчёт через движок правил (если включён), иначе старая логика
     const hasTimeLimit = assessment.timeLimitMinutes != null && Number(assessment.timeLimitMinutes) > 0;
     const timeSpentSeconds = formatNumber(attempt.timeSpentSeconds);
-    if (passed && hasTimeLimit && timeSpentSeconds > 0) {
-      const totalSeconds = Number(assessment.timeLimitMinutes) * 60;
-      if (totalSeconds > 0) {
+    const totalSeconds = hasTimeLimit ? Number(assessment.timeLimitMinutes) * 60 : 0;
+    const timeRatio = hasTimeLimit && totalSeconds > 0 && timeSpentSeconds > 0 ? timeSpentSeconds / totalSeconds : null;
+
+    const engineResult = await rulesEngine.evaluate({
+      connection,
+      context: {
+        userId,
+        assessmentId: assessment.id,
+        branchId: user.branchId,
+        positionId: user.positionId,
+        scorePercent: formatNumber(attempt.scorePercent),
+        passed,
+        perfect: attempt.totalQuestions && attempt.totalQuestions > 0 && attempt.correctAnswers === attempt.totalQuestions,
+        timeRatio,
+        currentStreak: (stats.currentStreak || 0) + (passed ? 1 : 0),
+      },
+      combine: "additive",
+    });
+
+    let totalEarned = 0;
+    if (engineResult.usedRules) {
+      events = engineResult.events.map((e) => buildEvent(e.type, e.points, e.description));
+      totalEarned = events.reduce((sum, e) => sum + (e.points || 0), 0);
+      for (const code of engineResult.badges) {
+        badgesToAward.add(code);
+      }
+    } else {
+      // Fallback к текущей логике
+      totalEarned = Math.max(0, Math.round(formatNumber(attempt.scorePercent)));
+      if (totalEarned > 0) {
+        events.push(buildEvent("base", totalEarned, `Результат ${formatNumber(attempt.scorePercent)}%`));
+      }
+
+      if (attempt.totalQuestions && attempt.totalQuestions > 0 && attempt.correctAnswers === attempt.totalQuestions) {
+        const perfectBonus = 40;
+        totalEarned += perfectBonus;
+        events.push(buildEvent("perfect_bonus", perfectBonus, "Прохождение без ошибок"));
+        badgesToAward.add(BADGES.PERFECT);
+      }
+
+      if (formatNumber(attempt.scorePercent) >= COMPETENCE_THRESHOLD) {
+        const competenceBonus = 20;
+        totalEarned += competenceBonus;
+        events.push(buildEvent("competence_bonus", competenceBonus, "Высокий результат (90%+)"));
+        badgesToAward.add(BADGES.COMPETENCE);
+      }
+
+      if (passed && hasTimeLimit && timeSpentSeconds > 0 && totalSeconds > 0) {
         const ratio = timeSpentSeconds / totalSeconds;
         let speedBonus = 0;
         if (ratio <= 0.5) {
@@ -163,7 +299,7 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
         }
         if (speedBonus > 0) {
           totalEarned += speedBonus;
-          events.push(buildEvent('speed_bonus', speedBonus, 'Быстрое прохождение теста'));
+          events.push(buildEvent("speed_bonus", speedBonus, "Быстрое прохождение теста"));
         }
       }
     }
@@ -176,13 +312,15 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
       if (currentStreak > longestStreak) {
         longestStreak = currentStreak;
       }
-      for (const milestone of STREAK_MILESTONES) {
-        if (currentStreak >= milestone.value && milestone.value > lastStreakAward) {
-          totalEarned += milestone.bonus;
-          events.push(buildEvent('streak_bonus', milestone.bonus, `Серия ${currentStreak} успешных тестов`));
-          lastStreakAward = milestone.value;
-          if (milestone.value >= 5) {
-            badgesToAward.add(BADGES.STREAK);
+      if (!engineResult.usedRules) {
+        for (const milestone of STREAK_MILESTONES) {
+          if (currentStreak >= milestone.value && milestone.value > lastStreakAward) {
+            totalEarned += milestone.bonus;
+            events.push(buildEvent("streak_bonus", milestone.bonus, `Серия ${currentStreak} успешных тестов`));
+            lastStreakAward = milestone.value;
+            if (milestone.value >= 5) {
+              badgesToAward.add(BADGES.STREAK);
+            }
           }
         }
       }
@@ -193,7 +331,7 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
       longestStreak,
       lastStreakAward,
       lastAttemptAt: now,
-      lastSuccessAt: passed ? now : stats.lastSuccessAt
+      lastSuccessAt: passed ? now : stats.lastSuccessAt,
     };
 
     await gamificationModel.updateUserStats(userId, statsUpdate, connection);
@@ -220,31 +358,20 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
           pointsDelta: event.points,
           description: event.description,
           branchId: user.branchId,
-          positionId: user.positionId
+          positionId: user.positionId,
         },
         connection
       );
     }
 
-    let challenge = null;
-    if (totalEarned > 0) {
-      challenge = await gamificationModel.ensureMonthlyChallenge(connection);
-      if (challenge && user.branchId) {
-        await gamificationModel.incrementChallengeBranchScore(
-          {
-            challengeId: challenge.id,
-            branchId: user.branchId,
-            points: totalEarned
-          },
-          connection
-        );
-      }
-    }
-
     if (passed) {
       const assignmentState = await hasUnfinishedAssignments(connection, userId);
       if (assignmentState.totalAssigned > 0 && assignmentState.unfinished === 0) {
-        badgesToAward.add(BADGES.ALL_COMPLETED);
+        if (engineResult.usedRules) {
+          badgesToAward.add("all_tests_completed");
+        } else {
+          badgesToAward.add(BADGES.ALL_COMPLETED);
+        }
       }
     }
 
@@ -259,7 +386,7 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
           userId,
           badgeId: badge.id,
           attemptId,
-          description: badge.description
+          description: badge.description,
         },
         connection
       );
@@ -268,7 +395,7 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
           code: badge.code,
           name: badge.name,
           description: badge.description,
-          icon: badge.icon
+          icon: badge.icon,
         });
       }
     }
@@ -291,60 +418,64 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
               levelNumber: nextLevelInfo.levelNumber,
               name: nextLevelInfo.name,
               minPoints: nextLevelInfo.minPoints,
-              pointsToReach: Math.max(nextLevelInfo.minPoints - newPoints, 0)
+              pointsToReach: Math.max(nextLevelInfo.minPoints - newPoints, 0),
             }
-          : null
+          : null,
       },
       streak: {
         current: currentStreak,
-        longest: longestStreak
+        longest: longestStreak,
       },
       badges: awardedBadges,
       monthlyPoints,
-      challenge: challenge
-        ? {
-            id: challenge.id,
-            title: challenge.title,
-            periodStart: challenge.periodStart,
-            periodEnd: challenge.periodEnd
-          }
-        : null
     };
 
     logContext.lines.push(
       `🎮 <b>Геймификация</b>`,
       `Пользователь: ${user.firstName} ${user.lastName} (ID: ${userId})`,
       `Очки: +${totalEarned} → ${newPoints}`,
-      `Результат: ${formatNumber(attempt.scorePercent)}% (${passed ? 'успешно' : 'неуспешно'})`
+      `Результат: ${formatNumber(attempt.scorePercent)}% (${passed ? "успешно" : "неуспешно"})`
     );
     if (previousLevel !== newLevel) {
       logContext.lines.push(`Уровень: ${previousLevel} → ${newLevel}`);
     }
     if (awardedBadges.length) {
-      logContext.lines.push(
-        `Бейджи: ${awardedBadges
-          .map((badge) => `${badge.icon || '🎖'} ${badge.name}`)
-          .join(', ')}`
-      );
+      logContext.lines.push(`Бейджи: ${awardedBadges.map((badge) => `${badge.icon || "🎖"} ${badge.name}`).join(", ")}`);
     }
-    if (challenge && user.branchName) {
-      logContext.lines.push(`Очки филиала «${user.branchName}»: +${totalEarned}`);
-    }
-
     if (logContext.lines.length) {
-      logContext.message = logContext.lines.join('\n');
+      logContext.message = logContext.lines.join("\n");
     }
 
     return response;
   } catch (error) {
     await connection.rollback();
-    logger.error('Gamification processing failed for attempt %s: %s', attemptId, error.message);
+    logger.error("Gamification processing failed for attempt %s: %s", attemptId, error.message);
     throw error;
   } finally {
     connection.release();
     if (logContext.message) {
-      sendTelegramLog(logContext.message).catch((logError) => {
-        logger.error('Failed to send gamification log: %s', logError.message);
+      const entry = buildAuditEntry({
+        scope: "system",
+        action: "gamification.reward.applied",
+        entity: "assessment_attempt",
+        entityId: attemptId,
+        actor: { id: null, role: "system", name: "GamificationService" },
+        metadata: {
+          userId,
+          totalEarned,
+          newPoints,
+          previousLevel,
+          newLevel,
+          badges: awardedBadges,
+          streak: {
+            current: currentStreak,
+            longest: longestStreak,
+          },
+          rawMessage: logContext.message,
+        },
+      });
+      logAuditEvent(entry).catch((logError) => {
+        logger.error("Failed to record gamification audit log: %s", logError.message);
       });
     }
   }
@@ -359,7 +490,7 @@ async function getUserOverview(userId) {
       return null;
     }
 
-    const participationAllowed = user.roleName === 'employee';
+    const participationAllowed = user.roleName === "employee";
     const levels = await gamificationModel.getLevels(connection);
     const catalog = await gamificationModel.listBadgeCatalog(connection);
 
@@ -369,7 +500,7 @@ async function getUserOverview(userId) {
       currentStreak: 0,
       longestStreak: 0,
       lastSuccessAt: null,
-      lastAttemptAt: null
+      lastAttemptAt: null,
     };
     let badges = catalog.map((badge) => ({
       code: badge.code,
@@ -377,7 +508,7 @@ async function getUserOverview(userId) {
       description: badge.description,
       icon: badge.icon,
       earned: false,
-      awardedAt: null
+      awardedAt: null,
     }));
     let monthlyPoints = 0;
 
@@ -387,7 +518,7 @@ async function getUserOverview(userId) {
         currentStreak: statsData?.currentStreak || 0,
         longestStreak: statsData?.longestStreak || 0,
         lastSuccessAt: statsData?.lastSuccessAt || null,
-        lastAttemptAt: statsData?.lastAttemptAt || null
+        lastAttemptAt: statsData?.lastAttemptAt || null,
       };
 
       levelInfo = await gamificationModel.findLevelForPoints(user.points, connection);
@@ -397,7 +528,7 @@ async function getUserOverview(userId) {
             levelNumber: nextLevelInfo.levelNumber,
             name: nextLevelInfo.name,
             minPoints: nextLevelInfo.minPoints,
-            pointsToReach: Math.max(nextLevelInfo.minPoints - user.points, 0)
+            pointsToReach: Math.max(nextLevelInfo.minPoints - user.points, 0),
           }
         : null;
 
@@ -409,7 +540,7 @@ async function getUserOverview(userId) {
         description: badge.description,
         icon: badge.icon,
         earned: badgeMap.has(badge.code),
-        awardedAt: badgeMap.get(badge.code)?.awardedAt || null
+        awardedAt: badgeMap.get(badge.code)?.awardedAt || null,
       }));
 
       monthlyPoints = await gamificationModel.listUserMonthlyPoints(userId, connection);
@@ -423,7 +554,7 @@ async function getUserOverview(userId) {
         points: participationAllowed ? user.points : 0,
         level: participationAllowed ? user.level : 1,
         branchName: user.branchName,
-        positionName: user.positionName
+        positionName: user.positionName,
       },
       levels,
       levelInfo,
@@ -431,43 +562,7 @@ async function getUserOverview(userId) {
       stats,
       badges,
       monthlyPoints,
-      participationAllowed
-    };
-  } finally {
-    connection.release();
-  }
-}
-
-async function getTeamChallengesOverview(userId) {
-  const connection = await pool.getConnection();
-  try {
-    const user = await gamificationModel.getUserContext(userId, connection, { forUpdate: false });
-    if (!user) {
-      return null;
-    }
-
-    const challenge = await gamificationModel.ensureMonthlyChallenge(connection);
-    if (!challenge) {
-      return { challenges: [] };
-    }
-
-    const branchScores = await gamificationModel.listChallengeBranchScores(challenge.id, connection);
-    const userBranchScore = user.branchId
-      ? branchScores.find((item) => item.branchId === user.branchId)
-      : null;
-
-    return {
-      challenges: [
-        {
-          id: challenge.id,
-          title: challenge.title,
-          description: challenge.description,
-          periodStart: challenge.periodStart,
-          periodEnd: challenge.periodEnd,
-          branchScores,
-          userBranch: userBranchScore
-        }
-      ]
+      participationAllowed,
     };
   } finally {
     connection.release();
@@ -477,5 +572,5 @@ async function getTeamChallengesOverview(userId) {
 module.exports = {
   processAttemptCompletion,
   getUserOverview,
-  getTeamChallengesOverview
+  processAnswerEvent,
 };

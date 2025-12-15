@@ -1,31 +1,42 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { resolve } from "path";
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [vue()],
-  server: {
-    port: 5174,
-    host: true,
-  },
-  resolve: {
-    alias: {
-      "@": resolve(__dirname, "src"),
+export default defineConfig(({ mode }) => {
+  const rootEnvDir = resolve(__dirname, "..");
+  const env = loadEnv(mode, rootEnvDir, "");
+
+  return {
+    envDir: rootEnvDir,
+    define: {
+      __API_BASE_URL__: JSON.stringify(env.API_BASE_URL || ""),
+      __INVITE_EXPIRATION_DAYS__: JSON.stringify(env.INVITE_EXPIRATION_DAYS || "7"),
+      __BOT_USERNAME__: JSON.stringify(env.BOT_USERNAME || ""),
     },
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // Vendor chunks - разделяем библиотеки
-          "vue-vendor": ["vue", "vue-router", "pinia"],
-          "chart-vendor": ["chart.js", "vue-chartjs"],
-          "icons-vendor": ["lucide-vue-next"],
-          "axios-vendor": ["axios"],
-        },
+    plugins: [vue()],
+    server: {
+      port: 5174,
+      host: true,
+    },
+    resolve: {
+      alias: {
+        "@": resolve(__dirname, "src"),
       },
     },
-    chunkSizeWarningLimit: 1000, // Увеличиваем лимит до 1000 КБ (иконки занимают много места)
-  },
+    build: {
+      rollupOptions: {
+        output: {
+          // Vendor chunks - разделяем библиотеки
+          manualChunks: {
+            "vue-vendor": ["vue", "vue-router", "pinia"],
+            "chart-vendor": ["chart.js", "vue-chartjs"],
+            "icons-vendor": ["lucide-vue-next"],
+            "axios-vendor": ["axios"],
+          },
+        },
+      },
+      chunkSizeWarningLimit: 1000,
+    },
+  };
 });

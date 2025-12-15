@@ -27,7 +27,10 @@
 
       <!-- Переключатель группировки -->
       <div class="grouping-toggle">
-        <Checkbox v-model="groupByAssessment" label="Группировать по аттестациям" @update:modelValue="loadQuestions" />
+        <label class="toggle-checkbox">
+          <input type="checkbox" v-model="groupByAssessment" @change="loadQuestions" />
+          <span>Группировать по аттестациям</span>
+        </label>
       </div>
     </Card>
 
@@ -140,7 +143,6 @@ import Button from "../components/ui/Button.vue";
 import Input from "../components/ui/Input.vue";
 import Select from "../components/ui/Select.vue";
 import Badge from "../components/ui/Badge.vue";
-import Checkbox from "../components/ui/Checkbox.vue";
 import CategoryManager from "../components/CategoryManager.vue";
 
 const router = useRouter();
@@ -176,10 +178,18 @@ const getQuestionTypeLabel = (type) => {
   return option ? option.label : type;
 };
 
+const buildFiltersPayload = () => {
+  const payload = { ...filters.value };
+  if (groupByAssessment.value) {
+    payload.group_by = "assessment";
+  }
+  return payload;
+};
+
 const loadQuestions = async () => {
   loading.value = true;
   try {
-    const data = await getQuestions(filters.value);
+    const data = await getQuestions(buildFiltersPayload());
     questions.value = data.questions;
   } catch (error) {
     console.error("Load questions error:", error);
@@ -302,13 +312,19 @@ onMounted(async () => {
   border-top: 1px solid var(--divider);
 }
 
-.toggle-label {
+.toggle-checkbox {
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
   font-size: 14px;
   color: var(--text-primary);
+}
+
+.toggle-checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-blue);
 }
 
 /* Таблица */

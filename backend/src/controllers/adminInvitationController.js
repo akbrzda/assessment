@@ -2,7 +2,6 @@ const Joi = require("joi");
 const invitationModel = require("../models/invitationModel");
 const referenceModel = require("../models/referenceModel");
 const { generateInviteCode } = require("../utils/tokenGenerator");
-const { sendTelegramLog } = require("../services/telegramLogger");
 const { createLog } = require("./adminLogsController");
 const config = require("../config/env");
 
@@ -103,15 +102,6 @@ exports.createInvitation = async (req, res, next) => {
       req
     );
 
-    await sendTelegramLog(
-      `🔗 <b>Создана ссылка-приглашение</b>\n` +
-        `Код: ${code}\n` +
-        `ФИО: ${value.firstName} ${value.lastName}\n` +
-        `Филиал: ${invitation.branch_name}\n` +
-        `Срок действия: ${expirationDays} дней\n` +
-        `Создал: ${req.user.id}`
-    );
-
     res.status(201).json({ invitation, message: "Приглашение создано успешно" });
   } catch (error) {
     console.error("Create invitation error:", error);
@@ -163,14 +153,6 @@ exports.updateInvitation = async (req, res, next) => {
       req
     );
 
-    await sendTelegramLog(
-      `✏️ <b>Обновлена ссылка-приглашение</b>\n` +
-        `Код: ${invitation.code}\n` +
-        `ФИО: ${value.firstName} ${value.lastName}\n` +
-        `Филиал: ${updated.branch_name}\n` +
-        `Обновил: ${req.user.id}`
-    );
-
     res.json({ invitation: updated, message: "Приглашение обновлено успешно" });
   } catch (error) {
     console.error("Update invitation error:", error);
@@ -214,13 +196,6 @@ exports.extendInvitation = async (req, res, next) => {
     // Логирование действия
     await createLog(req.user.id, "UPDATE", `Продлено приглашение на ${value.days} дней (код: ${invitation.code})`, "invitation", invitationId, req);
 
-    await sendTelegramLog(
-      `⏰ <b>Продлена ссылка-приглашение</b>\n` +
-        `Код: ${updated.code}\n` +
-        `Новая дата истечения: ${new Date(updated.expires_at).toLocaleString("ru-RU")}\n` +
-        `Продлил на ${value.days} дней: ${req.user.id}`
-    );
-
     res.json({ invitation: updated, message: "Приглашение продлено успешно" });
   } catch (error) {
     console.error("Extend invitation error:", error);
@@ -259,13 +234,6 @@ exports.deleteInvitation = async (req, res, next) => {
       "invitation",
       invitationId,
       req
-    );
-
-    await sendTelegramLog(
-      `🗑️ <b>Удалена ссылка-приглашение</b>\n` +
-        `Код: ${invitation.code}\n` +
-        `ФИО: ${invitation.first_name} ${invitation.last_name}\n` +
-        `Удалил: ${req.user.id}`
     );
 
     res.status(204).send();

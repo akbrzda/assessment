@@ -1,4 +1,5 @@
 const { pool } = require("../config/database");
+const { buildAuditEntry, logAuditEvent, buildActorFromRequest } = require("../services/auditService");
 
 // Получить логи с фильтрами
 exports.getLogs = async (req, res, next) => {
@@ -177,22 +178,43 @@ exports.getEntityTypes = async (req, res, next) => {
 // Записать новый лог (используется внутренне)
 exports.createLog = async (adminId, actionType, description, entityType = null, entityId = null, req = null) => {
   try {
-    const ipAddress = req ? req.headers["x-forwarded-for"] || req.connection.remoteAddress : null;
+    const ipAddress = req ? req.headers["x-forwarded-for"] || req.connection?.remoteAddress || null : null;
     const userAgent = req ? req.headers["user-agent"] : null;
 
-    // Получить имя администратора
-    const [admin] = await pool.query("SELECT first_name, last_name FROM users WHERE id = ?", [adminId]);
-    const adminUsername = admin.length > 0 ? `${admin[0].first_name} ${admin[0].last_name}` : null;
-
-    await pool.query(
-      `INSERT INTO action_logs 
-       (admin_id, admin_username, action_type, entity_type, entity_id, description, ip_address, user_agent)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [adminId, adminUsername, actionType, entityType, entityId, description, ipAddress, userAgent]
+    const [adminRows] = await pool.query(
+      `SELECT u.first_name, u.last_name, r.name as role_name
+       FROM users u
+       LEFT JOIN roles r ON u.role_id = r.id
+       WHERE u.id = ?
+       LIMIT 1`,
+      [adminId]
     );
+
+    const actor = {
+      id: adminId || null,
+      role: adminRows[0]?.role_name || null,
+      name: adminRows[0] ? `${adminRows[0].first_name} ${adminRows[0].last_name}`.trim() : null,
+    };
+
+    const normalizedAction = actionType && actionType.includes(".") ? actionType : `legacy.${(actionType || "unknown").toLowerCase()}`;
+
+    const entry = buildAuditEntry({
+      scope: "admin_panel",
+      action: normalizedAction,
+      entity: entityType || null,
+      entityId: entityId || null,
+      actor,
+      metadata: {
+        description,
+        originalAction: actionType,
+      },
+      initiatorIp: ipAddress,
+      userAgent,
+    });
+
+    await logAuditEvent(entry);
   } catch (error) {
     console.error("Ошибка создания лога:", error);
-    // Не бросаем ошибку, чтобы не прерывать основной процесс
   }
 };
 
@@ -310,7 +332,6 @@ exports.exportLogs = async (req, res, next) => {
 // Отправить логи в Telegram
 exports.sendLogsToTelegram = async (req, res, next) => {
   try {
-    const { sendTelegramLog } = require("../services/telegramLogger");
     const { date_from, date_to, limit = 50 } = req.body;
 
     let conditions = ["al.created_at >= ?"];
@@ -366,7 +387,20 @@ exports.sendLogsToTelegram = async (req, res, next) => {
       message += `... и ещё ${logs.length - 20} действий`;
     }
 
-    await sendTelegramLog(message);
+    const entry = buildAuditEntry({
+      scope: "admin_panel",
+      action: "logs.exported",
+      entity: "action_logs",
+      entityId: null,
+      actor: buildActorFromRequest(req),
+      metadata: {
+        periodStart: date_from || null,
+        periodEnd: date_to || null,
+        total: logs.length,
+        preview: message,
+      },
+    });
+    await logAuditEvent(entry, { skipTelegram: false, skipDatabase: false });
 
     res.json({ success: true, message: "Логи отправлены в Telegram" });
   } catch (error) {

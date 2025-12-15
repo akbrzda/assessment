@@ -30,20 +30,7 @@ async function getBadges(req, res, next) {
   }
 }
 
-async function getTeamChallenges(req, res, next) {
-  try {
-    if (!req.currentUser) {
-      return res.status(401).json({ error: 'Требуется авторизация' });
-    }
-    const teamData = await gamificationService.getTeamChallengesOverview(req.currentUser.id);
-    res.json(teamData);
-  } catch (error) {
-    next(error);
-  }
-}
-
 module.exports = {
   getOverview,
-  getBadges,
-  getTeamChallenges
+  getBadges
 };

@@ -1,5 +1,4 @@
 const { pool } = require("../config/database");
-const { sendTelegramLog } = require("../services/telegramLogger");
 const { createLog } = require("./adminLogsController");
 const multer = require("multer");
 const path = require("path");
@@ -118,14 +117,6 @@ exports.createBadge = async (req, res, next) => {
 
     // Логирование
     await createLog(req.user.id, "CREATE", `Создан бейдж: ${name} (${code})`, "badge", result.insertId, req);
-
-    await sendTelegramLog(
-      `🏅 <b>Создан новый бейдж</b>\n` +
-        `Название: ${name}\n` +
-        `Код: ${code}\n` +
-        `Очков за бейдж: ${points_reward || 0}\n` +
-        `Создал: ${req.user.id}`
-    );
 
     res.status(201).json({ message: "Бейдж создан успешно", badgeId: result.insertId });
   } catch (error) {
@@ -258,8 +249,6 @@ exports.deleteBadge = async (req, res, next) => {
 
     // Логирование
     await createLog(req.user.id, "DELETE", `Удален бейдж: ${badge.name} (ID: ${id})`, "badge", id, req);
-
-    await sendTelegramLog(`🗑️ <b>Удален бейдж</b>\n` + `Название: ${badge.name}\n` + `ID: ${id}\n` + `Удалил: ${req.user.id}`);
 
     res.status(204).send();
   } catch (error) {

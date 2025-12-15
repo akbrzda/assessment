@@ -3,7 +3,7 @@ const userModel = require("../models/userModel");
 const referenceModel = require("../models/referenceModel");
 const invitationModel = require("../models/invitationModel");
 const { normalizeInviteCode } = require("../utils/inviteCode");
-const { sendTelegramLog } = require("../services/telegramLogger");
+const { buildAuditEntry, logAuditEvent } = require("../services/auditService");
 const config = require("../config/env");
 
 const registrationSchema = Joi.object({
@@ -199,13 +199,24 @@ async function register(req, res, next) {
 
     const dashboard = await userModel.getDashboardData(userId);
 
-    await sendTelegramLog(
-      `✅ <b>Новая регистрация</b>\n` +
-        `Пользователь: ${dashboard.firstName} ${dashboard.lastName}\n` +
-        `Роль: ${dashboard.roleName}\n` +
-        `Филиал: ${dashboard.branchName || "—"}\n` +
-        `Telegram ID: ${telegramId}`
-    );
+    const auditEntry = buildAuditEntry({
+      scope: "miniapp",
+      action: "user.registered",
+      entity: "user",
+      entityId: dashboard.id,
+      actor: {
+        id: dashboard.id,
+        role: dashboard.roleName,
+        name: `${dashboard.firstName} ${dashboard.lastName}`,
+      },
+      metadata: {
+        branch: dashboard.branchName,
+        role: dashboard.roleName,
+        telegramId,
+        invitedBy: invitation ? invitation.created_by : null,
+      },
+    });
+    await logAuditEvent(auditEntry);
 
     res.status(201).json({
       registered: true,
@@ -244,9 +255,21 @@ async function updateProfile(req, res, next) {
 
     const dashboard = await userModel.getDashboardData(req.currentUser.id);
 
-    await sendTelegramLog(
-      `✏️ <b>Обновление профиля</b>\n` + `Пользователь: ${dashboard.firstName} ${dashboard.lastName}\n` + `Telegram ID: ${req.currentUser.telegramId}`
-    );
+    const auditEntry = buildAuditEntry({
+      scope: "miniapp",
+      action: "user.profile.updated",
+      entity: "user",
+      entityId: req.currentUser.id,
+      actor: {
+        id: req.currentUser.id,
+        role: dashboard.roleName,
+        name: `${dashboard.firstName} ${dashboard.lastName}`,
+      },
+      metadata: {
+        telegramId: req.currentUser.telegramId,
+      },
+    });
+    await logAuditEvent(auditEntry);
 
     res.json({ user: dashboard });
   } catch (error) {

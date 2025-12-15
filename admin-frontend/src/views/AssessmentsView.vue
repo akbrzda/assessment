@@ -269,18 +269,14 @@ const getStatusVariant = (status) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return "";
-
   const date = new Date(dateString);
-  const offset = 5 * 60; // UTC+5 в минутах
-  const localDate = new Date(date.getTime() + offset * 60 * 1000);
-
-  return localDate.toLocaleDateString("ru-RU", {
+  if (Number.isNaN(date.getTime())) return dateString;
+  return date.toLocaleDateString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: "UTC",
   });
 };
 

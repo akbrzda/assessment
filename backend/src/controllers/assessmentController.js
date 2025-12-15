@@ -3,9 +3,9 @@ const assessmentModel = require("../models/assessmentModel");
 const referenceModel = require("../models/referenceModel");
 const userModel = require("../models/userModel");
 const logger = require("../utils/logger");
-const { sendTelegramLog } = require("../services/telegramLogger");
-const { sendUserNotification } = require("../services/telegramNotifier");
 const gamificationService = require("../services/gamificationService");
+const domainEventBus = require("../events/domainEventBus");
+const { logAndSend, buildActorFromRequest } = require("../services/auditService");
 
 const optionSchema = Joi.object({
   text: Joi.string().trim().min(1).max(512).required(),
@@ -249,27 +249,30 @@ async function create(req, res, next) {
       branchId: req.currentUser.branchId,
     });
 
-    await sendTelegramLog(
-      `📝 <b>Создана аттестация</b>\n` +
-        `Название: ${created.title}\n` +
-        `Открытие: ${created.openAt}\n` +
-        `Создал: ${req.currentUser.firstName} ${req.currentUser.lastName}`
-    );
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      scope: "admin_panel",
+      action: "assessment.created",
+      entity: "assessment",
+      entityId: assessmentId,
+      metadata: {
+        title: created.title,
+        openAt: created.openAt,
+        closeAt: created.closeAt,
+        questionCount: questions.length,
+        assignedCount: assignedUserIds.length,
+      },
+    });
 
     try {
       const targetUserIds = await assessmentModel.listAssignedUserIds(assessmentId);
       if (targetUserIds.length) {
-        const targetUsers = await userModel.findByIds(targetUserIds);
-        await Promise.all(
-          targetUsers
-            .filter((user) => user.telegramId)
-            .map((user) =>
-              sendUserNotification(
-                user.telegramId,
-                `📝 Новая аттестация: ${created.title}\nОткрытие: ${formatDateTime(created.openAt)}\nЗавершение: ${formatDateTime(created.closeAt)}`
-              )
-            )
-        );
+        domainEventBus.publish("notification.assessment.created", {
+          assessment: created,
+          userIds: targetUserIds,
+          locale: "ru",
+        });
       }
     } catch (notifyError) {
       // логируем и не прерываем основной поток
@@ -344,12 +347,25 @@ async function submitAnswer(req, res, next) {
       return res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
     }
 
-    await assessmentModel.saveAnswer({
+    const result = await assessmentModel.saveAnswer({
       attemptId,
       userId: req.currentUser.id,
       questionId: value.questionId,
       optionId: value.optionId,
     });
+
+    // Применяем правила геймификации на уровне ответа (если включены)
+    try {
+      await gamificationService.processAnswerEvent({
+        userId: req.currentUser.id,
+        attemptId,
+        assessmentId: result.assessmentId,
+        questionId: value.questionId,
+        answerCorrect: result.isCorrect,
+      });
+    } catch (gerr) {
+      logger.error("Gamification answer event failed for attempt %s: %s", attemptId, gerr.message);
+    }
 
     res.status(204).send();
   } catch (error) {
@@ -388,17 +404,39 @@ async function completeAttempt(req, res, next) {
       try {
         const creator = await userModel.findById(summary.assessment.createdBy);
         if (creator?.telegramId) {
-          const message =
-            `📊 <b>Аттестация завершена</b>\n` +
-            `Тест: ${summary.assessment.title}\n` +
-            `Сотрудник: ${req.currentUser.firstName} ${req.currentUser.lastName}\n` +
-            `Результат: ${scorePercent}% (${passed ? "успешно" : "неуспешно"})`;
-          await sendUserNotification(creator.telegramId, message);
+          domainEventBus.publish("notification.assessment.completed", {
+            assessment: summary.assessment,
+            creator,
+            performer: {
+              id: req.currentUser.id,
+              firstName: req.currentUser.firstName,
+              lastName: req.currentUser.lastName,
+            },
+            attemptId: summary.attempt.id,
+            scorePercent,
+            passed,
+          });
         }
       } catch (notifyError) {
         logger.error("Failed to notify creator about completed assessment %s: %s", assessmentId, notifyError.message);
       }
     }
+
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      scope: "miniapp",
+      action: "assessment.attempt.completed",
+      entity: "assessment_attempt",
+      entityId: summary.attempt.id,
+      metadata: {
+        assessmentId: summary.assessment.id,
+        title: summary.assessment.title,
+        scorePercent,
+        passed,
+        attemptNumber: summary.attempt.attemptNumber,
+      },
+    });
 
     res.json({
       assessment: {
@@ -507,12 +545,20 @@ async function update(req, res, next) {
       branchId: req.currentUser.branchId,
     });
 
-    await sendTelegramLog(
-      `✏️ <b>Обновлена аттестация</b>\n` +
-        `Название: ${updated.title}\n` +
-        `Открытие: ${updated.openAt}\n` +
-        `Обновил: ${req.currentUser.firstName} ${req.currentUser.lastName}`
-    );
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      scope: "admin_panel",
+      action: "assessment.updated",
+      entity: "assessment",
+      entityId: assessmentId,
+      metadata: {
+        title: updated.title,
+        openAt: updated.openAt,
+        closeAt: updated.closeAt,
+        questionCount: questions.length,
+      },
+    });
 
     res.json({ assessment: updated });
   } catch (error) {
@@ -543,9 +589,17 @@ async function remove(req, res, next) {
 
     await assessmentModel.deleteAssessment(assessmentId);
 
-    await sendTelegramLog(
-      `🗑️ <b>Удалена аттестация</b>\n` + `Название: ${existing.title}\n` + `Удалил: ${req.currentUser.firstName} ${req.currentUser.lastName}`
-    );
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      scope: "admin_panel",
+      action: "assessment.deleted",
+      entity: "assessment",
+      entityId: assessmentId,
+      metadata: {
+        title: existing.title,
+      },
+    });
 
     res.status(204).send();
   } catch (error) {

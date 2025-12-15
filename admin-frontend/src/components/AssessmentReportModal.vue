@@ -158,8 +158,43 @@ const handleClose = () => {
 };
 
 const handleExport = () => {
-  // TODO: реализовать экспорт конкретной аттестации
-  alert("Экспорт в PDF будет реализован");
+  if (!report.value) return;
+
+  const rows = report.value.participants
+    .map(
+      (participant, index) =>
+        `${index + 1}. ${participant.first_name} ${participant.last_name} — ${participant.branch_name || "—"} — ${participant.position_name || "—"} — ${
+          participant.score !== null ? `${participant.score.toFixed(2)}%` : "—"
+        } (${getStatusText(participant.status)})`
+    )
+    .join("\n");
+
+  const html = `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Отчёт по аттестации</title>
+      </head>
+      <body>
+        <h1>${report.value.assessment.title}</h1>
+        <p>Участников: ${report.value.summary.total_participants}</p>
+        <p>Завершили: ${report.value.summary.completed_count}</p>
+        <p>Средний балл: ${report.value.summary.avg_score?.toFixed(2) ?? 0}%</p>
+        <p>Процент успеха: ${report.value.summary.pass_percent}%</p>
+        <pre style="white-space: pre-wrap; font-family: 'Inter', Arial, sans-serif; margin-top: 16px;">${rows}</pre>
+      </body>
+    </html>
+  `;
+
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `assessment_report_${report.value.assessment.id || "export"}.html`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
 
 const getScoreClass = (score, passScore) => {

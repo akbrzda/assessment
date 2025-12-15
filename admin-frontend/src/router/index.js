@@ -121,6 +121,9 @@ const router = createRouter({
 // Защита маршрутов
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore();
+  const requiresAuth = to.matched.some((record) => record.meta?.requiresAuth);
+  const roleRestrictedRecord = [...to.matched].reverse().find((record) => Array.isArray(record.meta?.roles));
+  const allowedRoles = roleRestrictedRecord?.meta?.roles;
 
   // Обновить title страницы
   const baseTitle = "Система аттестаций";
@@ -130,15 +133,22 @@ router.beforeEach((to, from, next) => {
     document.title = baseTitle;
   }
 
-  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    next("/login");
-  } else if (to.path === "/login" && authStore.isAuthenticated) {
-    next("/dashboard");
-  } else if (to.meta.roles && !to.meta.roles.includes(authStore.user?.role)) {
-    next("/dashboard");
-  } else {
-    next();
+  // Если маршрут требует авторизации и пользователь не авторизован
+  if (requiresAuth && !authStore.isAuthenticated) {
+    return next("/login");
   }
+
+  // Если пользователь авторизован и пытается попасть на страницу логина
+  if (to.path === "/login" && authStore.isAuthenticated) {
+    return next("/dashboard");
+  }
+
+  // Проверка ролей
+  if (allowedRoles && !allowedRoles.includes(authStore.user?.role)) {
+    return next("/dashboard");
+  }
+
+  next();
 });
 
 export default router;

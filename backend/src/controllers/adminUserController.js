@@ -2,10 +2,9 @@ const Joi = require("joi");
 const bcrypt = require("bcrypt");
 const userModel = require("../models/userModel");
 const { pool } = require("../config/database");
-const { sendTelegramLog } = require("../services/telegramLogger");
-const { sendUserNotification } = require("../services/telegramNotifier");
 const referenceModel = require("../models/referenceModel");
-const { createLog } = require("./adminLogsController");
+const domainEventBus = require("../events/domainEventBus");
+const { logAndSend, buildActorFromRequest } = require("../services/auditService");
 
 const updateSchema = Joi.object({
   firstName: Joi.string().trim().min(2).max(64).required(),
@@ -146,20 +145,32 @@ async function updateUser(req, res, next) {
     await userModel.updateUserByAdmin(userId, payload);
     const updated = await userModel.findById(userId);
 
-    if (existing.telegramId) {
-      await sendUserNotification(existing.telegramId, "Ваш профиль обновлен администратором. Проверьте информацию в мини-приложении.");
+    if (updated.telegramId) {
+      domainEventBus.publish("notification.user.direct", {
+        userId: updated.id,
+        templateKey: "user.profileUpdated",
+        metadata: {
+          updatedBy: req.user.id,
+          updatedFields: Object.keys(payload),
+        },
+        eventId: `user_profile_updated_${updated.id}_${Date.now()}`,
+      });
     }
 
-    // Логирование действия
-    await createLog(
-      req.user.id,
-      "UPDATE",
-      `Обновлен пользователь: ${updated.firstName} ${updated.lastName} (ID: ${userId})`,
-      "user",
-      userId,
+    await logAndSend({
       req,
-      { notify: true }
-    );
+      actor: buildActorFromRequest(req),
+      action: "user.updated",
+      entity: "user",
+      entityId: userId,
+      metadata: {
+        branchId: value.branchId,
+        positionId: value.positionId,
+        roleId: value.roleId,
+        level: value.level ?? existing.level,
+        points: value.points ?? existing.points,
+      },
+    });
 
     res.json({ user: updated });
   } catch (error) {
@@ -179,20 +190,35 @@ async function deleteUser(req, res, next) {
       return res.status(400).json({ error: "Нельзя удалить самого себя" });
     }
 
-    await sendUserNotification(existing.telegramId, "Ваш аккаунт был удален администратором. Для доступа обратитесь к руководству.");
+    if (existing.telegramId) {
+      domainEventBus.publish("notification.user.direct", {
+        userId,
+        user: {
+          id: userId,
+          telegramId: existing.telegramId,
+        },
+        templateKey: "user.accountDeleted",
+        eventId: `user_deleted_${userId}_${Date.now()}`,
+        metadata: {
+          deletedBy: req.user.id,
+        },
+      });
+    }
 
     await userModel.deleteUser(userId);
 
-    // Логирование действия
-    await createLog(
-      req.user.id,
-      "DELETE",
-      `Удален пользователь: ${existing.firstName} ${existing.lastName} (ID: ${userId})`,
-      "user",
-      userId,
+    await logAndSend({
       req,
-      { notify: true }
-    );
+      actor: buildActorFromRequest(req),
+      action: "user.deleted",
+      entity: "user",
+      entityId: userId,
+      metadata: {
+        firstName: existing.firstName,
+        lastName: existing.lastName,
+      },
+      result: "success",
+    });
 
     res.status(204).send();
   } catch (error) {
@@ -491,16 +517,19 @@ async function createUser(req, res, next) {
       [result.insertId]
     );
 
-    // Логирование действия
-    await createLog(
-      req.user.id,
-      "CREATE",
-      `Создан пользователь: ${newUser[0].first_name} ${newUser[0].last_name} (ID: ${newUser[0].id})`,
-      "user",
-      newUser[0].id,
+    await logAndSend({
       req,
-      { notify: true }
-    );
+      actor: buildActorFromRequest(req),
+      action: "user.created",
+      entity: "user",
+      entityId: newUser[0].id,
+      metadata: {
+        branchId,
+        positionId,
+        roleId,
+        login: login || null,
+      },
+    });
 
     res.status(201).json({ user: newUser[0] });
   } catch (error) {
@@ -528,16 +557,16 @@ async function resetPassword(req, res, next) {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await pool.query("UPDATE users SET password = ? WHERE id = ?", [hashedPassword, userId]);
 
-    // Логирование действия
-    await createLog(
-      req.user.id,
-      "UPDATE",
-      `Сброшен пароль пользователя ID: ${userId}`,
-      "user",
-      userId,
+    await logAndSend({
       req,
-      { notify: true }
-    );
+      actor: buildActor(req),
+      action: "user.password.reset",
+      entity: "user",
+      entityId: userId,
+      metadata: {
+        changedBy: req.user.id,
+      },
+    });
 
     res.json({ message: "Пароль успешно сброшен" });
   } catch (error) {

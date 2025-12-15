@@ -69,6 +69,8 @@ export const useUserStore = defineStore("user", () => {
   const invitation = ref(null);
   const invitationAccepted = ref(false);
   const overview = ref(null);
+  const overviewLoading = ref(false);
+  let overviewPromise = null;
   const error = ref(null);
 
   const isAuthenticated = computed(() => Boolean(user.value));
@@ -88,16 +90,34 @@ export const useUserStore = defineStore("user", () => {
     }
   }
 
-  async function loadOverview() {
-    try {
-      const response = await apiClient.getGamificationOverview();
-      overview.value = response?.overview || null;
-      if (user.value && overview.value) {
-        user.value = mapUserPayload(user.value, overview.value);
-      }
-    } catch (err) {
-      console.error("Не удалось загрузить геймификацию", err);
+  async function loadOverview({ force = false } = {}) {
+    if (overview.value && !force && !overviewLoading.value) {
+      return overview.value;
     }
+
+    if (overviewPromise && !force) {
+      return overviewPromise;
+    }
+
+    overviewPromise = (async () => {
+      overviewLoading.value = true;
+      try {
+        const response = await apiClient.getGamificationOverview();
+        overview.value = response?.overview || null;
+        if (user.value && overview.value) {
+          user.value = mapUserPayload(user.value, overview.value);
+        }
+        return overview.value;
+      } catch (err) {
+        console.error("Не удалось загрузить геймификацию", err);
+        throw err;
+      } finally {
+        overviewLoading.value = false;
+        overviewPromise = null;
+      }
+    })();
+
+    return overviewPromise;
   }
 
   async function ensureStatus({ force = false } = {}) {
@@ -114,24 +134,15 @@ export const useUserStore = defineStore("user", () => {
 
       const status = await apiClient.getStatus();
 
-      console.log("👤 User status received:", {
-        registered: status.registered,
-        hasInvitation: Boolean(status.invitation),
-        invitationData: status.invitation
-          ? {
-              code: status.invitation.code,
-              firstName: status.invitation.firstName,
-              branchName: status.invitation.branchName,
-            }
-          : null,
-      });
-
       if (status.registered) {
-        const mapped = mapUserPayload(status.user, overview.value);
-        user.value = mapped;
+        user.value = mapUserPayload(status.user, overview.value);
         invitation.value = null;
         invitationAccepted.value = true;
-        await loadOverview();
+        if (!overview.value || force) {
+          loadOverview({ force: Boolean(force) }).catch((err) => {
+            console.error("Не удалось обновить данные геймификации", err);
+          });
+        }
       } else {
         user.value = null;
         registrationDefaults.value = status.defaults || { firstName: "", lastName: "", avatarUrl: null };
@@ -174,7 +185,7 @@ export const useUserStore = defineStore("user", () => {
         lastName: telegramStore.user?.last_name || mapped.lastName || "",
         avatarUrl: telegramStore.user?.photo_url || null,
       };
-      await loadOverview();
+      await loadOverview({ force: true });
       return { success: true };
     } catch (err) {
       console.error("Ошибка регистрации", err);
@@ -192,6 +203,7 @@ export const useUserStore = defineStore("user", () => {
       const response = await apiClient.updateProfile(payload);
       const mapped = mapUserPayload(response.user, overview.value);
       user.value = mapped;
+      await loadOverview({ force: true });
       return { success: true };
     } catch (err) {
       console.error("Ошибка обновления профиля", err);
@@ -238,7 +250,7 @@ export const useUserStore = defineStore("user", () => {
         avatarUrl: telegramStore.user?.photo_url || null,
       };
 
-      await loadOverview();
+      await loadOverview({ force: true });
       return { success: true };
     } catch (err) {
       console.error("Ошибка принятия приглашения", err);
@@ -265,6 +277,7 @@ export const useUserStore = defineStore("user", () => {
     invitation,
     invitationAccepted,
     overview,
+    overviewLoading,
     error,
 
     // getters

@@ -1,5 +1,4 @@
 const { pool } = require("../config/database");
-const { sendTelegramLog } = require("../services/telegramLogger");
 const { createLog } = require("./adminLogsController");
 
 /**
@@ -412,15 +411,6 @@ exports.createAssessment = async (req, res, next) => {
       req
     );
 
-    await sendTelegramLog(
-      `📝 <b>Создана новая аттестация</b>\n` +
-        `ID: ${assessmentId}\n` +
-        `Название: ${title}\n` +
-        `Вопросов: ${questions.length}\n` +
-        `Назначено пользователей: ${assignedUserIds.length}\n` +
-        `Создал: ${req.user.id}`
-    );
-
     res.status(201).json({ assessmentId, message: "Аттестация создана успешно" });
   } catch (error) {
     await connection.rollback();
@@ -607,8 +597,6 @@ exports.updateAssessment = async (req, res, next) => {
     // Логирование действия
     await createLog(req.user.id, "UPDATE", `Обновлена аттестация: ${title} (ID: ${assessmentId})`, "assessment", assessmentId, req);
 
-    await sendTelegramLog(`✏️ <b>Обновлена аттестация</b>\n` + `ID: ${assessmentId}\n` + `Название: ${title}\n` + `Обновил: ${req.user.id}`);
-
     res.json({ message: "Аттестация обновлена успешно" });
   } catch (error) {
     await connection.rollback();
@@ -663,8 +651,6 @@ exports.deleteAssessment = async (req, res, next) => {
 
     // Логирование действия
     await createLog(req.user.id, "DELETE", `Удалена аттестация: ${assessment.title} (ID: ${assessmentId})`, "assessment", assessmentId, req);
-
-    await sendTelegramLog(`🗑️ <b>Удалена аттестация</b>\n` + `ID: ${assessmentId}\n` + `Название: ${assessment.title}\n` + `Удалил: ${req.user.id}`);
 
     res.status(204).send();
   } catch (error) {

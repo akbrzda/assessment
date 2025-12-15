@@ -1,19 +1,22 @@
 require("./config/env");
+const http = require("http");
 const config = require("./config/env");
 const logger = require("./utils/logger");
 const { healthCheck } = require("./config/database");
 const app = require("./app");
-const { startScheduler } = require("./services/assessmentScheduler");
+const { initWebSocket } = require("./services/websocketService");
 
 async function bootstrap() {
   try {
     await healthCheck();
 
-    // Запуск планировщика уведомлений
-    startScheduler();
-    logger.info("✅ Assessment notification scheduler started");
+    // Создаём HTTP сервер для интеграции с Socket.IO
+    const server = http.createServer(app);
 
-    app.listen(config.port, () => {
+    // Инициализация WebSocket
+    initWebSocket(server);
+
+    server.listen(config.port, () => {
       logger.info(`Server listening on port ${config.port}`);
     });
   } catch (error) {

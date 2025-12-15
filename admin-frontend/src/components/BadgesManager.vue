@@ -126,8 +126,11 @@
             </div>
           </div>
 
-          <div class="form-group">
-            <Checkbox v-model="formData.is_active" label="Активен" />
+          <div class="form-group inline-checkbox">
+            <label>
+              <input v-model="formData.is_active" type="checkbox" class="native-checkbox" />
+              <span>Активен</span>
+            </label>
           </div>
           <template #footer>
             <Button variant="secondary" @click="closeModal">Отмена</Button>
@@ -148,10 +151,10 @@ import Button from "./ui/Button.vue";
 import Input from "./ui/Input.vue";
 import Select from "./ui/Select.vue";
 import Textarea from "./ui/Textarea.vue";
-import Checkbox from "./ui/Checkbox.vue";
 import Icon from "./ui/Icon.vue";
+import { API_BASE_URL } from "@/env";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api";
+const apiBaseUrl = API_BASE_URL || "http://localhost:3001/api";
 const apiUrl = apiBaseUrl.replace("/api", "");
 
 const badges = ref([]);
@@ -577,6 +580,20 @@ onMounted(() => {
 .form-group small {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.inline-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.native-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-blue);
 }
 
 .color-picker-wrapper {

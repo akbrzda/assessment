@@ -343,19 +343,14 @@ const getStatusVariant = (status) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return "—";
-
-  // Парсим дату и добавляем offset UTC+5 (5 часов = 300 минут)
   const date = new Date(dateString);
-  const offset = 5 * 60; // минуты
-  const localDate = new Date(date.getTime() + offset * 60 * 1000);
-
-  return localDate.toLocaleString("ru-RU", {
+  if (Number.isNaN(date.getTime())) return dateString;
+  return date.toLocaleString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: "UTC",
   });
 };
 

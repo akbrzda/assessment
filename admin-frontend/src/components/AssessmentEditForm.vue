@@ -262,11 +262,14 @@ const removeOption = (questionIndex, optionIndex) => {
 
 const formatDateForInput = (dateString) => {
   if (!dateString) return "";
-  // Парсим дату как UTC и добавляем +5 часов (Asia/Yekaterinburg)
+  if (typeof dateString === "string" && dateString.includes("T")) {
+    return dateString.split("T")[0];
+  }
   const date = new Date(dateString);
-  const offset = 5 * 60; // +5 часов в минутах
-  const localDate = new Date(date.getTime() + offset * 60 * 1000);
-  return localDate.toISOString().split("T")[0];
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toISOString().split("T")[0];
 };
 
 const handleSubmit = async () => {

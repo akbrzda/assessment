@@ -272,104 +272,6 @@ async function recordEvent({ userId, attemptId = null, eventType, pointsDelta, d
   );
 }
 
-async function ensureMonthlyChallenge(connection) {
-  const executor = getExecutor(connection);
-  const [[currentMonth]] = await executor.execute(
-    `SELECT DATE_FORMAT(CURDATE(), '%Y-%m-01') AS periodStart,
-            LAST_DAY(CURDATE()) AS periodEnd`
-  );
-
-  const [existingRows] = await executor.execute(
-    `SELECT id, title, description, period_start AS periodStart, period_end AS periodEnd, status
-       FROM team_challenges
-      WHERE period_start = ?
-      LIMIT 1`
-    , [currentMonth.periodStart]
-  );
-
-  if (existingRows.length) {
-    const challenge = existingRows[0];
-    if (challenge.status !== 'active') {
-      await executor.execute(
-        `UPDATE team_challenges
-            SET status = 'active',
-                period_end = ?,
-                updated_at = NOW()
-          WHERE id = ?`
-        , [currentMonth.periodEnd, challenge.id]
-      );
-      challenge.status = 'active';
-      challenge.periodEnd = currentMonth.periodEnd;
-    }
-    challenge.periodStart = currentMonth.periodStart;
-    return {
-      id: Number(challenge.id),
-      title: challenge.title,
-      description: challenge.description,
-      periodStart: challenge.periodStart,
-      periodEnd: challenge.periodEnd,
-      status: challenge.status
-    };
-  }
-
-  const [insertResult] = await executor.execute(
-    `INSERT INTO team_challenges (title, description, period_start, period_end, status)
-     VALUES (?, ?, ?, ?, 'active')`
-    , [
-      'Командный челлендж месяца',
-      'Суммарные очки филиалов за текущий месяц',
-      currentMonth.periodStart,
-      currentMonth.periodEnd
-    ]
-  );
-
-  return {
-    id: Number(insertResult.insertId),
-    title: 'Командный челлендж месяца',
-    description: 'Суммарные очки филиалов за текущий месяц',
-    periodStart: currentMonth.periodStart,
-    periodEnd: currentMonth.periodEnd,
-    status: 'active'
-  };
-}
-
-async function incrementChallengeBranchScore({ challengeId, branchId, points }, connection) {
-  if (!branchId || !points) {
-    return;
-  }
-  const executor = getExecutor(connection);
-  await executor.execute(
-    `INSERT INTO team_challenge_branch_scores (challenge_id, branch_id, points)
-     VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       points = points + VALUES(points),
-       updated_at = NOW()`
-    , [challengeId, branchId, Number(points)]
-  );
-}
-
-async function listChallengeBranchScores(challengeId, connection) {
-  const executor = getExecutor(connection);
-  const [rows] = await executor.execute(
-    `SELECT tcbs.branch_id AS branchId,
-            b.name AS branchName,
-            tcbs.points,
-            tcbs.updated_at AS updatedAt
-       FROM team_challenge_branch_scores tcbs
-       JOIN branches b ON b.id = tcbs.branch_id
-      WHERE tcbs.challenge_id = ?
-      ORDER BY tcbs.points DESC, b.name ASC`
-    , [challengeId]
-  );
-
-  return rows.map((row) => ({
-    branchId: Number(row.branchId),
-    branchName: row.branchName,
-    points: Number(row.points || 0),
-    updatedAt: row.updatedAt
-  }));
-}
-
 async function listUserMonthlyPoints(userId, connection) {
   const executor = getExecutor(connection);
   const [[row]] = await executor.execute(
@@ -396,8 +298,5 @@ module.exports = {
   listUserBadges,
   awardBadge,
   recordEvent,
-  ensureMonthlyChallenge,
-  incrementChallengeBranchScore,
-  listChallengeBranchScores,
   listUserMonthlyPoints
 };

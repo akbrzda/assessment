@@ -384,20 +384,36 @@ const isFormValid = computed(() => {
   );
 });
 
+const getManagerBranchIds = (branches = []) => {
+  const user = authStore.user || {};
+  if (Array.isArray(user.branch_ids) && user.branch_ids.length) {
+    return user.branch_ids.map((id) => Number(id));
+  }
+  if (Array.isArray(user.branches) && user.branches.length) {
+    return user.branches
+      .map((branch) => (typeof branch === "object" ? branch.id : branch))
+      .filter((id) => id !== undefined)
+      .map((id) => Number(id));
+  }
+  if (Array.isArray(branches) && branches.length) {
+    return branches.map((branch) => branch.id);
+  }
+  if (user.branch_id) {
+    return [Number(user.branch_id)];
+  }
+  return [];
+};
+
 const loadReferences = async () => {
   try {
     const data = await getReferences();
+    references.value = data;
 
-    // Для manager фильтруем филиалы - только свой
-    if (authStore.isManager && authStore.user?.branch_id) {
-      references.value = {
-        ...data,
-        branches: data.branches.filter((b) => b.id === authStore.user.branch_id),
-      };
-      // Автоматически выбираем филиал manager'а
-      formData.value.branchIds = [authStore.user.branch_id];
-    } else {
-      references.value = data;
+    if (authStore.isManager) {
+      const allowedBranches = getManagerBranchIds(data?.branches);
+      if (allowedBranches.length) {
+        formData.value.branchIds = [...new Set(allowedBranches)];
+      }
     }
   } catch (error) {
     console.error("Load references error:", error);
@@ -502,17 +518,14 @@ const prevStep = () => {
 
 const formatDateTime = (dateString) => {
   if (!dateString) return "—";
-
-  // Парсим дату и добавляем UTC+5
-  const date = new Date(dateString + "T00:00:00");
-  const offset = 5 * 60; // UTC+5 в минутах
-  const localDate = new Date(date.getTime() + offset * 60 * 1000);
-
-  return localDate.toLocaleDateString("ru-RU", {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) {
+    return dateString;
+  }
+  return date.toLocaleDateString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-    timeZone: "UTC",
   });
 };
 
@@ -595,19 +608,22 @@ const submitAssessment = async () => {
   submitting.value = true;
   try {
     // Преобразуем даты в формат с временем 00:00
+    const transformBankQuestion = (question) => ({
+      question_id: question.id,
+      text: question.question_text,
+      options: (question.options || []).map((opt) => ({
+        text: opt.option_text,
+        isCorrect: opt.is_correct === 1,
+      })),
+    });
+
     const assessmentData = {
       ...formData.value,
       openAt: dateToISOWithMidnight(formData.value.openAt),
       closeAt: dateToISOWithMidnight(formData.value.closeAt),
       questions:
         questionsMode.value === "bank"
-          ? (selectedBankQuestions.value || []).map((q) => ({
-              text: q.question_text,
-              options: (q.options || []).map((opt) => ({
-                text: opt.option_text,
-                isCorrect: opt.is_correct === 1,
-              })),
-            }))
+          ? (selectedBankQuestions.value || []).map(transformBankQuestion)
           : formData.value.questions,
     };
 

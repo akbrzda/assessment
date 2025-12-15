@@ -1,6 +1,10 @@
 logs
 node_modules/
-.env
 .DS_Store
 .vscode
 dist/
+
+# Environment files
+.env
+.env.local
+.env.*.local

@@ -34,10 +34,22 @@ apiClient.interceptors.response.use(
         localStorage.setItem("accessToken", data.accessToken);
         originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
 
+        // Обновляем токен в store и переподключаем WebSocket
+        try {
+          const { useAuthStore } = await import("@/stores/auth");
+          const authStore = useAuthStore();
+          authStore.setToken(data.accessToken);
+        } catch (storeError) {
+          console.error("Failed to update auth store:", storeError);
+        }
+
         return apiClient(originalRequest);
       } catch (refreshError) {
         localStorage.clear();
-        window.location.href = "/login";
+        // Перенаправляем на login только если мы не на странице login
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
         return Promise.reject(refreshError);
       }
     }

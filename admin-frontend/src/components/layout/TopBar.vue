@@ -13,6 +13,15 @@
       </div>
 
       <div class="topbar-actions">
+        <!-- Индикатор подключения WebSocket -->
+        <div
+          class="connection-status"
+          :class="{ connected: isConnected, disconnected: !isConnected }"
+          :title="isConnected ? 'Подключено' : 'Отключено'"
+        >
+          <span class="status-dot"></span>
+        </div>
+
         <!-- Переключатель темы -->
         <button @click="toggleTheme" class="action-btn" title="Переключить тему">
           <span class="theme-icon">
@@ -42,6 +51,7 @@ import { computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "../../stores/auth";
 import { useThemeStore } from "../../stores/theme";
+import { useWebSocket } from "../../composables/useWebSocket";
 import Icon from "../ui/Icon.vue";
 
 const themeStore = useThemeStore();
@@ -50,6 +60,9 @@ const theme = computed(() => themeStore.theme);
 const toggleTheme = () => {
   themeStore.toggleTheme();
 };
+
+const { isConnected } = useWebSocket();
+
 defineEmits(["toggle-sidebar"]);
 
 const router = useRouter();
@@ -223,6 +236,53 @@ const handleLogout = async () => {
 
 .logout-btn:hover {
   opacity: 0.6;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 12px;
+  cursor: help;
+  transition: all 0.2s;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.connection-status.connected .status-dot {
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+}
+
+.connection-status.disconnected .status-dot {
+  background: #ef4444;
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
+  animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes pulse-red {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+  }
 }
 
 @media (max-width: 1024px) {

@@ -1,6 +1,7 @@
 import { getInitData } from "./telegram";
+import { API_BASE_URL } from "@/env";
 
-const envBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+const envBaseUrl = (API_BASE_URL || "").trim();
 const runtimeBaseUrl = typeof window !== "undefined" && window.location ? window.location.origin : "";
 const BASE_URL = (envBaseUrl || runtimeBaseUrl || "").replace(/\/$/, "");
 
@@ -103,9 +104,6 @@ export const apiClient = {
   getGamificationBadges() {
     return request("/gamification/badges");
   },
-  getTeamChallenges() {
-    return request("/gamification/team");
-  },
   getLeaderboardUsers(params = {}) {
     const searchParams = new URLSearchParams();
     if (params.branchId && Number.isFinite(Number(params.branchId))) {
@@ -120,5 +118,19 @@ export const apiClient = {
     const query = searchParams.toString();
     const path = query ? `/leaderboard/users?${query}` : "/leaderboard/users";
     return request(path);
+  },
+  getNotificationHistory(params = {}) {
+    const searchParams = new URLSearchParams();
+    if (params.status && params.status !== "all") {
+      searchParams.set("status", params.status);
+    }
+    if (params.page) {
+      searchParams.set("page", params.page);
+    }
+    if (params.limit) {
+      searchParams.set("limit", params.limit);
+    }
+    const query = searchParams.toString();
+    return request(`/notifications/history${query ? `?${query}` : ""}`);
   },
 };

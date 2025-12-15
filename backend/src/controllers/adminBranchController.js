@@ -1,6 +1,5 @@
 const { pool } = require("../config/database");
-const { sendTelegramLog } = require("../services/telegramLogger");
-const { createLog } = require("./adminLogsController");
+const { logAndSend, buildActorFromRequest } = require("../services/auditService");
 
 /**
  * Получить список филиалов
@@ -124,12 +123,17 @@ exports.createBranch = async (req, res, next) => {
 
     const [result] = await pool.query("INSERT INTO branches (name, city) VALUES (?, ?)", [name.trim(), city?.trim() || null]);
 
-    // Логирование
-    await createLog(req.user.id, "CREATE", `Создан филиал "${name}"${city ? ` в городе ${city}` : ""}`, "branch", result.insertId, req);
-
-    await sendTelegramLog(
-      `🏢 <b>Создан филиал</b>\n` + `ID: ${result.insertId}\n` + `Название: ${name}\n` + (city ? `Город: ${city}\n` : "") + `Создал: ${req.user.id}`
-    );
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "branch.created",
+      entity: "branch",
+      entityId: result.insertId,
+      metadata: {
+        name: name.trim(),
+        city: city?.trim() || null,
+      },
+    });
 
     res.status(201).json({
       branchId: result.insertId,
@@ -169,24 +173,19 @@ exports.updateBranch = async (req, res, next) => {
 
     await pool.query("UPDATE branches SET name = ?, city = ? WHERE id = ?", [name.trim(), city?.trim() || null, branchId]);
 
-    // Логирование
-    await createLog(
-      req.user.id,
-      "UPDATE",
-      `Обновлен филиал: "${branches[0].name}" → "${name}"${city !== branches[0].city ? `, город: ${city || "не указан"}` : ""}`,
-      "branch",
-      branchId,
-      req
-    );
-
-    await sendTelegramLog(
-      `✏️ <b>Обновлен филиал</b>\n` +
-        `ID: ${branchId}\n` +
-        `Старое название: ${branches[0].name}\n` +
-        `Новое название: ${name}\n` +
-        (city !== branches[0].city ? `Город: ${city || "не указан"}\n` : "") +
-        `Обновил: ${req.user.id}`
-    );
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "branch.updated",
+      entity: "branch",
+      entityId: branchId,
+      metadata: {
+        previousName: branches[0].name,
+        name: name.trim(),
+        previousCity: branches[0].city,
+        city: city?.trim() || null,
+      },
+    });
 
     res.json({ message: "Филиал обновлен успешно" });
   } catch (error) {
@@ -220,10 +219,16 @@ exports.deleteBranch = async (req, res, next) => {
 
     await pool.query("DELETE FROM branches WHERE id = ?", [branchId]);
 
-    // Логирование
-    await createLog(req.user.id, "DELETE", `Удален филиал "${branches[0].name}"`, "branch", branchId, req);
-
-    await sendTelegramLog(`🗑️ <b>Удален филиал</b>\n` + `ID: ${branchId}\n` + `Название: ${branches[0].name}\n` + `Удалил: ${req.user.id}`);
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "branch.deleted",
+      entity: "branch",
+      entityId: branchId,
+      metadata: {
+        name: branches[0].name,
+      },
+    });
 
     res.status(204).send();
   } catch (error) {
@@ -275,22 +280,18 @@ exports.assignManager = async (req, res, next) => {
 
     await pool.query("INSERT INTO branch_managers (branch_id, user_id) VALUES (?, ?)", [branchId, userId]);
 
-    // Логирование
-    await createLog(
-      req.user.id,
-      "ASSIGN",
-      `Назначен управляющий ${users[0].first_name} ${users[0].last_name} к филиалу "${branches[0].name}"`,
-      "branch_manager",
-      branchId,
-      req
-    );
-
-    await sendTelegramLog(
-      `👤 <b>Назначен управляющий</b>\n` +
-        `Филиал: ${branches[0].name} (ID: ${branchId})\n` +
-        `Управляющий: ${users[0].first_name} ${users[0].last_name} (ID: ${userId})\n` +
-        `Назначил: ${req.user.id}`
-    );
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "branch.manager.assigned",
+      entity: "branch",
+      entityId: branchId,
+      metadata: {
+        managerId: userId,
+        managerName: `${users[0].first_name} ${users[0].last_name}`,
+        branchName: branches[0].name,
+      },
+    });
 
     res.json({ message: "Управляющий назначен успешно" });
   } catch (error) {
@@ -327,22 +328,18 @@ exports.removeManager = async (req, res, next) => {
       return res.status(404).json({ error: "Назначение не найдено" });
     }
 
-    // Логирование
-    await createLog(
-      req.user.id,
-      "REMOVE",
-      `Удален управляющий ${users[0].first_name} ${users[0].last_name} из филиала "${branches[0].name}"`,
-      "branch_manager",
-      branchId,
-      req
-    );
-
-    await sendTelegramLog(
-      `❌ <b>Удален управляющий</b>\n` +
-        `Филиал: ${branches[0].name} (ID: ${branchId})\n` +
-        `Управляющий: ${users[0].first_name} ${users[0].last_name} (ID: ${userId})\n` +
-        `Удалил: ${req.user.id}`
-    );
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "branch.manager.removed",
+      entity: "branch",
+      entityId: branchId,
+      metadata: {
+        managerId: userId,
+        managerName: `${users[0].first_name} ${users[0].last_name}`,
+        branchName: branches[0].name,
+      },
+    });
 
     res.json({ message: "Управляющий удален успешно" });
   } catch (error) {
@@ -393,22 +390,18 @@ exports.assignManagerToBranches = async (req, res, next) => {
     const values = branchIds.map((branchId) => [branchId, userId]);
     await pool.query("INSERT IGNORE INTO branch_managers (branch_id, user_id) VALUES ?", [values]);
 
-    // Логирование
-    await createLog(
-      req.user.id,
-      "ASSIGN_MULTIPLE",
-      `Массовое назначение: ${users[0].first_name} ${users[0].last_name} назначен к ${branches.length} филиалам`,
-      "branch_manager",
-      userId,
-      req
-    );
-
-    await sendTelegramLog(
-      `👥 <b>Массовое назначение управляющего</b>\n` +
-        `Управляющий: ${users[0].first_name} ${users[0].last_name} (ID: ${userId})\n` +
-        `Филиалы: ${branches.map((b) => b.name).join(", ")}\n` +
-        `Назначил: ${req.user.id}`
-    );
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "branch.manager.mass_assigned",
+      entity: "user",
+      entityId: userId,
+      metadata: {
+        managerName: `${users[0].first_name} ${users[0].last_name}`,
+        branchIds,
+        branchNames: branches.map((b) => b.name),
+      },
+    });
 
     res.json({ message: "Управляющий назначен к выбранным филиалам успешно" });
   } catch (error) {

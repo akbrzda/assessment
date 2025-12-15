@@ -4,9 +4,10 @@
 - Do not create documentation, instructions, reports, or any similar files unless explicitly stated in the request or task.
   For example, README.md, Instruction.md, CONFIG, IMPLEMENTATION, etc.
 - Break all incoming requests into smaller tasks, complete them step by step, and ask clarifying questions if necessary.
-- Do not launch the terminal or commands yourself; only ask the user to run the commands in a new terminal.
 - Write clear and understandable comments; do not write long or meaningless ones. Everything is clear, understandable, and concise.
-- Instruct the user to run `npm start` in a new terminal window. Do NOT attempt to run this command yourself.
+- First read technical specifications before writing code and do tasks, in docs/ADMIN_PANEL.md and docs/MINIAPP.md.
+- Dont write long comments in code files, keep them short and meaningful.
+- Always follow the coding style and conventions used in the existing codebase.
 
 # Vue.js rules
 

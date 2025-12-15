@@ -1,10 +1,12 @@
+import { API_BASE_URL as ENV_API_BASE_URL } from "@/env";
+
 let webAppInstance = null;
 const themeListeners = new Set();
 const viewportListeners = new Set();
 
-const envBaseUrl = typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL.trim() : "";
+const envBaseUrl = (ENV_API_BASE_URL || "").trim();
 const runtimeBaseUrl = typeof window !== "undefined" && window.location ? window.location.origin : "";
-const API_BASE_URL = (envBaseUrl || runtimeBaseUrl || "").replace(/\/$/, "");
+const BASE_URL = (envBaseUrl || runtimeBaseUrl || "").replace(/\/$/, "");
 const CLOUD_STORAGE_ENDPOINT = "/cloud-storage";
 
 function resolveWebApp() {
@@ -140,14 +142,14 @@ function callCloudStorage(method, key, value) {
 }
 
 async function requestCloudStorageFallback(path, { method = "POST", body } = {}) {
-  if (!API_BASE_URL) {
+  if (!BASE_URL) {
     throw new Error("API base URL is not configured");
   }
   if (typeof fetch !== "function") {
     throw new Error("Fetch API is not available");
   }
 
-  const url = `${API_BASE_URL}${path}`;
+  const url = `${BASE_URL}${path}`;
   const headers = new Headers({ "Content-Type": "application/json" });
   const initData = getInitData();
   if (initData) {

@@ -1,5 +1,4 @@
 const { pool } = require("../config/database");
-const { sendTelegramLog } = require("../services/telegramLogger");
 const { createLog } = require("./adminLogsController");
 
 /**
@@ -199,14 +198,6 @@ exports.createQuestion = async (req, res, next) => {
     // Логирование действия
     await createLog(req.user.id, "CREATE", `Создан вопрос в банке (ID: ${questionId}, тип: ${questionType})`, "question", questionId, req);
 
-    await sendTelegramLog(
-      `📝 <b>Добавлен вопрос в банк</b>\n` +
-        `ID: ${questionId}\n` +
-        `Тип: ${questionType}\n` +
-        `Текст: ${questionText.substring(0, 100)}...\n` +
-        `Создал: ${req.user.id}`
-    );
-
     res.status(201).json({ questionId, message: "Вопрос создан успешно" });
   } catch (error) {
     await connection.rollback();
@@ -297,8 +288,6 @@ exports.updateQuestion = async (req, res, next) => {
     // Логирование действия
     await createLog(req.user.id, "UPDATE", `Обновлен вопрос в банке (ID: ${questionId}, тип: ${questionType})`, "question", questionId, req);
 
-    await sendTelegramLog(`✏️ <b>Обновлен вопрос в банке</b>\n` + `ID: ${questionId}\n` + `Тип: ${questionType}\n` + `Обновил: ${req.user.id}`);
-
     res.json({ message: "Вопрос обновлен успешно" });
   } catch (error) {
     await connection.rollback();
@@ -326,13 +315,6 @@ exports.deleteQuestion = async (req, res, next) => {
 
     // Логирование действия
     await createLog(req.user.id, "DELETE", `Удален вопрос из банка (ID: ${questionId})`, "question", questionId, req);
-
-    await sendTelegramLog(
-      `🗑️ <b>Удален вопрос из банка</b>\n` +
-        `ID: ${questionId}\n` +
-        `Текст: ${questions[0].question_text.substring(0, 100)}...\n` +
-        `Удалил: ${req.user.id}`
-    );
 
     res.status(204).send();
   } catch (error) {
@@ -362,8 +344,6 @@ exports.createCategory = async (req, res, next) => {
 
     // Логирование действия
     await createLog(req.user.id, "CREATE", `Создана категория вопросов: ${name} (ID: ${result.insertId})`, "category", result.insertId, req);
-
-    await sendTelegramLog(`📁 <b>Создана категория вопросов</b>\n` + `Название: ${name}\n` + `Создал: ${req.user.id}`);
 
     res.status(201).json({ categoryId: result.insertId, message: "Категория создана" });
   } catch (error) {
@@ -400,8 +380,6 @@ exports.updateCategory = async (req, res, next) => {
     // Логирование действия
     await createLog(req.user.id, "UPDATE", `Обновлена категория вопросов: ${name} (ID: ${categoryId})`, "category", categoryId, req);
 
-    await sendTelegramLog(`✏️ <b>Обновлена категория вопросов</b>\n` + `ID: ${categoryId}\n` + `Название: ${name}\n` + `Обновил: ${req.user.id}`);
-
     res.json({ message: "Категория обновлена" });
   } catch (error) {
     console.error("Update category error:", error);
@@ -431,8 +409,6 @@ exports.deleteCategory = async (req, res, next) => {
 
     // Логирование действия
     await createLog(req.user.id, "DELETE", `Удалена категория вопросов (ID: ${categoryId})`, "category", categoryId, req);
-
-    await sendTelegramLog(`🗑️ <b>Удалена категория вопросов</b>\n` + `ID: ${categoryId}\n` + `Удалил: ${req.user.id}`);
 
     res.status(204).send();
   } catch (error) {

@@ -2,7 +2,6 @@ const Joi = require("joi");
 const invitationModel = require("../models/invitationModel");
 const referenceModel = require("../models/referenceModel");
 const { generateInviteCode } = require("../utils/tokenGenerator");
-const { sendTelegramLog } = require("../services/telegramLogger");
 const { createLog } = require("./adminLogsController");
 const config = require("../config/env");
 
@@ -65,12 +64,13 @@ async function create(req, res, next) {
 
     const invitation = await invitationModel.findById(invitationId);
 
-    await sendTelegramLog(
-      `🔗 <b>Создана приглашение</b>\n` +
-        `Код: ${invitation.code}\n` +
-        `Роль: ${invitation.role_name}\n` +
-        `Филиал: ${invitation.branch_name}\n` +
-        `Создал: ${req.currentUser.firstName} ${req.currentUser.lastName}`
+    await createLog(
+      req.currentUser.id,
+      "CREATE",
+      `Создано приглашение: ${invitation.code} для ${invitation.first_name} ${invitation.last_name}`,
+      "invitation",
+      invitationId,
+      req
     );
 
     res.status(201).json({ invitation });
@@ -112,11 +112,13 @@ async function extend(req, res, next) {
 
     const updated = await invitationModel.findById(invitationId);
 
-    await sendTelegramLog(
-      `⏰ <b>Продлена ссылка</b>\n` +
-        `Код: ${updated.code}\n` +
-        `Новая дата: ${updated.expires_at}\n` +
-        `Продлил: ${req.currentUser.firstName} ${req.currentUser.lastName}`
+    await createLog(
+      req.currentUser.id,
+      "EXTEND",
+      `Продлено приглашение ${updated.code} на ${value.days} дней (новая дата: ${updated.expires_at})`,
+      "invitation",
+      invitationId,
+      req
     );
 
     res.json({ invitation: updated });
@@ -139,8 +141,13 @@ async function remove(req, res, next) {
 
     await invitationModel.deleteInvitation(invitationId);
 
-    await sendTelegramLog(
-      `🗑️ <b>Удалена ссылка</b>\n` + `Код: ${invitation.code}\n` + `Удалил: ${req.currentUser.firstName} ${req.currentUser.lastName}`
+    await createLog(
+      req.currentUser.id,
+      "DELETE",
+      `Удалено приглашение: ${invitation.code}`,
+      "invitation",
+      invitationId,
+      req
     );
 
     res.status(204).send();
@@ -174,12 +181,13 @@ async function update(req, res, next) {
 
     const updated = await invitationModel.findById(invitationId);
 
-    await sendTelegramLog(
-      `✏️ <b>Изменено приглашение</b>\n` +
-        `Код: ${updated.code}\n` +
-        `ФИО: ${updated.first_name} ${updated.last_name}\n` +
-        `Филиал: ${updated.branch_name}\n` +
-        `Изменил: ${req.currentUser.firstName} ${req.currentUser.lastName}`
+    await createLog(
+      req.currentUser.id,
+      "UPDATE",
+      `Обновлено приглашение: ${updated.code} (${updated.first_name} ${updated.last_name})`,
+      "invitation",
+      invitationId,
+      req
     );
 
     res.json({ invitation: updated });

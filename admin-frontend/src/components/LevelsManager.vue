@@ -84,7 +84,10 @@
             <Input v-model="formData.color" type="text" placeholder="#6366F1" />
           </div>
         </div>
-        <Checkbox v-model="formData.is_active" label="Активен" />
+        <label class="inline-checkbox">
+          <input v-model="formData.is_active" type="checkbox" class="native-checkbox" />
+          <span>Активен</span>
+        </label>
         <template #footer>
           <Button variant="secondary" @click="closeModal">Отмена</Button>
           <Button :loading="saving" @click="saveLevel">{{ editingLevel ? "Сохранить" : "Создать" }}</Button>
@@ -101,7 +104,6 @@ import Card from "./ui/Card.vue";
 import Modal from "./ui/Modal.vue";
 import Button from "./ui/Button.vue";
 import Input from "./ui/Input.vue";
-import Checkbox from "./ui/Checkbox.vue";
 import Textarea from "./ui/Textarea.vue";
 import Icon from "./ui/Icon.vue";
 
@@ -441,6 +443,21 @@ onMounted(() => {
   justify-content: center;
   padding: 24px 0;
   border-top: 1px solid var(--divider);
+}
+
+.inline-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-top: 8px;
+}
+
+.native-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-blue);
 }
 
 .empty-state {

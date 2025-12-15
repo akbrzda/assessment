@@ -1,6 +1,5 @@
 const { pool } = require("../config/database");
-const { sendTelegramLog } = require("../services/telegramLogger");
-const { createLog } = require("./adminLogsController");
+const { logAndSend, buildActorFromRequest } = require("../services/auditService");
 const settingsService = require("../services/settingsService");
 
 /**
@@ -76,16 +75,18 @@ exports.updateSetting = async (req, res, next) => {
     // Сбросить кэш настроек
     settingsService.clearCache();
 
-    // Логирование действия
-    await createLog(req.user.id, "UPDATE", `Изменена настройка: ${key} (${oldValue} → ${value})`, "setting", null, req);
-
-    await sendTelegramLog(
-      `⚙️ <b>Изменена настройка системы</b>\n` +
-        `Ключ: ${key}\n` +
-        `Старое значение: ${oldValue}\n` +
-        `Новое значение: ${value}\n` +
-        `Изменил: ${req.user.id}`
-    );
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "setting.updated",
+      entity: "setting",
+      entityId: null,
+      metadata: {
+        key,
+        previousValue: oldValue,
+        value,
+      },
+    });
 
     res.json({ message: "Настройка обновлена успешно" });
   } catch (error) {
@@ -125,10 +126,17 @@ exports.createSetting = async (req, res, next) => {
     // Сбросить кэш настроек
     settingsService.clearCache();
 
-    // Логирование действия
-    await createLog(req.user.id, "CREATE", `Создана настройка: ${key} = ${value}`, "setting", null, req);
-
-    await sendTelegramLog(`➕ <b>Создана настройка системы</b>\n` + `Ключ: ${key}\n` + `Значение: ${value}\n` + `Создал: ${req.user.id}`);
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "setting.created",
+      entity: "setting",
+      entityId: null,
+      metadata: {
+        key: key.trim(),
+        value,
+      },
+    });
 
     res.status(201).json({ message: "Настройка создана успешно" });
   } catch (error) {
@@ -156,12 +164,17 @@ exports.deleteSetting = async (req, res, next) => {
     // Сбросить кэш настроек
     settingsService.clearCache();
 
-    // Логирование действия
-    await createLog(req.user.id, "DELETE", `Удалена настройка: ${key} (было: ${existing[0].setting_value})`, "setting", null, req);
-
-    await sendTelegramLog(
-      `🗑️ <b>Удалена настройка системы</b>\n` + `Ключ: ${key}\n` + `Значение: ${existing[0].setting_value}\n` + `Удалил: ${req.user.id}`
-    );
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "setting.deleted",
+      entity: "setting",
+      entityId: null,
+      metadata: {
+        key,
+        value: existing[0].setting_value,
+      },
+    });
 
     res.status(204).send();
   } catch (error) {

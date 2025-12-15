@@ -1,13 +1,22 @@
 const path = require("path");
+const fs = require("fs");
 const { Telegraf } = require("telegraf");
 const dotenv = require("dotenv");
 
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+// Загрузка корневого .env (общие переменные для всех модулей)
+const rootEnvPath = path.resolve(__dirname, "../../.env");
+dotenv.config({ path: rootEnvPath });
 
-const { BOT_TOKEN, MINI_APP_URL, ADMIN_CHAT_ID } = process.env;
+// Загрузка локального .env (специфичные переменные bot)
+const localEnvPath = path.resolve(__dirname, "../.env");
+if (fs.existsSync(localEnvPath)) {
+  dotenv.config({ path: localEnvPath });
+}
+
+const { BOT_TOKEN, MINI_APP_URL, LOG_CHAT_ID, LOG_THREAD_ID } = process.env;
 
 if (!BOT_TOKEN) {
-  console.error("[bot] BOT_TOKEN is not set. Check bot/.env");
+  console.error("[bot] BOT_TOKEN is not set. Check the root .env file.");
   process.exit(1);
 }
 

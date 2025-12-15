@@ -9,7 +9,4 @@ export { default as Preloader } from "./Preloader.vue";
 export { default as Icon } from "./Icon.vue";
 export { default as EmptyState } from "./EmptyState.vue";
 export { default as ConfirmDialog } from "./ConfirmDialog.vue";
-export { default as Checkbox } from "./Checkbox.vue";
-export { default as Radio } from "./Radio.vue";
-export { default as CheckboxGroup } from "./CheckboxGroup.vue";
 export { default as Textarea } from "./Textarea.vue";

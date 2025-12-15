@@ -98,6 +98,20 @@ class WebSocketService {
     }
   }
 
+  reconnectWithNewToken(newToken) {
+    console.log("WebSocket: переподключение с новым токеном");
+    this.disconnect();
+
+    // Небольшая задержка перед переподключением
+    setTimeout(() => {
+      // Временно обновляем токен в localStorage для connect()
+      const authStore = useAuthStore();
+      if (authStore.accessToken === newToken) {
+        this.connect();
+      }
+    }, 500);
+  }
+
   // Подписка на события
   on(event, handler) {
     if (!this.eventHandlers.has(event)) {

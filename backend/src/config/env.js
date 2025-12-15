@@ -1,7 +1,16 @@
 const path = require("path");
+const fs = require("fs");
 const dotenv = require("dotenv");
 
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+// Загрузка корневого .env (общие переменные для всех модулей)
+const rootEnvPath = path.resolve(__dirname, "../../../.env");
+dotenv.config({ path: rootEnvPath });
+
+// Загрузка локального .env (если требуется переопределить переменные)
+const localEnvPath = path.resolve(__dirname, "../../.env");
+if (fs.existsSync(localEnvPath)) {
+  dotenv.config({ path: localEnvPath });
+}
 
 const requiredVars = ["PORT", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "BOT_TOKEN", "JWT_SECRET", "JWT_REFRESH_SECRET"];
 
@@ -35,9 +44,26 @@ module.exports = {
   botToken: process.env.BOT_TOKEN,
   logBotToken: process.env.LOG_BOT_TOKEN,
   logChatId: process.env.LOG_CHAT_ID,
+  logThreadId: (() => {
+    if (!process.env.LOG_THREAD_ID) {
+      return null;
+    }
+    const parsed = Number(process.env.LOG_THREAD_ID);
+    return Number.isFinite(parsed) ? parsed : null;
+  })(),
   jwtSecret: process.env.JWT_SECRET || "your_secret_key_here",
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || "your_refresh_secret_key_here",
   inviteExpirationDays: Number(process.env.INVITE_EXPIRATION_DAYS || 7),
   allowedOrigins: parseList(process.env.ALLOWED_ORIGINS),
   superAdminIds: parseList(process.env.SUPERADMIN_IDS),
+  redisUrl: process.env.REDIS_URL || null,
+  notificationSla: (() => {
+    try {
+      return process.env.NOTIFICATION_SLA ? JSON.parse(process.env.NOTIFICATION_SLA) : null;
+    } catch (error) {
+      console.warn("[env] Failed to parse NOTIFICATION_SLA, using defaults 24/6/1h");
+      return null;
+    }
+  })(),
+  notificationCheckIntervalMinutes: Number(process.env.NOTIFICATION_CHECK_INTERVAL_MINUTES || 15),
 };

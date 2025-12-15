@@ -7,4 +7,8 @@ export default {
   logout() {
     return apiClient.post("/admin/auth/logout");
   },
+  refresh() {
+    const refreshToken = localStorage.getItem("refreshToken");
+    return apiClient.post("/admin/auth/refresh", { refreshToken });
+  },
 };

@@ -1,5 +1,4 @@
 const { pool } = require("../config/database");
-const { sendTelegramLog } = require("../services/telegramLogger");
 const { createLog } = require("./adminLogsController");
 
 /**
@@ -88,14 +87,6 @@ exports.createLevel = async (req, res, next) => {
     // Логирование
     await createLog(req.user.id, "CREATE", `Создан уровень: ${name} (${level_number}) с порогом ${min_points} очков`, "level", level_number, req);
 
-    await sendTelegramLog(
-      `⭐ <b>Создан новый уровень</b>\n` +
-        `Уровень: ${level_number}\n` +
-        `Название: ${name}\n` +
-        `Минимум очков: ${min_points}\n` +
-        `Создал: ${req.user.id}`
-    );
-
     res.status(201).json({ message: "Уровень создан успешно" });
   } catch (error) {
     console.error("Create level error:", error);
@@ -171,8 +162,6 @@ exports.deleteLevel = async (req, res, next) => {
     // Логирование
     await createLog(req.user.id, "DELETE", `Удален уровень: ${level.name} (${level_number})`, "level", level_number, req);
 
-    await sendTelegramLog(`🗑️ <b>Удален уровень</b>\n` + `Уровень: ${level_number}\n` + `Название: ${level.name}\n` + `Удалил: ${req.user.id}`);
-
     res.status(204).send();
   } catch (error) {
     console.error("Delete level error:", error);
@@ -222,8 +211,6 @@ exports.recalculateLevels = async (req, res, next) => {
     // Логирование
     if (req.user && req.user.id) {
       await createLog(req.user.id, "UPDATE", `Пересчитаны уровни для ${updatedCount} пользователей`, "level", null, req);
-
-      await sendTelegramLog(`🔄 <b>Пересчитаны уровни пользователей</b>\n` + `Количество: ${updatedCount}\n` + `Инициатор: ${req.user.id}`);
     }
 
     res.json({

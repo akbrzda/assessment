@@ -10,6 +10,5 @@ router.use(verifyInitData, resolveUser);
 
 router.get('/overview', requireRole(['employee', 'manager', 'superadmin']), gamificationController.getOverview);
 router.get('/badges', requireRole(['employee', 'manager', 'superadmin']), gamificationController.getBadges);
-router.get('/team', requireRole(['employee', 'manager', 'superadmin']), gamificationController.getTeamChallenges);
 
 module.exports = router;

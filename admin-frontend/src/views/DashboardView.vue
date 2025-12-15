@@ -3,6 +3,54 @@
     <Preloader v-if="loading" />
 
     <div v-else class="dashboard-content">
+      <div class="filters-section">
+        <Card class="filters-card" title="Фильтры">
+          <div class="filters-grid">
+            <Select
+              v-model="filters.period"
+              :options="periodOptions"
+              label="Период"
+              @change="handlePeriodChange"
+            />
+            <Input
+              v-if="isCustomPeriod"
+              v-model="filters.dateFrom"
+              type="date"
+              label="Дата от"
+            />
+            <Input
+              v-if="isCustomPeriod"
+              v-model="filters.dateTo"
+              type="date"
+              label="Дата до"
+            />
+            <Select
+              v-model="filters.branchId"
+              :options="branchOptions"
+              label="Филиал"
+              @change="handleBranchChange"
+            />
+            <Select
+              v-model="filters.positionId"
+              :options="positionOptions"
+              label="Должность"
+              @change="handlePositionChange"
+            />
+          </div>
+          <div class="filters-actions">
+            <Button variant="secondary" icon="refresh-ccw" @click="handleResetFilters">Сбросить</Button>
+            <Button variant="primary" icon="filter" @click="handleApplyFilters">Применить</Button>
+            <Button variant="ghost" icon="refresh-cw" :disabled="loading || autoRefreshing" @click="manualRefresh">
+              {{ autoRefreshing ? "Автообновление…" : "Обновить" }}
+            </Button>
+          </div>
+        </Card>
+        <div v-if="isOffline" class="offline-banner">
+          <Icon name="wifi-off" size="18" />
+          <span>Нет подключения к сети. Показаны последние загруженные данные.</span>
+        </div>
+      </div>
+
       <!-- Карточки основных метрик -->
       <div class="metrics-grid">
         <Card class="metric-card" @click="navigateToAssessments">
@@ -169,19 +217,42 @@
   </div>
 </template>
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
-import apiClient from "../utils/axios";
+import dashboardApi from "../api/dashboard";
+import { getReferences } from "../api/users";
+import { useToast } from "../composables/useToast";
 import Preloader from "../components/ui/Preloader.vue";
 import Card from "../components/ui/Card.vue";
 import Badge from "../components/ui/Badge.vue";
 import LineChart from "../components/charts/LineChart.vue";
 import Icon from "../components/ui/Icon.vue";
+import Button from "../components/ui/Button.vue";
+import Select from "../components/ui/Select.vue";
+import Input from "../components/ui/Input.vue";
 
 const router = useRouter();
 const authStore = useAuthStore();
+const { showToast } = useToast();
+
 const loading = ref(true);
+const autoRefreshing = ref(false);
+const isOffline = ref(typeof navigator !== "undefined" ? !navigator.onLine : false);
+
+const filters = ref({
+  period: "week",
+  dateFrom: "",
+  dateTo: "",
+  branchId: "",
+  positionId: "",
+});
+
+const references = ref({
+  branches: [],
+  positions: [],
+});
+
 const metrics = ref({
   activeAssessments: 0,
   totalUsers: 0,
@@ -196,12 +267,13 @@ const activityData = ref([]);
 const branchKPI = ref([]);
 const latestActivities = ref([]);
 
-const sortedBranchKPI = computed(() => {
-  return [...branchKPI.value].sort((a, b) => (b.success_rate || 0) - (a.success_rate || 0));
-});
+const REFRESH_INTERVAL = 300000; // 5 минут
+let refreshTimer = null;
+
+const sortedBranchKPI = computed(() => [...branchKPI.value].sort((a, b) => (b.success_rate || 0) - (a.success_rate || 0)));
 
 const activityDatasets = computed(() => {
-  if (!activityData.value || activityData.value.length === 0) return [];
+  if (!activityData.value.length) return [];
 
   return [
     {
@@ -228,55 +300,173 @@ const activityDatasets = computed(() => {
   ];
 });
 
-// Methods
-const fetchMetrics = async () => {
+const branchOptions = computed(() => [
+  { value: "", label: "Все филиалы" },
+  ...references.value.branches.map((branch) => ({ value: String(branch.id), label: branch.name })),
+]);
+
+const positionOptions = computed(() => [
+  { value: "", label: "Все должности" },
+  ...references.value.positions.map((position) => ({ value: String(position.id), label: position.name })),
+]);
+
+const periodOptions = [
+  { value: "week", label: "Неделя" },
+  { value: "month", label: "Месяц" },
+  { value: "quarter", label: "Квартал" },
+  { value: "custom", label: "Произвольный период" },
+];
+
+const isCustomPeriod = computed(() => filters.value.period === "custom");
+
+const buildParams = () => {
+  const params = {
+    period: filters.value.period,
+  };
+
+  if (isCustomPeriod.value) {
+    if (filters.value.dateFrom) {
+      params.date_from = filters.value.dateFrom;
+    }
+    if (filters.value.dateTo) {
+      params.date_to = filters.value.dateTo;
+    }
+  }
+
+  if (filters.value.branchId) {
+    params.branch_id = filters.value.branchId;
+  }
+
+  if (filters.value.positionId) {
+    params.position_id = filters.value.positionId;
+  }
+
+  return params;
+};
+
+const loadReferences = async () => {
   try {
+    const data = await getReferences();
+    references.value = {
+      branches: data.branches || [],
+      positions: data.positions || [],
+    };
+  } catch (error) {
+    console.error("Load references error:", error);
+  }
+};
+
+const fetchMetrics = async (params) => {
+  const { data } = await dashboardApi.getMetrics(params);
+  metrics.value = data;
+};
+
+const fetchBranchKPI = async (params) => {
+  const { data } = await dashboardApi.getBranchKPI(params);
+  branchKPI.value = data.branchKPI || [];
+};
+
+const fetchActivityTrends = async (params) => {
+  const { data } = await dashboardApi.getActivityTrends(params);
+  activityData.value = (data.dailyActivity || []).map((d) => ({
+    ...d,
+    date: formatDateLabel(d.date),
+  }));
+};
+
+const fetchLatestAssessmentActivities = async (params) => {
+  const { data } = await dashboardApi.getLatestAssessmentActivities({ ...params, limit: 5 });
+  latestActivities.value = data.latestActivities || [];
+};
+
+const loadAllData = async ({ silent = false } = {}) => {
+  const params = buildParams();
+
+  if (params.period === "custom" && (!params.date_from || !params.date_to)) {
+    if (!silent) {
+      showToast("Укажите начало и конец периода", "warning");
+    }
+    return;
+  }
+
+  if (!silent) {
     loading.value = true;
-    const { data } = await apiClient.get("/admin/dashboard/metrics");
-    metrics.value = data;
+  }
+
+  try {
+    await Promise.all([
+      fetchMetrics(params),
+      fetchActivityTrends(params),
+      fetchBranchKPI(params),
+      fetchLatestAssessmentActivities(params),
+    ]);
   } catch (error) {
-    console.error("Fetch metrics error:", error);
+    console.error("Dashboard load error:", error);
+    showToast("Не удалось загрузить данные дашборда", "error");
   } finally {
-    loading.value = false;
+    if (!silent) {
+      loading.value = false;
+    }
   }
 };
 
-const fetchBranchKPI = async () => {
-  try {
-    const { data } = await apiClient.get("/admin/dashboard/branch-kpi");
-    branchKPI.value = data.branchKPI;
-  } catch (error) {
-    console.error("Fetch branch KPI error:", error);
+const startAutoRefresh = () => {
+  stopAutoRefresh();
+  refreshTimer = setInterval(async () => {
+    if (isOffline.value) return;
+    autoRefreshing.value = true;
+    await loadAllData({ silent: true });
+    autoRefreshing.value = false;
+  }, REFRESH_INTERVAL);
+};
+
+const stopAutoRefresh = () => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
   }
 };
 
-const fetchActivityTrends = async () => {
-  try {
-    const { data } = await apiClient.get("/admin/dashboard/activity-trends");
-    activityData.value = data.dailyActivity.map((d) => ({
-      ...d,
-      date: formatDateLabel(d.date),
-    }));
-  } catch (error) {
-    console.error("Fetch activity trends error:", error);
+const handleApplyFilters = async () => {
+  await loadAllData();
+};
+
+const handleResetFilters = async () => {
+  filters.value = {
+    period: "week",
+    dateFrom: "",
+    dateTo: "",
+    branchId: "",
+    positionId: "",
+  };
+  await loadAllData();
+};
+
+const handlePeriodChange = async () => {
+  if (!isCustomPeriod.value) {
+    filters.value.dateFrom = "";
+    filters.value.dateTo = "";
+    await loadAllData();
   }
 };
 
-const fetchLatestActivities = async () => {
-  try {
-    const { data } = await apiClient.get("/admin/dashboard/latest-assessment-activities", {
-      params: { limit: 5 },
-    });
-    latestActivities.value = data.latestActivities;
-  } catch (error) {
-    console.error("Fetch latest activities error:", error);
+const handleBranchChange = async () => {
+  if (isCustomPeriod.value && (!filters.value.dateFrom || !filters.value.dateTo)) {
+    return;
   }
+  await loadAllData();
 };
 
-const loadAllData = async () => {
-  const promises = [fetchMetrics(), fetchActivityTrends(), fetchBranchKPI(), fetchLatestActivities()];
+const handlePositionChange = async () => {
+  if (isCustomPeriod.value && (!filters.value.dateFrom || !filters.value.dateTo)) {
+    return;
+  }
+  await loadAllData();
+};
 
-  await Promise.all(promises);
+const manualRefresh = async () => {
+  if (loading.value) return;
+  await loadAllData();
 };
 
 const getScoreClass = (score) => {
@@ -287,23 +477,33 @@ const getScoreClass = (score) => {
 };
 
 const formatScore = (score) => {
-  return score ? Math.round(score) : 0;
+  if (score == null) return 0;
+  return Math.round(score);
 };
 
 const formatDateLabel = (dateStr) => {
   const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) {
+    return dateStr;
+  }
   return date.toLocaleDateString("ru-RU", { month: "short", day: "numeric" });
 };
 
 const formatTime = (dateStr) => {
+  if (!dateStr) return "—";
   const date = new Date(dateStr);
   const now = new Date();
-  const diff = now - date;
+  const diff = now.getTime() - date.getTime();
+
+  if (Number.isNaN(diff)) {
+    return date.toLocaleString("ru-RU");
+  }
 
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
 
+  if (minutes < 1) return "только что";
   if (minutes < 60) return `${minutes} мин назад`;
   if (hours < 24) return `${hours} ч назад`;
   if (days < 7) return `${days} дн назад`;
@@ -325,8 +525,34 @@ const getMedalEmoji = (index) => {
   return medals[index] || "🏅";
 };
 
+const handleOnline = async () => {
+  isOffline.value = false;
+  showToast("Соединение восстановлено", "success");
+  await loadAllData({ silent: true });
+};
+
+const handleOffline = () => {
+  isOffline.value = true;
+  showToast("Нет соединения. Показаны сохранённые данные", "warning");
+};
+
 onMounted(async () => {
+  await loadReferences();
   await loadAllData();
+  startAutoRefresh();
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+  }
+});
+
+onBeforeUnmount(() => {
+  stopAutoRefresh();
+  if (typeof window !== "undefined") {
+    window.removeEventListener("online", handleOnline);
+    window.removeEventListener("offline", handleOffline);
+  }
 });
 </script>
 
@@ -372,6 +598,43 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.filters-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.filters-card {
+  padding: 20px;
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.filters-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.offline-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(255, 189, 58, 0.12);
+  color: #b45309;
+  font-size: 14px;
+}
+.offline-banner :deep(svg) {
+  color: inherit;
 }
 
 /* Metrics Grid */

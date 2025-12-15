@@ -1,6 +1,6 @@
 const Joi = require("joi");
 const { pool } = require("../config/database");
-const { sendTelegramLog } = require("../services/telegramLogger");
+const { logAuditEvent, buildAuditEntry, buildActorFromRequest } = require("../services/auditService");
 
 const branchSchema = Joi.object({
   name: Joi.string().trim().min(2).max(128).required(),
@@ -41,12 +41,18 @@ async function createBranch(req, res, next) {
 
     const [branches] = await pool.execute("SELECT * FROM branches WHERE id = ?", [result.insertId]);
 
-    await sendTelegramLog(
-      `🏢 <b>Создан филиал</b>\n` +
-        `Название: ${value.name}\n` +
-        `Город: ${value.city || "—"}\n` +
-        `Создал: ${req.currentUser.firstName} ${req.currentUser.lastName}`
-    );
+    const auditEntry = buildAuditEntry({
+      scope: "admin_panel",
+      action: "branch.created",
+      entity: "branch",
+      entityId: result.insertId,
+      actor: buildActorFromRequest(req),
+      metadata: {
+        name: value.name,
+        city: value.city || null,
+      },
+    });
+    await logAuditEvent(auditEntry);
 
     res.status(201).json({ branch: branches[0] });
   } catch (error) {
@@ -78,12 +84,20 @@ async function updateBranch(req, res, next) {
 
     const [branches] = await pool.execute("SELECT * FROM branches WHERE id = ?", [branchId]);
 
-    await sendTelegramLog(
-      `✏️ <b>Обновлен филиал</b>\n` +
-        `Название: ${value.name}\n` +
-        `Город: ${value.city || "—"}\n` +
-        `Обновил: ${req.currentUser.firstName} ${req.currentUser.lastName}`
-    );
+    const auditEntry = buildAuditEntry({
+      scope: "admin_panel",
+      action: "branch.updated",
+      entity: "branch",
+      entityId: branchId,
+      actor: buildActorFromRequest(req),
+      metadata: {
+        previousName: existing[0].name,
+        name: value.name,
+        previousCity: existing[0].city,
+        city: value.city || null,
+      },
+    });
+    await logAuditEvent(auditEntry);
 
     res.json({ branch: branches[0] });
   } catch (error) {
@@ -114,9 +128,17 @@ async function deleteBranch(req, res, next) {
 
     await pool.execute("DELETE FROM branches WHERE id = ?", [branchId]);
 
-    await sendTelegramLog(
-      `🗑️ <b>Удален филиал</b>\n` + `Название: ${existing[0].name}\n` + `Удалил: ${req.currentUser.firstName} ${req.currentUser.lastName}`
-    );
+    const auditEntry = buildAuditEntry({
+      scope: "admin_panel",
+      action: "branch.deleted",
+      entity: "branch",
+      entityId: branchId,
+      actor: buildActorFromRequest(req),
+      metadata: {
+        name: existing[0].name,
+      },
+    });
+    await logAuditEvent(auditEntry);
 
     res.status(204).send();
   } catch (error) {

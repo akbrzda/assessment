@@ -187,7 +187,7 @@
         <Select v-model.number="form.branchId" label="Филиал" :options="branchSelectOptions" placeholder="Выберите филиал" required />
       </div>
       <p v-if="!editingInvitation" class="modal-hint">
-        Срок действия приглашения: {{ defaultExpirationDays }} дней (переменная <code>VITE_INVITE_EXPIRATION_DAYS</code> в файле <code>.env</code>)
+        Срок действия приглашения: {{ defaultExpirationDays }} дней (переменная <code>INVITE_EXPIRATION_DAYS</code> в файле <code>.env</code>)
       </p>
       <template #footer>
         <Button variant="secondary" @click="closeFormModal">Отмена</Button>
@@ -212,7 +212,7 @@
           required
         />
         <p class="modal-hint">
-          По умолчанию: {{ defaultExpirationDays }} дней (переменная <code>VITE_INVITE_EXPIRATION_DAYS</code> в файле <code>.env</code>)
+          По умолчанию: {{ defaultExpirationDays }} дней (переменная <code>INVITE_EXPIRATION_DAYS</code> в файле <code>.env</code>)
         </p>
       </div>
       <template #footer>
@@ -234,14 +234,15 @@ import Button from "../components/ui/Button.vue";
 import Badge from "../components/ui/Badge.vue";
 import Input from "../components/ui/Input.vue";
 import Select from "../components/ui/Select.vue";
+import { INVITE_EXPIRATION_DAYS, BOT_USERNAME } from "@/env";
 
 const loading = ref(false);
 const saving = ref(false);
 
 const references = ref({ branches: [] });
 const invitations = ref([]);
-const DEFAULT_EXPIRATION_FROM_ENV = Number(import.meta.env.VITE_INVITE_EXPIRATION_DAYS || 7);
-const BOT_USERNAME_FROM_ENV = import.meta.env.VITE_BOT_USERNAME || "your_bot";
+const DEFAULT_EXPIRATION_FROM_ENV = Number(INVITE_EXPIRATION_DAYS || 7);
+const BOT_USERNAME_FROM_ENV = BOT_USERNAME || "your_bot";
 
 const defaultExpirationDays = ref(DEFAULT_EXPIRATION_FROM_ENV);
 const botUsername = ref(BOT_USERNAME_FROM_ENV);

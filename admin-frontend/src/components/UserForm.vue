@@ -71,7 +71,7 @@
 </template>
 
 <script setup>
-import { watch, ref, computed } from "vue";
+import { watch, ref, computed, nextTick } from "vue";
 import Input from "./ui/Input.vue";
 import Select from "./ui/Select.vue";
 import { useFormValidation } from "../composables/useFormValidation";
@@ -86,6 +86,7 @@ const emit = defineEmits(["update:modelValue"]);
 
 const localData = ref({ ...props.modelValue });
 const { errors, validateField, clearFieldError } = useFormValidation();
+const isSyncing = ref(false);
 
 const validationSchema = {
   firstName: ["required", { min: 2 }, { max: 50 }],
@@ -177,7 +178,8 @@ const roleOptions = computed(() => [
 watch(
   localData,
   (newValue) => {
-    emit("update:modelValue", newValue);
+    if (isSyncing.value) return;
+    emit("update:modelValue", { ...newValue });
   },
   { deep: true }
 );
@@ -185,9 +187,17 @@ watch(
 watch(
   () => props.modelValue,
   (newValue) => {
+    if (!newValue) {
+      localData.value = {};
+      return;
+    }
+    isSyncing.value = true;
     localData.value = { ...newValue };
+    nextTick(() => {
+      isSyncing.value = false;
+    });
   },
-  { deep: true }
+  { deep: true, immediate: true }
 );
 </script>
 
