@@ -79,6 +79,7 @@ const pageTitle = computed(() => {
     questions: "Банк вопросов",
     reports: "Отчёты и аналитика",
     branches: "Управление филиалами",
+    positions: "Управление должностями",
     settings: "Настройки системы",
     logs: "Журнал действий",
   };

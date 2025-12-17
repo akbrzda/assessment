@@ -95,7 +95,13 @@ const routes = [
         path: "branches",
         name: "Branches",
         component: () => import("../views/BranchesView.vue"),
-        meta: { roles: ["superadmin"], title: "Филиалы и должности" },
+        meta: { roles: ["superadmin"], title: "Филиалы" },
+      },
+      {
+        path: "positions",
+        name: "Positions",
+        component: () => import("../views/PositionsView.vue"),
+        meta: { roles: ["superadmin"], title: "Должности" },
       },
       {
         path: "settings",

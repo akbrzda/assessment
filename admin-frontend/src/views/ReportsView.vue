@@ -10,7 +10,7 @@
     </div>
 
     <!-- Фильтры -->
-    <Card class="filters-card" title="Фильтры">
+    <Card class="filters-card">
       <div class="filters-grid">
         <Input v-model="filters.dateFrom" label="Дата от" type="date" />
         <Input v-model="filters.dateTo" label="Дата до" type="date" />

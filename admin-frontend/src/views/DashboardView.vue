@@ -4,38 +4,13 @@
 
     <div v-else class="dashboard-content">
       <div class="filters-section">
-        <Card class="filters-card" title="Фильтры">
+        <Card class="filters-card">
           <div class="filters-grid">
-            <Select
-              v-model="filters.period"
-              :options="periodOptions"
-              label="Период"
-              @change="handlePeriodChange"
-            />
-            <Input
-              v-if="isCustomPeriod"
-              v-model="filters.dateFrom"
-              type="date"
-              label="Дата от"
-            />
-            <Input
-              v-if="isCustomPeriod"
-              v-model="filters.dateTo"
-              type="date"
-              label="Дата до"
-            />
-            <Select
-              v-model="filters.branchId"
-              :options="branchOptions"
-              label="Филиал"
-              @change="handleBranchChange"
-            />
-            <Select
-              v-model="filters.positionId"
-              :options="positionOptions"
-              label="Должность"
-              @change="handlePositionChange"
-            />
+            <Select v-model="filters.period" :options="periodOptions" label="Период" @change="handlePeriodChange" />
+            <Input v-if="isCustomPeriod" v-model="filters.dateFrom" type="date" label="Дата от" />
+            <Input v-if="isCustomPeriod" v-model="filters.dateTo" type="date" label="Дата до" />
+            <Select v-model="filters.branchId" :options="branchOptions" label="Филиал" @change="handleBranchChange" />
+            <Select v-model="filters.positionId" :options="positionOptions" label="Должность" @change="handlePositionChange" />
           </div>
           <div class="filters-actions">
             <Button variant="secondary" icon="refresh-ccw" @click="handleResetFilters">Сбросить</Button>
@@ -394,12 +369,7 @@ const loadAllData = async ({ silent = false } = {}) => {
   }
 
   try {
-    await Promise.all([
-      fetchMetrics(params),
-      fetchActivityTrends(params),
-      fetchBranchKPI(params),
-      fetchLatestAssessmentActivities(params),
-    ]);
+    await Promise.all([fetchMetrics(params), fetchActivityTrends(params), fetchBranchKPI(params), fetchLatestAssessmentActivities(params)]);
   } catch (error) {
     console.error("Dashboard load error:", error);
     showToast("Не удалось загрузить данные дашборда", "error");
