@@ -4,11 +4,11 @@ import { resolve } from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  const rootEnvDir = resolve(__dirname, "..");
-  const env = loadEnv(mode, rootEnvDir, "");
+  const envDir = __dirname;
+  const env = loadEnv(mode, envDir, "");
 
   return {
-    envDir: rootEnvDir,
+    envDir,
     define: {
       __API_BASE_URL__: JSON.stringify(env.API_BASE_URL || ""),
       __INVITE_EXPIRATION_DAYS__: JSON.stringify(env.INVITE_EXPIRATION_DAYS || "7"),

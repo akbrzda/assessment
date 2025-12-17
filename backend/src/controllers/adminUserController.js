@@ -3,7 +3,6 @@ const bcrypt = require("bcrypt");
 const userModel = require("../models/userModel");
 const { pool } = require("../config/database");
 const referenceModel = require("../models/referenceModel");
-const domainEventBus = require("../events/domainEventBus");
 const { logAndSend, buildActorFromRequest } = require("../services/auditService");
 
 const updateSchema = Joi.object({
@@ -145,18 +144,6 @@ async function updateUser(req, res, next) {
     await userModel.updateUserByAdmin(userId, payload);
     const updated = await userModel.findById(userId);
 
-    if (updated.telegramId) {
-      domainEventBus.publish("notification.user.direct", {
-        userId: updated.id,
-        templateKey: "user.profileUpdated",
-        metadata: {
-          updatedBy: req.user.id,
-          updatedFields: Object.keys(payload),
-        },
-        eventId: `user_profile_updated_${updated.id}_${Date.now()}`,
-      });
-    }
-
     await logAndSend({
       req,
       actor: buildActorFromRequest(req),
@@ -188,21 +175,6 @@ async function deleteUser(req, res, next) {
 
     if (userId === req.user.id) {
       return res.status(400).json({ error: "Нельзя удалить самого себя" });
-    }
-
-    if (existing.telegramId) {
-      domainEventBus.publish("notification.user.direct", {
-        userId,
-        user: {
-          id: userId,
-          telegramId: existing.telegramId,
-        },
-        templateKey: "user.accountDeleted",
-        eventId: `user_deleted_${userId}_${Date.now()}`,
-        metadata: {
-          deletedBy: req.user.id,
-        },
-      });
     }
 
     await userModel.deleteUser(userId);

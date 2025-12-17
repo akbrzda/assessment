@@ -4,7 +4,6 @@ const referenceModel = require("../models/referenceModel");
 const userModel = require("../models/userModel");
 const logger = require("../utils/logger");
 const gamificationService = require("../services/gamificationService");
-const domainEventBus = require("../events/domainEventBus");
 const { logAndSend, buildActorFromRequest } = require("../services/auditService");
 
 const optionSchema = Joi.object({
@@ -261,23 +260,8 @@ async function create(req, res, next) {
         openAt: created.openAt,
         closeAt: created.closeAt,
         questionCount: questions.length,
-        assignedCount: assignedUserIds.length,
       },
     });
-
-    try {
-      const targetUserIds = await assessmentModel.listAssignedUserIds(assessmentId);
-      if (targetUserIds.length) {
-        domainEventBus.publish("notification.assessment.created", {
-          assessment: created,
-          userIds: targetUserIds,
-          locale: "ru",
-        });
-      }
-    } catch (notifyError) {
-      // логируем и не прерываем основной поток
-      logger.error("Failed to notify users about assessment %s: %s", assessmentId, notifyError.message);
-    }
 
     res.status(201).json({ assessment: created });
   } catch (error) {
@@ -398,28 +382,6 @@ async function completeAttempt(req, res, next) {
       });
     } catch (gamificationError) {
       logger.error("Failed to process gamification for attempt %s: %s", attemptId, gamificationError.message);
-    }
-
-    if (summary.assessment.createdBy && summary.assessment.createdBy !== req.currentUser.id) {
-      try {
-        const creator = await userModel.findById(summary.assessment.createdBy);
-        if (creator?.telegramId) {
-          domainEventBus.publish("notification.assessment.completed", {
-            assessment: summary.assessment,
-            creator,
-            performer: {
-              id: req.currentUser.id,
-              firstName: req.currentUser.firstName,
-              lastName: req.currentUser.lastName,
-            },
-            attemptId: summary.attempt.id,
-            scorePercent,
-            passed,
-          });
-        }
-      } catch (notifyError) {
-        logger.error("Failed to notify creator about completed assessment %s: %s", assessmentId, notifyError.message);
-      }
     }
 
     await logAndSend({

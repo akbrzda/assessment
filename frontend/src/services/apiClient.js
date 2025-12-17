@@ -119,18 +119,4 @@ export const apiClient = {
     const path = query ? `/leaderboard/users?${query}` : "/leaderboard/users";
     return request(path);
   },
-  getNotificationHistory(params = {}) {
-    const searchParams = new URLSearchParams();
-    if (params.status && params.status !== "all") {
-      searchParams.set("status", params.status);
-    }
-    if (params.page) {
-      searchParams.set("page", params.page);
-    }
-    if (params.limit) {
-      searchParams.set("limit", params.limit);
-    }
-    const query = searchParams.toString();
-    return request(`/notifications/history${query ? `?${query}` : ""}`);
-  },
 };

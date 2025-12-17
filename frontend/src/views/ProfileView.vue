@@ -100,37 +100,6 @@
         <div class="skeleton-line mb-8 w-60"></div>
       </div>
 
-      <!-- Notifications history -->
-      <div class="card">
-        <h3 class="title-small mb-16">Последние уведомления</h3>
-
-        <div v-if="notificationsLoading" class="notifications-skeleton">
-          <div class="skeleton-row" v-for="n in 3" :key="n">
-            <div class="skeleton-line w-70"></div>
-            <div class="skeleton-line w-40"></div>
-          </div>
-        </div>
-
-        <div v-else-if="notificationHistory.length === 0" class="empty-state">
-          <p class="body-small text-secondary">Сообщения ещё не отправлялись</p>
-        </div>
-
-        <div v-else class="notifications-list">
-          <div v-for="item in notificationHistory" :key="item.id" class="notification-row">
-            <div class="notification-info">
-              <div class="notification-meta">
-                <span :class="['status-pill', getNotificationStatusClass(item.status)]">
-                  {{ getNotificationStatusLabel(item.status) }}
-                </span>
-                <span class="notification-date">{{ formatNotificationDate(item.createdAt) }}</span>
-              </div>
-              <div class="notification-title">{{ item.templateKey || "Уведомление" }}</div>
-              <div v-if="item.message" class="notification-message">{{ item.message }}</div>
-              <div v-if="item.lastError" class="notification-error">Ошибка: {{ item.lastError }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Edit Profile Modal -->
@@ -199,9 +168,6 @@ export default {
       totalTime: "--:--",
     });
 
-    const notificationHistory = ref([]);
-    const notificationsLoading = ref(false);
-
     const editForm = reactive({
       firstName: "",
       lastName: "",
@@ -267,51 +233,6 @@ export default {
       }
       const secs = seconds % 60;
       return `${minutes}:${String(secs).padStart(2, "0")}`;
-    }
-
-    function getNotificationStatusLabel(status) {
-      switch (status) {
-        case "sent":
-          return "Отправлено";
-        case "failed":
-          return "Ошибка";
-        case "retrying":
-          return "Повтор";
-        case "queued":
-          return "В очереди";
-        default:
-          return status || "Неизвестно";
-      }
-    }
-
-    function getNotificationStatusClass(status) {
-      switch (status) {
-        case "sent":
-          return "status-success";
-        case "failed":
-          return "status-danger";
-        case "retrying":
-          return "status-warning";
-        case "queued":
-        default:
-          return "status-info";
-      }
-    }
-
-    function formatNotificationDate(value) {
-      if (!value) {
-        return "";
-      }
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) {
-        return "";
-      }
-      return date.toLocaleString("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
     }
 
     async function loadProfileData() {
@@ -380,22 +301,8 @@ export default {
       }
     }
 
-    async function loadNotificationHistory() {
-      notificationsLoading.value = true;
-      try {
-        const response = await apiClient.getNotificationHistory({ limit: 10 });
-        notificationHistory.value = Array.isArray(response?.notifications) ? response.notifications : [];
-      } catch (error) {
-        console.warn("Не удалось загрузить историю уведомлений", error);
-        notificationHistory.value = [];
-      } finally {
-        notificationsLoading.value = false;
-      }
-    }
-
     onMounted(() => {
       loadProfileData();
-      loadNotificationHistory();
     });
 
     return {
@@ -414,11 +321,6 @@ export default {
       closeEditModal,
       saveProfile,
       showBadgeDetails,
-      notificationHistory,
-      notificationsLoading,
-      getNotificationStatusLabel,
-      getNotificationStatusClass,
-      formatNotificationDate,
     };
   },
 };
@@ -659,87 +561,6 @@ export default {
 
 .w-80 {
   width: 80%;
-}
-
-.notifications-skeleton .skeleton-row {
-  margin-bottom: 12px;
-}
-
-.notifications-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.notification-row {
-  border: 1px solid var(--divider);
-  border-radius: 12px;
-  padding: 12px 16px;
-  background-color: var(--bg-secondary);
-}
-
-.notification-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.notification-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.notification-title {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text-primary);
-}
-
-.notification-message {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.notification-error {
-  font-size: 13px;
-  color: var(--danger);
-}
-
-.notification-date {
-  white-space: nowrap;
-}
-
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  color: white;
-}
-
-.status-success {
-  background-color: #1db954;
-}
-
-.status-danger {
-  background-color: #ef4444;
-}
-
-.status-warning {
-  background-color: #f59e0b;
-}
-
-.status-info {
-  background-color: #3b82f6;
 }
 
 @keyframes shimmer {
