@@ -1,8 +1,3 @@
-const { pool } = require("../config/database");
-const logger = require("../utils/logger");
-const { sendTelegramLog } = require("./telegramLogger");
-const { emitNewLog } = require("./websocketService");
-
 function normalizeActor(actor = {}) {
   if (!actor) {
     return { id: null, role: null, name: null };
@@ -60,78 +55,8 @@ function buildAuditEntry({
   };
 }
 
-async function persistAuditEntry(entry) {
-  const { actor, action, entity, entityId, metadata, result, scope, timestamp, initiatorIp, userAgent } = entry;
-
-  const descriptionParts = [
-    `Действие: ${action}`,
-    entity ? `Сущность: ${entity}${entityId ? ` (#${entityId})` : ""}` : null,
-    scope ? `Источник: ${scope}` : null,
-    result ? `Статус: ${result}` : null,
-  ].filter(Boolean);
-
-  const description = descriptionParts.join(" | ");
-
-  try {
-    if (!actor.id) {
-      logger.warn("Skip action_logs insert for %s: missing actor.id", action);
-      return;
-    }
-
-    await pool.query(
-      `INSERT INTO action_logs 
-        (admin_id, admin_username, action_type, entity_type, entity_id, description, changes, ip_address, user_agent, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        actor.id,
-        actor.name,
-        action,
-        entity,
-        entityId,
-        description,
-        JSON.stringify({
-          metadata,
-          result,
-          scope,
-          timestamp,
-        }),
-        initiatorIp,
-        userAgent,
-        new Date(timestamp),
-      ]
-    );
-  } catch (error) {
-    logger.error("Failed to persist audit entry: %s", error.message);
-  }
-}
-
-async function logAuditEvent(entry, options = {}) {
-  const { skipTelegram = false, skipDatabase = false, skipWebSocket = false } = options;
-
-  if (!skipDatabase) {
-    await persistAuditEntry(entry);
-  }
-
-  if (!skipTelegram) {
-    await sendTelegramLog(entry);
-  }
-
-  // Отправляем лог через WebSocket для realtime-обновления
-  if (!skipWebSocket) {
-    try {
-      emitNewLog({
-        timestamp: entry.timestamp,
-        action: entry.action,
-        actor: entry.actor,
-        entity: entry.entity,
-        entityId: entry.entityId,
-        result: entry.result,
-        scope: entry.scope,
-      });
-    } catch (error) {
-      logger.error("Failed to emit log via WebSocket: %s", error.message);
-    }
-  }
+async function logAuditEvent(entry) {
+  return entry;
 }
 
 async function logAndSend({
@@ -143,8 +68,6 @@ async function logAndSend({
   entityId,
   metadata = {},
   result = "success",
-  skipTelegram = false,
-  skipDatabase = false,
 }) {
   const entry = buildAuditEntry({
     scope,
@@ -158,9 +81,7 @@ async function logAndSend({
     userAgent: req ? req.headers["user-agent"] : null,
   });
 
-  await logAuditEvent(entry, { skipTelegram, skipDatabase });
-
-  return entry;
+  return logAuditEvent(entry);
 }
 
 module.exports = {

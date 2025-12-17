@@ -49,7 +49,6 @@ const menuItems = computed(() => {
     items.splice(2, 0, { path: "/invitations", label: "Приглашения", icon: "Link2" });
     items.push({ path: "/branches", label: "Филиалы", icon: "Building2" });
     items.push({ path: "/positions", label: "Должности", icon: "Briefcase" });
-    items.push({ path: "/logs", label: "Журнал", icon: "ScrollText" });
     items.push({ path: "/settings", label: "Настройки", icon: "Settings" });
   }
 

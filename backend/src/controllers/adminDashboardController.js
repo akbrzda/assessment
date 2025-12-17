@@ -413,44 +413,6 @@ exports.getBranchKPI = async (req, res) => {
 };
 
 /**
- * Получить последние действия управляющих
- */
-exports.getRecentActions = async (req, res) => {
-  try {
-    const { limit = 10 } = req.query;
-
-    const [recentActions] = await pool.query(
-      `
-      SELECT 
-        al.id,
-        al.admin_id,
-        al.admin_username,
-        al.action_type,
-        al.entity_type,
-        al.entity_id,
-        al.description,
-        al.created_at,
-        u.first_name,
-        u.last_name,
-        r.name as role_name
-      FROM action_logs al
-      LEFT JOIN users u ON al.admin_id = u.id
-      LEFT JOIN roles r ON u.role_id = r.id
-      WHERE r.name IN ('manager', 'superadmin')
-      ORDER BY al.created_at DESC
-      LIMIT ?
-    `,
-      [parseInt(limit)]
-    );
-
-    res.json({ recentActions });
-  } catch (error) {
-    console.error("Get recent actions error:", error);
-    res.status(500).json({ error: "Ошибка получения последних действий" });
-  }
-};
-
-/**
  * Получить последние попытки аттестаций
  */
 exports.getLatestAssessmentActivities = async (req, res) => {

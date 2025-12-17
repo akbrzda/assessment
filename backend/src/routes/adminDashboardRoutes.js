@@ -13,9 +13,6 @@ router.get("/activity-trends", verifyJWT, verifyAdminRole(["superadmin", "manage
 // Получить KPI по филиалам
 router.get("/branch-kpi", verifyJWT, verifyAdminRole(["superadmin", "manager"]), adminDashboardController.getBranchKPI);
 
-// Получить последние действия
-router.get("/recent-actions", verifyJWT, verifyAdminRole(["superadmin", "manager"]), adminDashboardController.getRecentActions);
-
 // Получить последние попытки аттестаций
 router.get(
   "/latest-assessment-activities",

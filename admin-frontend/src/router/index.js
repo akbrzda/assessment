@@ -109,12 +109,6 @@ const routes = [
         component: () => import("../views/SettingsView.vue"),
         meta: { roles: ["superadmin"], title: "Настройки" },
       },
-      {
-        path: "logs",
-        name: "Logs",
-        component: () => import("../views/LogsView.vue"),
-        meta: { roles: ["superadmin"], title: "Логи действий" },
-      },
     ],
   },
 ];
