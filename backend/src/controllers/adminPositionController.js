@@ -1,6 +1,28 @@
 const { pool } = require("../config/database");
 const { logAndSend, buildActorFromRequest } = require("../services/auditService");
 
+const normalizeVisibilityFlag = (value, defaultValue = true) => {
+  if (value === undefined || value === null) {
+    return defaultValue;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return value === 1;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1") {
+      return true;
+    }
+    if (normalized === "false" || normalized === "0") {
+      return false;
+    }
+  }
+  return Boolean(value);
+};
+
 /**
  * Получить список должностей
  */
@@ -12,6 +34,7 @@ exports.getPositions = async (req, res, next) => {
       SELECT 
         p.id,
         p.name,
+        p.is_visible_in_miniapp,
         p.created_at,
         COUNT(DISTINCT u.id) as employees_count,
         COUNT(DISTINCT aa.id) as assessments_completed,
@@ -29,7 +52,7 @@ exports.getPositions = async (req, res, next) => {
       params.push(`%${search}%`);
     }
 
-    query += " GROUP BY p.id ORDER BY p.name ASC";
+    query += " GROUP BY p.id ORDER BY p.id ASC";
 
     const [positions] = await pool.query(query, params);
 
@@ -83,20 +106,21 @@ exports.getPositionById = async (req, res, next) => {
  */
 exports.createPosition = async (req, res, next) => {
   try {
-    const { name } = req.body;
+    const { name, isVisibleInMiniapp } = req.body;
 
     if (!name || name.trim().length === 0) {
       return res.status(400).json({ error: "Название должности обязательно" });
     }
 
     const normalizedName = name.trim();
+    const visibility = normalizeVisibilityFlag(isVisibleInMiniapp);
 
     const [existing] = await pool.query("SELECT id FROM positions WHERE name = ?", [normalizedName]);
     if (existing.length > 0) {
       return res.status(400).json({ error: "Должность с таким названием уже существует" });
     }
 
-    const [result] = await pool.query("INSERT INTO positions (name) VALUES (?)", [normalizedName]);
+    const [result] = await pool.query("INSERT INTO positions (name, is_visible_in_miniapp) VALUES (?, ?)", [normalizedName, visibility ? 1 : 0]);
 
     await logAndSend({
       req,
@@ -106,6 +130,7 @@ exports.createPosition = async (req, res, next) => {
       entityId: result.insertId,
       metadata: {
         name: normalizedName,
+        isVisibleInMiniapp: visibility,
       },
     });
 
@@ -125,25 +150,31 @@ exports.createPosition = async (req, res, next) => {
 exports.updatePosition = async (req, res, next) => {
   try {
     const positionId = Number(req.params.id);
-    const { name } = req.body;
+    const { name, isVisibleInMiniapp } = req.body;
 
     if (!name || name.trim().length === 0) {
       return res.status(400).json({ error: "Название должности обязательно" });
     }
 
     const normalizedName = name.trim();
+    const [positions] = await pool.query("SELECT id, name, is_visible_in_miniapp FROM positions WHERE id = ?", [positionId]);
 
-    const [positions] = await pool.query("SELECT id, name FROM positions WHERE id = ?", [positionId]);
     if (positions.length === 0) {
       return res.status(404).json({ error: "Должность не найдена" });
     }
+
+    const visibility = normalizeVisibilityFlag(isVisibleInMiniapp, positions[0].is_visible_in_miniapp === 1);
 
     const [existing] = await pool.query("SELECT id FROM positions WHERE name = ? AND id != ?", [normalizedName, positionId]);
     if (existing.length > 0) {
       return res.status(400).json({ error: "Должность с таким названием уже существует" });
     }
 
-    await pool.query("UPDATE positions SET name = ? WHERE id = ?", [normalizedName, positionId]);
+    await pool.query("UPDATE positions SET name = ?, is_visible_in_miniapp = ? WHERE id = ?", [
+      normalizedName,
+      visibility ? 1 : 0,
+      positionId,
+    ]);
 
     await logAndSend({
       req,
@@ -154,6 +185,8 @@ exports.updatePosition = async (req, res, next) => {
       metadata: {
         previousName: positions[0].name,
         name: normalizedName,
+        previousVisibility: positions[0].is_visible_in_miniapp === 1,
+        isVisibleInMiniapp: visibility,
       },
     });
 

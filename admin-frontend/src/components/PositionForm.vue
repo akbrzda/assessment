@@ -11,6 +11,14 @@
         @blur="validateField('name')"
       />
 
+      <label class="checkbox-field">
+        <input v-model="form.isVisibleInMiniapp" type="checkbox" />
+        <div>
+          <span class="checkbox-title">Показывать должность в миниапп</span>
+          <p class="checkbox-description">Скрытые должности доступны только администраторам и при редактировании сотрудников</p>
+        </div>
+      </label>
+
       <div v-if="positionId && positionStats" class="stats-section">
         <h4 class="stats-title">Статистика</h4>
         <div class="stats-grid-3">
@@ -45,6 +53,7 @@ import { createPosition, getPositionById, updatePosition } from "../api/position
 import Preloader from "./ui/Preloader.vue";
 import Input from "./ui/Input.vue";
 import Button from "./ui/Button.vue";
+import { useToast } from "../composables/useToast";
 
 const props = defineProps({
   positionId: {
@@ -56,9 +65,10 @@ const props = defineProps({
 const emit = defineEmits(["submit", "cancel"]);
 
 const loading = ref(false);
-const form = ref({ name: "" });
+const form = ref({ name: "", isVisibleInMiniapp: true });
 const errors = ref({});
 const positionStats = ref(null);
+const { showToast } = useToast();
 
 const toNumber = (value) => {
   if (value === null || value === undefined || value === "") {
@@ -74,7 +84,7 @@ const formatAvgScore = (value) => {
 };
 
 const resetForm = () => {
-  form.value = { name: "" };
+  form.value = { name: "", isVisibleInMiniapp: true };
   errors.value = {};
   positionStats.value = null;
 };
@@ -107,6 +117,7 @@ const loadPosition = async () => {
   try {
     const data = await getPositionById(props.positionId);
     form.value.name = data.position.name;
+    form.value.isVisibleInMiniapp = data.position.is_visible_in_miniapp === 1;
     positionStats.value = {
       employees_count: data.position.employees_count,
       assessments_completed: data.position.assessments_completed,
@@ -114,7 +125,7 @@ const loadPosition = async () => {
     };
   } catch (error) {
     console.error("Load position error:", error);
-    alert("Ошибка загрузки должности");
+    showToast("Ошибка загрузки должности", "error");
   } finally {
     loading.value = false;
   }
@@ -124,25 +135,25 @@ const handleSubmit = async () => {
   validateField("name");
 
   if (Object.keys(errors.value).length > 0) {
-    alert("Проверьте корректность полей");
+    showToast("Проверьте корректность полей", "warning");
     return;
   }
 
   loading.value = true;
   try {
-    const payload = { name: form.value.name.trim() };
+    const payload = { name: form.value.name.trim(), isVisibleInMiniapp: Boolean(form.value.isVisibleInMiniapp) };
     if (props.positionId) {
       await updatePosition(props.positionId, payload);
-      alert("Должность обновлена");
+      showToast("Должность обновлена", "success");
     } else {
       await createPosition(payload);
-      alert("Должность создана");
+      showToast("Должность создана", "success");
     }
     emit("submit");
   } catch (error) {
     console.error("Save position error:", error);
     const errorMessage = error.response?.data?.error || "Ошибка сохранения должности";
-    alert(errorMessage);
+    showToast(errorMessage, "error");
   } finally {
     loading.value = false;
   }
@@ -177,6 +188,32 @@ onMounted(() => {
   background-color: var(--bg-secondary);
   border-radius: 12px;
   border: 1px solid var(--divider);
+}
+
+.checkbox-field {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 8px 0;
+}
+
+.checkbox-field input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--accent-blue);
+}
+
+.checkbox-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.checkbox-description {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
 .stats-title {

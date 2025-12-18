@@ -153,6 +153,7 @@ import Select from "./ui/Select.vue";
 import Textarea from "./ui/Textarea.vue";
 import Icon from "./ui/Icon.vue";
 import { API_BASE_URL } from "@/env";
+import { useToast } from "../composables/useToast";
 
 const apiBaseUrl = API_BASE_URL || "http://localhost:3001/api";
 const apiUrl = apiBaseUrl.replace("/api", "");
@@ -173,6 +174,7 @@ const showCreateModal = computed({
 const editingBadge = ref(null);
 const selectedFile = ref(null);
 const previewUrl = ref(null);
+const { showToast } = useToast();
 
 const formData = ref({
   code: "",
@@ -217,7 +219,7 @@ const loadBadges = async () => {
     badges.value = data.badges || [];
   } catch (error) {
     console.error("Ошибка загрузки бейджей:", error);
-    alert("Не удалось загрузить бейджи");
+    showToast("Не удалось загрузить бейджи", "error");
   } finally {
     loading.value = false;
   }
@@ -286,7 +288,7 @@ const clearImage = () => {
 // Сохранение бейджа
 const saveBadge = async () => {
   if (!formData.value.code || !formData.value.name) {
-    alert("Заполните обязательные поля");
+    showToast("Заполните обязательные поля", "warning");
     return;
   }
 
@@ -312,9 +314,9 @@ const saveBadge = async () => {
   } catch (error) {
     console.error("Ошибка сохранения бейджа:", error);
     if (error.response?.data?.error) {
-      alert(error.response.data.error);
+      showToast(error.response.data.error, "error");
     } else {
-      alert("Не удалось сохранить бейдж");
+      showToast("Не удалось сохранить бейдж", "error");
     }
   } finally {
     saving.value = false;
@@ -336,9 +338,9 @@ const deleteBadge = async (id) => {
   } catch (error) {
     console.error("Ошибка удаления бейджа:", error);
     if (error.response?.data?.error) {
-      alert(error.response.data.error);
+      showToast(error.response.data.error, "error");
     } else {
-      alert("Не удалось удалить бейдж");
+      showToast("Не удалось удалить бейдж", "error");
     }
   }
 };

@@ -1,7 +1,12 @@
 <template>
-  <div class="app-shell">
-    <Sidebar :isOpen="sidebarOpen" @close="sidebarOpen = false" />
-    <TopBar @toggle-sidebar="sidebarOpen = !sidebarOpen" />
+  <div class="app-shell" :class="{ 'sidebar-collapsed': isSidebarCollapsed }">
+    <Sidebar
+      :isOpen="sidebarOpen"
+      :isCollapsed="isSidebarCollapsed"
+      @close="sidebarOpen = false"
+      @toggle-collapse="toggleSidebarCollapsed"
+    />
+    <TopBar :sidebar-collapsed="isSidebarCollapsed" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
 
     <main class="main-content" :class="{ 'sidebar-open': sidebarOpen }">
       <router-view />
@@ -13,12 +18,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import Sidebar from "./Sidebar.vue";
 import TopBar from "./TopBar.vue";
+import { useThemeStore } from "../../stores/theme";
 
 const sidebarOpen = ref(true);
 const isMobile = ref(false);
+const themeStore = useThemeStore();
+const isSidebarCollapsed = computed(() => themeStore.sidebarCollapsed);
+
+const toggleSidebarCollapsed = () => {
+  themeStore.toggleSidebarCollapsed();
+};
 
 const checkMobile = () => {
   isMobile.value = window.innerWidth < 1024;
@@ -51,6 +63,10 @@ onUnmounted(() => {
   min-height: calc(100vh - 72px);
 }
 
+.app-shell.sidebar-collapsed .main-content {
+  margin-left: 96px;
+}
+
 .main-content :deep(> *) {
   max-width: 1280px;
   margin: 0 auto;
@@ -66,6 +82,10 @@ onUnmounted(() => {
   .main-content {
     margin-left: 0;
     padding: 24px 12px;
+  }
+
+  .app-shell.sidebar-collapsed .main-content {
+    margin-left: 0;
   }
 }
 

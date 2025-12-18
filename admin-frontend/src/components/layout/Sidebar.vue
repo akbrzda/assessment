@@ -1,39 +1,76 @@
 <template>
-  <aside class="sidebar" :class="{ 'is-open': isOpen }">
-    <div class="sidebar-header">
-      <h1 class="sidebar-title">Админ-панель</h1>
-      <!-- Кнопка закрытия для мобильных -->
-      <button @click="$emit('close')" class="close-btn" aria-label="Закрыть меню">
-        <Icon name="X" size="20" aria-hidden="true" />
-      </button>
-    </div>
+  <aside class="sidebar" :class="{ 'is-open': isOpen, 'is-collapsed': isCollapsed }">
+    <div class="sidebar-inner">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <div class="brand-icon">
+            <Icon name="Shield" size="22" aria-hidden="true" />
+          </div>
+          <div v-if="!isCollapsed" class="sidebar-title-wrapper">
+            <h1 class="sidebar-title">Админ-панель</h1>
+            <p class="sidebar-subtitle">Центр управления</p>
+          </div>
+        </div>
+        <div class="sidebar-header-actions">
+          <button
+            v-if="!isMobile"
+            @click="$emit('toggle-collapse')"
+            class="collapse-btn"
+            :title="collapseTitle"
+            aria-label="Переключить ширину сайдбара"
+          >
+            <Icon :name="isCollapsed ? 'ChevronRight' : 'ChevronLeft'" size="18" aria-hidden="true" />
+          </button>
+          <button @click="$emit('close')" class="close-btn" aria-label="Закрыть меню">
+            <Icon name="X" size="18" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
 
-    <nav class="sidebar-nav">
-      <router-link v-for="item in menuItems" :key="item.path" :to="item.path" class="nav-item" active-class="active" @click="handleNavClick">
-        <span class="nav-icon">
-          <Icon :name="item.icon" size="20" aria-hidden="true" />
-        </span>
-        <span class="nav-label">{{ item.label }}</span>
-      </router-link>
-    </nav>
+      <div class="sidebar-content">
+        <nav class="sidebar-nav">
+          <router-link
+            v-for="item in menuItems"
+            :key="item.path"
+            :to="item.path"
+            class="nav-item"
+            active-class="active"
+            :title="item.label"
+            @click="handleNavClick"
+          >
+            <span class="nav-icon">
+              <Icon :name="item.icon" size="20" aria-hidden="true" />
+            </span>
+            <span class="nav-label">{{ item.label }}</span>
+          </router-link>
+        </nav>
+      </div>
+    </div>
   </aside>
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref, onMounted, onUnmounted } from "vue";
 import { useAuthStore } from "../../stores/auth";
 import { Icon } from "../ui";
 
-defineProps({
+const props = defineProps({
   isOpen: {
     type: Boolean,
     default: true,
   },
+  isCollapsed: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-const emit = defineEmits(["close"]);
+const emit = defineEmits(["close", "toggle-collapse"]);
 
 const authStore = useAuthStore();
+const isMobile = ref(false);
+
+const collapseTitle = computed(() => (props.isCollapsed ? "Развернуть меню" : "Свернуть меню"));
 
 const menuItems = computed(() => {
   const items = [
@@ -61,6 +98,19 @@ const handleNavClick = () => {
     emit("close");
   }
 };
+
+const updateIsMobile = () => {
+  isMobile.value = window.innerWidth < 1024;
+};
+
+onMounted(() => {
+  updateIsMobile();
+  window.addEventListener("resize", updateIsMobile);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("resize", updateIsMobile);
+});
 </script>
 
 <style scoped>
@@ -72,10 +122,21 @@ const handleNavClick = () => {
   left: 0;
   top: 0;
   border-right: 1px solid var(--divider);
-  overflow-y: auto;
   z-index: 40;
   transition: transform 0.3s ease;
   backdrop-filter: blur(18px);
+  display: flex;
+}
+
+.sidebar-inner {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar.is-collapsed {
+  width: 96px;
 }
 
 @media (max-width: 1023px) {
@@ -86,15 +147,46 @@ const handleNavClick = () => {
   .sidebar.is-open {
     transform: translateX(0);
   }
+
+  .sidebar.is-collapsed {
+    width: 264px;
+  }
 }
 
 .sidebar-header {
   border-bottom: 1px solid var(--divider);
-  position: relative;
   min-height: 72px;
   display: flex;
   align-items: center;
-  padding-left: 20px;
+  justify-content: space-between;
+  padding: 16px 18px;
+  gap: 12px;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.brand-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.sidebar-title-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .sidebar-title {
@@ -107,55 +199,109 @@ const handleNavClick = () => {
 .sidebar-subtitle {
   font-size: 12px;
   color: var(--text-secondary);
-  margin: 4px 0 0 0;
+  margin: 0;
+}
+
+.sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collapse-btn {
+  border: 1px solid var(--divider);
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.collapse-btn:hover {
+  background: var(--nav-hover-bg);
+  color: var(--text-primary);
 }
 
 .close-btn {
-  display: none;
-  position: absolute;
-  right: 16px;
-  top: 16px;
-  padding: 6px;
+  border: 1px solid var(--divider);
   background: transparent;
-  border: none;
-  cursor: pointer;
   color: var(--text-secondary);
-  border-radius: 6px;
+  border-radius: 999px;
+  padding: 6px;
+  cursor: pointer;
   transition: all 0.2s;
+  width: 36px;
+  height: 36px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: var(--nav-hover-bg);
+  color: var(--text-primary);
 }
 
 @media (max-width: 1023px) {
   .close-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: inline-flex;
+  }
+
+  .collapse-btn {
+    display: none;
   }
 }
 
-.close-btn:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.close-btn .icon {
-  width: 20px;
-  height: 20px;
+.sidebar-content {
+  padding: 18px;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .sidebar-nav {
-  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--divider);
+  background: var(--surface-card);
+  box-shadow: 0 18px 40px #0000000a;
+}
+
+.sidebar.is-collapsed .sidebar-nav {
+  padding: 16px 10px;
+  align-items: center;
+}
+
+.sidebar.is-collapsed .sidebar-brand {
+  justify-content: center;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
-  margin-bottom: 10px;
+  padding: 10px 12px;
   border-radius: 14px;
   color: var(--text-secondary);
   text-decoration: none;
   transition: all 0.2s;
+  font-weight: 500;
+  position: relative;
+  min-height: 44px;
+  width: 100%;
+}
+
+.sidebar.is-collapsed .nav-item {
+  justify-content: center;
+  width: auto;
 }
 
 .nav-item:hover {
@@ -175,9 +321,16 @@ const handleNavClick = () => {
   align-items: center;
   justify-content: center;
   width: 24px;
+  flex-shrink: 0;
 }
 
 .nav-label {
   font-size: 14px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.sidebar.is-collapsed .nav-label {
+  display: none;
 }
 </style>

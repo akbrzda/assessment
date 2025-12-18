@@ -61,6 +61,7 @@ import Preloader from "./ui/Preloader.vue";
 import Input from "./ui/Input.vue";
 import Button from "./ui/Button.vue";
 import Textarea from "./ui/Textarea.vue";
+import { useToast } from "../composables/useToast";
 
 const emit = defineEmits(["updated"]);
 
@@ -76,6 +77,7 @@ const editForm = ref({
   name: "",
   description: "",
 });
+const { showToast } = useToast();
 
 const loadCategories = async () => {
   loading.value = true;
@@ -97,10 +99,10 @@ const handleCreate = async () => {
     newCategory.value = { name: "", description: "" };
     await loadCategories();
     emit("updated");
-    alert("Категория создана");
+    showToast("Категория создана", "success");
   } catch (error) {
     console.error("Create category error:", error);
-    alert("Ошибка создания категории");
+    showToast("Ошибка создания категории", "error");
   }
 };
 
@@ -123,16 +125,16 @@ const handleUpdate = async (id) => {
     editingId.value = null;
     await loadCategories();
     emit("updated");
-    alert("Категория обновлена");
+    showToast("Категория обновлена", "success");
   } catch (error) {
     console.error("Update category error:", error);
-    alert("Ошибка обновления категории");
+    showToast("Ошибка обновления категории", "error");
   }
 };
 
 const confirmDelete = async (category) => {
   if (category.questions_count > 0) {
-    alert("Нельзя удалить категорию с вопросами");
+    showToast("Нельзя удалить категорию с вопросами", "warning");
     return;
   }
 
@@ -141,10 +143,10 @@ const confirmDelete = async (category) => {
       await deleteCategory(category.id);
       await loadCategories();
       emit("updated");
-      alert("Категория удалена");
+      showToast("Категория удалена", "success");
     } catch (error) {
       console.error("Delete category error:", error);
-      alert("Ошибка удаления категории");
+      showToast("Ошибка удаления категории", "error");
     }
   }
 };

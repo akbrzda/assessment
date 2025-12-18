@@ -151,6 +151,25 @@
     <!-- Edit modal -->
     <Modal :show="showEditModal" title="Редактировать пользователя" @close="closeModals">
       <UserForm v-model="formData" :references="references" :is-edit="true" />
+      <div class="password-generator-card">
+        <div class="password-generator-head">
+          <div>
+            <p class="password-generator-title">Генерация пароля</p>
+            <p class="password-generator-text">Создайте сложный пароль на основе текущих данных сотрудника.</p>
+          </div>
+          <Button size="sm" variant="secondary" icon="Sparkles" :loading="passwordGenerating" @click="handleGeneratePassword">
+            Сгенерировать
+          </Button>
+        </div>
+        <div v-if="generatedPassword" class="password-generator-result">
+          <Input v-model="generatedPassword" label="Сгенерированный пароль" readonly />
+          <div class="password-generator-actions">
+            <Button size="sm" variant="ghost" icon="Copy" @click="copyGeneratedPassword">Скопировать</Button>
+            <Button size="sm" icon="KeyRound" :loading="passwordApplying" @click="applyGeneratedPassword">Применить пароль</Button>
+          </div>
+          <p class="password-generator-hint">Пароль содержит верхний и нижний регистр, цифры и символы.</p>
+        </div>
+      </div>
       <div class="modal-actions">
         <Button variant="secondary" @click="closeModals">Отмена</Button>
         <Button :loading="actionLoading" @click="handleUpdate">Сохранить</Button>
@@ -321,6 +340,7 @@ import Modal from "../components/ui/Modal.vue";
 import Preloader from "../components/ui/Preloader.vue";
 import UserForm from "../components/UserForm.vue";
 import Icon from "../components/ui/Icon.vue";
+import { useToast } from "../composables/useToast";
 
 const authStore = useAuthStore();
 const loading = ref(false);
@@ -350,6 +370,10 @@ const selectedUser = ref(null);
 const userProfile = ref(null);
 const profileLoading = ref(false);
 const newPassword = ref("");
+const { showToast } = useToast();
+const generatedPassword = ref("");
+const passwordGenerating = ref(false);
+const passwordApplying = ref(false);
 
 const defaultForm = () => ({
   firstName: "",
@@ -456,7 +480,7 @@ const loadUsers = async () => {
     users.value = data.users || [];
   } catch (error) {
     console.error("Ошибка загрузки пользователей", error);
-    alert("Не удалось загрузить пользователей");
+    showToast("Не удалось загрузить пользователей", "error");
   } finally {
     loading.value = false;
   }
@@ -504,7 +528,7 @@ const openProfileModal = async (user) => {
     userProfile.value = normalizeUserProfile(data);
   } catch (error) {
     console.error("Ошибка загрузки профиля", error);
-    alert("Не удалось загрузить профиль пользователя");
+    showToast("Не удалось загрузить профиль пользователя", "error");
     showProfileModal.value = false;
   } finally {
     profileLoading.value = false;
@@ -529,7 +553,7 @@ const handleExportExcel = async () => {
     window.URL.revokeObjectURL(url);
   } catch (error) {
     console.error("Ошибка экспорта", error);
-    alert("Не удалось экспортировать список пользователей");
+    showToast("Не удалось экспортировать список пользователей", "error");
   }
 };
 
@@ -553,6 +577,7 @@ const openCreateModal = () => {
 
 const openEditModal = (user) => {
   selectedUser.value = user;
+  generatedPassword.value = "";
   formData.value = {
     firstName: user.first_name,
     lastName: user.last_name,
@@ -590,15 +615,18 @@ const closeModals = () => {
   selectedUser.value = null;
   userProfile.value = null;
   newPassword.value = "";
+  generatedPassword.value = "";
+  passwordGenerating.value = false;
+  passwordApplying.value = false;
 };
 
 const validateForm = () => {
   if (!formData.value.firstName.trim() || !formData.value.lastName.trim()) {
-    alert("Укажите имя и фамилию пользователя");
+    showToast("Укажите имя и фамилию пользователя", "warning");
     return false;
   }
   if (!formData.value.branchId || !formData.value.positionId || !formData.value.roleId) {
-    alert("Выберите филиал, должность и роль");
+    showToast("Выберите филиал, должность и роль", "warning");
     return false;
   }
   return true;
@@ -621,10 +649,10 @@ const handleCreate = async () => {
 
     await loadUsers();
     closeModals();
-    alert("Пользователь создан");
+    showToast("Пользователь создан", "success");
   } catch (error) {
     console.error("Ошибка создания пользователя", error);
-    alert(error.response?.data?.error || "Не удалось создать пользователя");
+    showToast(error.response?.data?.error || "Не удалось создать пользователя", "error");
   } finally {
     actionLoading.value = false;
   }
@@ -654,10 +682,10 @@ const handleUpdate = async () => {
 
     await loadUsers();
     closeModals();
-    alert("Данные пользователя обновлены");
+    showToast("Данные пользователя обновлены", "success");
   } catch (error) {
     console.error("Ошибка обновления пользователя", error);
-    alert(error.response?.data?.error || "Не удалось обновить пользователя");
+    showToast(error.response?.data?.error || "Не удалось обновить пользователя", "error");
   } finally {
     actionLoading.value = false;
   }
@@ -666,7 +694,7 @@ const handleUpdate = async () => {
 const handleResetPassword = async () => {
   if (!selectedUser.value) return;
   if (!newPassword.value || newPassword.value.length < 6) {
-    alert("Пароль должен содержать не менее 6 символов");
+    showToast("Пароль должен содержать не менее 6 символов", "warning");
     return;
   }
 
@@ -674,10 +702,10 @@ const handleResetPassword = async () => {
   try {
     await resetPassword(selectedUser.value.id, newPassword.value);
     closeModals();
-    alert("Пароль обновлен");
+    showToast("Пароль обновлен", "success");
   } catch (error) {
     console.error("Ошибка сброса пароля", error);
-    alert(error.response?.data?.error || "Не удалось сбросить пароль");
+    showToast(error.response?.data?.error || "Не удалось сбросить пароль", "error");
   } finally {
     actionLoading.value = false;
   }
@@ -691,10 +719,10 @@ const handleDelete = async () => {
     await deleteUser(selectedUser.value.id);
     await loadUsers();
     closeModals();
-    alert("Пользователь удален");
+    showToast("Пользователь удален", "success");
   } catch (error) {
     console.error("Ошибка удаления пользователя", error);
-    alert(error.response?.data?.error || "Не удалось удалить пользователя");
+    showToast(error.response?.data?.error || "Не удалось удалить пользователя", "error");
   } finally {
     actionLoading.value = false;
   }
@@ -752,8 +780,137 @@ const normalizeUserProfile = (profile) => {
     user,
     nextLevel: safeProfile.nextLevel || null,
     progressToNextLevel: safeProfile.progressToNextLevel ?? 0,
-    userPoints: user.points ?? safeProfile.points ?? 0,
+  userPoints: user.points ?? safeProfile.points ?? 0,
   };
+};
+
+const getBranchNameById = (id) => {
+  if (!id) return "";
+  const branch = references.value.branches.find((item) => String(item.id) === String(id));
+  return branch?.name || "";
+};
+
+const getPositionNameById = (id) => {
+  if (!id) return "";
+  const position = references.value.positions.find((item) => String(item.id) === String(id));
+  return position?.name || "";
+};
+
+const createSeededRandom = (seed) => {
+  let current = seed || Date.now();
+  return () => {
+    current = (current * 48271) % 2147483647;
+    return current / 2147483647;
+  };
+};
+
+const deriveCharFromText = (text, set) => {
+  if (!text) return null;
+  const total = [...text].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return set.charAt(total % set.length);
+};
+
+const generatePasswordFromForm = () => {
+  const firstName = formData.value.firstName?.trim();
+  const lastName = formData.value.lastName?.trim();
+  const login = formData.value.login?.trim();
+  const branchName = getBranchNameById(formData.value.branchId);
+  const positionName = getPositionNameById(formData.value.positionId);
+
+  const lowerChars = "abcdefghjkmnpqrstuvwxyz";
+  const upperChars = lowerChars.toUpperCase();
+  const digits = "0123456789";
+  const symbols = "!@#$%^&*()-_=+?";
+
+  const baseSeedText = [firstName, lastName, login, branchName, positionName].filter(Boolean).join("");
+  const baseSeed = baseSeedText
+    ? [...baseSeedText].reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    : Date.now();
+  const random = createSeededRandom(baseSeed + Date.now());
+
+  const pickRandom = (set) => set.charAt(Math.floor(random() * set.length));
+
+  const chars = [];
+  chars.push(deriveCharFromText(firstName || branchName, lowerChars) || pickRandom(lowerChars));
+  chars.push(deriveCharFromText(lastName || positionName, upperChars) || pickRandom(upperChars));
+  const numericSeed = `${formData.value.branchId || ""}${formData.value.positionId || ""}${formData.value.level || ""}`;
+  chars.push(deriveCharFromText(numericSeed, digits) || pickRandom(digits));
+  chars.push(deriveCharFromText(login || `${branchName}${positionName}`, symbols) || pickRandom(symbols));
+
+  const allChars = lowerChars + upperChars + digits + symbols;
+  while (chars.length < 8) {
+    chars.push(pickRandom(allChars));
+  }
+
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+
+  return chars.join("");
+};
+
+const ensurePasswordData = () => {
+  if (!selectedUser.value) {
+    showToast("Сначала выберите пользователя", "warning");
+    return false;
+  }
+  if (!formData.value.firstName?.trim() || !formData.value.lastName?.trim()) {
+    showToast("Заполните имя и фамилию перед генерацией пароля", "warning");
+    return false;
+  }
+  if (!formData.value.branchId || !formData.value.positionId) {
+    showToast("Выберите филиал и должность пользователя", "warning");
+    return false;
+  }
+  return true;
+};
+
+const handleGeneratePassword = () => {
+  if (!ensurePasswordData()) return;
+  passwordGenerating.value = true;
+  try {
+    generatedPassword.value = generatePasswordFromForm();
+    showToast("Пароль сгенерирован", "success");
+  } catch (error) {
+    console.error("Ошибка генерации пароля", error);
+    showToast("Не удалось сгенерировать пароль", "error");
+  } finally {
+    passwordGenerating.value = false;
+  }
+};
+
+const copyGeneratedPassword = async () => {
+  if (!generatedPassword.value) return;
+  if (typeof navigator === "undefined" || !navigator.clipboard) {
+    showToast("Буфер обмена недоступен в этом браузере", "error");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(generatedPassword.value);
+    showToast("Пароль скопирован в буфер обмена", "success");
+  } catch (error) {
+    console.error("Ошибка копирования пароля", error);
+    showToast("Не удалось скопировать пароль", "error");
+  }
+};
+
+const applyGeneratedPassword = async () => {
+  if (!generatedPassword.value || !selectedUser.value) {
+    showToast("Сначала сгенерируйте пароль", "warning");
+    return;
+  }
+
+  passwordApplying.value = true;
+  try {
+    await resetPassword(selectedUser.value.id, generatedPassword.value);
+    showToast("Пароль применён для пользователя", "success");
+  } catch (error) {
+    console.error("Ошибка применения пароля", error);
+    showToast(error.response?.data?.error || "Не удалось обновить пароль", "error");
+  } finally {
+    passwordApplying.value = false;
+  }
 };
 
 onMounted(async () => {
@@ -794,6 +951,55 @@ onMounted(async () => {
 
 .filters-card {
   margin-bottom: 32px;
+}
+
+.password-generator-card {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid var(--divider);
+  border-radius: 18px;
+  background: var(--surface-card);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.password-generator-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.password-generator-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--text-primary);
+}
+
+.password-generator-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.password-generator-result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.password-generator-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.password-generator-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
 }
 
 .filters-grid {

@@ -1,6 +1,50 @@
 const { pool } = require("../config/database");
 const { logAndSend, buildActorFromRequest } = require("../services/auditService");
 
+const MANAGERS_QUERY = `
+  SELECT 
+    u.id,
+    u.first_name,
+    u.last_name,
+    u.telegram_id,
+    r.name as role_name,
+    COUNT(DISTINCT bm.branch_id) as branches_count
+  FROM users u
+  LEFT JOIN roles r ON u.role_id = r.id
+  LEFT JOIN branch_managers bm ON u.id = bm.user_id
+  WHERE r.name IN ('manager', 'superadmin')
+  GROUP BY u.id
+  ORDER BY u.first_name, u.last_name
+`;
+
+const mapManagerRows = (managers) =>
+  managers.map((manager) => ({
+    ...manager,
+    role: manager.role_name,
+  }));
+
+const normalizeVisibilityFlag = (value, defaultValue = true) => {
+  if (value === undefined || value === null) {
+    return defaultValue;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return value === 1;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1") {
+      return true;
+    }
+    if (normalized === "false" || normalized === "0") {
+      return false;
+    }
+  }
+  return Boolean(value);
+};
+
 /**
  * Получить список филиалов
  */
@@ -13,6 +57,7 @@ exports.getBranches = async (req, res, next) => {
         b.id,
         b.name,
         b.city,
+        b.is_visible_in_miniapp,
         b.created_at,
         COUNT(DISTINCT u.id) as employees_count,
         COUNT(DISTINCT aa.id) as assessments_completed,
@@ -35,7 +80,7 @@ exports.getBranches = async (req, res, next) => {
     }
 
     query += " AND (mr.name IN ('manager', 'superadmin') OR mr.name IS NULL)";
-    query += " GROUP BY b.id ORDER BY b.name ASC";
+    query += " GROUP BY b.id ORDER BY b.id ASC";
 
     const [branches] = await pool.query(query, params);
 
@@ -81,14 +126,18 @@ exports.getBranchById = async (req, res, next) => {
         u.first_name,
         u.last_name,
         u.telegram_id,
+        r.name as role_name,
         bm.assigned_at
       FROM branch_managers bm
       JOIN users u ON bm.user_id = u.id
+      LEFT JOIN roles r ON u.role_id = r.id
       WHERE bm.branch_id = ?
       ORDER BY bm.assigned_at DESC
     `,
       [branchId]
     );
+
+    const [availableManagersRows] = await pool.query(MANAGERS_QUERY);
 
     res.json({
       branch: {
@@ -96,6 +145,7 @@ exports.getBranchById = async (req, res, next) => {
         ...stats[0],
         managers,
       },
+      availableManagers: mapManagerRows(availableManagersRows),
     });
   } catch (error) {
     console.error("Get branch by ID error:", error);
@@ -108,11 +158,12 @@ exports.getBranchById = async (req, res, next) => {
  */
 exports.createBranch = async (req, res, next) => {
   try {
-    const { name, city } = req.body;
+    const { name, city, isVisibleInMiniapp } = req.body;
 
     if (!name || name.trim().length === 0) {
       return res.status(400).json({ error: "Название филиала обязательно" });
     }
+    const visibility = normalizeVisibilityFlag(isVisibleInMiniapp);
 
     // Проверить уникальность названия
     const [existing] = await pool.query("SELECT id FROM branches WHERE name = ?", [name.trim()]);
@@ -121,7 +172,11 @@ exports.createBranch = async (req, res, next) => {
       return res.status(400).json({ error: "Филиал с таким названием уже существует" });
     }
 
-    const [result] = await pool.query("INSERT INTO branches (name, city) VALUES (?, ?)", [name.trim(), city?.trim() || null]);
+    const [result] = await pool.query("INSERT INTO branches (name, city, is_visible_in_miniapp) VALUES (?, ?, ?)", [
+      name.trim(),
+      city?.trim() || null,
+      visibility ? 1 : 0,
+    ]);
 
     await logAndSend({
       req,
@@ -132,6 +187,7 @@ exports.createBranch = async (req, res, next) => {
       metadata: {
         name: name.trim(),
         city: city?.trim() || null,
+        isVisibleInMiniapp: visibility,
       },
     });
 
@@ -151,18 +207,20 @@ exports.createBranch = async (req, res, next) => {
 exports.updateBranch = async (req, res, next) => {
   try {
     const branchId = Number(req.params.id);
-    const { name, city } = req.body;
+    const { name, city, isVisibleInMiniapp } = req.body;
 
     if (!name || name.trim().length === 0) {
       return res.status(400).json({ error: "Название филиала обязательно" });
     }
 
     // Проверить существование
-    const [branches] = await pool.query("SELECT id, name, city FROM branches WHERE id = ?", [branchId]);
+    const [branches] = await pool.query("SELECT id, name, city, is_visible_in_miniapp FROM branches WHERE id = ?", [branchId]);
 
     if (branches.length === 0) {
       return res.status(404).json({ error: "Филиал не найден" });
     }
+
+    const visibility = normalizeVisibilityFlag(isVisibleInMiniapp, branches[0].is_visible_in_miniapp === 1);
 
     // Проверить уникальность названия (кроме текущего)
     const [existing] = await pool.query("SELECT id FROM branches WHERE name = ? AND id != ?", [name.trim(), branchId]);
@@ -171,7 +229,12 @@ exports.updateBranch = async (req, res, next) => {
       return res.status(400).json({ error: "Филиал с таким названием уже существует" });
     }
 
-    await pool.query("UPDATE branches SET name = ?, city = ? WHERE id = ?", [name.trim(), city?.trim() || null, branchId]);
+    await pool.query("UPDATE branches SET name = ?, city = ?, is_visible_in_miniapp = ? WHERE id = ?", [
+      name.trim(),
+      city?.trim() || null,
+      visibility ? 1 : 0,
+      branchId,
+    ]);
 
     await logAndSend({
       req,
@@ -184,6 +247,8 @@ exports.updateBranch = async (req, res, next) => {
         name: name.trim(),
         previousCity: branches[0].city,
         city: city?.trim() || null,
+        previousVisibility: branches[0].is_visible_in_miniapp === 1,
+        isVisibleInMiniapp: visibility,
       },
     });
 
@@ -415,29 +480,10 @@ exports.assignManagerToBranches = async (req, res, next) => {
  */
 exports.getManagers = async (req, res, next) => {
   try {
-    const [managers] = await pool.query(
-      `
-      SELECT 
-        u.id,
-        u.first_name,
-        u.last_name,
-        u.telegram_id,
-        r.name as role_name,
-        COUNT(DISTINCT bm.branch_id) as branches_count
-      FROM users u
-      LEFT JOIN roles r ON u.role_id = r.id
-      LEFT JOIN branch_managers bm ON u.id = bm.user_id
-      WHERE r.name IN ('manager', 'superadmin')
-      GROUP BY u.id
-      ORDER BY u.first_name, u.last_name
-    `
-    );
+    const [managers] = await pool.query(MANAGERS_QUERY);
 
     res.json({
-      managers: managers.map((manager) => ({
-        ...manager,
-        role: manager.role_name,
-      })),
+      managers: mapManagerRows(managers),
     });
   } catch (error) {
     console.error("Get managers error:", error);

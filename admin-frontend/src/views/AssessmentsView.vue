@@ -156,6 +156,7 @@ import Button from "../components/ui/Button.vue";
 import Badge from "../components/ui/Badge.vue";
 import Input from "../components/ui/Input.vue";
 import Select from "../components/ui/Select.vue";
+import { useToast } from "../composables/useToast";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -167,6 +168,7 @@ const filters = ref({
   status: "",
   branch: "",
 });
+const { showToast } = useToast();
 
 const references = ref({
   branches: [],
@@ -204,7 +206,7 @@ const loadAssessments = async () => {
     assessments.value = data.assessments;
   } catch (error) {
     console.error("Load assessments error:", error);
-    alert("Ошибка загрузки аттестаций");
+    showToast("Ошибка загрузки аттестаций", "error");
   } finally {
     loading.value = false;
   }
@@ -240,11 +242,11 @@ const confirmDelete = async (assessment) => {
   if (confirm(`Вы уверены, что хотите удалить аттестацию "${assessment.title}"?`)) {
     try {
       await deleteAssessment(assessment.id);
-      alert("Аттестация удалена");
+      showToast("Аттестация удалена", "success");
       loadAssessments();
     } catch (error) {
       console.error("Delete assessment error:", error);
-      alert("Ошибка удаления аттестации");
+      showToast("Ошибка удаления аттестации", "error");
     }
   }
 };

@@ -80,6 +80,7 @@ import Input from "./ui/Input.vue";
 import Select from "./ui/Select.vue";
 import Button from "./ui/Button.vue";
 import Textarea from "./ui/Textarea.vue";
+import { useToast } from "../composables/useToast";
 
 const props = defineProps({
   questionId: {
@@ -95,6 +96,7 @@ const props = defineProps({
 const emit = defineEmits(["submit", "cancel"]);
 
 const loading = ref(false);
+const { showToast } = useToast();
 
 const form = ref({
   categoryId: null,
@@ -198,7 +200,7 @@ const loadQuestion = async () => {
     };
   } catch (error) {
     console.error("Load question error:", error);
-    alert("Ошибка загрузки вопроса");
+    showToast("Ошибка загрузки вопроса", "error");
   } finally {
     loading.value = false;
   }
@@ -228,11 +230,11 @@ const setCorrectOption = (index) => {
 const handleSubmit = async () => {
   if (!isFormValid.value) {
     if (form.value.questionType === "text") {
-      alert("Пожалуйста, заполните текст вопроса и эталонный ответ");
+      showToast("Пожалуйста, заполните текст вопроса и эталонный ответ", "warning");
     } else if (form.value.questionType === "single") {
-      alert("Пожалуйста, заполните все поля и отметьте один правильный ответ");
+      showToast("Пожалуйста, заполните все поля и отметьте один правильный ответ", "warning");
     } else {
-      alert("Пожалуйста, заполните все поля и отметьте минимум 2 правильных ответа");
+      showToast("Пожалуйста, заполните все поля и отметьте минимум 2 правильных ответа", "warning");
     }
     return;
   }
@@ -241,15 +243,15 @@ const handleSubmit = async () => {
   try {
     if (props.questionId) {
       await updateQuestion(props.questionId, form.value);
-      alert("Вопрос обновлен");
+      showToast("Вопрос обновлен", "success");
     } else {
       await createQuestion(form.value);
-      alert("Вопрос создан");
+      showToast("Вопрос создан", "success");
     }
     emit("submit");
   } catch (error) {
     console.error("Save question error:", error);
-    alert(error.response?.data?.error || "Ошибка сохранения вопроса");
+    showToast(error.response?.data?.error || "Ошибка сохранения вопроса", "error");
   } finally {
     loading.value = false;
   }

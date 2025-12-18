@@ -67,6 +67,7 @@
 import { ref, computed, onMounted } from "vue";
 import { getAssessmentResults } from "../api/assessments";
 import Preloader from "./ui/Preloader.vue";
+import { useToast } from "../composables/useToast";
 
 const props = defineProps({
   assessmentId: {
@@ -77,6 +78,7 @@ const props = defineProps({
 
 const loading = ref(false);
 const results = ref([]);
+const { showToast } = useToast();
 
 const completedCount = computed(() => {
   return results.value.filter((r) => r.status === "completed").length;
@@ -100,7 +102,7 @@ const loadResults = async () => {
     results.value = data.results;
   } catch (error) {
     console.error("Load results error:", error);
-    alert("Ошибка загрузки результатов");
+    showToast("Ошибка загрузки результатов", "error");
   } finally {
     loading.value = false;
   }

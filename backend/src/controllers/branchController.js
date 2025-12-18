@@ -6,6 +6,7 @@ const branchSchema = Joi.object({
   name: Joi.string().trim().min(2).max(128).required(),
   city: Joi.string().trim().max(64).optional().allow("", null),
   isActive: Joi.boolean().optional(),
+  isVisibleInMiniapp: Joi.boolean().optional(),
 });
 
 async function listBranches(req, res, next) {
@@ -15,13 +16,14 @@ async function listBranches(req, res, next) {
         b.id,
         b.name,
         b.city,
+        b.is_visible_in_miniapp,
         b.created_at as createdAt,
         b.updated_at as updatedAt,
         COUNT(DISTINCT u.id) as usersCount
       FROM branches b
       LEFT JOIN users u ON u.branch_id = b.id
       GROUP BY b.id
-      ORDER BY b.name ASC
+      ORDER BY b.id ASC
     `);
 
     res.json({ branches });
@@ -37,7 +39,13 @@ async function createBranch(req, res, next) {
       return res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
     }
 
-    const [result] = await pool.execute("INSERT INTO branches (name, city) VALUES (?, ?)", [value.name, value.city || null]);
+    const visibility = value.isVisibleInMiniapp ?? true;
+
+    const [result] = await pool.execute("INSERT INTO branches (name, city, is_visible_in_miniapp) VALUES (?, ?, ?)", [
+      value.name,
+      value.city || null,
+      visibility ? 1 : 0,
+    ]);
 
     const [branches] = await pool.execute("SELECT * FROM branches WHERE id = ?", [result.insertId]);
 
@@ -50,6 +58,7 @@ async function createBranch(req, res, next) {
       metadata: {
         name: value.name,
         city: value.city || null,
+        isVisibleInMiniapp: Boolean(visibility),
       },
     });
     await logAuditEvent(auditEntry);
@@ -76,9 +85,12 @@ async function updateBranch(req, res, next) {
       return res.status(404).json({ error: "Филиал не найден" });
     }
 
-    await pool.execute("UPDATE branches SET name = ?, city = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [
+    const visibility = value.isVisibleInMiniapp ?? (existing[0].is_visible_in_miniapp === 1);
+
+    await pool.execute("UPDATE branches SET name = ?, city = ?, is_visible_in_miniapp = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [
       value.name,
       value.city || null,
+      visibility ? 1 : 0,
       branchId,
     ]);
 
@@ -95,6 +107,8 @@ async function updateBranch(req, res, next) {
         name: value.name,
         previousCity: existing[0].city,
         city: value.city || null,
+        previousVisibility: existing[0].is_visible_in_miniapp === 1,
+        isVisibleInMiniapp: Boolean(visibility),
       },
     });
     await logAuditEvent(auditEntry);

@@ -42,6 +42,7 @@ import Modal from "./ui/Modal.vue";
 import Preloader from "./ui/Preloader.vue";
 import Select from "./ui/Select.vue";
 import Button from "./ui/Button.vue";
+import { useToast } from "../composables/useToast";
 
 const props = defineProps({
   modelValue: {
@@ -58,6 +59,7 @@ const managers = ref([]);
 const branches = ref([]);
 const selectedManager = ref(null);
 const selectedBranches = ref([]);
+const { showToast } = useToast();
 
 const managerOptions = computed(() => [
   { value: null, label: "Выберите управляющего" },
@@ -98,7 +100,7 @@ const loadData = async () => {
     branches.value = branchesData.branches;
   } catch (error) {
     console.error("Load data error:", error);
-    alert("Ошибка загрузки данных");
+    showToast("Ошибка загрузки данных", "error");
   } finally {
     loading.value = false;
   }
@@ -126,20 +128,20 @@ const handleBranchToggle = (branchId, checked) => {
 
 const handleSubmit = async () => {
   if (!selectedManager.value || selectedBranches.value.length === 0) {
-    alert("Выберите управляющего и хотя бы один филиал");
+    showToast("Выберите управляющего и хотя бы один филиал", "warning");
     return;
   }
 
   loading.value = true;
   try {
     await assignManagerToBranches(selectedManager.value, selectedBranches.value);
-    alert("Управляющий успешно назначен");
+    showToast("Управляющий успешно назначен", "success");
     emit("assigned");
     handleClose();
   } catch (error) {
     console.error("Assign manager error:", error);
     const errorMessage = error.response?.data?.error || "Ошибка назначения управляющего";
-    alert(errorMessage);
+    showToast(errorMessage, "error");
   } finally {
     loading.value = false;
   }

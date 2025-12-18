@@ -42,6 +42,7 @@
                 <th>Название</th>
                 <th>Город</th>
                 <th>Управляющий</th>
+                <th>Миниапп</th>
                 <th>Сотрудников</th>
                 <th>Аттестаций</th>
                 <th>Средний балл</th>
@@ -50,7 +51,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="branch in branches" :key="branch.id" :class="{ 'inactive-branch': !branch.managers }">
+              <tr v-for="branch in branches" :key="branch.id" :class="{ 'inactive-branch': !branch.managers, 'hidden-branch': !branch.isVisibleInMiniapp }">
                 <td>{{ branch.id }}</td>
                 <td class="branch-name">{{ branch.name }}</td>
                 <td class="city-cell">{{ branch.city || "—" }}</td>
@@ -59,6 +60,11 @@
                     {{ branch.managers }}
                   </span>
                   <span v-else class="no-manager">не назначен</span>
+                </td>
+                <td>
+                  <span class="miniapp-status" :class="branch.isVisibleInMiniapp ? 'status-visible' : 'status-hidden'">
+                    {{ branch.isVisibleInMiniapp ? "Виден" : "Скрыт" }}
+                  </span>
                 </td>
                 <td>
                   <Badge variant="primary" size="sm">{{ branch.employees_count }}</Badge>
@@ -92,7 +98,7 @@
 
         <!-- Mobile Cards -->
         <div class="mobile-cards show-mobile">
-          <div v-for="branch in branches" :key="branch.id" class="branch-card" :class="{ 'inactive-branch': !branch.managers }">
+          <div v-for="branch in branches" :key="branch.id" class="branch-card" :class="{ 'inactive-branch': !branch.managers, 'hidden-branch': !branch.isVisibleInMiniapp }">
             <div class="branch-card-header">
               <div>
                 <h3 class="branch-card-name">{{ branch.name }}</h3>
@@ -111,6 +117,14 @@
                 <span class="branch-card-value">
                   <span v-if="branch.managers" class="managers-list-mobile">{{ branch.managers }}</span>
                   <span v-else class="no-manager">не назначен</span>
+                </span>
+              </div>
+              <div class="branch-card-row">
+                <span class="branch-card-label">Миниапп:</span>
+                <span class="branch-card-value">
+                  <span class="miniapp-status" :class="branch.isVisibleInMiniapp ? 'status-visible' : 'status-hidden'">
+                    {{ branch.isVisibleInMiniapp ? "Виден" : "Скрыт" }}
+                  </span>
                 </span>
               </div>
               <div class="branch-card-row">
@@ -162,6 +176,7 @@ import Badge from "../components/ui/Badge.vue";
 import Input from "../components/ui/Input.vue";
 import BranchForm from "../components/BranchForm.vue";
 import AssignManagerModal from "../components/AssignManagerModal.vue";
+import { useToast } from "../composables/useToast";
 
 const loading = ref(false);
 const branches = ref([]);
@@ -172,6 +187,7 @@ const filters = ref({
 const showFormModal = ref(false);
 const showAssignManagerModal = ref(false);
 const editingId = ref(null);
+const { showToast } = useToast();
 
 const loadBranches = async () => {
   loading.value = true;
@@ -180,10 +196,11 @@ const loadBranches = async () => {
     branches.value = (data.branches || []).map((branch) => ({
       ...branch,
       avg_score: toNumber(branch.avg_score),
+      isVisibleInMiniapp: branch.is_visible_in_miniapp === 1,
     }));
   } catch (error) {
     console.error("Load branches error:", error);
-    alert("Ошибка загрузки филиалов");
+    showToast("Ошибка загрузки филиалов", "error");
   } finally {
     loading.value = false;
   }
@@ -229,19 +246,19 @@ const handleManagerAssigned = () => {
 
 const confirmDelete = async (branch) => {
   if (branch.employees_count > 0) {
-    alert(`Невозможно удалить филиал "${branch.name}". В нем ${branch.employees_count} сотрудников.`);
+    showToast(`Невозможно удалить филиал "${branch.name}". В нем ${branch.employees_count} сотрудников.`, "warning");
     return;
   }
 
   if (confirm(`Вы уверены, что хотите удалить филиал "${branch.name}"?`)) {
     try {
       await deleteBranch(branch.id);
-      alert("Филиал удален");
+      showToast("Филиал удален", "success");
       loadBranches();
     } catch (error) {
       console.error("Delete branch error:", error);
       const errorMessage = error.response?.data?.error || "Ошибка удаления филиала";
-      alert(errorMessage);
+      showToast(errorMessage, "error");
     }
   }
 };
@@ -367,6 +384,10 @@ onMounted(() => {
   background-color: #8080800d;
 }
 
+.branches-table tbody tr.hidden-branch {
+  background-color: #fff8e6;
+}
+
 .branches-table td {
   padding: 16px;
   font-size: 15px;
@@ -489,6 +510,10 @@ onMounted(() => {
   background-color: #8080800d;
 }
 
+.branch-card.hidden-branch {
+  border-color: #fcd34d;
+}
+
 .branch-card-header {
   display: flex;
   align-items: flex-start;
@@ -537,6 +562,26 @@ onMounted(() => {
   color: var(--text-primary);
   font-weight: 600;
   text-align: right;
+}
+
+.miniapp-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-visible {
+  background-color: #def7ec;
+  color: #03543f;
+}
+
+.status-hidden {
+  background-color: #fef3c7;
+  color: #92400e;
 }
 
 .managers-list-mobile {

@@ -2,18 +2,25 @@ const { pool } = require("../config/database");
 
 async function getPositions() {
   // Исключаем "Управляющий" для обычных пользователей (регистрация, фильтры)
-  const [rows] = await pool.execute("SELECT id, name FROM positions WHERE name != 'Управляющий' ORDER BY name ASC");
+  const [rows] = await pool.execute(
+    "SELECT id, name FROM positions WHERE name != 'Управляющий' AND is_visible_in_miniapp = 1 ORDER BY name ASC"
+  );
   return rows;
 }
 
 async function getAllPositions() {
   // Возвращаем все должности (для админа)
-  const [rows] = await pool.execute("SELECT id, name FROM positions ORDER BY name ASC");
+  const [rows] = await pool.execute("SELECT id, name, is_visible_in_miniapp FROM positions ORDER BY name ASC");
   return rows;
 }
 
 async function getBranches() {
-  const [rows] = await pool.execute("SELECT id, name FROM branches ORDER BY name ASC");
+  const [rows] = await pool.execute("SELECT id, name FROM branches WHERE is_visible_in_miniapp = 1 ORDER BY name ASC");
+  return rows;
+}
+
+async function getAllBranches() {
+  const [rows] = await pool.execute("SELECT id, name, city, is_visible_in_miniapp FROM branches ORDER BY name ASC");
   return rows;
 }
 
@@ -69,6 +76,7 @@ module.exports = {
   getPositions,
   getAllPositions,
   getBranches,
+  getAllBranches,
   getRoles,
   getRoleByName,
   getBranchById,

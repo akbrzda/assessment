@@ -207,9 +207,11 @@ import BarChart from "../components/charts/BarChart.vue";
 import LineChart from "../components/charts/LineChart.vue";
 import ComboChart from "../components/charts/ComboChart.vue";
 import UserReportModal from "../components/UserReportModal.vue";
+import { useToast } from "../composables/useToast";
 
 const loading = ref(false);
 const exporting = ref(false);
+const { showToast } = useToast();
 const userReportModalOpen = ref(false);
 const selectedUserId = ref(null);
 
@@ -344,7 +346,7 @@ const loadData = async () => {
     trends.value = trendsData?.trends || [];
   } catch (error) {
     console.error("Load data error:", error);
-    alert("Ошибка загрузки данных");
+    showToast("Ошибка загрузки данных", "error");
   } finally {
     loading.value = false;
   }
@@ -366,7 +368,7 @@ const handleExportExcel = async () => {
     await exportToExcel("branches", filters.value);
   } catch (error) {
     console.error("Export Excel error:", error);
-    alert("Ошибка экспорта в Excel");
+    showToast("Ошибка экспорта в Excel", "error");
   } finally {
     exporting.value = false;
   }
@@ -378,7 +380,7 @@ const handleExportPDF = async () => {
     await exportToPDF("branches", filters.value);
   } catch (error) {
     console.error("Export PDF error:", error);
-    alert("Ошибка экспорта в PDF");
+    showToast("Ошибка экспорта в PDF", "error");
   } finally {
     exporting.value = false;
   }

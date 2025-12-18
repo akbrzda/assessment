@@ -55,6 +55,7 @@ import { ref, onMounted } from "vue";
 import { getQuestionById } from "../api/questionBank";
 import Preloader from "./ui/Preloader.vue";
 import Icon from "./ui/Icon.vue";
+import { useToast } from "../composables/useToast";
 
 const props = defineProps({
   questionId: {
@@ -73,6 +74,7 @@ const question = ref({
   created_at: "",
   updated_at: "",
 });
+const { showToast } = useToast();
 
 const getQuestionTypeLabel = (type) => {
   const labels = {
@@ -90,7 +92,7 @@ const loadQuestion = async () => {
     question.value = data.question;
   } catch (error) {
     console.error("Load question error:", error);
-    alert("Ошибка загрузки вопроса");
+    showToast("Ошибка загрузки вопроса", "error");
   } finally {
     loading.value = false;
   }

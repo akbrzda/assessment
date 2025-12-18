@@ -235,6 +235,7 @@ import Badge from "../components/ui/Badge.vue";
 import Input from "../components/ui/Input.vue";
 import Select from "../components/ui/Select.vue";
 import { INVITE_EXPIRATION_DAYS, BOT_USERNAME } from "@/env";
+import { useToast } from "../composables/useToast";
 
 const loading = ref(false);
 const saving = ref(false);
@@ -269,6 +270,7 @@ const form = ref({
 });
 
 const extendDays = ref(7);
+const { showToast } = useToast();
 
 const stats = computed(() => {
   const counters = { total: 0, active: 0, used: 0, expired: 0 };
@@ -401,7 +403,7 @@ const closeFormModal = () => {
 
 const submitForm = async () => {
   if (!form.value.firstName.trim() || !form.value.lastName.trim() || !form.value.branchId) {
-    window.alert("Заполните все обязательные поля");
+    showToast("Заполните все обязательные поля", "warning");
     return;
   }
 
@@ -414,7 +416,7 @@ const submitForm = async () => {
         branchId: form.value.branchId,
       });
       updateList(data?.invitation);
-      window.alert("Приглашение обновлено");
+      showToast("Приглашение обновлено", "success");
     } else {
       const { data } = await createInvitation({
         firstName: form.value.firstName.trim(),
@@ -423,14 +425,14 @@ const submitForm = async () => {
       });
       if (data?.invitation) {
         invitations.value.unshift(normalizeInvitation(data.invitation));
-        window.alert("Приглашение создано. Ссылка скопирована в буфер обмена.");
+        showToast("Приглашение создано. Ссылка скопирована в буфер обмена.", "success");
         copyLink(data.invitation.code);
       }
     }
     closeFormModal();
   } catch (error) {
     console.error("Ошибка сохранения приглашения", error);
-    window.alert(error.response?.data?.error || "Не удалось сохранить приглашение");
+    showToast(error.response?.data?.error || "Не удалось сохранить приглашение", "error");
   } finally {
     saving.value = false;
   }
@@ -460,7 +462,7 @@ const closeExtendModal = () => {
 
 const submitExtend = async () => {
   if (extendDays.value < 1 || extendDays.value > 30) {
-    window.alert("Количество дней должно быть от 1 до 30");
+    showToast("Количество дней должно быть от 1 до 30", "warning");
     return;
   }
 
@@ -468,11 +470,11 @@ const submitExtend = async () => {
   try {
     const { data } = await extendInvitation(editingInvitation.value.id, { days: extendDays.value });
     updateList(data?.invitation);
-    window.alert("Срок действия приглашения продлён");
+    showToast("Срок действия приглашения продлён", "success");
     closeExtendModal();
   } catch (error) {
     console.error("Ошибка продления приглашения", error);
-    window.alert(error.response?.data?.error || "Не удалось продлить приглашение");
+    showToast(error.response?.data?.error || "Не удалось продлить приглашение", "error");
   } finally {
     saving.value = false;
   }
@@ -480,7 +482,7 @@ const submitExtend = async () => {
 
 const confirmDelete = async (invitation) => {
   if (invitation.status === "used") {
-    window.alert("Нельзя удалить использованное приглашение");
+    showToast("Нельзя удалить использованное приглашение", "warning");
     return;
   }
 
@@ -491,10 +493,10 @@ const confirmDelete = async (invitation) => {
   try {
     await deleteInvitation(invitation.id);
     invitations.value = invitations.value.filter((item) => item.id !== invitation.id);
-    window.alert("Приглашение удалено");
+    showToast("Приглашение удалено", "success");
   } catch (error) {
     console.error("Ошибка удаления приглашения", error);
-    window.alert(error.response?.data?.error || "Не удалось удалить приглашение");
+    showToast(error.response?.data?.error || "Не удалось удалить приглашение", "error");
   }
 };
 
@@ -558,7 +560,7 @@ const copyLink = async (code) => {
     document.execCommand("copy");
     document.body.removeChild(textArea);
   }
-  window.alert("Ссылка приглашения скопирована");
+  showToast("Ссылка приглашения скопирована", "info");
 };
 
 const sendToTelegram = (invitation) => {

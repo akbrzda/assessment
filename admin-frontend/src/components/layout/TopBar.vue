@@ -1,5 +1,5 @@
 <template>
-  <header class="topbar">
+  <header class="topbar" :class="{ collapsed: sidebarCollapsed }">
     <div class="topbar-content">
       <!-- Кнопка меню (мобильные) -->
       <button @click="$emit('toggle-sidebar')" class="menu-btn">
@@ -22,13 +22,22 @@
           <span class="status-dot"></span>
         </div>
 
-        <!-- Переключатель темы -->
-        <button @click="toggleTheme" class="action-btn" title="Переключить тему">
-          <span class="theme-icon">
-            <Icon v-if="theme === 'light'" name="Moon" size="24" color="black" />
-            <Icon v-else name="Sun" size="24" color="white" />
-          </span>
-        </button>
+        <div class="theme-toggle">
+          <div class="theme-toggle-group" role="group" aria-label="Переключение темы">
+            <button
+              v-for="option in themeOptions"
+              :key="option.mode"
+              class="theme-toggle-btn"
+              :class="{ active: isThemeActive(option.mode) }"
+              :title="getThemeButtonTitle(option.mode)"
+              @click="selectTheme(option.mode)"
+            >
+              <Icon :name="option.icon" size="16" aria-hidden="true" />
+              <span class="theme-toggle-label">{{ option.label }}</span>
+            </button>
+          </div>
+          <span v-if="isSystemTheme" class="theme-sync-hint">Системные настройки</span>
+        </div>
         <!-- Профиль пользователя -->
         <div class="user-profile">
           <div class="user-info">
@@ -54,11 +63,48 @@ import { useThemeStore } from "../../stores/theme";
 import { useWebSocket } from "../../composables/useWebSocket";
 import Icon from "../ui/Icon.vue";
 
+defineProps({
+  sidebarCollapsed: {
+    type: Boolean,
+    default: false,
+  },
+});
+
 const themeStore = useThemeStore();
 const theme = computed(() => themeStore.theme);
+const themeMode = computed(() => themeStore.themeMode);
+const isSystemTheme = computed(() => themeMode.value === "system");
 
-const toggleTheme = () => {
-  themeStore.toggleTheme();
+const themeOptions = [
+  { mode: "light", label: "Светлая", icon: "Sun" },
+  { mode: "dark", label: "Тёмная", icon: "Moon" },
+];
+
+const isThemeActive = (mode) => {
+  if (themeMode.value === "system") {
+    return theme.value === mode;
+  }
+  return themeMode.value === mode;
+};
+
+const selectTheme = (mode) => {
+  if (!mode) return;
+  if (themeMode.value === mode) {
+    themeStore.setThemeMode("system");
+    return;
+  }
+  themeStore.setThemeMode(mode);
+};
+
+const getThemeButtonTitle = (mode) => {
+  const label = mode === "dark" ? "тёмную" : "светлую";
+  if (isSystemTheme.value) {
+    return theme.value === mode ? `Используется системная ${label} тема` : `Переключить на ${label} тему`;
+  }
+  if (themeMode.value === mode) {
+    return `Тема зафиксирована. Нажмите, чтобы вернуться к системной настройке`;
+  }
+  return `Выбрать ${label} тему`;
 };
 
 const { isConnected } = useWebSocket();
@@ -110,8 +156,16 @@ const handleLogout = async () => {
   backdrop-filter: blur(18px);
 }
 
+.topbar.collapsed {
+  left: 96px;
+}
+
 @media (max-width: 1023px) {
   .topbar {
+    left: 0;
+  }
+
+  .topbar.collapsed {
     left: 0;
   }
 }
@@ -176,25 +230,72 @@ const handleLogout = async () => {
   gap: 12px;
 }
 
-.action-btn {
-  padding: 8px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  border-radius: 8px;
-  transition: all 0.2s;
+.theme-toggle {
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.theme-toggle-group {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  border: 1px solid var(--divider);
+  border-radius: 999px;
+  padding: 2px;
+  background: var(--surface-card);
+  gap: 4px;
 }
 
-.action-btn:hover {
-  background: var(--bg-secondary);
+.theme-toggle-btn {
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.theme-icon {
-  font-size: 20px;
-  display: block;
+.theme-toggle-btn:hover {
+  color: var(--text-primary);
+}
+
+.theme-toggle-btn.active {
+  background: var(--nav-active-bg);
+  color: var(--nav-active-text);
+}
+
+.theme-toggle-label {
+  white-space: nowrap;
+}
+
+.theme-sync-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .theme-toggle {
+    align-items: center;
+  }
+
+  .theme-toggle-btn {
+    padding: 6px;
+  }
+
+  .theme-toggle-label {
+    display: none;
+  }
+
+  .theme-sync-hint {
+    display: none;
+  }
 }
 
 .user-profile {

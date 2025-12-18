@@ -284,6 +284,7 @@ import Preloader from "./ui/Preloader.vue";
 import Input from "./ui/Input.vue";
 import Select from "./ui/Select.vue";
 import Textarea from "./ui/Textarea.vue";
+import { useToast } from "../composables/useToast";
 
 const emit = defineEmits(["submit", "cancel"]);
 const authStore = useAuthStore();
@@ -326,6 +327,7 @@ const references = ref({
 });
 
 const allUsers = ref([]);
+const { showToast } = useToast();
 const userSearchQuery = ref("");
 const filteredUsers = computed(() => {
   if (!userSearchQuery.value) return allUsers.value;
@@ -585,12 +587,12 @@ const submitAssessment = async () => {
   validateNumberField("maxAttempts", 1, null);
 
   if (Object.keys(errors.value).length > 0) {
-    alert("Пожалуйста, исправьте ошибки в форме");
+    showToast("Пожалуйста, исправьте ошибки в форме", "warning");
     return;
   }
 
   if (!isFormValid.value) {
-    alert("Пожалуйста, заполните все обязательные поля");
+    showToast("Пожалуйста, заполните все обязательные поля", "warning");
     return;
   }
 
@@ -601,7 +603,7 @@ const submitAssessment = async () => {
       : formData.value.questions && formData.value.questions.length > 0;
 
   if (!hasQuestions) {
-    alert("Добавьте хотя бы один вопрос для аттестации");
+    showToast("Добавьте хотя бы один вопрос для аттестации", "warning");
     return;
   }
 
@@ -628,11 +630,11 @@ const submitAssessment = async () => {
     };
 
     await createAssessment(assessmentData);
-    alert("Аттестация успешно создана!");
+    showToast("Аттестация успешно создана!", "success");
     emit("submit");
   } catch (error) {
     console.error("Create assessment error:", error);
-    alert(error.response?.data?.error || "Ошибка создания аттестации");
+    showToast(error.response?.data?.error || "Ошибка создания аттестации", "error");
   } finally {
     submitting.value = false;
   }

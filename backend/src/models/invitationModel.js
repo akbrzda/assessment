@@ -62,7 +62,7 @@ async function findAll() {
      LEFT JOIN roles r ON r.id = inv.role_id
      LEFT JOIN users used_user ON used_user.id = inv.used_by
      LEFT JOIN users creator ON creator.id = inv.created_by
-     ORDER BY inv.created_at DESC`
+     ORDER BY inv.id ASC`
   );
   return rows;
 }
@@ -81,7 +81,7 @@ async function findByCreator(userId) {
      LEFT JOIN roles r ON r.id = inv.role_id
      LEFT JOIN users used_user ON used_user.id = inv.used_by
      WHERE inv.created_by = ?
-     ORDER BY inv.created_at DESC`,
+     ORDER BY inv.id ASC`,
     [userId]
   );
   return rows;

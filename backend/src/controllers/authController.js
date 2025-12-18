@@ -279,7 +279,11 @@ async function updateProfile(req, res, next) {
 
 async function getReferences(req, res, next) {
   try {
-    const [branches, positions, roles] = await Promise.all([referenceModel.getBranches(), referenceModel.getPositions(), referenceModel.getRoles()]);
+    const [branches, positions, roles] = await Promise.all([
+      referenceModel.getBranches(),
+      referenceModel.getPositions(),
+      referenceModel.getRoles(),
+    ]);
 
     res.json({ branches, positions, roles });
   } catch (error) {
@@ -290,7 +294,7 @@ async function getReferences(req, res, next) {
 async function getAdminReferences(req, res, next) {
   try {
     const [branches, positions, roles] = await Promise.all([
-      referenceModel.getBranches(),
+      referenceModel.getAllBranches(),
       referenceModel.getAllPositions(),
       referenceModel.getRoles(),
     ]);

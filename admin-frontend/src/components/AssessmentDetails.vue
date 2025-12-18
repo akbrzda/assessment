@@ -271,6 +271,7 @@ import Button from "./ui/Button.vue";
 import Badge from "./ui/Badge.vue";
 import Preloader from "./ui/Preloader.vue";
 import Icon from "./ui/Icon.vue";
+import { useToast } from "../composables/useToast";
 
 const props = defineProps({
   assessmentId: {
@@ -282,6 +283,7 @@ const props = defineProps({
 const loading = ref(false);
 const details = ref(null);
 const activeTab = ref("participants");
+const { showToast } = useToast();
 
 const stats = computed(() => {
   const statsData = details.value?.stats || {};
@@ -306,7 +308,7 @@ const loadDetails = async () => {
     details.value = data;
   } catch (error) {
     console.error("Load assessment details error:", error);
-    alert("Ошибка загрузки детализации");
+    showToast("Ошибка загрузки детализации", "error");
   } finally {
     loading.value = false;
   }
@@ -317,7 +319,7 @@ const handleExport = async () => {
     await exportAssessmentToExcel(props.assessmentId);
   } catch (error) {
     console.error("Export error:", error);
-    alert("Ошибка экспорта");
+    showToast("Ошибка экспорта", "error");
   }
 };
 

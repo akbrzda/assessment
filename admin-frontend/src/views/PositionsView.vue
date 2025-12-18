@@ -31,6 +31,7 @@
               <tr>
                 <th>ID</th>
                 <th>Название</th>
+                <th>Миниапп</th>
                 <th>Сотрудников</th>
                 <th>Аттестаций</th>
                 <th>Средний балл</th>
@@ -39,9 +40,14 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="position in positions" :key="position.id">
+              <tr v-for="position in positions" :key="position.id" :class="{ 'hidden-position': !position.isVisibleInMiniapp }">
                 <td>{{ position.id }}</td>
                 <td class="position-name">{{ position.name }}</td>
+                <td>
+                  <span class="miniapp-status" :class="position.isVisibleInMiniapp ? 'status-visible' : 'status-hidden'">
+                    {{ position.isVisibleInMiniapp ? "Виден" : "Скрыт" }}
+                  </span>
+                </td>
                 <td>
                   <Badge variant="primary" size="sm">{{ position.employees_count }}</Badge>
                 </td>
@@ -72,7 +78,7 @@
         </div>
 
         <div class="mobile-cards show-mobile">
-          <div v-for="position in positions" :key="position.id" class="position-card">
+          <div v-for="position in positions" :key="position.id" class="position-card" :class="{ 'hidden-position': !position.isVisibleInMiniapp }">
             <div class="position-card-header">
               <div>
                 <h3 class="position-card-name">{{ position.name }}</h3>
@@ -85,6 +91,14 @@
               <div class="position-card-row">
                 <span class="position-card-label">Аттестаций:</span>
                 <span class="position-card-value">{{ position.assessments_completed || 0 }}</span>
+              </div>
+              <div class="position-card-row">
+                <span class="position-card-label">Миниапп:</span>
+                <span class="position-card-value">
+                  <span class="miniapp-status" :class="position.isVisibleInMiniapp ? 'status-visible' : 'status-hidden'">
+                    {{ position.isVisibleInMiniapp ? "Виден" : "Скрыт" }}
+                  </span>
+                </span>
               </div>
               <div class="position-card-row">
                 <span class="position-card-label">Средний балл:</span>
@@ -126,12 +140,14 @@ import Button from "../components/ui/Button.vue";
 import Badge from "../components/ui/Badge.vue";
 import Input from "../components/ui/Input.vue";
 import PositionForm from "../components/PositionForm.vue";
+import { useToast } from "../composables/useToast";
 
 const loading = ref(false);
 const positions = ref([]);
 const filters = ref({ search: "" });
 const showFormModal = ref(false);
 const editingId = ref(null);
+const { showToast } = useToast();
 
 const toNumber = (value) => {
   if (value === null || value === undefined || value === "") {
@@ -173,10 +189,11 @@ const loadPositions = async () => {
     positions.value = (data.positions || []).map((position) => ({
       ...position,
       avg_score: toNumber(position.avg_score),
+      isVisibleInMiniapp: position.is_visible_in_miniapp === 1,
     }));
   } catch (error) {
     console.error("Load positions error:", error);
-    alert("Ошибка загрузки должностей");
+    showToast("Ошибка загрузки должностей", "error");
   } finally {
     loading.value = false;
   }
@@ -209,19 +226,19 @@ const handleFormSubmit = () => {
 
 const confirmDelete = async (position) => {
   if (position.employees_count > 0) {
-    alert(`Невозможно удалить должность "${position.name}". В ней ${position.employees_count} сотрудников.`);
+    showToast(`Невозможно удалить должность "${position.name}". В ней ${position.employees_count} сотрудников.`, "warning");
     return;
   }
 
   if (confirm(`Удалить должность "${position.name}"?`)) {
     try {
       await deletePosition(position.id);
-      alert("Должность удалена");
+      showToast("Должность удалена", "success");
       loadPositions();
     } catch (error) {
       console.error("Delete position error:", error);
       const errorMessage = error.response?.data?.error || "Ошибка удаления должности";
-      alert(errorMessage);
+      showToast(errorMessage, "error");
     }
   }
 };
@@ -366,6 +383,10 @@ onMounted(() => {
   border: 1px solid var(--divider);
 }
 
+.position-card.hidden-position {
+  border-color: #fcd34d;
+}
+
 .position-card-header {
   display: flex;
   align-items: flex-start;
@@ -413,6 +434,26 @@ onMounted(() => {
   color: var(--text-primary);
   font-weight: 600;
   text-align: right;
+}
+
+.miniapp-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-visible {
+  background-color: #def7ec;
+  color: #03543f;
+}
+
+.status-hidden {
+  background-color: #fef3c7;
+  color: #92400e;
 }
 
 .position-card-actions {

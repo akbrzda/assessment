@@ -131,13 +131,13 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue";
 import { updateAssessment } from "../api/assessments";
-import { getReferences } from "../api/users";
-import { getUsers } from "../api/users";
+import { getReferences, getUsers } from "../api/users";
 import Card from "./ui/Card.vue";
 import Input from "./ui/Input.vue";
 import Textarea from "./ui/Textarea.vue";
 import Button from "./ui/Button.vue";
 import Preloader from "./ui/Preloader.vue";
+import { useToast } from "../composables/useToast";
 
 const props = defineProps({
   assessment: {
@@ -157,6 +157,7 @@ const userSearchQuery = ref("");
 const selectedBranches = ref([]);
 const selectedPositions = ref([]);
 const selectedUsers = ref([]);
+const { showToast } = useToast();
 
 const formData = ref({
   title: "",
@@ -256,7 +257,7 @@ const removeOption = (questionIndex, optionIndex) => {
   if (formData.value.questions[questionIndex].options.length > 2) {
     formData.value.questions[questionIndex].options.splice(optionIndex, 1);
   } else {
-    alert("Должно быть минимум 2 варианта ответа");
+    showToast("Должно быть минимум 2 варианта ответа", "warning");
   }
 };
 
@@ -275,28 +276,28 @@ const formatDateForInput = (dateString) => {
 const handleSubmit = async () => {
   // Валидация
   if (!formData.value.title || !formData.value.openAt || !formData.value.closeAt) {
-    alert("Заполните все обязательные поля");
+    showToast("Заполните все обязательные поля", "warning");
     return;
   }
 
   if (formData.value.questions.length === 0) {
-    alert("Добавьте хотя бы один вопрос");
+    showToast("Добавьте хотя бы один вопрос", "warning");
     return;
   }
 
   // Проверка вопросов
   for (const question of formData.value.questions) {
     if (!question.text) {
-      alert("Все вопросы должны иметь текст");
+      showToast("Все вопросы должны иметь текст", "warning");
       return;
     }
     if (question.options.length < 2) {
-      alert("У каждого вопроса должно быть минимум 2 варианта ответа");
+      showToast("У каждого вопроса должно быть минимум 2 варианта ответа", "warning");
       return;
     }
     const correctCount = question.options.filter((opt) => opt.isCorrect).length;
     if (correctCount !== 1) {
-      alert("У каждого вопроса должен быть ровно 1 правильный ответ");
+      showToast("У каждого вопроса должен быть ровно 1 правильный ответ", "warning");
       return;
     }
   }
@@ -319,11 +320,11 @@ const handleSubmit = async () => {
     };
 
     await updateAssessment(props.assessment.id, data);
-    alert("Аттестация обновлена успешно!");
+    showToast("Аттестация обновлена успешно!", "success");
     emit("submit");
   } catch (error) {
     console.error("Update assessment error:", error);
-    alert(error.response?.data?.error || "Ошибка обновления аттестации");
+    showToast(error.response?.data?.error || "Ошибка обновления аттестации", "error");
   } finally {
     submitting.value = false;
   }

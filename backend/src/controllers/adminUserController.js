@@ -81,7 +81,7 @@ async function listUsers(req, res, next) {
       params.push(searchPattern, searchPattern, searchPattern);
     }
 
-    query += " ORDER BY u.created_at DESC";
+    query += " ORDER BY u.id ASC";
 
     const [users] = await pool.query(query, params);
     res.json({ users });
@@ -531,7 +531,7 @@ async function resetPassword(req, res, next) {
 
     await logAndSend({
       req,
-      actor: buildActor(req),
+      actor: buildActorFromRequest(req),
       action: "user.password.reset",
       entity: "user",
       entityId: userId,

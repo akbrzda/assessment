@@ -11,8 +11,8 @@ router.use(verifyJWT, verifyAdminRole(["superadmin", "manager"]));
  */
 router.get("/", async (req, res, next) => {
   try {
-    const [branches] = await pool.query("SELECT id, name, city FROM branches ORDER BY name");
-    const [positions] = await pool.query("SELECT id, name FROM positions ORDER BY name");
+    const [branches] = await pool.query("SELECT id, name, city, is_visible_in_miniapp FROM branches ORDER BY name");
+    const [positions] = await pool.query("SELECT id, name, is_visible_in_miniapp FROM positions ORDER BY name");
     const [roles] = await pool.query("SELECT id, name, description FROM roles ORDER BY name");
 
     res.json({

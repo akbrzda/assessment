@@ -113,6 +113,7 @@ import { getUserReport } from "../api/analytics";
 import Modal from "./ui/Modal.vue";
 import Preloader from "./ui/Preloader.vue";
 import LineChart from "./charts/LineChart.vue";
+import { useToast } from "../composables/useToast";
 
 const props = defineProps({
   modelValue: {
@@ -134,6 +135,7 @@ const emit = defineEmits(["update:modelValue", "close"]);
 const isOpen = ref(props.modelValue);
 const loading = ref(false);
 const report = ref(null);
+const { showToast } = useToast();
 
 const toNumber = (value) => {
   if (value === null || value === undefined || value === "") {
@@ -184,7 +186,7 @@ const loadReport = async () => {
     report.value = normalizeReport(data);
   } catch (error) {
     console.error("Load user report error:", error);
-    alert("Ошибка загрузки отчёта");
+    showToast("Ошибка загрузки отчёта", "error");
   } finally {
     loading.value = false;
   }

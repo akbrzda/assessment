@@ -144,6 +144,7 @@ import Input from "../components/ui/Input.vue";
 import Select from "../components/ui/Select.vue";
 import Badge from "../components/ui/Badge.vue";
 import CategoryManager from "../components/CategoryManager.vue";
+import { useToast } from "../composables/useToast";
 
 const router = useRouter();
 const loading = ref(false);
@@ -155,6 +156,7 @@ const filters = ref({
   category: "",
   type: "",
 });
+const { showToast } = useToast();
 
 const showCategoryModal = ref(false);
 
@@ -193,7 +195,7 @@ const loadQuestions = async () => {
     questions.value = data.questions;
   } catch (error) {
     console.error("Load questions error:", error);
-    alert("Ошибка загрузки вопросов");
+    showToast("Ошибка загрузки вопросов", "error");
   } finally {
     loading.value = false;
   }
@@ -238,11 +240,11 @@ const confirmDelete = async (question) => {
   if (confirm(`Вы уверены, что хотите удалить этот вопрос?`)) {
     try {
       await deleteQuestion(question.id);
-      alert("Вопрос удален");
+      showToast("Вопрос удален", "success");
       loadQuestions();
     } catch (error) {
       console.error("Delete question error:", error);
-      alert("Ошибка удаления вопроса");
+      showToast("Ошибка удаления вопроса", "error");
     }
   }
 };

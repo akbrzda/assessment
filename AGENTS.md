@@ -5,7 +5,7 @@
   For example, README.md, Instruction.md, CONFIG, IMPLEMENTATION, etc.
 - Break all incoming requests into smaller tasks, complete them step by step, and ask clarifying questions if necessary.
 - Write clear and understandable comments; do not write long or meaningless ones. Everything is clear, understandable, and concise.
-- First read technical specifications before writing code and do tasks, in docs/ADMIN_PANEL.md and docs/MINIAPP.md.
+- First read technical specifications before writing code and do tasks.
 - Dont write long comments in code files, keep them short and meaningful.
 - Always follow the coding style and conventions used in the existing codebase.
 

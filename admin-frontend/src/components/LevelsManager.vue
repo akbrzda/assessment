@@ -106,6 +106,7 @@ import Button from "./ui/Button.vue";
 import Input from "./ui/Input.vue";
 import Textarea from "./ui/Textarea.vue";
 import Icon from "./ui/Icon.vue";
+import { useToast } from "../composables/useToast";
 
 const levels = ref([]);
 const stats = ref([]);
@@ -134,6 +135,7 @@ const formData = ref({
   is_active: true,
   sort_order: 0,
 });
+const { showToast } = useToast();
 
 // Загрузка данных
 const loadLevels = async () => {
@@ -143,7 +145,7 @@ const loadLevels = async () => {
     levels.value = data.levels || [];
   } catch (error) {
     console.error("Ошибка загрузки уровней:", error);
-    alert("Не удалось загрузить уровни");
+    showToast("Не удалось загрузить уровни", "error");
   } finally {
     loading.value = false;
   }
@@ -177,7 +179,7 @@ const editLevel = (level) => {
 // Сохранение уровня
 const saveLevel = async () => {
   if (!formData.value.name || !formData.value.code || formData.value.min_points === null) {
-    alert("Заполните все обязательные поля");
+    showToast("Заполните все обязательные поля", "warning");
     return;
   }
 
@@ -194,9 +196,9 @@ const saveLevel = async () => {
   } catch (error) {
     console.error("Ошибка сохранения уровня:", error);
     if (error.response?.data?.error) {
-      alert(error.response.data.error);
+      showToast(error.response.data.error, "error");
     } else {
-      alert("Не удалось сохранить уровень");
+      showToast("Не удалось сохранить уровень", "error");
     }
   } finally {
     saving.value = false;
@@ -219,9 +221,9 @@ const deleteLevel = async (levelNumber) => {
   } catch (error) {
     console.error("Ошибка удаления уровня:", error);
     if (error.response?.data?.error) {
-      alert(error.response.data.error);
+      showToast(error.response.data.error, "error");
     } else {
-      alert("Не удалось удалить уровень");
+      showToast("Не удалось удалить уровень", "error");
     }
   }
 };
@@ -235,11 +237,11 @@ const recalculateLevels = async () => {
   recalculating.value = true;
   try {
     const result = await levelsApi.recalculateLevels();
-    alert(result.message || "Уровни успешно пересчитаны");
+    showToast(result.message || "Уровни успешно пересчитаны", "success");
     await loadStats();
   } catch (error) {
     console.error("Ошибка пересчёта уровней:", error);
-    alert("Не удалось пересчитать уровни");
+    showToast("Не удалось пересчитать уровни", "error");
   } finally {
     recalculating.value = false;
   }

@@ -144,6 +144,7 @@ import Input from "./ui/Input.vue";
 import Select from "./ui/Select.vue";
 import Button from "./ui/Button.vue";
 import Textarea from "./ui/Textarea.vue";
+import { useToast } from "../composables/useToast";
 
 const props = defineProps({
   assessmentId: {
@@ -171,6 +172,7 @@ const form = ref({
   userIds: [],
   questions: [],
 });
+const { showToast } = useToast();
 
 const isFormValid = computed(() => {
   if (!form.value.title || !form.value.openAt || !form.value.closeAt) return false;
@@ -261,7 +263,7 @@ const loadAssessment = async () => {
     };
   } catch (error) {
     console.error("Load assessment error:", error);
-    alert("Ошибка загрузки аттестации");
+    showToast("Ошибка загрузки аттестации", "error");
   } finally {
     loading.value = false;
   }
@@ -336,12 +338,12 @@ const handleSubmit = async () => {
   validateDateField("closeAt");
 
   if (Object.keys(errors.value).length > 0) {
-    alert("Пожалуйста, исправьте ошибки в форме");
+    showToast("Пожалуйста, исправьте ошибки в форме", "warning");
     return;
   }
 
   if (!isFormValid.value) {
-    alert("Пожалуйста, заполните все обязательные поля и добавьте хотя бы один вопрос");
+    showToast("Пожалуйста, заполните все обязательные поля и добавьте хотя бы один вопрос", "warning");
     return;
   }
 
@@ -356,15 +358,15 @@ const handleSubmit = async () => {
 
     if (props.assessmentId) {
       await updateAssessment(props.assessmentId, assessmentData);
-      alert("Аттестация обновлена");
+      showToast("Аттестация обновлена", "success");
     } else {
       await createAssessment(assessmentData);
-      alert("Аттестация создана");
+      showToast("Аттестация создана", "success");
     }
     emit("submit");
   } catch (error) {
     console.error("Save assessment error:", error);
-    alert("Ошибка сохранения аттестации");
+    showToast("Ошибка сохранения аттестации", "error");
   } finally {
     loading.value = false;
   }
