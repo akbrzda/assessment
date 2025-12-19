@@ -26,8 +26,26 @@
         <Textarea v-model="formData.description" label="Описание" :rows="3" placeholder="Краткое описание аттестации" />
       </div>
 
-      <!-- Шаг 2: Вопросы -->
+      <!-- Шаг 2: Теория -->
       <div v-else-if="currentStep === 2" class="step-content">
+        <h3 class="step-title">Теория перед тестом</h3>
+        <p class="hint">Сделайте прохождение теории обязательным перед началом попытки.</p>
+
+        <label class="theory-toggle">
+          <input type="checkbox" v-model="theoryEnabled" />
+          <span>Требовать прохождение теории перед тестом</span>
+        </label>
+
+        <div v-if="theoryEnabled" class="theory-builder-wrapper">
+          <AssessmentTheoryBuilder v-model="theoryData" />
+          <p v-if="theoryError" class="error-text">{{ theoryError }}</p>
+        </div>
+
+        <p v-else class="text-secondary">Вы можете включить теорию в любой момент после создания аттестации.</p>
+      </div>
+
+      <!-- Шаг 3: Вопросы -->
+      <div v-else-if="currentStep === 3" class="step-content">
         <h3 class="step-title">Вопросы аттестации</h3>
 
         <div class="questions-mode-tabs">
@@ -116,8 +134,8 @@
         </div>
       </div>
 
-      <!-- Шаг 3: Участники -->
-      <div v-else-if="currentStep === 3" class="step-content">
+      <!-- Шаг 4: Участники -->
+      <div v-else-if="currentStep === 4" class="step-content">
         <h3 class="step-title">Назначение участников</h3>
 
         <p class="hint">Выберите один или несколько способов назначения</p>
@@ -174,8 +192,8 @@
         </div>
       </div>
 
-      <!-- Шаг 4: Параметры и даты -->
-      <div v-else-if="currentStep === 4" class="step-content">
+      <!-- Шаг 5: Параметры и даты -->
+      <div v-else-if="currentStep === 5" class="step-content">
         <h3 class="step-title">Параметры и сроки</h3>
 
         <div class="form-row">
@@ -265,7 +283,7 @@
 
       <div class="spacer"></div>
 
-      <Button v-if="currentStep < 4" @click="nextStep" :disabled="!canProceed">Далее</Button>
+      <Button v-if="currentStep < steps.length" @click="nextStep" :disabled="!canProceed">Далее</Button>
 
       <Button v-else @click="submitAssessment" :loading="submitting" :disabled="!isFormValid" icon="check">Создать аттестацию </Button>
     </div>
@@ -273,7 +291,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useAuthStore } from "../stores/auth";
 import { createAssessment } from "../api/assessments";
 import { getReferences, getUsers } from "../api/users";
@@ -284,6 +302,9 @@ import Preloader from "./ui/Preloader.vue";
 import Input from "./ui/Input.vue";
 import Select from "./ui/Select.vue";
 import Textarea from "./ui/Textarea.vue";
+import AssessmentTheoryBuilder from "./AssessmentTheoryBuilder.vue";
+import { saveTheoryDraft, publishTheory } from "../api/theory";
+import { createEmptyTheory, validateTheoryData, buildTheoryPayload, hasTheoryBlocks } from "../utils/theory";
 import { useToast } from "../composables/useToast";
 
 const emit = defineEmits(["submit", "cancel"]);
@@ -296,7 +317,7 @@ const assignmentMode = ref("branches");
 const questionsMode = ref("bank");
 const errors = ref({});
 
-const steps = [{ label: "Основная информация" }, { label: "Вопросы" }, { label: "Участники" }, { label: "Параметры" }];
+const steps = [{ label: "Основная информация" }, { label: "Теория" }, { label: "Вопросы" }, { label: "Участники" }, { label: "Параметры" }];
 
 // Банк вопросов
 const loadingBankQuestions = ref(false);
@@ -329,11 +350,40 @@ const references = ref({
 const allUsers = ref([]);
 const { showToast } = useToast();
 const userSearchQuery = ref("");
+const theoryEnabled = ref(false);
+const theoryData = ref(createEmptyTheory());
+const theoryError = ref("");
 const filteredUsers = computed(() => {
   if (!userSearchQuery.value) return allUsers.value;
   const query = userSearchQuery.value.toLowerCase();
   return allUsers.value.filter((user) => user.first_name.toLowerCase().includes(query) || user.last_name.toLowerCase().includes(query));
 });
+
+const validateTheory = (showMessage = false) => {
+  if (!theoryEnabled.value) {
+    theoryError.value = "";
+    return true;
+  }
+  const result = validateTheoryData(theoryData.value);
+  if (!result.valid) {
+    if (showMessage) {
+      theoryError.value = result.message;
+      showToast(result.message, "warning");
+    }
+    return false;
+  }
+  theoryError.value = "";
+  return true;
+};
+
+const persistTheoryVersion = async (assessmentId) => {
+  if (!theoryEnabled.value || !hasTheoryBlocks(theoryData.value)) {
+    return;
+  }
+  const payload = buildTheoryPayload(theoryData.value);
+  await saveTheoryDraft(assessmentId, payload);
+  await publishTheory(assessmentId, "new");
+};
 
 const categoryOptions = computed(() => [
   { value: "", label: "Все категории" },
@@ -342,6 +392,19 @@ const categoryOptions = computed(() => [
     label: cat.name,
   })),
 ]);
+
+watch(
+  theoryEnabled,
+  (enabled) => {
+    if (enabled && !hasTheoryBlocks(theoryData.value)) {
+      theoryData.value = createEmptyTheory();
+    }
+    if (!enabled) {
+      theoryError.value = "";
+    }
+  },
+  { immediate: false }
+);
 
 const MAX_YEAR_OFFSET = 100;
 // Максимальная дата (текущий год + 100)
@@ -369,6 +432,9 @@ const canProceed = computed(() => {
     }
   }
   if (currentStep.value === 3) {
+    return validateTheory(false);
+  }
+  if (currentStep.value === 4) {
     return formData.value.branchIds.length > 0 || formData.value.positionIds.length > 0 || formData.value.userIds.length > 0;
   }
   return true;
@@ -376,12 +442,14 @@ const canProceed = computed(() => {
 
 const isFormValid = computed(() => {
   const hasQuestions = questionsMode.value === "bank" ? selectedBankQuestions.value.length > 0 : formData.value.questions.length > 0;
+  const theoryValid = !theoryEnabled.value || validateTheoryData(theoryData.value).valid;
 
   return (
     formData.value.title.trim() !== "" &&
     formData.value.openAt !== "" &&
     formData.value.closeAt !== "" &&
     hasQuestions &&
+    theoryValid &&
     (formData.value.branchIds.length > 0 || formData.value.positionIds.length > 0 || formData.value.userIds.length > 0)
   );
 });
@@ -507,7 +575,10 @@ const setCorrectOption = (qIndex, oIndex) => {
 };
 
 const nextStep = () => {
-  if (canProceed.value && currentStep.value < 4) {
+  if (currentStep.value === 3 && !validateTheory(true)) {
+    return;
+  }
+  if (canProceed.value && currentStep.value < steps.length) {
     currentStep.value++;
   }
 };
@@ -607,6 +678,10 @@ const submitAssessment = async () => {
     return;
   }
 
+  if (!validateTheory(true)) {
+    return;
+  }
+
   submitting.value = true;
   try {
     // Преобразуем даты в формат с временем 00:00
@@ -623,13 +698,21 @@ const submitAssessment = async () => {
       ...formData.value,
       openAt: dateToISOWithMidnight(formData.value.openAt),
       closeAt: dateToISOWithMidnight(formData.value.closeAt),
-      questions:
-        questionsMode.value === "bank"
-          ? (selectedBankQuestions.value || []).map(transformBankQuestion)
-          : formData.value.questions,
+      questions: questionsMode.value === "bank" ? (selectedBankQuestions.value || []).map(transformBankQuestion) : formData.value.questions,
     };
 
-    await createAssessment(assessmentData);
+    const result = await createAssessment(assessmentData);
+    const createdAssessmentId = result?.assessment?.id;
+
+    if (theoryEnabled.value && hasTheoryBlocks(theoryData.value) && createdAssessmentId) {
+      try {
+        await persistTheoryVersion(createdAssessmentId);
+      } catch (error) {
+        console.error("Theory creation error:", error);
+        showToast("Аттестация создана, но сохранить теорию не удалось. Настройте теорию позже.", "warning");
+      }
+    }
+
     showToast("Аттестация успешно создана!", "success");
     emit("submit");
   } catch (error) {
@@ -1028,6 +1111,32 @@ onMounted(() => {
 .btn-add-option:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.theory-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.theory-toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+.theory-builder-wrapper {
+  margin-top: 16px;
+}
+
+.error-text {
+  color: #ef4444;
+  margin-top: 12px;
+}
+
+.text-secondary {
+  color: var(--text-secondary);
 }
 
 /* Assignment */

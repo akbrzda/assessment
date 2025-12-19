@@ -494,3 +494,60 @@ ON DUPLICATE KEY UPDATE
   scope_json = VALUES(scope_json),
   priority = VALUES(priority),
   is_active = VALUES(is_active);
+CREATE TABLE IF NOT EXISTS assessment_theory_versions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  assessment_id INT UNSIGNED NOT NULL,
+  version_number INT UNSIGNED NOT NULL,
+  status ENUM('draft', 'published') NOT NULL DEFAULT 'draft',
+  completion_required TINYINT(1) NOT NULL DEFAULT 0,
+  required_block_count INT UNSIGNED NOT NULL DEFAULT 0,
+  optional_block_count INT UNSIGNED NOT NULL DEFAULT 0,
+  metadata JSON DEFAULT NULL,
+  published_at DATETIME DEFAULT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_assessment_theory_versions_version (assessment_id, version_number),
+  KEY idx_assessment_theory_versions_status (assessment_id, status),
+  CONSTRAINT fk_theory_versions_assessment FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS assessment_theory_blocks (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  version_id INT UNSIGNED NOT NULL,
+  order_index INT UNSIGNED NOT NULL DEFAULT 1,
+  title VARCHAR(255) NOT NULL,
+  block_type VARCHAR(32) NOT NULL,
+  content TEXT DEFAULT NULL,
+  video_url VARCHAR(512) DEFAULT NULL,
+  external_url VARCHAR(512) DEFAULT NULL,
+  metadata JSON DEFAULT NULL,
+  is_required TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_theory_blocks_version (version_id, order_index),
+  KEY idx_theory_blocks_required (version_id, is_required),
+  CONSTRAINT fk_theory_blocks_version FOREIGN KEY (version_id) REFERENCES assessment_theory_versions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS assessment_theory_completions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  assessment_id INT UNSIGNED NOT NULL,
+  user_id INT UNSIGNED NOT NULL,
+  version_id INT UNSIGNED NOT NULL,
+  completed_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  client_payload JSON DEFAULT NULL,
+  UNIQUE KEY uq_theory_completion (assessment_id, user_id, version_id),
+  KEY idx_theory_completion_user (user_id),
+  KEY idx_theory_completion_version (version_id),
+  CONSTRAINT fk_theory_completion_assessment FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE,
+  CONSTRAINT fk_theory_completion_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_theory_completion_version FOREIGN KEY (version_id) REFERENCES assessment_theory_versions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE assessments
+  ADD COLUMN current_theory_version_id INT UNSIGNED DEFAULT NULL AFTER max_attempts,
+  ADD CONSTRAINT fk_assessments_current_theory_version
+    FOREIGN KEY (current_theory_version_id) REFERENCES assessment_theory_versions(id)
+    ON DELETE SET NULL;
+ALTER TABLE assessment_theory_completions
+  ADD COLUMN time_spent_seconds INT UNSIGNED DEFAULT 0 AFTER client_payload;

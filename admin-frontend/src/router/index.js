@@ -62,6 +62,12 @@ const routes = [
         meta: { roles: ["superadmin", "manager"], title: "Детали аттестации" },
       },
       {
+        path: "assessments/:id/theory",
+        name: "AssessmentTheory",
+        component: () => import("../views/AssessmentTheoryView.vue"),
+        meta: { roles: ["superadmin", "manager"], title: "Теория аттестации" },
+      },
+      {
         path: "questions",
         name: "Questions",
         component: () => import("../views/QuestionsView.vue"),

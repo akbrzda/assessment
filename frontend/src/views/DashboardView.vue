@@ -18,7 +18,19 @@
             </span>
           </div>
 
-          <button v-if="nextAssessment.status === 'open'" class="btn btn-primary btn-full" @click="startAssessment(nextAssessment.id)">Начать</button>
+          <p v-if="nextAssessment.requiresTheory" class="theory-hint" :class="{ done: nextAssessment.theoryCompleted }">
+            {{ nextAssessment.theoryCompleted ? "Теория пройдена" : "Сначала изучите теорию" }}
+          </p>
+          <button
+            v-if="nextAssessment.requiresTheory && !nextAssessment.theoryCompleted"
+            class="btn btn-primary btn-full"
+            @click="openTheory(nextAssessment.id)"
+          >
+            Пройти теорию
+          </button>
+          <button v-else-if="nextAssessment.status === 'open'" class="btn btn-primary btn-full" @click="startAssessment(nextAssessment)">
+            Начать
+          </button>
           <button v-else class="btn btn-primary btn-full" disabled>
             {{ nextAssessment.status === "pending" ? "Ожидает открытия" : "Завершена" }}
           </button>
@@ -168,9 +180,21 @@ export default {
       return `${start} - ${end}`;
     }
 
-    async function startAssessment(id) {
+    async function startAssessment(assessment) {
+      if (!assessment) {
+        return;
+      }
+      if (assessment.requiresTheory && !assessment.theoryCompleted) {
+        openTheory(assessment.id);
+        return;
+      }
       telegramStore.hapticFeedback("impact", "light");
-      router.push(`/assessment/${id}`);
+      router.push(`/assessment/${assessment.id}`);
+    }
+
+    function openTheory(id) {
+      telegramStore.hapticFeedback("impact", "light");
+      router.push(`/assessment/${id}/theory`);
     }
 
     function normalizeAssessment(item) {
@@ -198,6 +222,9 @@ export default {
         status = "completed";
       }
 
+      const requiresTheory = Boolean(item.theory?.completionRequired);
+      const theoryCompleted = requiresTheory ? Boolean(item.theory?.completedAt) : false;
+
       return {
         id: item.id,
         title: item.title,
@@ -223,6 +250,8 @@ export default {
                   passed: threshold != null ? lastScore >= threshold : false,
                 }
               : null,
+        requiresTheory,
+        theoryCompleted,
       };
     }
 
@@ -312,6 +341,7 @@ export default {
       formatDate,
       formatDateRange,
       startAssessment,
+      openTheory,
     };
   },
 };
@@ -324,6 +354,16 @@ export default {
 
 .assessment-card {
   text-align: center;
+}
+
+.theory-hint {
+  font-size: 13px;
+  color: var(--warning, #ff9500);
+  margin: 0 0 12px 0;
+}
+
+.theory-hint.done {
+  color: var(--success);
 }
 
 .no-assessment {

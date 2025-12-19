@@ -663,6 +663,12 @@ async function listAssessmentsForUser(userId) {
        a.time_limit_minutes,
        a.pass_score_percent,
        a.max_attempts,
+       a.current_theory_version_id,
+       tv.version_number AS theory_version_number,
+       tv.completion_required AS theory_completion_required,
+       tv.published_at AS theory_published_at,
+       tc.id AS theory_completion_id,
+       tc.completed_at AS theory_completed_at,
        CASE
          WHEN UTC_TIMESTAMP() < a.open_at THEN 'pending'
          WHEN UTC_TIMESTAMP() BETWEEN a.open_at AND a.close_at THEN 'active'
@@ -710,8 +716,10 @@ async function listAssessmentsForUser(userId) {
         WHERE user_id = ?
         GROUP BY assessment_id
      ) best_attempts ON best_attempts.assessment_id = a.id
+     LEFT JOIN assessment_theory_versions tv ON tv.id = a.current_theory_version_id AND tv.status = 'published'
+     LEFT JOIN assessment_theory_completions tc ON tc.assessment_id = a.id AND tc.user_id = ? AND tc.version_id = tv.id
       ORDER BY a.open_at ASC`,
-    [userId, userId, userId, userId, userId, userId]
+    [userId, userId, userId, userId, userId, userId, userId]
   );
 
   return rows.map((row) => ({
@@ -731,6 +739,15 @@ async function listAssessmentsForUser(userId) {
     lastCompletedAt: toIsoUtc(row.completed_at),
     lastStartedAt: toIsoUtc(row.started_at),
     bestScorePercent: row.best_score_percent != null ? Number(row.best_score_percent) : null,
+    theory: row.current_theory_version_id
+      ? {
+          versionId: Number(row.current_theory_version_id),
+          versionNumber: row.theory_version_number != null ? Number(row.theory_version_number) : null,
+          completionRequired: row.theory_completion_required ? true : false,
+          publishedAt: toIsoUtc(row.theory_published_at),
+          completedAt: row.theory_completed_at ? toIsoUtc(row.theory_completed_at) : null,
+        }
+      : null,
     timeRemainingSeconds: (() => {
       const timeLimitMinutes = row.time_limit_minutes != null ? Number(row.time_limit_minutes) : null;
       const startedAtIso = toIsoUtc(row.started_at);

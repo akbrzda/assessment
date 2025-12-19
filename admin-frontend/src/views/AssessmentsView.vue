@@ -78,6 +78,13 @@
                       icon="pencil"
                     ></Button>
                     <Button
+                      v-if="canEditAssessment(assessment)"
+                      @click="goToTheory(assessment.id)"
+                      class="action-btn action-btn-info"
+                      title="Теория"
+                      icon="book-open-check"
+                    ></Button>
+                    <Button
                       v-if="assessment.status === 'pending'"
                       @click="confirmDelete(assessment)"
                       class="action-btn action-btn-delete"
@@ -133,6 +140,9 @@
               <Button size="sm" variant="secondary" icon="chart-column" @click="goToDetails(assessment.id)" fullWidth> Детали </Button>
               <Button v-if="canEditAssessment(assessment)" size="sm" variant="primary" icon="pencil" @click="goToEdit(assessment.id)" fullWidth>
                 Редактировать
+              </Button>
+              <Button v-if="canEditAssessment(assessment)" size="sm" variant="secondary" icon="book-open-check" @click="goToTheory(assessment.id)" fullWidth>
+                Теория
               </Button>
               <Button v-if="assessment.status === 'pending'" size="sm" variant="danger" icon="trash" @click="confirmDelete(assessment)" fullWidth>
                 Удалить
@@ -231,6 +241,10 @@ const goToDetails = (id) => {
 
 const goToEdit = (id) => {
   router.push(`/assessments/${id}/edit`);
+};
+
+const goToTheory = (id) => {
+  router.push(`/assessments/${id}/theory`);
 };
 
 const canEditAssessment = (assessment) => {

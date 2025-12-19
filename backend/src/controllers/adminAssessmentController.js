@@ -806,7 +806,9 @@ exports.getAssessmentDetails = async (req, res, next) => {
         aa.total_questions,
         aa.started_at,
         aa.completed_at,
-        TIMESTAMPDIFF(SECOND, aa.started_at, aa.completed_at) as time_spent_seconds
+        TIMESTAMPDIFF(SECOND, aa.started_at, aa.completed_at) as time_spent_seconds,
+        tc.time_spent_seconds as theory_time_seconds,
+        tc.completed_at as theory_completed_at
       FROM assessment_user_assignments aua
       JOIN users u ON aua.user_id = u.id
       LEFT JOIN branches b ON u.branch_id = b.id
@@ -820,6 +822,9 @@ exports.getAssessmentDetails = async (req, res, next) => {
           ORDER BY started_at DESC 
           LIMIT 1
         )
+      LEFT JOIN assessment_theory_completions tc ON tc.assessment_id = aua.assessment_id 
+        AND tc.user_id = u.id
+        AND tc.version_id = (SELECT current_theory_version_id FROM assessments WHERE id = aua.assessment_id)
       WHERE aua.assessment_id = ?
       ORDER BY u.last_name, u.first_name
     `,
@@ -837,7 +842,9 @@ exports.getAssessmentDetails = async (req, res, next) => {
         AVG(CASE WHEN latest.status = 'completed' THEN latest.score_percent END) as avg_score,
         MIN(CASE WHEN latest.status = 'completed' THEN latest.score_percent END) as min_score,
         MAX(CASE WHEN latest.status = 'completed' THEN latest.score_percent END) as max_score,
-        COUNT(DISTINCT CASE WHEN latest.score_percent >= ? THEN latest.user_id END) as passed_count
+        COUNT(DISTINCT CASE WHEN latest.score_percent >= ? THEN latest.user_id END) as passed_count,
+        AVG(tc.time_spent_seconds) as avg_theory_time_seconds,
+        COUNT(DISTINCT tc.user_id) as theory_completed_count
       FROM assessment_user_assignments aua
       LEFT JOIN (
         SELECT aa1.*
@@ -850,6 +857,9 @@ exports.getAssessmentDetails = async (req, res, next) => {
         ) aa2 ON aa1.user_id = aa2.user_id AND aa1.started_at = aa2.max_started
         WHERE aa1.assessment_id = ?
       ) latest ON latest.user_id = aua.user_id
+      LEFT JOIN assessment_theory_completions tc ON tc.assessment_id = aua.assessment_id
+        AND tc.user_id = aua.user_id
+        AND tc.version_id = (SELECT current_theory_version_id FROM assessments WHERE id = aua.assessment_id)
       WHERE aua.assessment_id = ?
     `,
       [assessment.pass_score_percent, assessmentId, assessmentId, assessmentId]

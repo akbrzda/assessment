@@ -9,7 +9,10 @@
           <h2 class="details-title">{{ details.assessment.title }}</h2>
           <p class="details-subtitle">{{ details.assessment.description || "Нет описания" }}</p>
         </div>
-        <Button icon="file-chart-column" variant="secondary" @click="handleExport"> Экспорт в Excel </Button>
+        <div class="details-actions">
+          <Button icon="book-open" variant="secondary" @click="openTheory"> Теория </Button>
+          <Button icon="file-chart-column" variant="secondary" @click="handleExport"> Экспорт в Excel </Button>
+        </div>
       </div>
 
       <!-- Информация об аттестации -->
@@ -157,6 +160,16 @@
             <div class="stat-label">Прошли</div>
           </div>
         </Card>
+
+        <Card class="stat-card" v-if="stats.theory_completed_count > 0">
+          <div class="stat-icon">
+            <Icon name="book-open" size="40" />
+          </div>
+          <div class="stat-content">
+            <div class="stat-value">{{ formatTheoryTime(stats.avg_theory_time_seconds) }}</div>
+            <div class="stat-label">Среднее время теории</div>
+          </div>
+        </Card>
       </div>
 
       <!-- Вкладки -->
@@ -183,8 +196,10 @@
                 <th>Статус</th>
                 <th>Результат</th>
                 <th>Правильных</th>
-                <th>Время</th>
+                <th>Время теста</th>
+                <th>Время теории</th>
                 <th>Дата</th>
+                <th>Действия</th>
               </tr>
             </thead>
             <tbody>
@@ -213,8 +228,17 @@
                 <td>
                   {{ formatDuration(participant.time_spent_seconds) }}
                 </td>
+                <td>
+                  <span v-if="participant.theory_time_seconds" class="theory-time">
+                    {{ formatDuration(participant.theory_time_seconds) }}
+                  </span>
+                  <span v-else class="score-empty">—</span>
+                </td>
                 <td class="date-cell">
                   {{ formatDate(participant.completed_at || participant.started_at) }}
+                </td>
+                <td class="actions-cell">
+                  <Button size="sm" variant="ghost" icon="book-open" @click="openTheory">Теория</Button>
                 </td>
               </tr>
             </tbody>
@@ -265,6 +289,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
 import { getAssessmentDetails, exportAssessmentToExcel } from "../api/assessments";
 import Card from "./ui/Card.vue";
 import Button from "./ui/Button.vue";
@@ -284,10 +309,10 @@ const loading = ref(false);
 const details = ref(null);
 const activeTab = ref("participants");
 const { showToast } = useToast();
+const router = useRouter();
 
 const stats = computed(() => {
   const statsData = details.value?.stats || {};
-  console.log("Stats computed:", statsData);
   return {
     total_assigned: statsData.total_assigned || 0,
     completed_count: statsData.completed_count || 0,
@@ -297,6 +322,8 @@ const stats = computed(() => {
     min_score: statsData.min_score,
     max_score: statsData.max_score,
     passed_count: statsData.passed_count || 0,
+    avg_theory_time_seconds: statsData.avg_theory_time_seconds || 0,
+    theory_completed_count: statsData.theory_completed_count || 0,
   };
 });
 
@@ -304,7 +331,6 @@ const loadDetails = async () => {
   loading.value = true;
   try {
     const data = await getAssessmentDetails(props.assessmentId);
-    console.log("Assessment details loaded:", data);
     details.value = data;
   } catch (error) {
     console.error("Load assessment details error:", error);
@@ -321,6 +347,10 @@ const handleExport = async () => {
     console.error("Export error:", error);
     showToast("Ошибка экспорта", "error");
   }
+};
+
+const openTheory = () => {
+  router.push({ name: "AssessmentTheory", params: { id: props.assessmentId } });
 };
 
 const getStatusLabel = (status) => {
@@ -361,6 +391,15 @@ const formatDuration = (seconds) => {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${mins}м ${secs}с`;
+};
+
+const formatTheoryTime = (seconds) => {
+  if (!seconds || seconds === 0) return "—";
+  const mins = Math.floor(seconds / 60);
+  if (mins < 1) {
+    return `${Math.round(seconds)}с`;
+  }
+  return `${mins}м`;
 };
 
 const toNumber = (value) => {
@@ -434,6 +473,13 @@ onMounted(() => {
   justify-content: space-between;
   align-items: flex-start;
   gap: 32px;
+}
+
+.details-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .details-title {

@@ -13,7 +13,15 @@
     </div>
 
     <!-- Progress Indicator -->
-    <div class="progress-section" v-if="questions.length > 0">
+    <div v-if="awaitingStart" class="start-screen card text-center">
+      <div class="wrapper">
+        <h2 class="title-medium mb-8">Готовы начать аттестацию?</h2>
+        <p class="body-small text-secondary mb-16">После нажатия начнётся отсчёт времени. Убедитесь, что вы готовы.</p>
+        <button class="btn btn-primary btn-full" @click="startAttempt">Начать аттестацию</button>
+      </div>
+    </div>
+
+    <div class="progress-section" v-if="!awaitingStart && questions.length > 0">
       <div class="wrapper">
         <div class="progress-info">
           <span class="question-counter">Вопрос {{ currentQuestionIndex + 1 }} из {{ questions.length }}</span>
@@ -75,7 +83,7 @@
     </div>
 
     <!-- Question Dots -->
-    <div class="dots-section" v-if="questions.length > 0">
+    <div class="dots-section" v-if="!awaitingStart && questions.length > 0">
       <div class="question-dots">
         <div
           v-for="(question, index) in questions"
@@ -156,6 +164,7 @@ export default {
     const selectedAnswer = ref(null);
     const userAnswers = ref([]);
     const attemptId = ref(null);
+    const awaitingStart = ref(false);
     const timeRemaining = ref(0);
     const showTimeUpModal = ref(false);
     const showFinishModal = ref(false);
@@ -371,35 +380,61 @@ export default {
           const remaining = payload.latestAttempt.remainingSeconds;
           timeRemaining.value = Number.isFinite(remaining) ? Number(remaining) : timeLimitSeconds;
 
-          const selectedMap = new Map(
-            (payload.questions || []).map((question) => [question.id, question.selectedOptionId || null])
-          );
+          const selectedMap = new Map((payload.questions || []).map((question) => [question.id, question.selectedOptionId || null]));
           userAnswers.value = questions.value.map((question) => selectedMap.get(question.id) || null);
           selectedAnswer.value = userAnswers.value[0] ?? null;
         } else {
-          const attempt = await apiClient.startAssessmentAttempt(assessmentId.value);
-          attemptId.value = attempt.id;
-          const remaining = attempt.remainingSeconds;
-          timeRemaining.value = Number.isFinite(remaining) ? Number(remaining) : timeLimitSeconds;
-          userAnswers.value = new Array(questions.value.length).fill(null);
-          selectedAnswer.value = null;
+          // Не создаём попытку автоматически — ждём явного старта пользователем.
+          awaitingStart.value = true;
+          attemptId.value = null;
+          timeRemaining.value = timeLimitSeconds;
         }
 
         if (timeRemaining.value == null) {
           timeRemaining.value = 0;
         }
 
-        startTimer();
+        if (attemptId.value) {
+          startTimer();
+        }
+        return true;
       } catch (error) {
         console.error("Не удалось загрузить аттестацию", error);
         telegramStore.showAlert(error.message || "Не удалось загрузить аттестацию");
         document.body.style.overflow = "";
         router.replace("/assessments");
+        return false;
+      }
+    }
+
+    async function startAttempt() {
+      if (attemptId.value || !assessmentId.value || awaitingStart.value === false) return;
+      try {
+        const attempt = await apiClient.startAssessmentAttempt(assessmentId.value);
+        attemptId.value = attempt.id;
+        const remaining = attempt.remainingSeconds;
+        const timeLimitSeconds = assessment.value?.timeLimitSeconds || null;
+        timeRemaining.value = Number.isFinite(remaining) ? Number(remaining) : timeLimitSeconds;
+        userAnswers.value = new Array(questions.value.length).fill(null);
+        selectedAnswer.value = null;
+        awaitingStart.value = false;
+        startTimer();
+      } catch (attemptError) {
+        if (attemptError.status === 409 && attemptError.code === "THEORY_NOT_COMPLETED") {
+          telegramStore.showAlert(attemptError.message || "Сначала изучите обязательную теорию");
+          router.replace(`/assessment/${assessmentId.value}/theory`);
+          return false;
+        }
+        console.error("Не удалось начать попытку", attemptError);
+        telegramStore.showAlert(attemptError.message || "Не удалось начать попытку");
       }
     }
 
     onMounted(async () => {
-      await loadAssessment();
+      const ready = await loadAssessment();
+      if (!ready) {
+        return;
+      }
 
       telegramStore.hideMainButton();
       telegramStore.showBackButton(handleEarlyExit);
@@ -447,6 +482,8 @@ export default {
       confirmFinishAssessment,
       handleEarlyExit,
       confirmEarlyExit,
+      startAttempt,
+      awaitingStart,
     };
   },
 };
@@ -710,7 +747,6 @@ export default {
 .question-dot.answered {
   background-color: var(--success);
 }
-
 
 .text-warning {
   color: var(--warning, #ff9500) !important;

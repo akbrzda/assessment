@@ -37,6 +37,9 @@ async function request(path, options = {}) {
     const message = errorBody.error || "Произошла ошибка";
     const error = new Error(message);
     error.status = response.status;
+    if (errorBody.code) {
+      error.code = errorBody.code;
+    }
     throw error;
   }
 
@@ -103,6 +106,15 @@ export const apiClient = {
   },
   getGamificationBadges() {
     return request("/gamification/badges");
+  },
+  getAssessmentTheory(assessmentId) {
+    return request(`/assessments/${assessmentId}/theory`);
+  },
+  completeAssessmentTheory(assessmentId, payload) {
+    return request(`/assessments/${assessmentId}/theory/completion`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
   getLeaderboardUsers(params = {}) {
     const searchParams = new URLSearchParams();

@@ -1,5 +1,6 @@
 const Joi = require("joi");
 const assessmentModel = require("../models/assessmentModel");
+const theoryModel = require("../models/theoryModel");
 const referenceModel = require("../models/referenceModel");
 const userModel = require("../models/userModel");
 const logger = require("../utils/logger");
@@ -298,6 +299,27 @@ async function startAttempt(req, res, next) {
     }
     if (assessment.status === "closed") {
       return res.status(400).json({ error: "Аттестация уже закрыта" });
+    }
+
+    const theoryMeta = await theoryModel.getCurrentTheoryMeta(assessmentId);
+    if (theoryMeta && theoryMeta.completionRequired) {
+      const hasCompletion = await theoryModel.userHasCompletion({
+        assessmentId,
+        userId: req.currentUser.id,
+        versionId: theoryMeta.versionId,
+      });
+
+      if (!hasCompletion) {
+        return res.status(409).json({
+          error: "Необходимо пройти обязательную теорию перед началом теста",
+          code: "THEORY_NOT_COMPLETED",
+          theory: {
+            versionId: theoryMeta.versionId,
+            versionNumber: theoryMeta.versionNumber,
+            publishedAt: theoryMeta.publishedAt,
+          },
+        });
+      }
     }
 
     const attempt = await assessmentModel.createAttempt(assessment, req.currentUser.id);

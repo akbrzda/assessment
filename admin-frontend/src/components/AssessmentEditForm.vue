@@ -30,6 +30,32 @@
           </div>
         </section>
 
+        <!-- Теория -->
+        <section class="form-section">
+          <div class="theory-section-header">
+            <div>
+              <h3 class="section-title">Теория перед аттестацией</h3>
+              <p class="section-hint">Добавьте обязательные материалы, которые сотрудник должен изучить перед тестом.</p>
+            </div>
+            <label class="switch-field">
+              <input type="checkbox" v-model="theoryEnabled" />
+              <span>Требовать прохождение теории</span>
+            </label>
+          </div>
+
+          <div v-if="theoryLoading" class="inline-loading">
+            <Preloader />
+          </div>
+
+          <div v-else>
+            <div v-if="theoryEnabled" class="theory-builder-wrapper">
+              <AssessmentTheoryBuilder v-model="theoryData" />
+              <p v-if="theoryError" class="error-text">{{ theoryError }}</p>
+            </div>
+            <p v-else class="hint text-secondary">Теория отключена. Включите переключатель, чтобы добавить блоки.</p>
+          </div>
+        </section>
+
         <!-- Назначения -->
         <section class="form-section">
           <h3 class="section-title">Назначение</h3>
@@ -132,12 +158,15 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { updateAssessment } from "../api/assessments";
 import { getReferences, getUsers } from "../api/users";
+import { getAdminTheory, saveTheoryDraft, publishTheory } from "../api/theory";
 import Card from "./ui/Card.vue";
 import Input from "./ui/Input.vue";
 import Textarea from "./ui/Textarea.vue";
 import Button from "./ui/Button.vue";
 import Preloader from "./ui/Preloader.vue";
+import AssessmentTheoryBuilder from "./AssessmentTheoryBuilder.vue";
 import { useToast } from "../composables/useToast";
+import { createEmptyTheory, mapVersionToTheoryData, buildTheoryPayload, validateTheoryData, hasTheoryBlocks } from "../utils/theory";
 
 const props = defineProps({
   assessment: {
@@ -158,6 +187,10 @@ const selectedBranches = ref([]);
 const selectedPositions = ref([]);
 const selectedUsers = ref([]);
 const { showToast } = useToast();
+const theoryEnabled = ref(false);
+const theoryData = ref(createEmptyTheory());
+const theoryError = ref("");
+const theoryLoading = ref(false);
 
 const formData = ref({
   title: "",
@@ -175,6 +208,32 @@ const filteredUsers = computed(() => {
   const query = userSearchQuery.value.toLowerCase();
   return allUsers.value.filter((user) => user.first_name.toLowerCase().includes(query) || user.last_name.toLowerCase().includes(query));
 });
+
+const validateTheory = (showMessage = false) => {
+  if (!theoryEnabled.value) {
+    theoryError.value = "";
+    return true;
+  }
+  const result = validateTheoryData(theoryData.value);
+  if (!result.valid) {
+    theoryError.value = result.message;
+    if (showMessage) {
+      showToast(result.message, "warning");
+    }
+    return false;
+  }
+  theoryError.value = "";
+  return true;
+};
+
+const persistTheoryVersion = async () => {
+  if (!theoryEnabled.value || !hasTheoryBlocks(theoryData.value)) {
+    return;
+  }
+  const payload = buildTheoryPayload(theoryData.value);
+  await saveTheoryDraft(props.assessment.id, payload);
+  await publishTheory(props.assessment.id, "new");
+};
 
 // Подсчёт пользователей, которые будут назначены
 const assignedUsersPreview = computed(() => {
@@ -232,6 +291,28 @@ const loadUsers = async () => {
     allUsers.value = data.users || [];
   } catch (error) {
     console.error("Load users error:", error);
+  }
+};
+
+const loadTheory = async () => {
+  theoryLoading.value = true;
+  try {
+    const response = await getAdminTheory(props.assessment.id);
+    const theory = response?.theory || null;
+    const version = theory?.draftVersion || theory?.currentVersion || null;
+    if (version && (version.requiredBlocks?.length || version.optionalBlocks?.length)) {
+      theoryEnabled.value = true;
+      theoryData.value = mapVersionToTheoryData(version);
+    } else {
+      theoryEnabled.value = false;
+      theoryData.value = createEmptyTheory();
+    }
+  } catch (error) {
+    console.error("Load theory error:", error);
+    theoryEnabled.value = false;
+    theoryData.value = createEmptyTheory();
+  } finally {
+    theoryLoading.value = false;
   }
 };
 
@@ -302,6 +383,10 @@ const handleSubmit = async () => {
     }
   }
 
+  if (!validateTheory(true)) {
+    return;
+  }
+
   submitting.value = true;
 
   try {
@@ -320,6 +405,16 @@ const handleSubmit = async () => {
     };
 
     await updateAssessment(props.assessment.id, data);
+
+    if (theoryEnabled.value && hasTheoryBlocks(theoryData.value)) {
+      try {
+        await persistTheoryVersion();
+      } catch (error) {
+        console.error("Update theory error:", error);
+        showToast("Не удалось сохранить теорию. Попробуйте позже.", "warning");
+      }
+    }
+
     showToast("Аттестация обновлена успешно!", "success");
     emit("submit");
   } catch (error) {
@@ -371,6 +466,7 @@ onMounted(async () => {
     }
   }
 
+  await loadTheory();
   loading.value = false;
 });
 </script>
@@ -537,6 +633,51 @@ onMounted(async () => {
   font-size: 13px;
   color: var(--text-hint);
   font-style: italic;
+}
+
+.theory-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.section-hint {
+  margin: 4px 0 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.switch-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.switch-field input {
+  width: 18px;
+  height: 18px;
+}
+
+.theory-builder-wrapper {
+  margin-top: 16px;
+}
+
+.inline-loading {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.error-text {
+  color: #ef4444;
+  margin-top: 12px;
+}
+
+.text-secondary {
+  color: var(--text-secondary);
 }
 
 @media (max-width: 768px) {

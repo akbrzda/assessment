@@ -23,7 +23,12 @@
       <div v-if="filteredAssessments.length" class="assessments-list">
         <div v-for="assessment in filteredAssessments" :key="assessment.id" class="card assessment-card" @click="handleAssessmentClick(assessment)">
           <div class="assessment-header">
-            <h3 class="title-small mb-8">{{ assessment.title }}</h3>
+            <div>
+              <h3 class="title-small mb-8">{{ assessment.title }}</h3>
+              <p v-if="assessment.requiresTheory" class="theory-hint" :class="{ done: assessment.theoryCompleted }">
+                {{ assessment.theoryCompleted ? "Теория пройдена" : "Нужно пройти теорию" }}
+              </p>
+            </div>
             <span class="badge" :class="getStatusClass(assessment.status)">
               {{ getStatusText(assessment.status) }}
             </span>
@@ -53,9 +58,17 @@
 
           <div class="assessment-actions">
             <button
-              v-if="assessment.status === 'open' && assessment.attemptsUsed < assessment.maxAttempts"
+              v-if="assessment.requiresTheory && !assessment.theoryCompleted"
               class="btn btn-primary btn-full"
-              @click.stop="startAssessment(assessment.id)"
+              @click.stop="openTheory(assessment.id)"
+            >
+              Пройти теорию
+            </button>
+
+            <button
+              v-else-if="assessment.status === 'open' && assessment.attemptsUsed < assessment.maxAttempts"
+              class="btn btn-primary btn-full"
+              @click.stop="startAssessment(assessment)"
             >
               {{ assessment.attemptsUsed > 0 ? "Пройти ещё раз" : "Начать" }}
             </button>
@@ -217,14 +230,26 @@ export default {
       telegramStore.hapticFeedback("impact", "light");
     }
 
-    function startAssessment(id) {
+    function startAssessment(assessment) {
+      if (!assessment) {
+        return;
+      }
+      if (assessment.requiresTheory && !assessment.theoryCompleted) {
+        openTheory(assessment.id);
+        return;
+      }
       telegramStore.hapticFeedback("impact", "medium");
-      router.push(`/assessment/${id}`);
+      router.push(`/assessment/${assessment.id}`);
     }
 
     function viewResults(id) {
       telegramStore.hapticFeedback("impact", "light");
       router.push(`/assessment-results/${id}`);
+    }
+
+    function openTheory(id) {
+      telegramStore.hapticFeedback("impact", "light");
+      router.push(`/assessment/${id}/theory`);
     }
 
     function normalizeAssessment(item) {
@@ -236,6 +261,9 @@ export default {
       const bestScore = Number.isFinite(item.bestScorePercent) ? Math.round(item.bestScorePercent) : null;
       const attemptsUsed = Number.isFinite(item.lastAttemptNumber) ? Number(item.lastAttemptNumber) : 0;
       const maxAttempts = Number.isFinite(item.maxAttempts) ? Number(item.maxAttempts) : 1;
+      const requiresTheory = Boolean(item.theory?.completionRequired);
+      const theoryCompleted = requiresTheory ? Boolean(item.theory?.completedAt) : false;
+
       const statusMap = {
         active: "open",
         pending: "pending",
@@ -256,6 +284,9 @@ export default {
         threshold,
         maxAttempts,
         attemptsUsed,
+        requiresTheory,
+        theoryCompleted,
+        theoryVersion: item.theory?.versionNumber || null,
         bestResult:
           bestScore != null
             ? {
@@ -303,6 +334,7 @@ export default {
       handleAssessmentClick,
       startAssessment,
       viewResults,
+      openTheory,
     };
   },
 };
@@ -359,6 +391,16 @@ export default {
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 12px;
+}
+
+.theory-hint {
+  font-size: 12px;
+  color: var(--warning, #ff9500);
+  margin: 0;
+}
+
+.theory-hint.done {
+  color: var(--success);
 }
 
 .assessment-info {
