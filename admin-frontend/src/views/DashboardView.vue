@@ -32,7 +32,7 @@
           <div class="metric-content">
             <div class="metric-icon metric-icon-blue"><Icon name="ClipboardList" size="32" aria-hidden="true" /></div>
             <div class="metric-info">
-              <h3 class="metric-label">Активные аттестации</h3>
+              <p class="metric-label">Активные аттестации</p>
               <p class="metric-value">{{ metrics.activeAssessments }}</p>
             </div>
           </div>
@@ -42,7 +42,7 @@
           <div class="metric-content">
             <div class="metric-icon metric-icon-green"><Icon name="Users" size="32" aria-hidden="true" /></div>
             <div class="metric-info">
-              <h3 class="metric-label">Всего сотрудников</h3>
+              <p class="metric-label">Всего сотрудников</p>
               <p class="metric-value">{{ metrics.totalUsers }}</p>
             </div>
           </div>
@@ -52,7 +52,7 @@
           <div class="metric-content">
             <div class="metric-icon metric-icon-purple"><Icon name="Building2" size="32" aria-hidden="true" /></div>
             <div class="metric-info">
-              <h3 class="metric-label">Филиалы</h3>
+              <p class="metric-label">Филиалы</p>
               <p class="metric-value">{{ metrics.totalBranches }}</p>
             </div>
           </div>
@@ -62,7 +62,7 @@
           <div class="metric-content">
             <div class="metric-icon metric-icon-orange"><Icon name="briefcase-business" size="32" aria-hidden="true" /></div>
             <div class="metric-info">
-              <h3 class="metric-label">Должности</h3>
+              <p class="metric-label">Должности</p>
               <p class="metric-value">{{ metrics.totalPositions }}</p>
             </div>
           </div>

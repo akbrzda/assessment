@@ -5,63 +5,35 @@ const SIDEBAR_KEY = "sidebarCollapsed";
 
 export const useThemeStore = defineStore("theme", {
   state: () => ({
-    themeMode: localStorage.getItem(THEME_KEY) || "system",
-    resolvedTheme: "light",
+    themeMode: localStorage.getItem(THEME_KEY) || "light",
     sidebarCollapsed: localStorage.getItem(SIDEBAR_KEY) === "true",
-    mediaQuery: null,
-    systemListener: null,
   }),
 
   getters: {
     theme(state) {
-      if (state.themeMode === "light" || state.themeMode === "dark") {
-        return state.themeMode;
-      }
-      return state.resolvedTheme;
+      return state.themeMode === "dark" ? "dark" : "light";
     },
   },
 
   actions: {
     init() {
-      if (typeof window !== "undefined" && window.matchMedia) {
-        this.mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-        this.resolvedTheme = this.mediaQuery.matches ? "dark" : "light";
-
-        const listener = (event) => {
-          this.handleSystemThemeChange(event.matches);
-        };
-
-        if (this.mediaQuery.addEventListener) {
-          this.mediaQuery.addEventListener("change", listener);
-        } else if (this.mediaQuery.addListener) {
-          this.mediaQuery.addListener(listener);
-        }
-
-        this.systemListener = listener;
-      } else {
-        this.resolvedTheme = "light";
+      if (this.themeMode !== "light" && this.themeMode !== "dark") {
+        this.themeMode = "light";
       }
-
       this.applyTheme();
     },
 
-    handleSystemThemeChange(matchesDark) {
-      this.resolvedTheme = matchesDark ? "dark" : "light";
-      if (this.themeMode === "system") {
-        this.applyTheme();
-      }
-    },
-
     setThemeMode(mode) {
+      if (mode !== "light" && mode !== "dark") {
+        return;
+      }
       this.themeMode = mode;
       localStorage.setItem(THEME_KEY, mode);
       this.applyTheme();
     },
 
     cycleThemeMode() {
-      const modes = ["light", "dark", "system"];
-      const currentIndex = modes.indexOf(this.themeMode);
-      const nextMode = modes[(currentIndex + 1) % modes.length];
+      const nextMode = this.themeMode === "light" ? "dark" : "light";
       this.setThemeMode(nextMode);
     },
 
@@ -70,8 +42,7 @@ export const useThemeStore = defineStore("theme", {
     },
 
     applyTheme() {
-      const theme = this.theme;
-      document.documentElement.classList.toggle("dark", theme === "dark");
+      document.documentElement.classList.toggle("dark", this.theme === "dark");
     },
 
     setSidebarCollapsed(value) {

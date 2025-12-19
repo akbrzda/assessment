@@ -58,27 +58,27 @@ defineProps({
 }
 
 .badge-primary {
-  background-color: var(--accent-blue-soft);
-  color: var(--accent-blue);
+  background-color: var(--accent-blue);
+  color: #ffffff;
 }
 
 .badge-success {
-  background-color: var(--accent-green-soft);
-  color: var(--accent-green);
+  background-color: var(--accent-green);
+  color: #ffffff;
 }
 
 .badge-warning {
-  background-color: var(--accent-orange-soft);
-  color: var(--accent-orange);
+  background-color: var(--accent-orange);
+  color: #ffffff;
 }
 
 .badge-danger {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  background-color: #ef4444;
+  color: #ffffff;
 }
 
 .badge-info {
-  background-color: var(--accent-purple-soft);
-  color: var(--accent-purple);
+  background-color: var(--accent-purple);
+  color: #ffffff;
 }
 </style>

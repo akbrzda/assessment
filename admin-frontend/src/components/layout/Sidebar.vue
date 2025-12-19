@@ -3,12 +3,9 @@
     <div class="sidebar-inner">
       <div class="sidebar-header">
         <div class="sidebar-brand">
-          <div class="brand-icon">
-            <Icon name="Shield" size="22" aria-hidden="true" />
-          </div>
           <div v-if="!isCollapsed" class="sidebar-title-wrapper">
-            <h1 class="sidebar-title">Админ-панель</h1>
-            <p class="sidebar-subtitle">Центр управления</p>
+            <h1 class="sidebar-title">Управление</h1>
+            <!-- <p class="sidebar-subtitle">Центр управления</p>-->
           </div>
         </div>
         <div class="sidebar-header-actions">
@@ -136,7 +133,7 @@ onUnmounted(() => {
 }
 
 .sidebar.is-collapsed {
-  width: 96px;
+  width: 72px;
 }
 
 @media (max-width: 1023px) {
@@ -268,20 +265,15 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px 14px;
   border-radius: 20px;
-  border: 1px solid var(--divider);
-  background: var(--surface-card);
-  box-shadow: 0 18px 40px #0000000a;
 }
 
 .sidebar.is-collapsed .sidebar-nav {
-  padding: 16px 10px;
   align-items: center;
 }
 
 .sidebar.is-collapsed .sidebar-brand {
-  justify-content: center;
+  display: none;
 }
 
 .nav-item {

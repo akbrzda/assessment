@@ -36,7 +36,6 @@
               <span class="theme-toggle-label">{{ option.label }}</span>
             </button>
           </div>
-          <span v-if="isSystemTheme" class="theme-sync-hint">Системные настройки</span>
         </div>
         <!-- Профиль пользователя -->
         <div class="user-profile">
@@ -71,26 +70,17 @@ defineProps({
 });
 
 const themeStore = useThemeStore();
-const theme = computed(() => themeStore.theme);
 const themeMode = computed(() => themeStore.themeMode);
-const isSystemTheme = computed(() => themeMode.value === "system");
 
 const themeOptions = [
-  { mode: "light", label: "Светлая", icon: "Sun" },
-  { mode: "dark", label: "Тёмная", icon: "Moon" },
+  { mode: "light", label: "", icon: "Sun" },
+  { mode: "dark", label: "", icon: "Moon" },
 ];
 
-const isThemeActive = (mode) => {
-  if (themeMode.value === "system") {
-    return theme.value === mode;
-  }
-  return themeMode.value === mode;
-};
+const isThemeActive = (mode) => themeMode.value === mode;
 
 const selectTheme = (mode) => {
-  if (!mode) return;
-  if (themeMode.value === mode) {
-    themeStore.setThemeMode("system");
+  if (!mode || themeMode.value === mode) {
     return;
   }
   themeStore.setThemeMode(mode);
@@ -98,13 +88,10 @@ const selectTheme = (mode) => {
 
 const getThemeButtonTitle = (mode) => {
   const label = mode === "dark" ? "тёмную" : "светлую";
-  if (isSystemTheme.value) {
-    return theme.value === mode ? `Используется системная ${label} тема` : `Переключить на ${label} тему`;
-  }
   if (themeMode.value === mode) {
-    return `Тема зафиксирована. Нажмите, чтобы вернуться к системной настройке`;
+    return `Сейчас активна ${label} тема`;
   }
-  return `Выбрать ${label} тему`;
+  return `Переключить на ${label} тему`;
 };
 
 const { isConnected } = useWebSocket();
@@ -275,11 +262,6 @@ const handleLogout = async () => {
   white-space: nowrap;
 }
 
-.theme-sync-hint {
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
 @media (max-width: 768px) {
   .theme-toggle {
     align-items: center;
@@ -290,10 +272,6 @@ const handleLogout = async () => {
   }
 
   .theme-toggle-label {
-    display: none;
-  }
-
-  .theme-sync-hint {
     display: none;
   }
 }

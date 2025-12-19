@@ -1,11 +1,13 @@
 <template>
   <div class="select-group">
-    <label v-if="label" class="select-label">
+    <label v-if="label" class="select-label" :for="selectId">
       {{ label }}
       <span v-if="required" class="select-required">*</span>
     </label>
     <div class="select-wrapper">
       <select
+        :id="selectId"
+        :name="selectName"
         :value="modelValue"
         :disabled="disabled"
         :required="required"
@@ -24,7 +26,9 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed, useId } from "vue";
+
+const props = defineProps({
   modelValue: {
     type: [String, Number, null],
     default: null,
@@ -38,12 +42,18 @@ defineProps({
   error: String,
   disabled: Boolean,
   required: Boolean,
+  id: String,
+  name: String,
   size: {
     type: String,
     default: "md",
     validator: (value) => ["sm", "md", "lg"].includes(value),
   },
 });
+
+const localId = typeof useId === "function" ? useId() : `select-${Math.random().toString(36).slice(2, 9)}`;
+const selectId = computed(() => props.id || localId);
+const selectName = computed(() => props.name || selectId.value);
 
 defineEmits(["update:modelValue"]);
 </script>
