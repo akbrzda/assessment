@@ -145,6 +145,7 @@ import Select from "./ui/Select.vue";
 import Button from "./ui/Button.vue";
 import Textarea from "./ui/Textarea.vue";
 import { useToast } from "../composables/useToast";
+import { formatBranchLabel } from "../utils/branch";
 
 const props = defineProps({
   assessmentId: {
@@ -191,7 +192,7 @@ const isFormValid = computed(() => {
 const branchOptions = computed(() =>
   references.value.branches.map((branch) => ({
     value: branch.id,
-    label: branch.name,
+    label: formatBranchLabel(branch),
   }))
 );
 

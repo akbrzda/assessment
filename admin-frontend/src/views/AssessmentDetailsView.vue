@@ -10,7 +10,7 @@
     <div v-else class="details-container">
       <!-- Заголовок с навигацией -->
       <div class="page-header">
-        <Button variant="ghost" icon="arrow-left" @click="goBack"> Назад к списку </Button>
+        <Button variant="ghost" icon="arrow-left" @click="goBack"> Назад </Button>
       </div>
 
       <!-- Компонент детализации -->

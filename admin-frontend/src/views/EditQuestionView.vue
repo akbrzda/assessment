@@ -2,7 +2,7 @@
   <div class="edit-question-view">
     <!-- Header -->
     <div class="page-header">
-      <Button variant="ghost" icon="arrow-left" @click="goBack"> Назад к списку</Button>
+      <Button variant="ghost" icon="arrow-left" @click="goBack"> Назад</Button>
       <h2 class="page-heading">Редактировать вопрос</h2>
     </div>
 

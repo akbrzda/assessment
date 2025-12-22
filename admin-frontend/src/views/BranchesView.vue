@@ -51,9 +51,13 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="branch in branches" :key="branch.id" :class="{ 'inactive-branch': !branch.managers, 'hidden-branch': !branch.isVisibleInMiniapp }">
+              <tr
+                v-for="branch in branches"
+                :key="branch.id"
+                :class="{ 'inactive-branch': !branch.managers, 'hidden-branch': !branch.isVisibleInMiniapp }"
+              >
                 <td>{{ branch.id }}</td>
-                <td class="branch-name">{{ branch.name }}</td>
+                <td class="branch-name">{{ formatBranchLabel(branch) }}</td>
                 <td class="city-cell">{{ branch.city || "—" }}</td>
                 <td class="managers-cell">
                   <span v-if="branch.managers" class="managers-list">
@@ -98,10 +102,15 @@
 
         <!-- Mobile Cards -->
         <div class="mobile-cards show-mobile">
-          <div v-for="branch in branches" :key="branch.id" class="branch-card" :class="{ 'inactive-branch': !branch.managers, 'hidden-branch': !branch.isVisibleInMiniapp }">
+          <div
+            v-for="branch in branches"
+            :key="branch.id"
+            class="branch-card"
+            :class="{ 'inactive-branch': !branch.managers, 'hidden-branch': !branch.isVisibleInMiniapp }"
+          >
             <div class="branch-card-header">
               <div>
-                <h3 class="branch-card-name">{{ branch.name }}</h3>
+                <h3 class="branch-card-name">{{ formatBranchLabel(branch) }}</h3>
                 <p class="branch-card-id">ID: {{ branch.id }}</p>
               </div>
               <Badge variant="primary" size="sm">{{ branch.employees_count }} чел.</Badge>
@@ -177,6 +186,7 @@ import Input from "../components/ui/Input.vue";
 import BranchForm from "../components/BranchForm.vue";
 import AssignManagerModal from "../components/AssignManagerModal.vue";
 import { useToast } from "../composables/useToast";
+import { formatBranchLabel } from "../utils/branch";
 
 const loading = ref(false);
 const branches = ref([]);
@@ -246,11 +256,11 @@ const handleManagerAssigned = () => {
 
 const confirmDelete = async (branch) => {
   if (branch.employees_count > 0) {
-    showToast(`Невозможно удалить филиал "${branch.name}". В нем ${branch.employees_count} сотрудников.`, "warning");
+    showToast(`Невозможно удалить филиал "${formatBranchLabel(branch)}". В нем ${branch.employees_count} сотрудников.`, "warning");
     return;
   }
 
-  if (confirm(`Вы уверены, что хотите удалить филиал "${branch.name}"?`)) {
+  if (confirm(`Вы уверены, что хотите удалить филиал "${formatBranchLabel(branch)}"?`)) {
     try {
       await deleteBranch(branch.id);
       showToast("Филиал удален", "success");
@@ -382,10 +392,6 @@ onMounted(() => {
 
 .branches-table tbody tr.inactive-branch {
   background-color: #8080800d;
-}
-
-.branches-table tbody tr.hidden-branch {
-  background-color: #fff8e6;
 }
 
 .branches-table td {

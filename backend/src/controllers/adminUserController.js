@@ -2,6 +2,7 @@ const Joi = require("joi");
 const bcrypt = require("bcrypt");
 const userModel = require("../models/userModel");
 const { pool } = require("../config/database");
+const assessmentModel = require("../models/assessmentModel");
 const referenceModel = require("../models/referenceModel");
 const { logAndSend, buildActorFromRequest } = require("../services/auditService");
 
@@ -142,6 +143,11 @@ async function updateUser(req, res, next) {
     }
 
     await userModel.updateUserByAdmin(userId, payload);
+    await assessmentModel.assignUserToMatchingAssessments({
+      userId,
+      branchId: value.branchId,
+      positionId: value.positionId,
+    });
     const updated = await userModel.findById(userId);
 
     await logAndSend({
@@ -501,6 +507,12 @@ async function createUser(req, res, next) {
         roleId,
         login: login || null,
       },
+    });
+
+    await assessmentModel.assignUserToMatchingAssessments({
+      userId: newUser[0].id,
+      branchId,
+      positionId,
     });
 
     res.status(201).json({ user: newUser[0] });

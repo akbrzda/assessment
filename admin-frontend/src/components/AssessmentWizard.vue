@@ -115,19 +115,53 @@
 
               <Input v-model="question.text" type="text" label="Текст вопроса" placeholder="Введите текст вопроса" />
 
-              <div class="form-group">
-                <label>Варианты ответов (минимум 2)</label>
+              <div class="question-type-toggle">
+                <label v-for="typeOption in questionTypeOptions" :key="typeOption.value" class="type-option">
+                  <input
+                    type="radio"
+                    :value="typeOption.value"
+                    :checked="question.questionType === typeOption.value"
+                    @change="() => handleQuestionTypeChange(qIndex, typeOption.value)"
+                  />
+                  <span>{{ typeOption.label }}</span>
+                </label>
+              </div>
+              <p class="hint">
+                <template v-if="question.questionType === 'single'">Один правильный вариант из списка</template>
+                <template v-else-if="question.questionType === 'multiple'">Несколько правильных вариантов</template>
+                <template v-else>Сотрудник вводит текст, который сравнивается с эталонным</template>
+              </p>
+
+              <Textarea
+                v-if="question.questionType === 'text'"
+                v-model="question.correctTextAnswer"
+                label="Эталонный ответ"
+                :rows="2"
+                placeholder="Введите правильный ответ"
+              />
+
+              <div v-else class="form-group">
+                <label>Варианты ответов (2-6)</label>
                 <div class="options-list">
                   <div v-for="(option, oIndex) in question.options" :key="oIndex" class="option-row">
                     <Input v-model="option.text" type="text" placeholder="Текст варианта" />
                     <label class="correct-option-label">
-                      <input type="radio" :name="`question-${qIndex}`" :checked="option.isCorrect" @change="() => setCorrectOption(qIndex, oIndex)" />
+                      <template v-if="question.questionType === 'multiple'">
+                        <input type="checkbox" v-model="option.isCorrect" />
+                      </template>
+                      <template v-else>
+                        <input type="radio" :name="`question-${qIndex}`" :checked="option.isCorrect" @change="() => setCorrectOption(qIndex, oIndex)" />
+                      </template>
                       <span>Правильный</span>
                     </label>
                     <Button @click="removeOption(qIndex, oIndex)" :disabled="question.options.length <= 2" variant="danger" size="sm" icon="trash" />
                   </div>
                 </div>
                 <Button @click="addOption(qIndex)" :disabled="question.options.length >= 6" variant="secondary">+ Добавить вариант</Button>
+                <p class="hint">
+                  <template v-if="question.questionType === 'single'">Отметьте один правильный ответ</template>
+                  <template v-else>Отметьте минимум 2 правильных ответа</template>
+                </p>
               </div>
             </div>
           </div>
@@ -153,7 +187,7 @@
             <div class="checkbox-list">
               <label v-for="branch in references.branches" :key="branch.id" class="checkbox-label">
                 <input type="checkbox" :value="branch.id" v-model="formData.branchIds" />
-                <span>{{ branch.name }}</span>
+                <span>{{ formatBranchLabel(branch) }}</span>
               </label>
             </div>
           </div>
@@ -306,6 +340,7 @@ import AssessmentTheoryBuilder from "./AssessmentTheoryBuilder.vue";
 import { saveTheoryDraft, publishTheory } from "../api/theory";
 import { createEmptyTheory, validateTheoryData, buildTheoryPayload, hasTheoryBlocks } from "../utils/theory";
 import { useToast } from "../composables/useToast";
+import { formatBranchLabel } from "../utils/branch";
 
 const emit = defineEmits(["submit", "cancel"]);
 const authStore = useAuthStore();
@@ -318,6 +353,11 @@ const questionsMode = ref("bank");
 const errors = ref({});
 
 const steps = [{ label: "Основная информация" }, { label: "Теория" }, { label: "Вопросы" }, { label: "Участники" }, { label: "Параметры" }];
+const questionTypeOptions = [
+  { value: "single", label: "Один вариант" },
+  { value: "multiple", label: "Несколько вариантов" },
+  { value: "text", label: "Текстовый ответ" },
+];
 
 // Банк вопросов
 const loadingBankQuestions = ref(false);
@@ -415,6 +455,33 @@ function calculateMaxDate() {
   return `${currentYear + MAX_YEAR_OFFSET}-12-31`;
 }
 
+const isQuestionValid = (question) => {
+  if (!question || !question.text || question.text.trim() === "") {
+    return false;
+  }
+  if (question.questionType === "text") {
+    return Boolean(question.correctTextAnswer && question.correctTextAnswer.trim().length > 0);
+  }
+  if (!Array.isArray(question.options) || question.options.length < 2) {
+    return false;
+  }
+  if (!question.options.every((opt) => opt.text && opt.text.trim().length > 0)) {
+    return false;
+  }
+  const correctCount = question.options.filter((opt) => opt.isCorrect).length;
+  if (question.questionType === "single") {
+    return correctCount === 1;
+  }
+  return correctCount >= 2;
+};
+
+const areCustomQuestionsValid = () => {
+  if (!formData.value.questions.length) {
+    return false;
+  }
+  return formData.value.questions.every((question) => isQuestionValid(question));
+};
+
 const canProceed = computed(() => {
   switch (currentStep.value) {
     case 1:
@@ -430,12 +497,7 @@ const canProceed = computed(() => {
       if (questionsMode.value === "bank") {
         return selectedBankQuestions.value.length > 0;
       }
-      return (
-        formData.value.questions.length > 0 &&
-        formData.value.questions.every(
-          (q) => q.text.trim() !== "" && q.options.length >= 2 && q.options.every((o) => o.text.trim() !== "") && q.options.some((o) => o.isCorrect)
-        )
-      );
+      return areCustomQuestionsValid();
     case 4:
       return formData.value.branchIds.length > 0 || formData.value.positionIds.length > 0 || formData.value.userIds.length > 0;
     default:
@@ -444,7 +506,10 @@ const canProceed = computed(() => {
 });
 
 const isFormValid = computed(() => {
-  const hasQuestions = questionsMode.value === "bank" ? selectedBankQuestions.value.length > 0 : formData.value.questions.length > 0;
+  const hasBankQuestions = selectedBankQuestions.value.length > 0;
+  const hasCustomQuestions = formData.value.questions.length > 0;
+  const hasQuestions = questionsMode.value === "bank" ? hasBankQuestions : hasCustomQuestions;
+  const customValid = questionsMode.value === "bank" ? true : areCustomQuestionsValid();
   const theoryValid = !theoryEnabled.value || validateTheoryData(theoryData.value).valid;
 
   return (
@@ -452,6 +517,7 @@ const isFormValid = computed(() => {
     formData.value.openAt !== "" &&
     formData.value.closeAt !== "" &&
     hasQuestions &&
+    customValid &&
     theoryValid &&
     (formData.value.branchIds.length > 0 || formData.value.positionIds.length > 0 || formData.value.userIds.length > 0)
   );
@@ -542,13 +608,17 @@ const searchUsers = async () => {
   }
 };
 
+const createDefaultOptions = () => [
+  { text: "", isCorrect: true },
+  { text: "", isCorrect: false },
+];
+
 const addQuestion = () => {
   formData.value.questions.push({
     text: "",
-    options: [
-      { text: "", isCorrect: true },
-      { text: "", isCorrect: false },
-    ],
+    questionType: "single",
+    correctTextAnswer: "",
+    options: createDefaultOptions(),
   });
 };
 
@@ -557,8 +627,12 @@ const removeQuestion = (index) => {
 };
 
 const addOption = (qIndex) => {
-  if (formData.value.questions[qIndex].options.length < 6) {
-    formData.value.questions[qIndex].options.push({
+  const question = formData.value.questions[qIndex];
+  if (!question || question.questionType === "text") {
+    return;
+  }
+  if (question.options.length < 6) {
+    question.options.push({
       text: "",
       isCorrect: false,
     });
@@ -566,16 +640,79 @@ const addOption = (qIndex) => {
 };
 
 const removeOption = (qIndex, oIndex) => {
-  if (formData.value.questions[qIndex].options.length > 2) {
-    formData.value.questions[qIndex].options.splice(oIndex, 1);
+  const question = formData.value.questions[qIndex];
+  if (!question || question.questionType === "text") {
+    return;
+  }
+  if (question.options.length > 2) {
+    question.options.splice(oIndex, 1);
   }
 };
 
 const setCorrectOption = (qIndex, oIndex) => {
-  formData.value.questions[qIndex].options.forEach((opt, idx) => {
+  const question = formData.value.questions[qIndex];
+  if (!question || question.questionType !== "single") {
+    return;
+  }
+  question.options.forEach((opt, idx) => {
     opt.isCorrect = idx === oIndex;
   });
 };
+
+const handleQuestionTypeChange = (qIndex, type) => {
+  const question = formData.value.questions[qIndex];
+  if (!question) {
+    return;
+  }
+  question.questionType = type;
+  if (type === "text") {
+    question.options = [];
+    question.correctTextAnswer = "";
+    return;
+  }
+  if (!Array.isArray(question.options) || question.options.length < 2) {
+    question.options = createDefaultOptions();
+  }
+  question.correctTextAnswer = "";
+  if (type === "single") {
+    let hasCorrect = false;
+    question.options.forEach((option) => {
+      if (option.isCorrect && !hasCorrect) {
+        hasCorrect = true;
+      } else {
+        option.isCorrect = false;
+      }
+    });
+    if (!hasCorrect) {
+      question.options[0].isCorrect = true;
+    }
+  } else if (type === "multiple") {
+    const correctCount = question.options.filter((opt) => opt.isCorrect).length;
+    if (correctCount < 2) {
+      question.options.forEach((option, idx) => {
+        option.isCorrect = idx < 2;
+      });
+    }
+  }
+};
+
+const mapCustomQuestion = (question) => {
+  const questionType = question.questionType || "single";
+  return {
+    text: question.text.trim(),
+    questionType,
+    correctTextAnswer: questionType === "text" ? (question.correctTextAnswer || "").trim() : "",
+    options:
+      questionType === "text"
+        ? []
+        : (question.options || []).map((option) => ({
+            text: option.text.trim(),
+            isCorrect: Boolean(option.isCorrect),
+          })),
+  };
+};
+
+const getCustomQuestionsPayload = () => formData.value.questions.map((question) => mapCustomQuestion(question));
 
 const nextStep = () => {
   if (currentStep.value === 2 && !validateTheory(true)) {
@@ -681,6 +818,11 @@ const submitAssessment = async () => {
     return;
   }
 
+  if (questionsMode.value === "custom" && !areCustomQuestionsValid()) {
+    showToast("Проверьте текст вопросов и варианты ответов", "warning");
+    return;
+  }
+
   if (!validateTheory(true)) {
     return;
   }
@@ -688,20 +830,31 @@ const submitAssessment = async () => {
   submitting.value = true;
   try {
     // Преобразуем даты в формат с временем 00:00
-    const transformBankQuestion = (question) => ({
-      question_id: question.id,
-      text: question.question_text,
-      options: (question.options || []).map((opt) => ({
-        text: opt.option_text,
-        isCorrect: opt.is_correct === 1,
-      })),
-    });
+    const transformBankQuestion = (question) => {
+      const questionType = question.question_type || "single";
+      return {
+        question_id: question.id,
+        text: question.question_text,
+        questionType,
+        correctTextAnswer: questionType === "text" ? (question.correct_text_answer || "") : "",
+        options:
+          questionType === "text"
+            ? []
+            : (question.options || []).map((opt) => ({
+                text: opt.option_text,
+                isCorrect: opt.is_correct === 1,
+              })),
+      };
+    };
 
     const assessmentData = {
       ...formData.value,
       openAt: dateToISOWithMidnight(formData.value.openAt),
       closeAt: dateToISOWithMidnight(formData.value.closeAt),
-      questions: questionsMode.value === "bank" ? (selectedBankQuestions.value || []).map(transformBankQuestion) : formData.value.questions,
+      questions:
+        questionsMode.value === "bank"
+          ? (selectedBankQuestions.value || []).map(transformBankQuestion)
+          : getCustomQuestionsPayload(),
     };
 
     const result = await createAssessment(assessmentData);
@@ -1044,6 +1197,35 @@ onMounted(() => {
   margin: 0;
   font-size: 16px;
   color: var(--text-primary);
+}
+
+.question-type-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.type-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--divider);
+  border-radius: 999px;
+  background: var(--bg-primary);
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.type-option input {
+  margin: 0;
+}
+
+.type-option input:checked + span {
+  color: var(--accent-blue);
+  font-weight: 600;
 }
 
 .btn-remove {

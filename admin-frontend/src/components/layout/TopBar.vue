@@ -144,7 +144,7 @@ const handleLogout = async () => {
 }
 
 .topbar.collapsed {
-  left: 96px;
+  left: 72px;
 }
 
 @media (max-width: 1023px) {

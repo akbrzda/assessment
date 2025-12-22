@@ -341,6 +341,7 @@ import Preloader from "../components/ui/Preloader.vue";
 import UserForm from "../components/UserForm.vue";
 import Icon from "../components/ui/Icon.vue";
 import { useToast } from "../composables/useToast";
+import { formatBranchLabel } from "../utils/branch";
 
 const authStore = useAuthStore();
 const loading = ref(false);
@@ -400,7 +401,7 @@ const branchOptions = computed(() => [
   { value: "", label: "Все филиалы" },
   ...references.value.branches.map((branch) => ({
     value: String(branch.id),
-    label: branch.name,
+    label: formatBranchLabel(branch),
   })),
 ]);
 
@@ -435,7 +436,7 @@ const activeFilters = computed(() => {
   if (filters.search) active.push({ key: "search", label: `Поиск: "${filters.search}"` });
   if (filters.branch) {
     const branch = references.value.branches.find((b) => String(b.id) === filters.branch);
-    if (branch) active.push({ key: "branch", label: `Филиал: ${branch.name}` });
+    if (branch) active.push({ key: "branch", label: `Филиал: ${formatBranchLabel(branch)}` });
   }
   if (filters.position) {
     const position = references.value.positions.find((p) => String(p.id) === filters.position);
@@ -787,7 +788,7 @@ const normalizeUserProfile = (profile) => {
 const getBranchNameById = (id) => {
   if (!id) return "";
   const branch = references.value.branches.find((item) => String(item.id) === String(id));
-  return branch?.name || "";
+  return branch ? formatBranchLabel(branch) : "";
 };
 
 const getPositionNameById = (id) => {

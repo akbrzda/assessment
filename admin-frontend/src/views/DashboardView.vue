@@ -206,6 +206,7 @@ import Icon from "../components/ui/Icon.vue";
 import Button from "../components/ui/Button.vue";
 import Select from "../components/ui/Select.vue";
 import Input from "../components/ui/Input.vue";
+import { formatBranchLabel } from "../utils/branch";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -277,7 +278,7 @@ const activityDatasets = computed(() => {
 
 const branchOptions = computed(() => [
   { value: "", label: "Все филиалы" },
-  ...references.value.branches.map((branch) => ({ value: String(branch.id), label: branch.name })),
+  ...references.value.branches.map((branch) => ({ value: String(branch.id), label: formatBranchLabel(branch) })),
 ]);
 
 const positionOptions = computed(() => [

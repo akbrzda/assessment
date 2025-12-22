@@ -2,7 +2,7 @@
   <div class="create-assessment-view">
     <!-- Заголовок с навигацией -->
     <div class="page-header">
-      <Button variant="ghost" icon="arrow-left" @click="goBack"> Назад к списку </Button>
+      <Button variant="ghost" icon="arrow-left" @click="goBack"> Назад </Button>
       <h1 class="page-title">Создать аттестацию</h1>
     </div>
 
@@ -33,7 +33,6 @@ const handleSubmit = () => {
 <style scoped>
 .create-assessment-view {
   width: 100%;
-  max-width: 1200px;
   margin: 0 auto;
 }
 

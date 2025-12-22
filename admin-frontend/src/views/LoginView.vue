@@ -10,7 +10,7 @@
       </header>
 
       <form @submit.prevent="handleLogin" class="login-form">
-        <Input v-model="login" type="text" label="Логин" placeholder="admin@example" required />
+        <Input v-model="login" type="text" label="Логин" placeholder="admin" required />
 
         <Input v-model="password" type="password" label="Пароль" placeholder="Введите пароль" required />
 

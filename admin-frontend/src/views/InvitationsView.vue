@@ -236,6 +236,7 @@ import Input from "../components/ui/Input.vue";
 import Select from "../components/ui/Select.vue";
 import { INVITE_EXPIRATION_DAYS, BOT_USERNAME } from "@/env";
 import { useToast } from "../composables/useToast";
+import { formatBranchLabel } from "../utils/branch";
 
 const loading = ref(false);
 const saving = ref(false);
@@ -292,7 +293,7 @@ const branchOptions = computed(() => [
   { value: "", label: "Все филиалы" },
   ...references.value.branches.map((b) => ({
     value: String(b.id),
-    label: b.name,
+    label: formatBranchLabel(b),
   })),
 ]);
 
@@ -300,7 +301,7 @@ const branchSelectOptions = computed(() => [
   { value: "", label: "Выберите филиал" },
   ...references.value.branches.map((b) => ({
     value: b.id,
-    label: b.name,
+    label: formatBranchLabel(b),
   })),
 ]);
 
@@ -365,7 +366,7 @@ const normalizeInvitation = (item) => {
     firstName: item.first_name,
     lastName: item.last_name,
     branchId: item.branch_id,
-    branchName: item.branch_name,
+    branchName: formatBranchLabel({ name: item.branch_name || "", city: item.branch_city || "" }) || item.branch_name,
     createdAt: item.created_at ? new Date(item.created_at) : null,
     expiresAt,
     usedAt,

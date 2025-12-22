@@ -74,7 +74,7 @@ defineEmits(["update:modelValue"]);
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 15px;
+  font-size: 16px;
   resize: vertical;
   transition: all 0.2s ease;
 }
@@ -89,19 +89,36 @@ defineEmits(["update:modelValue"]);
   box-shadow: 0 0 0 3px #007aff1a;
 }
 
+.textarea-sm,
+.textarea-md,
+.textarea-lg {
+  font-size: 16px;
+}
+
 .textarea-sm {
-  font-size: 14px;
   padding: 8px 12px;
 }
 
 .textarea-md {
-  font-size: 15px;
   padding: 10px 16px;
 }
 
 .textarea-lg {
-  font-size: 16px;
   padding: 12px 20px;
+}
+
+@media (min-width: 768px) {
+  .textarea-sm {
+    font-size: 14px;
+  }
+
+  .textarea-md {
+    font-size: 15px;
+  }
+
+  .textarea-lg {
+    font-size: 16px;
+  }
 }
 
 .textarea::placeholder {

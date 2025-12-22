@@ -551,3 +551,10 @@ ALTER TABLE assessments
     ON DELETE SET NULL;
 ALTER TABLE assessment_theory_completions
   ADD COLUMN time_spent_seconds INT UNSIGNED DEFAULT 0 AFTER client_payload;
+ALTER TABLE assessment_questions
+  ADD COLUMN question_type ENUM('single','multiple','text') NOT NULL DEFAULT 'single' AFTER question_text,
+  ADD COLUMN correct_text_answer TEXT NULL AFTER question_type;
+
+ALTER TABLE assessment_answers
+  ADD COLUMN selected_option_ids JSON DEFAULT NULL AFTER option_id,
+  ADD COLUMN text_answer TEXT DEFAULT NULL AFTER selected_option_ids;

@@ -174,6 +174,7 @@ import Badge from "../components/ui/Badge.vue";
 import Input from "../components/ui/Input.vue";
 import Select from "../components/ui/Select.vue";
 import { useToast } from "../composables/useToast";
+import { formatBranchLabel } from "../utils/branch";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -202,7 +203,7 @@ const branchOptions = computed(() => [
   { value: "", label: "Все филиалы" },
   ...references.value.branches.map((branch) => ({
     value: String(branch.id),
-    label: branch.name,
+    label: formatBranchLabel(branch),
   })),
 ]);
 
@@ -254,14 +255,7 @@ const goToTheory = (id) => {
   router.push(`/assessments/${id}/theory`);
 };
 
-const canEditAssessment = (assessment) => {
-  // Админы могут редактировать в любом статусе
-  if (authStore.isSuperAdmin || authStore.isManager) {
-    return true;
-  }
-  // Остальные только для статуса "Ожидает"
-  return assessment.status === "pending";
-};
+const canEditAssessment = (assessment) => assessment.status === "pending";
 
 const confirmDelete = async (assessment) => {
   if (confirm(`Вы уверены, что хотите удалить аттестацию "${assessment.title}"?`)) {

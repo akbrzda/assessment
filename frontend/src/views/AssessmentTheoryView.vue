@@ -94,6 +94,9 @@
 
         <!-- Кнопка в конце -->
         <div class="action-button-container">
+          <p v-if="readingTimeLabel && !completion" class="reading-time-note">
+            Кнопка станет активна после ~{{ readingTimeLabel }} чтения обязательных блоков
+          </p>
           <button class="btn btn-primary btn-full" :disabled="!canSubmit || versionOutdated" @click="handlePrimaryAction">
             {{ primaryButtonLabel }}
           </button>
@@ -108,6 +111,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { apiClient } from "../services/apiClient";
 import { useTelegramStore } from "../stores/telegram";
+import { sumReadingSeconds, formatReadingTime } from "../utils/readingTime";
 
 const route = useRoute();
 const router = useRouter();
@@ -131,6 +135,10 @@ const assessmentId = computed(() => Number(route.params.id));
 const requiredBlocks = computed(() => theory.value?.requiredBlocks || []);
 const optionalBlocks = computed(() => theory.value?.optionalBlocks || []);
 const versionId = computed(() => theory.value?.version?.id || null);
+const requiredReadingSeconds = computed(() => sumReadingSeconds(requiredBlocks.value));
+const readingTimeLabel = computed(() =>
+  requiredReadingSeconds.value ? formatReadingTime(requiredReadingSeconds.value) : null
+);
 
 const canSubmit = computed(() => {
   if (versionOutdated.value) return false;
@@ -201,11 +209,11 @@ function startReadingTimer() {
     return;
   }
 
-  // Если не пройдена - 20 секунд задержка
+  const waitSeconds = requiredReadingSeconds.value > 0 ? requiredReadingSeconds.value : 15;
   let secondsElapsed = 0;
   readingTimerInterval = setInterval(() => {
     secondsElapsed++;
-    if (secondsElapsed >= 20 && !hasReadTheory.value) {
+    if (secondsElapsed >= waitSeconds && !hasReadTheory.value) {
       hasReadTheory.value = true;
       telegramStore.hapticFeedback("impact", "light");
       clearInterval(readingTimerInterval);
@@ -467,6 +475,13 @@ details summary::-webkit-details-marker {
 .action-button-container {
   margin-top: 24px;
   margin-bottom: 24px;
+}
+
+.reading-time-note {
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
 }
 
 @media (max-width: 480px) {

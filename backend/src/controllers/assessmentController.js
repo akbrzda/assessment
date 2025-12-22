@@ -14,18 +14,46 @@ const optionSchema = Joi.object({
 
 const questionSchema = Joi.object({
   text: Joi.string().trim().min(1).required(),
-  options: Joi.array().items(optionSchema).min(2).max(6).required(),
+  questionType: Joi.string().valid("single", "multiple", "text").default("single"),
+  correctTextAnswer: Joi.when("questionType", {
+    is: "text",
+    then: Joi.string().trim().min(1).required(),
+    otherwise: Joi.string().allow("", null).default(""),
+  }),
+  options: Joi.when("questionType", {
+    is: "text",
+    then: Joi.array().default([]),
+    otherwise: Joi.array().items(optionSchema).min(2).max(6).required(),
+  }),
 }).custom((value, helpers) => {
-  const correctCount = value.options.filter((option) => option.isCorrect).length;
-  if (correctCount !== 1) {
-    return helpers.message("Каждый вопрос должен иметь ровно один правильный ответ");
+  if (value.questionType === "single") {
+    const correctCount = value.options.filter((option) => option.isCorrect).length;
+    if (correctCount !== 1) {
+      return helpers.message("Для вопросов с одним ответом необходимо выбрать ровно один правильный вариант");
+    }
+  }
+  if (value.questionType === "multiple") {
+    const correctCount = value.options.filter((option) => option.isCorrect).length;
+    if (correctCount < 2) {
+      return helpers.message("Для множественного выбора необходимо выбрать минимум два правильных варианта");
+    }
+  }
+  if (value.questionType === "text" && !value.correctTextAnswer?.trim()) {
+    return helpers.message("Для текстового вопроса необходимо указать эталонный ответ");
   }
   return value;
 });
 
 const answerSchema = Joi.object({
   questionId: Joi.number().integer().positive().required(),
-  optionId: Joi.number().integer().positive().required(),
+  optionId: Joi.number().integer().positive(),
+  optionIds: Joi.array().items(Joi.number().integer().positive()).min(1),
+  textAnswer: Joi.string().allow("", null),
+}).custom((value, helpers) => {
+  if (value.optionId == null && (!value.optionIds || value.optionIds.length === 0) && (value.textAnswer == null || value.textAnswer === "")) {
+    return helpers.message("Не указан ответ");
+  }
+  return value;
 });
 
 const baseSchema = Joi.object({
@@ -54,10 +82,14 @@ const baseSchema = Joi.object({
 function normalizeQuestionPayload(questions) {
   return questions.map((question) => ({
     text: question.text.trim(),
-    options: question.options.map((option) => ({
-      text: option.text.trim(),
-      isCorrect: Boolean(option.isCorrect),
-    })),
+    questionType: question.questionType || "single",
+    correctTextAnswer: question.questionType === "text" ? question.correctTextAnswer?.trim() || "" : "",
+    options: Array.isArray(question.options)
+      ? question.options.map((option) => ({
+          text: option.text.trim(),
+          isCorrect: Boolean(option.isCorrect),
+        }))
+      : [],
   }));
 }
 

@@ -30,22 +30,45 @@
         <div class="question-content" v-if="currentQuestion">
           <h2 class="question-text">{{ currentQuestion.text }}</h2>
 
-          <div class="answers-list">
+          <div v-if="currentQuestion.questionType === 'text'" class="text-answer-block">
+            <label class="text-answer-label" :for="`text-answer-${currentQuestion.id}`">Ваш ответ</label>
+            <textarea
+              :id="`text-answer-${currentQuestion.id}`"
+              v-model="selectedTextAnswer"
+              class="text-answer-input"
+              rows="4"
+              placeholder="Введите ответ"
+            ></textarea>
+          </div>
+
+          <div v-else class="answers-list" :class="{ multiple: currentQuestion.questionType === 'multiple' }">
             <label
               v-for="answer in currentQuestion.answers"
               :key="answer.id"
               class="answer-option"
-              :class="{ selected: selectedAnswer === answer.id }"
-              @click="selectAnswer(answer.id)"
+              :class="{
+                selected:
+                  currentQuestion.questionType === 'multiple'
+                    ? selectedMultipleAnswers.includes(answer.id)
+                    : selectedAnswer === answer.id,
+              }"
+              @click="toggleAnswer(answer.id)"
             >
               <input
+                v-if="currentQuestion.questionType === 'multiple'"
+                type="checkbox"
+                :checked="selectedMultipleAnswers.includes(answer.id)"
+                style="display: none"
+              />
+              <input
+                v-else
                 type="radio"
                 :name="`question-${currentQuestion.id}`"
                 :value="answer.id"
                 :checked="selectedAnswer === answer.id"
                 style="display: none"
               />
-              <div class="radio-indicator"></div>
+              <div class="indicator" :class="{ checkbox: currentQuestion.questionType === 'multiple' }"></div>
               <span class="answer-text">{{ answer.text }}</span>
             </label>
           </div>
@@ -61,16 +84,11 @@
     <!-- Navigation -->
     <div class="navigation-section">
       <div class="nav-buttons" v-if="currentQuestion">
-        <button
-          v-if="currentQuestionIndex < questions.length - 1"
-          class="btn btn-primary btn-full"
-          :disabled="selectedAnswer === null"
-          @click="nextQuestion"
-        >
+        <button v-if="currentQuestionIndex < questions.length - 1" class="btn btn-primary btn-full" :disabled="!canProceedCurrent || isSaving" @click="nextQuestion">
           Далее
         </button>
 
-        <button v-else class="btn btn-primary btn-full" :disabled="selectedAnswer === null" @click="showFinishConfirmation">Завершить</button>
+        <button v-else class="btn btn-primary btn-full" :disabled="!canProceedCurrent || isSaving" @click="showFinishConfirmation">Завершить</button>
       </div>
     </div>
 
@@ -154,6 +172,8 @@ export default {
     const questions = ref([]);
     const currentQuestionIndex = ref(0);
     const selectedAnswer = ref(null);
+    const selectedMultipleAnswers = ref([]);
+    const selectedTextAnswer = ref("");
     const userAnswers = ref([]);
     const attemptId = ref(null);
     const awaitingStart = ref(true);
@@ -175,6 +195,20 @@ export default {
         return 0;
       }
       return ((currentQuestionIndex.value + 1) / questions.value.length) * 100;
+    });
+
+    const canProceedCurrent = computed(() => {
+      const question = currentQuestion.value;
+      if (!question) {
+        return false;
+      }
+      if (question.questionType === "multiple") {
+        return selectedMultipleAnswers.value.length > 0;
+      }
+      if (question.questionType === "text") {
+        return selectedTextAnswer.value.trim().length > 0;
+      }
+      return selectedAnswer.value != null;
     });
 
     function formatTime(seconds) {
@@ -252,19 +286,28 @@ export default {
         return;
       }
       const orderIds = progress.questionOrder;
-      const map = new Map(questions.value.map((question) => [question.id, question]));
-      const ordered = [];
+      const map = new Map(
+        questions.value.map((question, index) => [question.id, { question, answer: userAnswers.value[index] || null }])
+      );
+      const orderedQuestions = [];
+      const orderedAnswers = [];
       orderIds.forEach((id) => {
         if (map.has(id)) {
-          ordered.push(map.get(id));
+          const entry = map.get(id);
+          orderedQuestions.push(entry.question);
+          orderedAnswers.push(entry.answer);
           map.delete(id);
         }
       });
       if (map.size) {
-        ordered.push(...map.values());
+        map.forEach((entry) => {
+          orderedQuestions.push(entry.question);
+          orderedAnswers.push(entry.answer);
+        });
       }
-      if (ordered.length) {
-        questions.value = ordered;
+      if (orderedQuestions.length) {
+        questions.value = orderedQuestions;
+        userAnswers.value = orderedAnswers;
       }
     };
 
@@ -292,31 +335,116 @@ export default {
       });
     };
 
-    function selectAnswer(optionId) {
-      selectedAnswer.value = optionId;
+    const arraysEqual = (a = [], b = []) => {
+      if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
+        return false;
+      }
+      for (let idx = 0; idx < a.length; idx += 1) {
+        if (a[idx] !== b[idx]) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    const resetSelectionState = () => {
+      selectedAnswer.value = null;
+      selectedMultipleAnswers.value = [];
+      selectedTextAnswer.value = "";
+    };
+
+    const applyStoredAnswer = (index) => {
+      resetSelectionState();
+      const question = questions.value[index];
+      if (!question) {
+        return;
+      }
+      const stored = userAnswers.value[index];
+      if (!stored || stored.type !== question.questionType) {
+        return;
+      }
+
+      if (question.questionType === "single") {
+        selectedAnswer.value = stored.value ?? null;
+      } else if (question.questionType === "multiple") {
+        selectedMultipleAnswers.value = Array.isArray(stored.value) ? [...stored.value] : [];
+      } else {
+        selectedTextAnswer.value = stored.value || "";
+      }
+    };
+
+    function toggleAnswer(optionId) {
+      if (!currentQuestion.value) {
+        return;
+      }
+      if (currentQuestion.value.questionType === "multiple") {
+        const index = selectedMultipleAnswers.value.indexOf(optionId);
+        if (index === -1) {
+          selectedMultipleAnswers.value.push(optionId);
+        } else {
+          selectedMultipleAnswers.value.splice(index, 1);
+        }
+      } else {
+        selectedAnswer.value = optionId;
+      }
       telegramStore.hapticFeedback("selection");
     }
 
     async function saveCurrentAnswer() {
       const attempt = attemptId.value;
       const question = currentQuestion.value;
-      if (!attempt || !question || selectedAnswer.value == null) {
+      if (!attempt || !question) {
         return;
       }
 
-      const optionId = selectedAnswer.value;
-      const previous = userAnswers.value[currentQuestionIndex.value];
-      if (previous === optionId) {
-        return;
+      const payload = {
+        questionId: question.id,
+      };
+      const index = currentQuestionIndex.value;
+      const previous = userAnswers.value[index];
+      let snapshot = null;
+
+      if (question.questionType === "single") {
+        if (selectedAnswer.value == null) {
+          return;
+        }
+        const optionId = selectedAnswer.value;
+        if (previous && previous.type === "single" && previous.value === optionId) {
+          return;
+        }
+        payload.optionId = optionId;
+        snapshot = optionId;
+      } else if (question.questionType === "multiple") {
+        if (!selectedMultipleAnswers.value.length) {
+          return;
+        }
+        const normalized = [...selectedMultipleAnswers.value].map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+        normalized.sort((a, b) => a - b);
+        if (previous && previous.type === "multiple" && arraysEqual(previous.value, normalized)) {
+          return;
+        }
+        payload.optionIds = normalized;
+        snapshot = normalized;
+      } else {
+        const textValue = selectedTextAnswer.value ? selectedTextAnswer.value.trim() : "";
+        if (!textValue) {
+          return;
+        }
+        if (previous && previous.type === "text" && previous.value === textValue) {
+          return;
+        }
+        payload.textAnswer = selectedTextAnswer.value;
+        snapshot = textValue;
       }
 
       isSaving.value = true;
       try {
-        await apiClient.submitAssessmentAnswer(assessmentId.value, attempt, {
-          questionId: question.id,
-          optionId,
-        });
-        userAnswers.value[currentQuestionIndex.value] = optionId;
+        await apiClient.submitAssessmentAnswer(assessmentId.value, attempt, payload);
+        if (question.questionType === "multiple" && Array.isArray(snapshot)) {
+          userAnswers.value[index] = { type: question.questionType, value: [...snapshot] };
+        } else {
+          userAnswers.value[index] = { type: question.questionType, value: snapshot };
+        }
       } catch (error) {
         console.error("Не удалось сохранить ответ", error);
         telegramStore.showAlert(error.message || "Не удалось сохранить ответ");
@@ -327,7 +455,7 @@ export default {
     }
 
     async function nextQuestion() {
-      if (selectedAnswer.value == null || isSaving.value) {
+      if (!canProceedCurrent.value || isSaving.value) {
         return;
       }
 
@@ -338,7 +466,7 @@ export default {
       }
 
       currentQuestionIndex.value += 1;
-      selectedAnswer.value = userAnswers.value[currentQuestionIndex.value] ?? null;
+      applyStoredAnswer(currentQuestionIndex.value);
       telegramStore.hapticFeedback("impact", "light");
       persistQuestionOrder();
     }
@@ -376,7 +504,7 @@ export default {
       isCompleted.value = true;
 
       try {
-        if (selectedAnswer.value != null && userAnswers.value[currentQuestionIndex.value] !== selectedAnswer.value) {
+        if (canProceedCurrent.value) {
           await saveCurrentAnswer();
         }
       } catch (error) {
@@ -470,13 +598,36 @@ export default {
         questions.value = (payload.questions || []).map((question) => ({
           id: question.id,
           text: question.text,
+          questionType: question.questionType || "single",
           answers: (question.options || []).map((option) => ({
             id: option.id,
             text: option.text,
           })),
         }));
 
-        userAnswers.value = new Array(questions.value.length).fill(null);
+        const metaMap = new Map((payload.questions || []).map((question) => [question.id, question]));
+        userAnswers.value = questions.value.map((question) => {
+          const meta = metaMap.get(question.id);
+          if (!meta) {
+            return null;
+          }
+          if (question.questionType === "single" && meta.selectedOptionId != null) {
+            return { type: "single", value: meta.selectedOptionId };
+          }
+          if (
+            question.questionType === "multiple" &&
+            Array.isArray(meta.selectedOptionIds) &&
+            meta.selectedOptionIds.length
+          ) {
+            const normalized = meta.selectedOptionIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+            normalized.sort((a, b) => a - b);
+            return { type: "multiple", value: normalized };
+          }
+          if (question.questionType === "text" && meta.textAnswer) {
+            return { type: "text", value: meta.textAnswer };
+          }
+          return null;
+        });
 
         if (payload.latestAttempt && payload.latestAttempt.status === "in_progress") {
           // Есть активная попытка - продолжаем её
@@ -485,11 +636,9 @@ export default {
           timeRemaining.value = Number.isFinite(remaining) ? Number(remaining) : timeLimitSeconds;
           const storedProgress = getAttemptProgress(attemptId.value);
           applyStoredQuestionOrder(storedProgress);
-          const selectedMap = new Map((payload.questions || []).map((question) => [question.id, question.selectedOptionId || null]));
-          userAnswers.value = questions.value.map((question) => selectedMap.get(question.id) || null);
           const resumeIndex = resolveResumeIndex(storedProgress);
           currentQuestionIndex.value = resumeIndex;
-          selectedAnswer.value = userAnswers.value[resumeIndex] ?? null;
+          applyStoredAnswer(resumeIndex);
 
           // Не в режиме ожидания - попытка уже начата
           awaitingStart.value = false;
@@ -533,7 +682,7 @@ export default {
         timeRemaining.value = Number.isFinite(remaining) ? Number(remaining) : timeLimitSeconds;
         userAnswers.value = new Array(questions.value.length).fill(null);
         currentQuestionIndex.value = 0;
-        selectedAnswer.value = null;
+        resetSelectionState();
         awaitingStart.value = false;
         persistQuestionOrder();
         startTimer();
@@ -574,6 +723,7 @@ export default {
           return;
         }
         saveAttemptProgress(attemptId.value, { currentQuestionIndex: newIndex });
+        applyStoredAnswer(newIndex);
       },
       { flush: "post" }
     );
@@ -596,6 +746,8 @@ export default {
       questions,
       currentQuestionIndex,
       selectedAnswer,
+      selectedMultipleAnswers,
+      selectedTextAnswer,
       userAnswers,
       timeRemaining,
       showTimeUpModal,
@@ -603,8 +755,9 @@ export default {
       showExitWarningModal,
       currentQuestion,
       progressPercentage,
+      canProceedCurrent,
       formatTime,
-      selectAnswer,
+      toggleAnswer,
       nextQuestion,
       finishAssessment,
       showFinishConfirmation,
@@ -773,7 +926,11 @@ export default {
   color: var(--text-primary);
 }
 
-.radio-indicator {
+.answers-list.multiple .answer-option {
+  align-items: center;
+}
+
+.indicator {
   width: 20px;
   height: 20px;
   border: 2px solid var(--divider);
@@ -784,11 +941,15 @@ export default {
   margin-top: 2px;
 }
 
-.answer-option.selected .radio-indicator {
+.indicator.checkbox {
+  border-radius: 6px;
+}
+
+.answer-option.selected .indicator {
   border-color: var(--accent-blue);
 }
 
-.answer-option.selected .radio-indicator::after {
+.answer-option.selected .indicator::after {
   content: "";
   position: absolute;
   top: 2px;
@@ -797,6 +958,42 @@ export default {
   height: 12px;
   background-color: var(--accent-blue);
   border-radius: 50%;
+}
+
+.indicator.checkbox::after {
+  border-radius: 4px;
+}
+
+.text-answer-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.text-answer-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.text-answer-input {
+  width: 100%;
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 16px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 120px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  transition: border-color 0.2s ease;
+}
+
+.text-answer-input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(0, 136, 204, 0.15);
 }
 
 .navigation-section {
@@ -929,12 +1126,12 @@ export default {
     gap: 12px;
   }
 
-  .radio-indicator {
+  .indicator {
     width: 18px;
     height: 18px;
   }
 
-  .answer-option.selected .radio-indicator::after {
+  .answer-option.selected .indicator::after {
     width: 10px;
     height: 10px;
     top: 2px;

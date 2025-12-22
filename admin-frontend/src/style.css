@@ -104,6 +104,52 @@ body {
   min-height: 100vh;
 }
 
+input[type="checkbox"]:not(.native-checkbox),
+input[type="radio"]:not(.native-checkbox) {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--divider);
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-primary);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+input[type="radio"]:not(.native-checkbox) {
+  border-radius: 50%;
+}
+
+input[type="checkbox"]:not(.native-checkbox)::after,
+input[type="radio"]:not(.native-checkbox)::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 4px;
+  background-color: transparent;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  transform: scale(0);
+}
+
+input[type="radio"]:not(.native-checkbox)::after {
+  border-radius: 50%;
+}
+
+input[type="checkbox"]:not(.native-checkbox):checked,
+input[type="radio"]:not(.native-checkbox):checked {
+  border-color: var(--accent-blue);
+  background-color: rgba(0, 136, 204, 0.08);
+}
+
+input[type="checkbox"]:not(.native-checkbox):checked::after,
+input[type="radio"]:not(.native-checkbox):checked::after {
+  background-color: var(--accent-blue);
+  transform: scale(1);
+}
+
 /* === Скроллбар === */
 ::-webkit-scrollbar {
   width: 8px;

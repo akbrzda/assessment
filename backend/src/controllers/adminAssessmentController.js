@@ -302,32 +302,35 @@ exports.createAssessment = async (req, res, next) => {
     // Добавить вопросы
     for (let i = 0; i < questions.length; i++) {
       const question = questions[i];
+      const questionType = question.questionType || "single";
+      const correctTextAnswer = questionType === "text" ? question.correctTextAnswer || "" : null;
       const [qResult] = await connection.query(
         `
-        INSERT INTO assessment_questions (assessment_id, question_text, order_index)
-        VALUES (?, ?, ?)
+        INSERT INTO assessment_questions (assessment_id, question_text, order_index, question_type, correct_text_answer)
+        VALUES (?, ?, ?, ?, ?)
       `,
-        [assessmentId, question.text, i]
+        [assessmentId, question.text, i, questionType, correctTextAnswer]
       );
 
       const questionId = qResult.insertId;
 
-      // Добавить варианты ответов
-      for (let j = 0; j < question.options.length; j++) {
-        const option = question.options[j];
-        const isCorrectValue = option.isCorrect ? 1 : 0;
-        console.log(
-          `[createAssessment] Saving option: questionId=${questionId}, text="${option.text}", isCorrect=${
-            option.isCorrect
-          } (type: ${typeof option.isCorrect}), converted=${isCorrectValue}`
-        );
-        await connection.query(
-          `
-          INSERT INTO assessment_question_options (question_id, option_text, is_correct, order_index)
-          VALUES (?, ?, ?, ?)
-        `,
-          [questionId, option.text, isCorrectValue, j]
-        );
+      if (questionType !== "text" && question.options) {
+        for (let j = 0; j < question.options.length; j++) {
+          const option = question.options[j];
+          const isCorrectValue = option.isCorrect ? 1 : 0;
+          console.log(
+            `[createAssessment] Saving option: questionId=${questionId}, text="${option.text}", isCorrect=${
+              option.isCorrect
+            } (type: ${typeof option.isCorrect}), converted=${isCorrectValue}`
+          );
+          await connection.query(
+            `
+            INSERT INTO assessment_question_options (question_id, option_text, is_correct, order_index)
+            VALUES (?, ?, ?, ?)
+          `,
+            [questionId, option.text, isCorrectValue, j]
+          );
+        }
       }
     }
 
@@ -459,8 +462,8 @@ exports.updateAssessment = async (req, res, next) => {
       }
     }
 
-    if (!["pending", "open"].includes(assessment.status)) {
-      return res.status(400).json({ error: 'Можно редактировать только аттестации в статусах "Ожидает" или "Открыта"' });
+    if (assessment.status !== "pending") {
+      return res.status(400).json({ error: 'Редактировать можно только аттестации в статусе "Ожидает"' });
     }
 
     await connection.beginTransaction();
@@ -569,26 +572,29 @@ exports.updateAssessment = async (req, res, next) => {
       // Добавить новые вопросы
       for (let i = 0; i < questions.length; i++) {
         const question = questions[i];
+        const questionType = question.questionType || "single";
+        const correctTextAnswer = questionType === "text" ? question.correctTextAnswer || "" : null;
         const [qResult] = await connection.query(
           `
-          INSERT INTO assessment_questions (assessment_id, question_text, order_index)
-          VALUES (?, ?, ?)
+          INSERT INTO assessment_questions (assessment_id, question_text, order_index, question_type, correct_text_answer)
+          VALUES (?, ?, ?, ?, ?)
         `,
-          [assessmentId, question.text, i]
+          [assessmentId, question.text, i, questionType, correctTextAnswer]
         );
 
         const questionId = qResult.insertId;
 
-        // Добавить варианты ответов
-        for (let j = 0; j < question.options.length; j++) {
-          const option = question.options[j];
-          await connection.query(
-            `
-            INSERT INTO assessment_question_options (question_id, option_text, is_correct, order_index)
-            VALUES (?, ?, ?, ?)
-          `,
-            [questionId, option.text, option.isCorrect ? 1 : 0, j]
-          );
+        if (questionType !== "text" && question.options) {
+          for (let j = 0; j < question.options.length; j++) {
+            const option = question.options[j];
+            await connection.query(
+              `
+              INSERT INTO assessment_question_options (question_id, option_text, is_correct, order_index)
+              VALUES (?, ?, ?, ?)
+            `,
+              [questionId, option.text, option.isCorrect ? 1 : 0, j]
+            );
+          }
         }
       }
     }

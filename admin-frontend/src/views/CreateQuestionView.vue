@@ -2,7 +2,7 @@
   <div class="create-question-view">
     <!-- Header -->
     <div class="page-header">
-      <Button @click="goBack" variant="ghost" icon="arrow-left">Назад к списку</Button>
+      <Button @click="goBack" variant="ghost" icon="arrow-left">Назад</Button>
       <h2 class="page-heading">Добавить вопрос</h2>
     </div>
 

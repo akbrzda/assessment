@@ -1,5 +1,6 @@
 const Joi = require("joi");
 const userModel = require("../models/userModel");
+const assessmentModel = require("../models/assessmentModel");
 const referenceModel = require("../models/referenceModel");
 const invitationModel = require("../models/invitationModel");
 const { normalizeInviteCode } = require("../utils/inviteCode");
@@ -191,6 +192,12 @@ async function register(req, res, next) {
       positionId: Number(targetPositionId),
       branchId: targetBranchId,
       roleId: targetRoleId,
+    });
+
+    await assessmentModel.assignUserToMatchingAssessments({
+      userId,
+      branchId: targetBranchId ? Number(targetBranchId) : null,
+      positionId: targetPositionId ? Number(targetPositionId) : null,
     });
 
     if (invitation) {

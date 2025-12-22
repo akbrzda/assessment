@@ -10,7 +10,7 @@
           <p class="details-subtitle">{{ details.assessment.description || "Нет описания" }}</p>
         </div>
         <div class="details-actions">
-          <Button icon="pencil" variant="primary" @click="goToEdit"> Редактировать </Button>
+          <Button v-if="canEditAssessment" icon="pencil" variant="primary" @click="goToEdit"> Редактировать </Button>
           <Button icon="book-open" variant="secondary" @click="openTheory"> Теория </Button>
           <Button icon="file-chart-column" variant="secondary" @click="handleExport"> Экспорт в Excel </Button>
         </div>
@@ -83,7 +83,7 @@
               </div>
               <div class="accessibility-tags">
                 <Badge v-for="branch in details.accessibility.branches" :key="branch.id" variant="primary" size="md">
-                  {{ branch.name }}
+                  {{ formatBranchLabel(branch) }}
                 </Badge>
               </div>
             </div>
@@ -298,6 +298,7 @@ import Badge from "./ui/Badge.vue";
 import Preloader from "./ui/Preloader.vue";
 import Icon from "./ui/Icon.vue";
 import { useToast } from "../composables/useToast";
+import { formatBranchLabel } from "../utils/branch";
 
 const props = defineProps({
   assessmentId: {
@@ -327,6 +328,8 @@ const stats = computed(() => {
     theory_completed_count: statsData.theory_completed_count || 0,
   };
 });
+
+const canEditAssessment = computed(() => details.value?.assessment?.status === "pending");
 
 const loadDetails = async () => {
   loading.value = true;

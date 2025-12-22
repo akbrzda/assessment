@@ -208,6 +208,7 @@ import LineChart from "../components/charts/LineChart.vue";
 import ComboChart from "../components/charts/ComboChart.vue";
 import UserReportModal from "../components/UserReportModal.vue";
 import { useToast } from "../composables/useToast";
+import { formatBranchLabel } from "../utils/branch";
 
 const loading = ref(false);
 const exporting = ref(false);
@@ -283,7 +284,7 @@ const branchDetailFields = [
 // Опции для Select
 const branchOptions = computed(() => [
   { value: "", label: "Все филиалы" },
-  ...references.value.branches.map((branch) => ({ value: branch.id, label: branch.name })),
+  ...references.value.branches.map((branch) => ({ value: branch.id, label: formatBranchLabel(branch) })),
 ]);
 
 const positionOptions = computed(() => [

@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="page-header">
       <div class="header-left">
-        <Button variant="ghost" icon="arrow-left" @click="goBack"> Назад к списку</Button>
+        <Button variant="ghost" icon="arrow-left" @click="goBack"> Назад</Button>
         <h2 class="page-heading">Просмотр вопроса</h2>
       </div>
       <div class="header-actions">

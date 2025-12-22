@@ -64,11 +64,11 @@ onUnmounted(() => {
 }
 
 .app-shell.sidebar-collapsed .main-content {
-  margin-left: 96px;
+  margin-left: 72px;
 }
 
 .main-content :deep(> *) {
-  max-width: 1280px;
+  
   margin: 0 auto;
 }
 

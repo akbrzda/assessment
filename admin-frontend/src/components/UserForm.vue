@@ -75,6 +75,7 @@ import { watch, ref, computed, nextTick } from "vue";
 import Input from "./ui/Input.vue";
 import Select from "./ui/Select.vue";
 import { useFormValidation } from "../composables/useFormValidation";
+import { formatBranchLabel } from "../utils/branch";
 
 const props = defineProps({
   modelValue: Object,
@@ -155,7 +156,7 @@ const branchOptions = computed(() => [
   { value: "", label: "Выберите филиал" },
   ...(props.references?.branches || []).map((branch) => ({
     value: branch.id,
-    label: branch.name,
+    label: formatBranchLabel(branch),
   })),
 ]);
 

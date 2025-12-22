@@ -65,7 +65,7 @@
             <div class="checkbox-group">
               <label v-for="branch in references.branches" :key="branch.id" class="checkbox-label">
                 <input type="checkbox" :value="branch.id" v-model="selectedBranches" />
-                <span>{{ branch.name }}</span>
+                <span>{{ formatBranchLabel(branch) }}</span>
               </label>
             </div>
           </div>
@@ -167,6 +167,7 @@ import Preloader from "./ui/Preloader.vue";
 import AssessmentTheoryBuilder from "./AssessmentTheoryBuilder.vue";
 import { useToast } from "../composables/useToast";
 import { createEmptyTheory, mapVersionToTheoryData, buildTheoryPayload, validateTheoryData, hasTheoryBlocks } from "../utils/theory";
+import { formatBranchLabel } from "../utils/branch";
 
 const props = defineProps({
   assessment: {

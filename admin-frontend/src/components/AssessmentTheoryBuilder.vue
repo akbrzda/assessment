@@ -5,6 +5,9 @@
         <div>
           <h4>Обязательные блоки</h4>
           <p class="section-hint">Сотрудники должны изучить каждый блок, чтобы начать тест.</p>
+          <p v-if="requiredReadingSeconds > 0" class="reading-summary">
+            Среднее время чтения текстовых блоков: {{ formatReadingTime(requiredReadingSeconds) }}
+          </p>
         </div>
         <div class="header-actions">
           <Button size="sm" variant="secondary" icon="text" @click="addRequiredBlock('text')"> Текст </Button>
@@ -36,6 +39,9 @@
             :rows="block.type === 'text' ? 5 : 3"
             :required="block.type === 'text'"
           />
+          <p v-if="block.type === 'text'" class="reading-hint">
+            Среднее время чтения: {{ getBlockReadingTime(block) }}
+          </p>
 
           <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" placeholder="https://..." required />
           <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" placeholder="https://..." required />
@@ -78,6 +84,9 @@
             :label="block.type === 'text' ? 'Текст блока' : 'Описание (опционально)'"
             :rows="block.type === 'text' ? 5 : 3"
           />
+          <p v-if="block.type === 'text'" class="reading-hint">
+            Среднее время чтения: {{ getBlockReadingTime(block) }}
+          </p>
 
           <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" placeholder="https://..." required />
           <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" placeholder="https://..." required />
@@ -88,13 +97,14 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import Input from "./ui/Input.vue";
 import Select from "./ui/Select.vue";
 import Textarea from "./ui/Textarea.vue";
 import FullscreenTextarea from "./ui/FullscreenTextarea.vue";
 import Button from "./ui/Button.vue";
 import { cloneTheoryData, createTheoryBlock } from "../utils/theory";
+import { calculateReadingSeconds, formatReadingTime, sumReadingSeconds } from "../utils/readingTime";
 
 const props = defineProps({
   modelValue: {
@@ -115,6 +125,7 @@ const typeOptions = [
 ];
 
 const localValue = ref(cloneTheoryData(props.modelValue));
+const requiredReadingSeconds = computed(() => sumReadingSeconds(localValue.value.requiredBlocks));
 
 watch(
   () => props.modelValue,
@@ -155,6 +166,8 @@ const addOptionalBlock = (type) => {
 const removeOptionalBlock = (index) => {
   localValue.value.optionalBlocks.splice(index, 1);
 };
+
+const getBlockReadingTime = (block) => formatReadingTime(calculateReadingSeconds(block.content || ""));
 </script>
 
 <style scoped>
@@ -189,6 +202,17 @@ const removeOptionalBlock = (index) => {
   margin: 4px 0 0 0;
   color: var(--text-secondary);
   font-size: 14px;
+}
+
+.reading-summary,
+.reading-hint {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.reading-hint {
+  font-style: italic;
 }
 
 .header-actions {

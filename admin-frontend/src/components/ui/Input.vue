@@ -101,19 +101,36 @@ defineEmits(["update:modelValue"]);
   }
 }
 
+.input-sm,
+.input-md,
+.input-lg {
+  font-size: 16px;
+}
+
 .input-sm {
-  font-size: 14px;
   padding: 8px 12px;
 }
 
 .input-md {
-  font-size: 15px;
   padding: 10px 16px;
 }
 
 .input-lg {
-  font-size: 16px;
   padding: 12px 20px;
+}
+
+@media (min-width: 768px) {
+  .input-sm {
+    font-size: 14px;
+  }
+
+  .input-md {
+    font-size: 15px;
+  }
+
+  .input-lg {
+    font-size: 16px;
+  }
 }
 
 .input::placeholder {

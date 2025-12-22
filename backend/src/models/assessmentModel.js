@@ -75,20 +75,24 @@ async function createAssessment({ assessment, questions, branchIds, userIds, pos
 
     for (let idx = 0; idx < questions.length; idx += 1) {
       const question = questions[idx];
+      const questionType = question.questionType || "single";
+      const correctTextAnswer = questionType === "text" ? question.correctTextAnswer || "" : null;
       const [questionResult] = await connection.execute(
-        `INSERT INTO assessment_questions (assessment_id, order_index, question_text)
-         VALUES (?, ?, ?)`,
-        [assessmentId, idx + 1, question.text]
+        `INSERT INTO assessment_questions (assessment_id, order_index, question_text, question_type, correct_text_answer)
+         VALUES (?, ?, ?, ?, ?)`,
+        [assessmentId, idx + 1, question.text, questionType, correctTextAnswer]
       );
       const questionId = questionResult.insertId;
 
-      const optionValues = question.options.map((option, optionIdx) => [questionId, optionIdx + 1, option.text, option.isCorrect ? 1 : 0]);
+      if (questionType !== "text" && question.options && question.options.length) {
+        const optionValues = question.options.map((option, optionIdx) => [questionId, optionIdx + 1, option.text, option.isCorrect ? 1 : 0]);
 
-      await connection.query(
-        `INSERT INTO assessment_question_options (question_id, order_index, option_text, is_correct)
+        await connection.query(
+          `INSERT INTO assessment_question_options (question_id, order_index, option_text, is_correct)
          VALUES ?`,
-        [optionValues]
-      );
+          [optionValues]
+        );
+      }
     }
 
     if (Array.isArray(branchIds) && branchIds.length > 0) {
@@ -152,20 +156,24 @@ async function updateAssessment(assessmentId, { assessment, questions, branchIds
 
     for (let idx = 0; idx < questions.length; idx += 1) {
       const question = questions[idx];
+      const questionType = question.questionType || "single";
+      const correctTextAnswer = questionType === "text" ? question.correctTextAnswer || "" : null;
       const [questionResult] = await connection.execute(
-        `INSERT INTO assessment_questions (assessment_id, order_index, question_text)
-         VALUES (?, ?, ?)`,
-        [assessmentId, idx + 1, question.text]
+        `INSERT INTO assessment_questions (assessment_id, order_index, question_text, question_type, correct_text_answer)
+         VALUES (?, ?, ?, ?, ?)`,
+        [assessmentId, idx + 1, question.text, questionType, correctTextAnswer]
       );
       const questionId = questionResult.insertId;
 
-      const optionValues = question.options.map((option, optionIdx) => [questionId, optionIdx + 1, option.text, option.isCorrect ? 1 : 0]);
+      if (questionType !== "text" && question.options && question.options.length) {
+        const optionValues = question.options.map((option, optionIdx) => [questionId, optionIdx + 1, option.text, option.isCorrect ? 1 : 0]);
 
-      await connection.query(
-        `INSERT INTO assessment_question_options (question_id, order_index, option_text, is_correct)
+        await connection.query(
+          `INSERT INTO assessment_question_options (question_id, order_index, option_text, is_correct)
          VALUES ?`,
-        [optionValues]
-      );
+          [optionValues]
+        );
+      }
     }
 
     if (Array.isArray(branchIds) && branchIds.length > 0) {
@@ -377,6 +385,8 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
        q.assessment_id,
        q.order_index,
        q.question_text,
+       q.question_type,
+       q.correct_text_answer,
        o.id AS option_id,
        o.order_index AS option_order,
        o.option_text,
@@ -395,8 +405,10 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
         id: row.id,
         order: row.order_index,
         text: row.question_text,
+        questionType: row.question_type || "single",
+        correctTextAnswer: row.correct_text_answer,
         options: [],
-        correctIndex: null,
+        correctIndexes: [],
       });
     }
     if (row.option_id) {
@@ -411,7 +423,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
       question.options.push(option);
 
       if (option.isCorrect) {
-        question.correctIndex = option.order != null ? Number(option.order) : question.options.length - 1;
+        question.correctIndexes.push(option.order != null ? Number(option.order) : question.options.length - 1);
       }
     }
   });
@@ -652,6 +664,68 @@ async function listAssignedUserIds(assessmentId) {
   return rows.map((row) => row.user_id);
 }
 
+async function assignUserToMatchingAssessments({ userId, branchId, positionId }) {
+  if (!userId || (!branchId && !positionId)) {
+    return;
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    const assessmentIds = new Set();
+
+    if (branchId) {
+      const [branchOnly] = await connection.execute(
+        `SELECT aba.assessment_id AS id
+           FROM assessment_branch_assignments aba
+          WHERE aba.branch_id = ?
+            AND NOT EXISTS (
+              SELECT 1 FROM assessment_position_assignments apa WHERE apa.assessment_id = aba.assessment_id
+            )`,
+        [branchId]
+      );
+      branchOnly.forEach((row) => assessmentIds.add(row.id));
+    }
+
+    if (positionId) {
+      const [positionOnly] = await connection.execute(
+        `SELECT apa.assessment_id AS id
+           FROM assessment_position_assignments apa
+          WHERE apa.position_id = ?
+            AND NOT EXISTS (
+              SELECT 1 FROM assessment_branch_assignments aba WHERE aba.assessment_id = apa.assessment_id
+            )`,
+        [positionId]
+      );
+      positionOnly.forEach((row) => assessmentIds.add(row.id));
+    }
+
+    if (branchId && positionId) {
+      const [intersection] = await connection.execute(
+        `SELECT DISTINCT aba.assessment_id AS id
+           FROM assessment_branch_assignments aba
+           JOIN assessment_position_assignments apa ON apa.assessment_id = aba.assessment_id
+          WHERE aba.branch_id = ? AND apa.position_id = ?`,
+        [branchId, positionId]
+      );
+      intersection.forEach((row) => assessmentIds.add(row.id));
+    }
+
+    if (!assessmentIds.size) {
+      return;
+    }
+
+    const values = Array.from(assessmentIds).map((assessmentId) => [assessmentId, userId]);
+    await connection.query(
+      `INSERT INTO assessment_user_assignments (assessment_id, user_id)
+         VALUES ?
+       ON DUPLICATE KEY UPDATE assessment_id = VALUES(assessment_id)`,
+      [values]
+    );
+  } finally {
+    connection.release();
+  }
+}
+
 async function listAssessmentsForUser(userId) {
   const [rows] = await pool.execute(
     `SELECT DISTINCT
@@ -824,6 +898,8 @@ async function getAssessmentForUser(assessmentId, userId) {
        q.id,
        q.order_index,
        q.question_text,
+       q.question_type,
+       q.correct_text_answer,
        o.id AS option_id,
        o.order_index AS option_order,
        o.option_text,
@@ -842,6 +918,7 @@ async function getAssessmentForUser(assessmentId, userId) {
         id: row.id,
         order: row.order_index,
         text: row.question_text,
+        questionType: row.question_type || "single",
         options: [],
       });
     }
@@ -907,12 +984,35 @@ async function getAssessmentForUser(assessmentId, userId) {
     };
 
     if (attempt.status === "in_progress") {
-      const [answerRows] = await pool.execute("SELECT question_id, option_id FROM assessment_answers WHERE attempt_id = ?", [attempt.id]);
-      const answerMap = new Map(answerRows.map((row) => [row.question_id, row.option_id]));
-      base.questions = base.questions.map((question) => ({
-        ...question,
-        selectedOptionId: answerMap.get(question.id) || null,
-      }));
+      const [answerRows] = await pool.execute(
+        "SELECT question_id, option_id, selected_option_ids, text_answer FROM assessment_answers WHERE attempt_id = ?",
+        [attempt.id]
+      );
+      const answerMap = new Map(answerRows.map((row) => [row.question_id, row]));
+      base.questions = base.questions.map((question) => {
+        const saved = answerMap.get(question.id);
+        if (!saved) {
+          return question;
+        }
+        if (question.questionType === "single") {
+          return { ...question, selectedOptionId: saved.option_id || null };
+        }
+        if (question.questionType === "multiple") {
+          let selectedOptionIds = [];
+          if (saved.selected_option_ids) {
+            try {
+              const parsed = JSON.parse(saved.selected_option_ids);
+              if (Array.isArray(parsed)) {
+                selectedOptionIds = parsed.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+              }
+            } catch (error) {
+              console.warn("Failed to parse saved multi-answer", error);
+            }
+          }
+          return { ...question, selectedOptionIds };
+        }
+        return { ...question, textAnswer: saved.text_answer || "" };
+      });
     }
   }
 
@@ -1011,7 +1111,17 @@ async function createAttempt(assessment, userId) {
   }
 }
 
-async function saveAnswer({ attemptId, userId, questionId, optionId }) {
+const normalizeTextAnswer = (value) => {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+};
+
+async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, textAnswer }) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -1032,37 +1142,82 @@ async function saveAnswer({ attemptId, userId, questionId, optionId }) {
       throw error;
     }
 
-    const [questionRows] = await connection.execute("SELECT id FROM assessment_questions WHERE id = ? AND assessment_id = ?", [
-      questionId,
-      attempt.assessment_id,
-    ]);
+    const [questionRows] = await connection.execute(
+      "SELECT id, question_type, correct_text_answer FROM assessment_questions WHERE id = ? AND assessment_id = ?",
+      [questionId, attempt.assessment_id]
+    );
     if (!questionRows.length) {
       const error = new Error("Вопрос не найден");
       error.status = 404;
       throw error;
     }
 
-    const [optionRows] = await connection.execute("SELECT id, is_correct FROM assessment_question_options WHERE id = ? AND question_id = ?", [
-      optionId,
-      questionId,
-    ]);
-    if (!optionRows.length) {
-      const error = new Error("Ответ не найден");
-      error.status = 404;
-      throw error;
+    const question = questionRows[0];
+    let resolvedOptionId = null;
+    let selectedOptionIdsJson = null;
+    let resolvedTextAnswer = null;
+    let isCorrect = 0;
+
+    if (question.question_type === "single") {
+      if (!optionId) {
+        const error = new Error("Не указан вариант ответа");
+        error.status = 400;
+        throw error;
+      }
+      const [optionRows] = await connection.execute("SELECT id, is_correct FROM assessment_question_options WHERE id = ? AND question_id = ?", [
+        optionId,
+        questionId,
+      ]);
+      if (!optionRows.length) {
+        const error = new Error("Ответ не найден");
+        error.status = 404;
+        throw error;
+      }
+      resolvedOptionId = optionRows[0].id;
+      isCorrect = optionRows[0].is_correct ? 1 : 0;
+    } else if (question.question_type === "multiple") {
+      if (!Array.isArray(optionIds) || optionIds.length === 0) {
+        const error = new Error("Не выбраны варианты ответа");
+        error.status = 400;
+        throw error;
+      }
+      const normalizedIds = [...new Set(optionIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
+      if (!normalizedIds.length) {
+        const error = new Error("Некорректные варианты ответа");
+        error.status = 400;
+        throw error;
+      }
+      const [options] = await connection.execute("SELECT id, is_correct FROM assessment_question_options WHERE question_id = ?", [questionId]);
+      const validIds = new Set(options.map((opt) => opt.id));
+      if (!normalizedIds.every((id) => validIds.has(id))) {
+        const error = new Error("Выбран недопустимый вариант ответа");
+        error.status = 400;
+        throw error;
+      }
+      const correctIds = options.filter((opt) => opt.is_correct).map((opt) => opt.id);
+      const sortedSelected = normalizedIds.slice().sort((a, b) => a - b);
+      const sortedCorrect = correctIds.slice().sort((a, b) => a - b);
+      const equalLength = sortedSelected.length === sortedCorrect.length;
+      const match = equalLength && sortedSelected.every((id, idx) => id === sortedCorrect[idx]);
+      isCorrect = match ? 1 : 0;
+      selectedOptionIdsJson = JSON.stringify(sortedSelected);
+    } else if (question.question_type === "text") {
+      if (typeof textAnswer !== "string") {
+        const error = new Error("Ответ должен быть текстом");
+        error.status = 400;
+        throw error;
+      }
+      resolvedTextAnswer = textAnswer.trim();
+      const normalizedUser = normalizeTextAnswer(resolvedTextAnswer);
+      const normalizedCorrect = normalizeTextAnswer(question.correct_text_answer || "");
+      isCorrect = normalizedUser && normalizedCorrect && normalizedUser === normalizedCorrect ? 1 : 0;
     }
 
-    const isCorrect = optionRows[0].is_correct ? 1 : 0;
-
-    console.log(
-      `[saveAnswer] attemptId=${attemptId}, questionId=${questionId}, optionId=${optionId}, is_correct from DB=${optionRows[0].is_correct}, converted=${isCorrect}`
-    );
-
     await connection.execute(
-      `INSERT INTO assessment_answers (attempt_id, question_id, option_id, is_correct, answered_at, created_at)
-       VALUES (?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
-       ON DUPLICATE KEY UPDATE option_id = VALUES(option_id), is_correct = VALUES(is_correct), answered_at = UTC_TIMESTAMP()`,
-      [attemptId, questionId, optionId, isCorrect]
+      `INSERT INTO assessment_answers (attempt_id, question_id, option_id, selected_option_ids, text_answer, is_correct, answered_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+       ON DUPLICATE KEY UPDATE option_id = VALUES(option_id), selected_option_ids = VALUES(selected_option_ids), text_answer = VALUES(text_answer), is_correct = VALUES(is_correct), answered_at = UTC_TIMESTAMP()`,
+      [attemptId, questionId, resolvedOptionId, selectedOptionIdsJson, resolvedTextAnswer, isCorrect]
     );
 
     await connection.commit();
@@ -1207,8 +1362,12 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
        q.id,
        q.order_index,
        q.question_text,
+       q.question_type,
+       q.correct_text_answer,
        selected.option_id AS selected_option_id,
        selected.option_text AS selected_option_text,
+       selected.selected_option_ids AS selected_option_ids,
+       selected.text_answer AS selected_text_answer,
        selected.is_correct AS selected_is_correct,
        correct.option_id AS correct_option_id,
        correct.option_text AS correct_option_text
@@ -1216,8 +1375,10 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
      LEFT JOIN (
        SELECT aa.question_id,
               aa.option_id,
-              o.option_text,
-              aa.is_correct
+              aa.selected_option_ids,
+              aa.text_answer,
+              aa.is_correct,
+              o.option_text
          FROM assessment_answers aa
          LEFT JOIN assessment_question_options o ON o.id = aa.option_id
         WHERE aa.attempt_id = ?
@@ -1234,16 +1395,33 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
     [attemptId, assessmentId]
   );
 
-  const questions = questionRows.map((row) => ({
-    id: row.id,
-    order: row.order_index,
-    text: row.question_text,
-    selectedOptionId: row.selected_option_id || null,
-    selectedOptionText: row.selected_option_text || null,
-    correctOptionId: row.correct_option_id || null,
-    correctOptionText: row.correct_option_text || null,
-    isCorrect: row.selected_is_correct != null ? Boolean(row.selected_is_correct) : null,
-  }));
+  const questions = questionRows.map((row) => {
+    let selectedOptionIds = [];
+    if (row.selected_option_ids) {
+      try {
+        const parsed = JSON.parse(row.selected_option_ids);
+        if (Array.isArray(parsed)) {
+          selectedOptionIds = parsed.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+        }
+      } catch (error) {
+        console.warn("Failed to parse selected options from result", error);
+      }
+    }
+    return {
+      id: row.id,
+      order: row.order_index,
+      text: row.question_text,
+      questionType: row.question_type || "single",
+      selectedOptionId: row.selected_option_id || null,
+      selectedOptionIds,
+      selectedTextAnswer: row.selected_text_answer || null,
+      selectedOptionText: row.selected_option_text || null,
+      correctOptionId: row.correct_option_id || null,
+      correctOptionText: row.correct_option_text || null,
+      correctTextAnswer: row.correct_text_answer || null,
+      isCorrect: row.selected_is_correct != null ? Boolean(row.selected_is_correct) : null,
+    };
+  });
 
   const [historyRows] = await pool.execute(
     `SELECT attempt_number,
@@ -1399,6 +1577,7 @@ module.exports = {
   listAssignablePositions,
   listAssignableBranches,
   listAssignedUserIds,
+  assignUserToMatchingAssessments,
   listAssessmentsForUser,
   getAssessmentForUser,
   createAttempt,

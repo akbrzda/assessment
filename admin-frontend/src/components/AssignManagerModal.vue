@@ -43,6 +43,7 @@ import Preloader from "./ui/Preloader.vue";
 import Select from "./ui/Select.vue";
 import Button from "./ui/Button.vue";
 import { useToast } from "../composables/useToast";
+import { formatBranchLabel } from "../utils/branch";
 
 const props = defineProps({
   modelValue: {
@@ -74,7 +75,7 @@ const managerOptions = computed(() => [
 const branchOptions = computed(() =>
   branches.value.map((branch) => ({
     value: branch.id,
-    label: branch.city ? `${branch.name} (${branch.city})` : branch.name,
+    label: formatBranchLabel(branch),
   }))
 );
 
