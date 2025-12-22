@@ -49,7 +49,7 @@ export function hasTheoryBlocks(data) {
 }
 
 export function buildTheoryPayload(data) {
-  const normalizeBlock = (block, isRequired) => {
+  const normalizeBlock = (block) => {
     const payload = {
       title: (block.title || "").trim(),
       type: block.type || "text",
@@ -57,7 +57,6 @@ export function buildTheoryPayload(data) {
       videoUrl: null,
       externalUrl: null,
       metadata: block.metadata || {},
-      isRequired: isRequired ? 1 : 0,
     };
     if (payload.type === "video") {
       payload.videoUrl = (block.videoUrl || "").trim();
@@ -69,8 +68,8 @@ export function buildTheoryPayload(data) {
   };
 
   return {
-    requiredBlocks: (data?.requiredBlocks || []).map((block) => normalizeBlock(block, true)),
-    optionalBlocks: (data?.optionalBlocks || []).map((block) => normalizeBlock(block, false)),
+    requiredBlocks: (data?.requiredBlocks || []).map((block) => normalizeBlock(block)),
+    optionalBlocks: (data?.optionalBlocks || []).map((block) => normalizeBlock(block)),
   };
 }
 

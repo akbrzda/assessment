@@ -10,6 +10,7 @@
           <p class="details-subtitle">{{ details.assessment.description || "Нет описания" }}</p>
         </div>
         <div class="details-actions">
+          <Button icon="pencil" variant="primary" @click="goToEdit"> Редактировать </Button>
           <Button icon="book-open" variant="secondary" @click="openTheory"> Теория </Button>
           <Button icon="file-chart-column" variant="secondary" @click="handleExport"> Экспорт в Excel </Button>
         </div>
@@ -351,6 +352,10 @@ const handleExport = async () => {
 
 const openTheory = () => {
   router.push({ name: "AssessmentTheory", params: { id: props.assessmentId } });
+};
+
+const goToEdit = () => {
+  router.push({ name: "EditAssessment", params: { id: props.assessmentId } });
 };
 
 const getStatusLabel = (status) => {

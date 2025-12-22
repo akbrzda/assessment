@@ -62,6 +62,11 @@ const loadAssessment = async () => {
       stats: data.stats,
     };
 
+    if (!["pending", "open"].includes(assessment.value.status)) {
+      error.value = 'Редактировать можно только аттестации в статусах "Ожидает" или "Открыта"';
+      return;
+    }
+
     // Проверка: можно ли редактировать (если есть завершённые попытки)
     if (data.stats && data.stats.completed_count > 0) {
       error.value = "Невозможно редактировать аттестацию с уже существующими попытками";

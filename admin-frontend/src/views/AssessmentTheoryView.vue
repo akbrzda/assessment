@@ -106,7 +106,7 @@
               <Select v-model="block.type" label="Тип блока" :options="blockTypeOptions" />
             </div>
 
-            <Textarea
+            <FullscreenTextarea
               v-model="block.content"
               :label="block.type === 'text' ? 'Содержимое' : 'Описание (опционально)'"
               :required="block.type === 'text'"
@@ -154,7 +154,7 @@
               <Select v-model="block.type" label="Тип блока" :options="blockTypeOptions" />
             </div>
 
-            <Textarea
+            <FullscreenTextarea
               v-model="block.content"
               :label="block.type === 'text' ? 'Содержимое' : 'Описание (опционально)'"
               :rows="block.type === 'text' ? 6 : 3"
@@ -180,6 +180,7 @@ import Card from "../components/ui/Card.vue";
 import Input from "../components/ui/Input.vue";
 import Select from "../components/ui/Select.vue";
 import Textarea from "../components/ui/Textarea.vue";
+import FullscreenTextarea from "../components/ui/FullscreenTextarea.vue";
 import Preloader from "../components/ui/Preloader.vue";
 import { getAdminTheory, saveTheoryDraft, publishTheory } from "../api/theory";
 import { useToast } from "../composables/useToast";

@@ -141,7 +141,14 @@
               <Button v-if="canEditAssessment(assessment)" size="sm" variant="primary" icon="pencil" @click="goToEdit(assessment.id)" fullWidth>
                 Редактировать
               </Button>
-              <Button v-if="canEditAssessment(assessment)" size="sm" variant="secondary" icon="book-open-check" @click="goToTheory(assessment.id)" fullWidth>
+              <Button
+                v-if="canEditAssessment(assessment)"
+                size="sm"
+                variant="secondary"
+                icon="book-open-check"
+                @click="goToTheory(assessment.id)"
+                fullWidth
+              >
                 Теория
               </Button>
               <Button v-if="assessment.status === 'pending'" size="sm" variant="danger" icon="trash" @click="confirmDelete(assessment)" fullWidth>
@@ -248,8 +255,12 @@ const goToTheory = (id) => {
 };
 
 const canEditAssessment = (assessment) => {
-  // Можно редактировать только если нет попыток и статус pending или open
-  return assessment.total_attempts === 0 && (assessment.status === "pending" || assessment.status === "open");
+  // Админы могут редактировать в любом статусе
+  if (authStore.isSuperAdmin || authStore.isManager) {
+    return true;
+  }
+  // Остальные только для статуса "Ожидает"
+  return assessment.status === "pending";
 };
 
 const confirmDelete = async (assessment) => {

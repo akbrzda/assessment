@@ -184,7 +184,8 @@ export default {
       if (!assessment) {
         return;
       }
-      if (assessment.requiresTheory && !assessment.theoryCompleted) {
+      // Всегда сначала открываем теорию, если она есть
+      if (assessment.requiresTheory) {
         openTheory(assessment.id);
         return;
       }
@@ -245,11 +246,11 @@ export default {
                 passed: hasPassed,
               }
             : lastScore != null
-              ? {
-                  score: lastScore,
-                  passed: threshold != null ? lastScore >= threshold : false,
-                }
-              : null,
+            ? {
+                score: lastScore,
+                passed: threshold != null ? lastScore >= threshold : false,
+              }
+            : null,
         requiresTheory,
         theoryCompleted,
       };
@@ -262,10 +263,7 @@ export default {
 
       isDataLoading.value = true;
       try {
-        const [, assessmentsResponse] = await Promise.all([
-          userStore.loadOverview(),
-          apiClient.listUserAssessments(),
-        ]);
+        const [, assessmentsResponse] = await Promise.all([userStore.loadOverview(), apiClient.listUserAssessments()]);
 
         const normalized = (assessmentsResponse?.assessments || []).map((item) => normalizeAssessment(item)).filter(Boolean);
 
@@ -278,15 +276,10 @@ export default {
 
         const completedAssessments = normalized.filter((assessment) => assessment.bestResult != null);
         const averageScore = completedAssessments.length
-          ? Math.round(
-              completedAssessments.reduce((acc, assessment) => acc + (assessment.bestResult?.score || 0), 0) /
-                completedAssessments.length
-            )
+          ? Math.round(completedAssessments.reduce((acc, assessment) => acc + (assessment.bestResult?.score || 0), 0) / completedAssessments.length)
           : 0;
 
-        const earnedBadges = Array.isArray(userStore.overview?.badges)
-          ? userStore.overview.badges.filter((badge) => badge.earned).length
-          : 0;
+        const earnedBadges = Array.isArray(userStore.overview?.badges) ? userStore.overview.badges.filter((badge) => badge.earned).length : 0;
 
         userStats.value = {
           completed: completedAssessments.length,

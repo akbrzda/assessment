@@ -30,7 +30,7 @@
             <Select v-model="block.type" label="Тип" :options="typeOptions" />
           </div>
 
-          <Textarea
+          <FullscreenTextarea
             v-model="block.content"
             :label="block.type === 'text' ? 'Текст блока' : 'Описание (опционально)'"
             :rows="block.type === 'text' ? 5 : 3"
@@ -73,7 +73,7 @@
             <Select v-model="block.type" label="Тип" :options="typeOptions" />
           </div>
 
-          <Textarea
+          <FullscreenTextarea
             v-model="block.content"
             :label="block.type === 'text' ? 'Текст блока' : 'Описание (опционально)'"
             :rows="block.type === 'text' ? 5 : 3"
@@ -92,6 +92,7 @@ import { ref, watch } from "vue";
 import Input from "./ui/Input.vue";
 import Select from "./ui/Select.vue";
 import Textarea from "./ui/Textarea.vue";
+import FullscreenTextarea from "./ui/FullscreenTextarea.vue";
 import Button from "./ui/Button.vue";
 import { cloneTheoryData, createTheoryBlock } from "../utils/theory";
 

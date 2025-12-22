@@ -416,28 +416,31 @@ function calculateMaxDate() {
 }
 
 const canProceed = computed(() => {
-  if (currentStep.value === 1) {
-    return formData.value.title.trim() !== "";
-  }
-  if (currentStep.value === 2) {
-    if (questionsMode.value === "bank") {
-      return selectedBankQuestions.value.length > 0;
-    } else {
+  switch (currentStep.value) {
+    case 1:
+      return formData.value.title.trim() !== "";
+    case 2: {
+      if (!theoryEnabled.value) {
+        return true;
+      }
+      const result = validateTheoryData(theoryData.value);
+      return result.valid;
+    }
+    case 3:
+      if (questionsMode.value === "bank") {
+        return selectedBankQuestions.value.length > 0;
+      }
       return (
         formData.value.questions.length > 0 &&
         formData.value.questions.every(
           (q) => q.text.trim() !== "" && q.options.length >= 2 && q.options.every((o) => o.text.trim() !== "") && q.options.some((o) => o.isCorrect)
         )
       );
-    }
+    case 4:
+      return formData.value.branchIds.length > 0 || formData.value.positionIds.length > 0 || formData.value.userIds.length > 0;
+    default:
+      return true;
   }
-  if (currentStep.value === 3) {
-    return validateTheory(false);
-  }
-  if (currentStep.value === 4) {
-    return formData.value.branchIds.length > 0 || formData.value.positionIds.length > 0 || formData.value.userIds.length > 0;
-  }
-  return true;
 });
 
 const isFormValid = computed(() => {
@@ -575,7 +578,7 @@ const setCorrectOption = (qIndex, oIndex) => {
 };
 
 const nextStep = () => {
-  if (currentStep.value === 3 && !validateTheory(true)) {
+  if (currentStep.value === 2 && !validateTheory(true)) {
     return;
   }
   if (canProceed.value && currentStep.value < steps.length) {

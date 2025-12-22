@@ -13,15 +13,7 @@
     </div>
 
     <!-- Progress Indicator -->
-    <div v-if="awaitingStart" class="start-screen card text-center">
-      <div class="wrapper">
-        <h2 class="title-medium mb-8">Готовы начать аттестацию?</h2>
-        <p class="body-small text-secondary mb-16">После нажатия начнётся отсчёт времени. Убедитесь, что вы готовы.</p>
-        <button class="btn btn-primary btn-full" @click="startAttempt">Начать аттестацию</button>
-      </div>
-    </div>
-
-    <div class="progress-section" v-if="!awaitingStart && questions.length > 0">
+    <div class="progress-section" v-if="questions.length > 0">
       <div class="wrapper">
         <div class="progress-info">
           <span class="question-counter">Вопрос {{ currentQuestionIndex + 1 }} из {{ questions.length }}</span>
@@ -144,7 +136,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useTelegramStore } from "../stores/telegram";
 import { useUserStore } from "../stores/user";
@@ -164,7 +156,7 @@ export default {
     const selectedAnswer = ref(null);
     const userAnswers = ref([]);
     const attemptId = ref(null);
-    const awaitingStart = ref(false);
+    const awaitingStart = ref(true);
     const timeRemaining = ref(0);
     const showTimeUpModal = ref(false);
     const showFinishModal = ref(false);
@@ -172,6 +164,7 @@ export default {
     const timer = ref(null);
     const isSaving = ref(false);
     const isCompleted = ref(false);
+    const PROGRESS_STORAGE_KEY = "assessmentAttemptProgress";
 
     const assessmentId = computed(() => Number(route.params.id));
 
@@ -192,6 +185,112 @@ export default {
       const remainingSeconds = seconds % 60;
       return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
     }
+
+    const hasProgressStorage = () => typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+
+    const readProgressStore = () => {
+      if (!hasProgressStorage()) {
+        return {};
+      }
+      try {
+        const raw = window.localStorage.getItem(PROGRESS_STORAGE_KEY);
+        if (!raw) {
+          return {};
+        }
+        const parsed = JSON.parse(raw);
+        return typeof parsed === "object" && parsed ? parsed : {};
+      } catch (error) {
+        console.warn("Не удалось прочитать прогресс аттестации", error);
+        return {};
+      }
+    };
+
+    const writeProgressStore = (store) => {
+      if (!hasProgressStorage()) {
+        return;
+      }
+      try {
+        window.localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(store));
+      } catch (error) {
+        console.warn("Не удалось сохранить прогресс аттестации", error);
+      }
+    };
+
+    const getAttemptProgress = (attempt) => {
+      if (!attempt) {
+        return null;
+      }
+      const store = readProgressStore();
+      return store[String(attempt)] || null;
+    };
+
+    const saveAttemptProgress = (attempt, patch) => {
+      if (!attempt || !patch) {
+        return;
+      }
+      const store = readProgressStore();
+      const key = String(attempt);
+      const current = store[key] || {};
+      store[key] = { ...current, ...patch };
+      writeProgressStore(store);
+    };
+
+    const clearAttemptProgress = (attempt) => {
+      if (!attempt) {
+        return;
+      }
+      const store = readProgressStore();
+      const key = String(attempt);
+      if (store[key]) {
+        delete store[key];
+        writeProgressStore(store);
+      }
+    };
+
+    const applyStoredQuestionOrder = (progress) => {
+      if (!progress?.questionOrder?.length || !questions.value.length) {
+        return;
+      }
+      const orderIds = progress.questionOrder;
+      const map = new Map(questions.value.map((question) => [question.id, question]));
+      const ordered = [];
+      orderIds.forEach((id) => {
+        if (map.has(id)) {
+          ordered.push(map.get(id));
+          map.delete(id);
+        }
+      });
+      if (map.size) {
+        ordered.push(...map.values());
+      }
+      if (ordered.length) {
+        questions.value = ordered;
+      }
+    };
+
+    const resolveResumeIndex = (progress) => {
+      if (progress && Number.isInteger(progress.currentQuestionIndex)) {
+        const idx = progress.currentQuestionIndex;
+        if (idx >= 0 && idx < questions.value.length) {
+          return idx;
+        }
+      }
+      const firstUnanswered = userAnswers.value.findIndex((answer) => answer == null);
+      if (firstUnanswered >= 0) {
+        return firstUnanswered;
+      }
+      return Math.max(questions.value.length - 1, 0);
+    };
+
+    const persistQuestionOrder = () => {
+      if (!attemptId.value || !questions.value.length) {
+        return;
+      }
+      saveAttemptProgress(attemptId.value, {
+        questionOrder: questions.value.map((question) => question.id),
+        currentQuestionIndex: currentQuestionIndex.value,
+      });
+    };
 
     function selectAnswer(optionId) {
       selectedAnswer.value = optionId;
@@ -241,6 +340,7 @@ export default {
       currentQuestionIndex.value += 1;
       selectedAnswer.value = userAnswers.value[currentQuestionIndex.value] ?? null;
       telegramStore.hapticFeedback("impact", "light");
+      persistQuestionOrder();
     }
 
     function showFinishConfirmation() {
@@ -288,6 +388,9 @@ export default {
       }
 
       const attempt = attemptId.value;
+      if (attempt) {
+        clearAttemptProgress(attempt);
+      }
       if (attempt) {
         try {
           await apiClient.completeAssessmentAttempt(assessmentId.value, attempt);
@@ -376,18 +479,31 @@ export default {
         userAnswers.value = new Array(questions.value.length).fill(null);
 
         if (payload.latestAttempt && payload.latestAttempt.status === "in_progress") {
+          // Есть активная попытка - продолжаем её
           attemptId.value = payload.latestAttempt.id;
           const remaining = payload.latestAttempt.remainingSeconds;
           timeRemaining.value = Number.isFinite(remaining) ? Number(remaining) : timeLimitSeconds;
-
+          const storedProgress = getAttemptProgress(attemptId.value);
+          applyStoredQuestionOrder(storedProgress);
           const selectedMap = new Map((payload.questions || []).map((question) => [question.id, question.selectedOptionId || null]));
           userAnswers.value = questions.value.map((question) => selectedMap.get(question.id) || null);
-          selectedAnswer.value = userAnswers.value[0] ?? null;
+          const resumeIndex = resolveResumeIndex(storedProgress);
+          currentQuestionIndex.value = resumeIndex;
+          selectedAnswer.value = userAnswers.value[resumeIndex] ?? null;
+
+          // Не в режиме ожидания - попытка уже начата
+          awaitingStart.value = false;
+          persistQuestionOrder();
         } else {
-          // Не создаём попытку автоматически — ждём явного старта пользователем.
+          if (payload.latestAttempt?.id) {
+            clearAttemptProgress(payload.latestAttempt.id);
+          }
+          // Нет активной попытки - запускаем новую
           awaitingStart.value = true;
           attemptId.value = null;
           timeRemaining.value = timeLimitSeconds;
+          // Запускаем попытку автоматически
+          await startAttempt();
         }
 
         if (timeRemaining.value == null) {
@@ -408,7 +524,7 @@ export default {
     }
 
     async function startAttempt() {
-      if (attemptId.value || !assessmentId.value || awaitingStart.value === false) return;
+      if (attemptId.value || !assessmentId.value) return;
       try {
         const attempt = await apiClient.startAssessmentAttempt(assessmentId.value);
         attemptId.value = attempt.id;
@@ -416,8 +532,10 @@ export default {
         const timeLimitSeconds = assessment.value?.timeLimitSeconds || null;
         timeRemaining.value = Number.isFinite(remaining) ? Number(remaining) : timeLimitSeconds;
         userAnswers.value = new Array(questions.value.length).fill(null);
+        currentQuestionIndex.value = 0;
         selectedAnswer.value = null;
         awaitingStart.value = false;
+        persistQuestionOrder();
         startTimer();
       } catch (attemptError) {
         if (attemptError.status === 409 && attemptError.code === "THEORY_NOT_COMPLETED") {
@@ -448,6 +566,17 @@ export default {
       window.addEventListener("beforeunload", handleBeforeUnload);
       window._assessmentBeforeUnloadHandler = handleBeforeUnload;
     });
+
+    watch(
+      currentQuestionIndex,
+      (newIndex) => {
+        if (!attemptId.value) {
+          return;
+        }
+        saveAttemptProgress(attemptId.value, { currentQuestionIndex: newIndex });
+      },
+      { flush: "post" }
+    );
 
     onUnmounted(() => {
       if (timer.value) {
@@ -491,7 +620,8 @@ export default {
 
 <style scoped>
 .assessment-process {
-  height: 100vh;
+  min-height: 100vh;
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
   background-color: var(--bg-primary);

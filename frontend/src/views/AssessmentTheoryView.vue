@@ -93,9 +93,11 @@
         </section>
 
         <!-- Кнопка в конце -->
-        <button class="btn btn-primary btn-full" :disabled="!canSubmit || versionOutdated" @click="handlePrimaryAction">
-          {{ primaryButtonLabel }}
-        </button>
+        <div class="action-button-container">
+          <button class="btn btn-primary btn-full" :disabled="!canSubmit || versionOutdated" @click="handlePrimaryAction">
+            {{ primaryButtonLabel }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -144,9 +146,9 @@ const primaryButtonLabel = computed(() => {
     return "Перейти к тесту";
   }
   if (hasReadTheory.value) {
-    return "Завершить теорию и перейти к тесту";
+    return "Перейти к тесту";
   }
-  return "Прочтите материалы (осталось немного)";
+  return "Перейти к тесту";
 });
 
 function formatDate(isoDate) {
@@ -193,6 +195,13 @@ function startVersionPolling() {
 }
 
 function startReadingTimer() {
+  // Если теория уже пройдена, сразу активируем кнопку
+  if (completion.value) {
+    hasReadTheory.value = true;
+    return;
+  }
+
+  // Если не пройдена - 20 секунд задержка
   let secondsElapsed = 0;
   readingTimerInterval = setInterval(() => {
     secondsElapsed++;
@@ -213,15 +222,10 @@ async function loadTheory() {
     theory.value = response?.theory || null;
     completion.value = theory.value?.completion || null;
 
-    if (completion.value) {
-      hasReadTheory.value = true;
-    }
-
-    if (!completion.value) {
-      theoryStartTime.value = Date.now();
-      startVersionPolling();
-      startReadingTimer();
-    }
+    // Всегда запускаем таймер чтения (внутри он проверит completion)
+    theoryStartTime.value = Date.now();
+    startVersionPolling();
+    startReadingTimer();
   } catch (err) {
     console.error("Не удалось загрузить теорию", err);
     error.value = err.message || "Не удалось загрузить данные";
@@ -298,7 +302,8 @@ onUnmounted(() => {
 <style scoped>
 .theory-page {
   padding-top: 20px;
-  height: 100vh;
+  padding-bottom: 20px;
+  min-height: 100vh;
   overflow-y: auto;
 }
 
@@ -457,6 +462,11 @@ details summary::-webkit-details-marker {
   100% {
     transform: rotate(360deg);
   }
+}
+
+.action-button-container {
+  margin-top: 24px;
+  margin-bottom: 24px;
 }
 
 @media (max-width: 480px) {

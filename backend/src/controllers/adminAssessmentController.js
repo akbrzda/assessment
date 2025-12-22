@@ -1,5 +1,6 @@
 const { pool } = require("../config/database");
 const { createLog } = require("./adminLogsController");
+const assessmentModel = require("../models/assessmentModel");
 
 /**
  * Получить список всех аттестаций для админ-панели
@@ -458,8 +459,8 @@ exports.updateAssessment = async (req, res, next) => {
       }
     }
 
-    if (assessment.status !== "pending") {
-      return res.status(400).json({ error: 'Можно редактировать только аттестации со статусом "Ожидает"' });
+    if (!["pending", "open"].includes(assessment.status)) {
+      return res.status(400).json({ error: 'Можно редактировать только аттестации в статусах "Ожидает" или "Открыта"' });
     }
 
     await connection.beginTransaction();
@@ -709,8 +710,24 @@ exports.getAssessmentDetails = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
+    // Отменить просроченные попытки перед получением данных
+    await assessmentModel.cancelExpiredAttempts(assessmentId);
+
     // Основная информация об аттестации
-    const [assessments] = await pool.query("SELECT * FROM assessments WHERE id = ?", [assessmentId]);
+    const [assessments] = await pool.query(
+      `
+      SELECT 
+        *,
+        CASE
+          WHEN UTC_TIMESTAMP() < open_at THEN 'pending'
+          WHEN UTC_TIMESTAMP() BETWEEN open_at AND close_at THEN 'open'
+          ELSE 'closed'
+        END as status
+      FROM assessments 
+      WHERE id = ?
+    `,
+      [assessmentId]
+    );
 
     if (assessments.length === 0) {
       return res.status(404).json({ error: "Аттестация не найдена" });
@@ -789,7 +806,7 @@ exports.getAssessmentDetails = async (req, res, next) => {
       question.answerStats = stats;
     }
 
-    // Участники с результатами (берем последнюю попытку каждого пользователя)
+    // Участники с результатами (показываем лучшую попытку или текущую in_progress)
     const [participants] = await pool.query(
       `
       SELECT 
@@ -799,39 +816,50 @@ exports.getAssessmentDetails = async (req, res, next) => {
         u.telegram_id,
         b.name as branch_name,
         p.name as position_name,
-        aa.id as attempt_id,
-        aa.status as attempt_status,
-        aa.score_percent,
-        aa.correct_answers,
-        aa.total_questions,
-        aa.started_at,
-        aa.completed_at,
-        TIMESTAMPDIFF(SECOND, aa.started_at, aa.completed_at) as time_spent_seconds,
+        COALESCE(best_completed.id, in_progress.id) as attempt_id,
+        COALESCE(best_completed.status, in_progress.status) as attempt_status,
+        best_completed.score_percent,
+        best_completed.correct_answers,
+        best_completed.total_questions,
+        COALESCE(best_completed.started_at, in_progress.started_at) as started_at,
+        best_completed.completed_at,
+        TIMESTAMPDIFF(SECOND, best_completed.started_at, best_completed.completed_at) as time_spent_seconds,
         tc.time_spent_seconds as theory_time_seconds,
         tc.completed_at as theory_completed_at
       FROM assessment_user_assignments aua
       JOIN users u ON aua.user_id = u.id
       LEFT JOIN branches b ON u.branch_id = b.id
       LEFT JOIN positions p ON u.position_id = p.id
-      LEFT JOIN assessment_attempts aa ON aa.assessment_id = aua.assessment_id 
-        AND aa.user_id = u.id 
-        AND aa.id = (
-          SELECT id FROM assessment_attempts 
-          WHERE assessment_id = aua.assessment_id 
-            AND user_id = u.id 
-          ORDER BY started_at DESC 
-          LIMIT 1
-        )
+      LEFT JOIN (
+        SELECT aa.*
+        FROM (
+          SELECT aa1.*, 
+                 ROW_NUMBER() OVER (PARTITION BY aa1.user_id ORDER BY aa1.score_percent DESC, aa1.completed_at DESC) as rn
+          FROM assessment_attempts aa1
+          WHERE aa1.assessment_id = ? AND aa1.status = 'completed'
+        ) aa
+        WHERE aa.rn = 1
+      ) best_completed ON best_completed.user_id = u.id
+      LEFT JOIN (
+        SELECT aa.*
+        FROM (
+          SELECT aa2.*, 
+                 ROW_NUMBER() OVER (PARTITION BY aa2.user_id ORDER BY aa2.started_at DESC) as rn
+          FROM assessment_attempts aa2
+          WHERE aa2.assessment_id = ? AND aa2.status = 'in_progress'
+        ) aa
+        WHERE aa.rn = 1
+      ) in_progress ON in_progress.user_id = u.id AND best_completed.id IS NULL
       LEFT JOIN assessment_theory_completions tc ON tc.assessment_id = aua.assessment_id 
         AND tc.user_id = u.id
         AND tc.version_id = (SELECT current_theory_version_id FROM assessments WHERE id = aua.assessment_id)
       WHERE aua.assessment_id = ?
       ORDER BY u.last_name, u.first_name
     `,
-      [assessmentId]
+      [assessmentId, assessmentId, assessmentId]
     );
 
-    // Статистика (на основе последней попытки каждого пользователя)
+    // Статистика (на основе лучшей завершенной попытки каждого пользователя)
     const [stats] = await pool.query(
       `
       SELECT 
@@ -850,12 +878,14 @@ exports.getAssessmentDetails = async (req, res, next) => {
         SELECT aa1.*
         FROM assessment_attempts aa1
         INNER JOIN (
-          SELECT user_id, MAX(started_at) as max_started
+          SELECT user_id, MAX(score_percent) as max_score, MAX(completed_at) as max_completed
           FROM assessment_attempts
-          WHERE assessment_id = ?
+          WHERE assessment_id = ? AND status = 'completed'
           GROUP BY user_id
-        ) aa2 ON aa1.user_id = aa2.user_id AND aa1.started_at = aa2.max_started
-        WHERE aa1.assessment_id = ?
+        ) aa2 ON aa1.user_id = aa2.user_id 
+                AND aa1.score_percent = aa2.max_score 
+                AND aa1.completed_at = aa2.max_completed
+        WHERE aa1.assessment_id = ? AND aa1.status = 'completed'
       ) latest ON latest.user_id = aua.user_id
       LEFT JOIN assessment_theory_completions tc ON tc.assessment_id = aua.assessment_id
         AND tc.user_id = aua.user_id

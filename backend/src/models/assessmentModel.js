@@ -518,12 +518,12 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
                 aa.time_spent_seconds,
                 ROW_NUMBER() OVER (
                   PARTITION BY aa.user_id
-                  ORDER BY COALESCE(aa.score_percent, -1) DESC,
-                           aa.attempt_number DESC,
-                           aa.completed_at DESC
+                  ORDER BY aa.score_percent DESC,
+                           aa.completed_at DESC,
+                           aa.attempt_number DESC
                 ) AS rn
          FROM assessment_attempts aa
-         WHERE aa.assessment_id = ?
+         WHERE aa.assessment_id = ? AND aa.status = 'completed'
        ) AS ranked
        WHERE ranked.rn = 1
      ) AS best
@@ -854,7 +854,25 @@ async function getAssessmentForUser(assessmentId, userId) {
     }
   });
 
-  base.questions = Array.from(questionMap.values());
+  // Рандомизируем вопросы и варианты ответов
+  const questionsArray = Array.from(questionMap.values());
+
+  // Перемешиваем вопросы
+  for (let i = questionsArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [questionsArray[i], questionsArray[j]] = [questionsArray[j], questionsArray[i]];
+  }
+
+  // Перемешиваем варианты ответов в каждом вопросе
+  questionsArray.forEach((question) => {
+    const options = question.options;
+    for (let i = options.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [options[i], options[j]] = [options[j], options[i]];
+    }
+  });
+
+  base.questions = questionsArray;
 
   const [attemptRows] = await pool.execute(
     `SELECT id, attempt_number, status, started_at, completed_at, score_percent
@@ -1348,6 +1366,28 @@ async function getUsersWithIncompleteAttempts(assessmentId) {
   return rows;
 }
 
+// Отменить попытки in_progress, у которых истек лимит времени
+async function cancelExpiredAttempts(assessmentId = null) {
+  let query = `
+    UPDATE assessment_attempts aa
+    JOIN assessments a ON aa.assessment_id = a.id
+    SET aa.status = 'cancelled',
+        aa.updated_at = UTC_TIMESTAMP()
+    WHERE aa.status = 'in_progress'
+      AND a.time_limit_minutes IS NOT NULL
+      AND TIMESTAMPDIFF(MINUTE, aa.started_at, UTC_TIMESTAMP()) > a.time_limit_minutes
+  `;
+
+  const params = [];
+  if (assessmentId) {
+    query += " AND aa.assessment_id = ?";
+    params.push(assessmentId);
+  }
+
+  const [result] = await pool.execute(query, params);
+  return result.affectedRows;
+}
+
 module.exports = {
   createAssessment,
   updateAssessment,
@@ -1368,4 +1408,5 @@ module.exports = {
   getRecentlyOpenedAssessments,
   getOpenAssessments,
   getUsersWithIncompleteAttempts,
+  cancelExpiredAttempts,
 };

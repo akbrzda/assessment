@@ -83,6 +83,9 @@ async function listManaged(req, res, next) {
 
 async function listForUser(req, res, next) {
   try {
+    // Отменить просроченные попытки перед получением списка
+    await assessmentModel.cancelExpiredAttempts();
+
     const assessments = await assessmentModel.listAssessmentsForUser(req.currentUser.id);
     res.json({ assessments });
   } catch (error) {
@@ -93,6 +96,10 @@ async function listForUser(req, res, next) {
 async function getForUser(req, res, next) {
   try {
     const assessmentId = Number(req.params.id);
+
+    // Отменить просроченные попытки для данной аттестации
+    await assessmentModel.cancelExpiredAttempts(assessmentId);
+
     const assessment = await assessmentModel.getAssessmentForUser(assessmentId, req.currentUser.id);
     if (!assessment) {
       return res.status(404).json({ error: "Аттестация не найдена или недоступна" });
@@ -273,6 +280,10 @@ async function create(req, res, next) {
 async function getDetail(req, res, next) {
   try {
     const assessmentId = Number(req.params.id);
+
+    // Отменить просроченные попытки перед получением деталей
+    await assessmentModel.cancelExpiredAttempts(assessmentId);
+
     const assessment = await assessmentModel.findAssessmentByIdForManager(assessmentId, {
       userId: req.currentUser.id,
       roleName: req.currentUser.roleName,
@@ -290,6 +301,10 @@ async function getDetail(req, res, next) {
 async function startAttempt(req, res, next) {
   try {
     const assessmentId = Number(req.params.id);
+
+    // Отменить просроченные попытки для данной аттестации
+    await assessmentModel.cancelExpiredAttempts(assessmentId);
+
     const assessment = await assessmentModel.getAssessmentForUser(assessmentId, req.currentUser.id);
     if (!assessment) {
       return res.status(404).json({ error: "Аттестация не найдена или недоступна" });
@@ -472,6 +487,10 @@ async function getAttemptResultController(req, res, next) {
 async function update(req, res, next) {
   try {
     const assessmentId = Number(req.params.id);
+
+    // Отменить просроченные попытки перед обновлением
+    await assessmentModel.cancelExpiredAttempts(assessmentId);
+
     const existing = await assessmentModel.findAssessmentByIdForManager(assessmentId, {
       userId: req.currentUser.id,
       roleName: req.currentUser.roleName,
@@ -481,13 +500,10 @@ async function update(req, res, next) {
       return res.status(404).json({ error: "Аттестация не найдена" });
     }
 
-    if (new Date(existing.openAt) <= new Date()) {
-      return res.status(400).json({ error: "Аттестацию нельзя изменить после открытия" });
-    }
-
-    const hasAttempts = await assessmentModel.hasAttempts(assessmentId);
-    if (hasAttempts) {
-      return res.status(400).json({ error: "Аттестацию нельзя изменить, так как уже есть попытки" });
+    // Админы и менеджеры могут редактировать в любом статусе
+    const isAdmin = req.currentUser.roleName === "admin" || req.currentUser.roleName === "manager";
+    if (!isAdmin && existing.status !== "pending") {
+      return res.status(403).json({ error: "Редактирование доступно только для аттестаций со статусом 'Ожидает'" });
     }
 
     const payload = {
@@ -553,6 +569,10 @@ async function update(req, res, next) {
 async function remove(req, res, next) {
   try {
     const assessmentId = Number(req.params.id);
+
+    // Отменить просроченные попытки перед удалением
+    await assessmentModel.cancelExpiredAttempts(assessmentId);
+
     const existing = await assessmentModel.findAssessmentByIdForManager(assessmentId, {
       userId: req.currentUser.id,
       roleName: req.currentUser.roleName,
