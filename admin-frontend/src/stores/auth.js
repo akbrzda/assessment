@@ -8,6 +8,7 @@ export const useAuthStore = defineStore("auth", {
     accessToken: localStorage.getItem("accessToken") || null,
     refreshToken: localStorage.getItem("refreshToken") || null,
     tokenRefreshTimer: null,
+    isRefreshing: false,
   }),
 
   getters: {
@@ -51,15 +52,24 @@ export const useAuthStore = defineStore("auth", {
 
       // Обновляем токен каждые 10 минут (токен живёт 15 минут)
       this.tokenRefreshTimer = setInterval(async () => {
+        // Предотвращаем параллельные обновления
+        if (this.isRefreshing) {
+          console.log("Обновление токена уже выполняется, пропускаем");
+          return;
+        }
+
+        this.isRefreshing = true;
         try {
           const { data } = await authApi.refresh();
-          this.setToken(data.accessToken);
+          this.setTokenAndReconnectWS(data.accessToken);
           console.log("Токен автоматически обновлён");
         } catch (error) {
           console.error("Не удалось обновить токен:", error);
           // Останавливаем таймер, axios interceptor сам сделает redirect на login
           clearInterval(this.tokenRefreshTimer);
           this.tokenRefreshTimer = null;
+        } finally {
+          this.isRefreshing = false;
         }
       }, 10 * 60 * 1000); // 10 минут
     },
@@ -67,11 +77,6 @@ export const useAuthStore = defineStore("auth", {
     setToken(newAccessToken) {
       this.accessToken = newAccessToken;
       localStorage.setItem("accessToken", newAccessToken);
-
-      // Переподключаем WebSocket с новым токеном
-      if (websocketService.isConnected) {
-        websocketService.reconnectWithNewToken(newAccessToken);
-      }
     },
 
     async logout() {

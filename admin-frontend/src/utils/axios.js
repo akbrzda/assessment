@@ -34,17 +34,14 @@ apiClient.interceptors.response.use(
         localStorage.setItem("accessToken", data.accessToken);
         originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
 
-        // Обновляем токен в store и переподключаем WebSocket
-        try {
-          const { useAuthStore } = await import("@/stores/auth");
-          const authStore = useAuthStore();
-          authStore.setToken(data.accessToken);
-        } catch (storeError) {
-          console.error("Failed to update auth store:", storeError);
-        }
+        // Синхронно обновляем токен в store и переподключаем WebSocket
+        const { useAuthStore } = await import("@/stores/auth");
+        const authStore = useAuthStore();
+        authStore.setTokenAndReconnectWS(data.accessToken);
 
         return apiClient(originalRequest);
       } catch (refreshError) {
+        console.error("Failed to refresh token:", refreshError);
         localStorage.clear();
         // Перенаправляем на login только если мы не на странице login
         if (window.location.pathname !== "/login") {

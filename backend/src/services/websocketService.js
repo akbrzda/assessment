@@ -24,7 +24,12 @@ function authenticateSocket(socket, next) {
     next();
   } catch (error) {
     logger.warn(`WebSocket authentication failed: ${error.message}`);
-    next(new Error("Authentication error: invalid token"));
+    // Передаем конкретную причину ошибки для правильной обработки на клиенте
+    if (error.name === "TokenExpiredError") {
+      next(new Error("Authentication error: token expired"));
+    } else {
+      next(new Error("Authentication error: invalid token"));
+    }
   }
 }
 
