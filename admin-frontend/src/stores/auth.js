@@ -79,6 +79,11 @@ export const useAuthStore = defineStore("auth", {
       localStorage.setItem("accessToken", newAccessToken);
     },
 
+    updateUser(userData) {
+      this.user = { ...this.user, ...userData };
+      localStorage.setItem("user", JSON.stringify(this.user));
+    },
+
     async logout() {
       try {
         await authApi.logout();

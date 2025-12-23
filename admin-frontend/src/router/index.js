@@ -115,6 +115,12 @@ const routes = [
         component: () => import("../views/SettingsView.vue"),
         meta: { roles: ["superadmin"], title: "Настройки" },
       },
+      {
+        path: "profile",
+        name: "Profile",
+        component: () => import("../views/ProfileView.vue"),
+        meta: { roles: ["superadmin", "manager"], title: "Профиль" },
+      },
     ],
   },
 ];

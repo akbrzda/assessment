@@ -62,12 +62,13 @@ exports.login = async (req, res) => {
       refreshToken,
       user: {
         id: user.id,
-        first_name: user.first_name,
-        last_name: user.last_name,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        avatarUrl: user.avatar_url,
         role: user.role_name,
-        branch_id: user.branch_id,
-        branch_name: user.branch_name,
-        position_name: user.position_name,
+        branchId: user.branch_id,
+        branchName: user.branch_name,
+        positionName: user.position_name,
       },
     });
   } catch (error) {

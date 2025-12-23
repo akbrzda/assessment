@@ -37,18 +37,6 @@
             </button>
           </div>
         </div>
-        <!-- Профиль пользователя -->
-        <div class="user-profile">
-          <div class="user-info">
-            <div class="user-name">{{ user?.first_name }} {{ user?.last_name }}</div>
-            <div class="user-role">
-              {{ roleLabel }}
-            </div>
-          </div>
-
-          <!-- Кнопка выхода -->
-          <button @click="handleLogout" class="logout-btn">Выйти</button>
-        </div>
       </div>
     </div>
   </header>
@@ -56,8 +44,7 @@
 
 <script setup>
 import { computed } from "vue";
-import { useRouter, useRoute } from "vue-router";
-import { useAuthStore } from "../../stores/auth";
+import { useRoute } from "vue-router";
 import { useThemeStore } from "../../stores/theme";
 import { useWebSocket } from "../../composables/useWebSocket";
 import Icon from "../ui/Icon.vue";
@@ -98,10 +85,7 @@ const { isConnected } = useWebSocket();
 
 defineEmits(["toggle-sidebar"]);
 
-const router = useRouter();
 const route = useRoute();
-const authStore = useAuthStore();
-const user = computed(() => authStore.user);
 
 const pageTitle = computed(() => {
   const titles = {
@@ -118,15 +102,6 @@ const pageTitle = computed(() => {
   };
   return titles[route.name?.toLowerCase()] || "Админ-панель";
 });
-
-const roleLabel = computed(() => {
-  return authStore.isSuperAdmin ? "Суперадмин" : "Управляющий";
-});
-
-const handleLogout = async () => {
-  await authStore.logout();
-  router.push("/login");
-};
 </script>
 
 <style scoped>
