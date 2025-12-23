@@ -161,7 +161,6 @@ const { showToast } = useToast();
 const showCategoryModal = ref(false);
 
 const categoryOptions = computed(() => [
-  { value: "", label: "Все категории" },
   ...categories.value.map((cat) => ({
     value: cat.id,
     label: `${cat.name} (${cat.questions_count})`,
@@ -169,7 +168,6 @@ const categoryOptions = computed(() => [
 ]);
 
 const typeOptions = [
-  { value: "", label: "Все типы" },
   { value: "single", label: "Один вариант" },
   { value: "multiple", label: "Множественный выбор" },
   { value: "text", label: "Текстовый ответ" },

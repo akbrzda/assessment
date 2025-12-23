@@ -3,14 +3,15 @@ const router = express.Router();
 const verifyJWT = require("../middleware/verifyJWT");
 const verifyAdminRole = require("../middleware/verifyAdminRole");
 const adminPositionController = require("../controllers/adminPositionController");
+const { cacheMiddleware, invalidateCacheMiddleware } = require("../middleware/cache");
 
 router.use(verifyJWT);
 router.use(verifyAdminRole(["superadmin"]));
 
-router.get("/", adminPositionController.getPositions);
-router.get("/:id", adminPositionController.getPositionById);
-router.post("/", adminPositionController.createPosition);
-router.put("/:id", adminPositionController.updatePosition);
-router.delete("/:id", adminPositionController.deletePosition);
+router.get("/", cacheMiddleware({ ttl: 300 }), adminPositionController.getPositions);
+router.get("/:id", cacheMiddleware({ ttl: 300 }), adminPositionController.getPositionById);
+router.post("/", invalidateCacheMiddleware(/^http:GET:.*\/api\/admin\/(positions|references)/), adminPositionController.createPosition);
+router.put("/:id", invalidateCacheMiddleware(/^http:GET:.*\/api\/admin\/(positions|references)/), adminPositionController.updatePosition);
+router.delete("/:id", invalidateCacheMiddleware(/^http:GET:.*\/api\/admin\/(positions|references)/), adminPositionController.deletePosition);
 
 module.exports = router;

@@ -1,28 +1,39 @@
-import apiClient from "../utils/axios";
+import apiClient, { mutateWithInvalidation } from "../utils/axios";
 
 export const getUsers = async (filters = {}) => {
-  const { data } = await apiClient.get("/admin/users", { params: filters });
+  const { data } = await apiClient.get("/admin/users", {
+    params: filters,
+    cacheMaxAge: 60000, // 1 минута
+  });
   return data;
 };
 
 export const getUserById = async (id) => {
-  const { data } = await apiClient.get(`/admin/users/${id}`);
+  const { data } = await apiClient.get(`/admin/users/${id}`, {
+    cacheMaxAge: 120000, // 2 минуты
+  });
   return data;
 };
 
 export const createUser = async (payload) => {
-  const { data } = await apiClient.post("/admin/users", payload);
-  return data;
+  return mutateWithInvalidation(async () => {
+    const { data } = await apiClient.post("/admin/users", payload);
+    return data;
+  }, /get:\/admin\/users/i);
 };
 
 export const updateUser = async (id, payload) => {
-  const { data } = await apiClient.patch(`/admin/users/${id}`, payload);
-  return data;
+  return mutateWithInvalidation(async () => {
+    const { data } = await apiClient.patch(`/admin/users/${id}`, payload);
+    return data;
+  }, /get:\/admin\/users/i);
 };
 
 export const deleteUser = async (id) => {
-  const { data } = await apiClient.delete(`/admin/users/${id}`);
-  return data;
+  return mutateWithInvalidation(async () => {
+    const { data } = await apiClient.delete(`/admin/users/${id}`);
+    return data;
+  }, /get:\/admin\/users/i);
 };
 
 export const resetPassword = async (id, newPassword) => {
@@ -31,7 +42,9 @@ export const resetPassword = async (id, newPassword) => {
 };
 
 export const getReferences = async () => {
-  const { data } = await apiClient.get("/admin/references");
+  const { data } = await apiClient.get("/admin/references", {
+    cacheMaxAge: 600000, // 10 минут
+  });
   return data;
 };
 

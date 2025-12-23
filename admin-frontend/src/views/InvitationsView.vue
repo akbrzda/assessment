@@ -283,14 +283,12 @@ const stats = computed(() => {
 });
 
 const statusOptions = computed(() => [
-  { value: "", label: "Все статусы" },
   { value: "active", label: "Активные" },
   { value: "used", label: "Использованные" },
   { value: "expired", label: "Истёкшие" },
 ]);
 
 const branchOptions = computed(() => [
-  { value: "", label: "Все филиалы" },
   ...references.value.branches.map((b) => ({
     value: String(b.id),
     label: formatBranchLabel(b),

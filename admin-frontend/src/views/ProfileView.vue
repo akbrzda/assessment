@@ -215,9 +215,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.profile-view {
-  max-width: 1200px;
-}
 
 .page-header {
   margin-bottom: 1.5rem;

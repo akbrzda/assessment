@@ -193,14 +193,12 @@ const references = ref({
 });
 
 const statusOptions = computed(() => [
-  { value: "", label: "Все статусы" },
   { value: "pending", label: "Ожидает" },
   { value: "open", label: "Открыта" },
   { value: "closed", label: "Закрыта" },
 ]);
 
 const branchOptions = computed(() => [
-  { value: "", label: "Все филиалы" },
   ...references.value.branches.map((branch) => ({
     value: String(branch.id),
     label: formatBranchLabel(branch),

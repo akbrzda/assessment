@@ -14,7 +14,7 @@
         :class="['select', `select-${size}`, { 'select-error': !!error }]"
         @change="$emit('update:modelValue', $event.target.value)"
       >
-        <option v-if="placeholder" value="">{{ placeholder }}</option>
+        <option v-if="placeholder && !modelValue" value="" disabled selected>{{ placeholder }}</option>
         <option v-for="option in options" :key="option.value" :value="option.value" :disabled="option.disabled">
           {{ option.label }}
         </option>

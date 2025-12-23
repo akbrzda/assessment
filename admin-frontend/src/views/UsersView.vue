@@ -79,12 +79,6 @@
                 <td class="actions-cell">
                   <div class="actions-buttons">
                     <Button class="action-btn action-btn-edit" icon="pencil" title="Редактировать" @click="openEditModal(user)"></Button>
-                    <Button
-                      class="action-btn action-btn-secondary"
-                      icon="key-round"
-                      title="Сбросить пароль"
-                      @click="openResetPasswordModal(user)"
-                    ></Button>
                     <Button class="action-btn action-btn-delete" title="Удалить" icon="trash" @click="openDeleteModal(user)"></Button>
                   </div>
                 </td>
@@ -131,7 +125,6 @@
 
             <div class="user-card-actions">
               <Button size="sm" variant="secondary" icon="pencil" fullWidth @click="openEditModal(user)">Редактировать</Button>
-              <Button size="sm" variant="secondary" icon="key-round" fullWidth @click="openResetPasswordModal(user)">Сбросить пароль</Button>
               <Button size="sm" variant="danger" icon="trash" fullWidth @click="openDeleteModal(user)">Удалить</Button>
             </div>
           </div>
@@ -154,12 +147,15 @@
       <div class="password-generator-card">
         <div class="password-generator-head">
           <div>
-            <p class="password-generator-title">Генерация пароля</p>
-            <p class="password-generator-text">Создайте сложный пароль на основе текущих данных сотрудника.</p>
+            <p class="password-generator-title">Управление паролем</p>
+            <p class="password-generator-text">Создайте сложный пароль на основе текущих данных сотрудника или установите пароль вручную.</p>
           </div>
-          <Button size="sm" variant="secondary" icon="Sparkles" :loading="passwordGenerating" @click="handleGeneratePassword">
-            Сгенерировать
-          </Button>
+          <div class="password-actions-group">
+            <Button size="sm" variant="secondary" icon="KeyRound" @click="openResetPasswordModal(selectedUser)"> Установить вручную </Button>
+            <Button size="sm" variant="secondary" icon="Sparkles" :loading="passwordGenerating" @click="handleGeneratePassword">
+              Сгенерировать
+            </Button>
+          </div>
         </div>
         <div v-if="generatedPassword" class="password-generator-result">
           <Input v-model="generatedPassword" label="Сгенерированный пароль" readonly />
@@ -398,7 +394,6 @@ const stats = computed(() => {
 });
 
 const branchOptions = computed(() => [
-  { value: "", label: "Все филиалы" },
   ...references.value.branches.map((branch) => ({
     value: String(branch.id),
     label: formatBranchLabel(branch),
@@ -406,7 +401,6 @@ const branchOptions = computed(() => [
 ]);
 
 const positionOptions = computed(() => [
-  { value: "", label: "Все должности" },
   ...references.value.positions.map((position) => ({
     value: String(position.id),
     label: position.name,
@@ -414,7 +408,6 @@ const positionOptions = computed(() => [
 ]);
 
 const roleOptions = computed(() => [
-  { value: "", label: "Все роли" },
   ...references.value.roles.map((role) => ({
     value: String(role.id),
     label: getRoleLabel(role.name),
@@ -422,7 +415,6 @@ const roleOptions = computed(() => [
 ]);
 
 const levelOptions = computed(() => [
-  { value: "", label: "Все уровни" },
   { value: "1", label: "1 - Новичок" },
   { value: "2", label: "2 - Специалист" },
   { value: "3", label: "3 - Эксперт" },
@@ -781,7 +773,7 @@ const normalizeUserProfile = (profile) => {
     user,
     nextLevel: safeProfile.nextLevel || null,
     progressToNextLevel: safeProfile.progressToNextLevel ?? 0,
-  userPoints: user.points ?? safeProfile.points ?? 0,
+    userPoints: user.points ?? safeProfile.points ?? 0,
   };
 };
 
@@ -824,9 +816,7 @@ const generatePasswordFromForm = () => {
   const symbols = "!@#$%^&*()-_=+?";
 
   const baseSeedText = [firstName, lastName, login, branchName, positionName].filter(Boolean).join("");
-  const baseSeed = baseSeedText
-    ? [...baseSeedText].reduce((acc, char) => acc + char.charCodeAt(0), 0)
-    : Date.now();
+  const baseSeed = baseSeedText ? [...baseSeedText].reduce((acc, char) => acc + char.charCodeAt(0), 0) : Date.now();
   const random = createSeededRandom(baseSeed + Date.now());
 
   const pickRandom = (set) => set.charAt(Math.floor(random() * set.length));
@@ -970,6 +960,12 @@ onMounted(async () => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.password-actions-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .password-generator-title {

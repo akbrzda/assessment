@@ -1,11 +1,14 @@
-import axios from "../utils/axios";
+import axios, { mutateWithInvalidation } from "../utils/axios";
 
 /**
  * Получить список аттестаций
  * @param {Object} filters - фильтры (status, branch, search)
  */
 export const getAssessments = async (filters = {}) => {
-  const response = await axios.get("/admin/assessments", { params: filters });
+  const response = await axios.get("/admin/assessments", {
+    params: filters,
+    cacheMaxAge: 120000, // 2 минуты
+  });
   return response.data;
 };
 
@@ -14,7 +17,9 @@ export const getAssessments = async (filters = {}) => {
  * @param {Number} id - ID аттестации
  */
 export const getAssessmentById = async (id) => {
-  const response = await axios.get(`/admin/assessments/${id}`);
+  const response = await axios.get(`/admin/assessments/${id}`, {
+    cacheMaxAge: 180000, // 3 минуты
+  });
   return response.data;
 };
 
@@ -23,8 +28,10 @@ export const getAssessmentById = async (id) => {
  * @param {Object} data - данные аттестации
  */
 export const createAssessment = async (data) => {
-  const response = await axios.post("/admin/assessments", data);
-  return response.data;
+  return mutateWithInvalidation(async () => {
+    const response = await axios.post("/admin/assessments", data);
+    return response.data;
+  }, /get:\/admin\/assessments/i);
 };
 
 /**
@@ -33,8 +40,10 @@ export const createAssessment = async (data) => {
  * @param {Object} data - данные для обновления
  */
 export const updateAssessment = async (id, data) => {
-  const response = await axios.put(`/admin/assessments/${id}`, data);
-  return response.data;
+  return mutateWithInvalidation(async () => {
+    const response = await axios.put(`/admin/assessments/${id}`, data);
+    return response.data;
+  }, /get:\/admin\/assessments/i);
 };
 
 /**
@@ -42,8 +51,10 @@ export const updateAssessment = async (id, data) => {
  * @param {Number} id - ID аттестации
  */
 export const deleteAssessment = async (id) => {
-  const response = await axios.delete(`/admin/assessments/${id}`);
-  return response.data;
+  return mutateWithInvalidation(async () => {
+    const response = await axios.delete(`/admin/assessments/${id}`);
+    return response.data;
+  }, /get:\/admin\/assessments/i);
 };
 
 /**
@@ -51,7 +62,9 @@ export const deleteAssessment = async (id) => {
  * @param {Number} id - ID аттестации
  */
 export const getAssessmentResults = async (id) => {
-  const response = await axios.get(`/admin/assessments/${id}/results`);
+  const response = await axios.get(`/admin/assessments/${id}/results`, {
+    cacheMaxAge: 60000, // 1 минута
+  });
   return response.data;
 };
 
@@ -60,7 +73,9 @@ export const getAssessmentResults = async (id) => {
  * @param {Number} id - ID аттестации
  */
 export const getAssessmentDetails = async (id) => {
-  const response = await axios.get(`/admin/assessments/${id}/details`);
+  const response = await axios.get(`/admin/assessments/${id}/details`, {
+    cacheMaxAge: 180000, // 3 минуты
+  });
   return response.data;
 };
 
@@ -71,6 +86,7 @@ export const getAssessmentDetails = async (id) => {
 export const exportAssessmentToExcel = async (id) => {
   const response = await axios.get(`/admin/assessments/${id}/export`, {
     responseType: "blob",
+    cache: false, // Не кешируем бинарные файлы
   });
 
   // Создать ссылку для скачивания

@@ -88,7 +88,6 @@ onMounted(() => {
 <style scoped>
 .edit-assessment-view {
   width: 100%;
-  max-width: 1200px;
   margin: 0 auto;
 }
 

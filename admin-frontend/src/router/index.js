@@ -121,7 +121,19 @@ const routes = [
         component: () => import("../views/ProfileView.vue"),
         meta: { roles: ["superadmin", "manager"], title: "Профиль" },
       },
+      {
+        path: "404",
+        name: "NotFound",
+        component: () => import("../views/NotFoundView.vue"),
+        meta: { title: "Страница не найдена" },
+      },
     ],
+  },
+  {
+    path: "/:pathMatch(.*)*",
+    redirect: (to) => {
+      return { name: "NotFound", query: { type: "not-found" } };
+    },
   },
 ];
 
@@ -157,7 +169,7 @@ router.beforeEach((to, from, next) => {
 
   // Проверка ролей
   if (allowedRoles && !allowedRoles.includes(authStore.user?.role)) {
-    return next("/dashboard");
+    return next({ name: "NotFound", query: { type: "forbidden" } });
   }
 
   next();
