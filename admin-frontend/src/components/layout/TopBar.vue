@@ -168,18 +168,18 @@ const handleLogout = async () => {
 
 // Закрытие меню при клике вне его
 const handleClickOutside = (event) => {
-  const profileMenu = document.querySelector('.profile-menu');
+  const profileMenu = document.querySelector(".profile-menu");
   if (profileMenu && !profileMenu.contains(event.target)) {
     isProfileMenuOpen.value = false;
   }
 };
 
 onMounted(() => {
-  document.addEventListener('click', handleClickOutside);
+  document.addEventListener("click", handleClickOutside);
 });
 
 onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside);
+  document.removeEventListener("click", handleClickOutside);
 });
 </script>
 
@@ -564,11 +564,11 @@ onUnmounted(() => {
   .profile-info {
     display: none;
   }
-  
+
   .profile-chevron {
     display: none;
   }
-  
+
   .profile-trigger {
     padding: 8px;
   }
