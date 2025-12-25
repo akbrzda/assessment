@@ -58,15 +58,7 @@
 
           <div class="assessment-actions">
             <button
-              v-if="assessment.requiresTheory && !assessment.theoryCompleted"
-              class="btn btn-primary btn-full"
-              @click.stop="openTheory(assessment.id)"
-            >
-              Пройти теорию
-            </button>
-
-            <button
-              v-else-if="
+              v-if="
                 assessment.status === 'open' &&
                 assessment.attemptsUsed < assessment.maxAttempts &&
                 (!assessment.bestResult || assessment.bestResult.score < 100)
@@ -74,7 +66,7 @@
               class="btn btn-primary btn-full"
               @click.stop="startAssessment(assessment)"
             >
-              {{ assessment.attemptsUsed > 0 ? "Пройти ещё раз" : "Начать" }}
+              {{ getStartButtonText(assessment) }}
             </button>
 
             <button
@@ -242,7 +234,8 @@ export default {
       if (!assessment) {
         return;
       }
-      if (assessment.requiresTheory && !assessment.theoryCompleted) {
+      // Если требуется теория, всегда открываем страницу с теорией
+      if (assessment.requiresTheory) {
         openTheory(assessment.id);
         return;
       }
@@ -258,6 +251,18 @@ export default {
     function openTheory(id) {
       telegramStore.hapticFeedback("impact", "light");
       router.push(`/assessment/${id}/theory`);
+    }
+
+    function getStartButtonText(assessment) {
+      if (!assessment) return "Начать";
+      
+      // Если теория требуется, но не пройдена
+      if (assessment.requiresTheory && !assessment.theoryCompleted) {
+        return "Пройти теорию";
+      }
+      
+      // Если есть попытки или теория пройдена
+      return assessment.attemptsUsed > 0 ? "Пройти ещё раз" : "Начать";
     }
 
     function normalizeAssessment(item) {
@@ -347,6 +352,7 @@ export default {
       getStatusClass,
       getStatusText,
       getActionButtonText,
+      getStartButtonText,
       getEmptyStateTitle,
       getEmptyStateDescription,
       formatDateRange,

@@ -269,7 +269,8 @@ async function submitCompletion() {
     const response = await apiClient.completeAssessmentTheory(assessmentId.value, payload);
     completion.value = response?.completion || null;
     telegramStore.hapticFeedback("notification", "success");
-    router.replace(`/assessment/${assessmentId.value}`);
+    // Переходим к тесту после завершения теории
+    router.push(`/assessment/${assessmentId.value}`);
   } catch (err) {
     console.error("Не удалось завершить теорию", err);
     telegramStore.showAlert(err.message || "Не удалось завершить теорию");
