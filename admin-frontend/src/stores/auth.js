@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import authApi from "../api/auth";
 import websocketService from "../services/websocket";
+import apiClient from "../utils/axios";
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
@@ -9,6 +10,8 @@ export const useAuthStore = defineStore("auth", {
     refreshToken: localStorage.getItem("refreshToken") || null,
     tokenRefreshTimer: null,
     isRefreshing: false,
+    userPermissions: null, // Индивидуальные права пользователя
+    permissionsLoaded: false,
   }),
 
   getters: {
@@ -16,6 +19,42 @@ export const useAuthStore = defineStore("auth", {
     isSuperAdmin: (state) => state.user?.role === "superadmin",
     isManager: (state) => state.user?.role === "manager",
     token: (state) => state.accessToken,
+
+    /**
+     * Проверяет доступ к модулю на основе роли и индивидуальных прав
+     */
+    hasModuleAccess: (state) => (moduleCode) => {
+      // Superadmin имеет доступ ко всем модулям
+      if (state.user?.role === "superadmin") {
+        return true;
+      }
+
+      // Если права не загружены, используем дефолтные права роли
+      if (!state.permissionsLoaded || !state.userPermissions) {
+        // Дефолтные права для manager
+        if (state.user?.role === "manager") {
+          const managerModules = ["assessments", "analytics", "users", "reports", "questions"];
+          return managerModules.includes(moduleCode);
+        }
+        return false;
+      }
+
+      // Ищем право для модуля
+      const permission = state.userPermissions.find((p) => p.moduleCode === moduleCode);
+      
+      // Если есть кастомное право, используем его
+      if (permission && permission.isCustom) {
+        return permission.hasAccess;
+      }
+
+      // Если индивидуального права нет или оно не кастомное, используем дефолтное право роли
+      if (state.user?.role === "manager") {
+        const managerModules = ["assessments", "analytics", "users", "reports", "questions"];
+        return managerModules.includes(moduleCode);
+      }
+
+      return false;
+    },
   },
 
   actions: {
@@ -37,10 +76,29 @@ export const useAuthStore = defineStore("auth", {
         // Запускаем автообновление токена
         this.startTokenRefresh();
 
+        // Загружаем права пользователя
+        await this.loadUserPermissions();
+
         return true;
       } catch (error) {
         console.error("Login failed:", error);
         return false;
+      }
+    },
+
+    async loadUserPermissions() {
+      if (!this.user?.id) {
+        this.permissionsLoaded = false;
+        return;
+      }
+
+      try {
+        const { data } = await apiClient.get(`/admin/permissions/users/${this.user.id}`);
+        this.userPermissions = data.permissions || [];
+        this.permissionsLoaded = true;
+      } catch (error) {
+        console.error("Не удалось загрузить права пользователя:", error);
+        this.permissionsLoaded = false;
       }
     },
 
@@ -102,6 +160,8 @@ export const useAuthStore = defineStore("auth", {
         this.user = null;
         this.accessToken = null;
         this.refreshToken = null;
+        this.userPermissions = null;
+        this.permissionsLoaded = false;
         localStorage.clear();
       }
     },

@@ -1,13 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const verifyJWT = require("../middleware/verifyJWT");
-const verifyAdminRole = require("../middleware/verifyAdminRole");
+const checkModuleAccess = require("../middleware/checkModuleAccess");
 const adminBranchController = require("../controllers/adminBranchController");
 const { cacheMiddleware, invalidateCacheMiddleware } = require("../middleware/cache");
 
-// Все маршруты требуют JWT и роль superadmin
+// Все маршруты требуют JWT и доступ к модулю branches
 router.use(verifyJWT);
-router.use(verifyAdminRole(["superadmin"]));
+router.use(checkModuleAccess("branches"));
 
 // Получить список управляющих (должен быть ДО /:id)
 router.get("/managers/list", cacheMiddleware({ ttl: 300 }), adminBranchController.getManagers);

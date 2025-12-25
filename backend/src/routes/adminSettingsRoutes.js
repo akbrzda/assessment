@@ -1,12 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const verifyJWT = require("../middleware/verifyJWT");
-const verifyAdminRole = require("../middleware/verifyAdminRole");
+const checkModuleAccess = require("../middleware/checkModuleAccess");
 const adminSettingsController = require("../controllers/adminSettingsController");
 
-// Все маршруты требуют JWT и роль superadmin
+// Все маршруты требуют JWT и доступ к модулю settings
 router.use(verifyJWT);
-router.use(verifyAdminRole(["superadmin"]));
+router.use(checkModuleAccess("settings"));
 
 // Получить все настройки
 router.get("/", adminSettingsController.getSettings);

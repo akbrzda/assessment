@@ -2,10 +2,10 @@ const express = require("express");
 const router = express.Router();
 const { pool } = require("../config/database");
 const verifyJWT = require("../middleware/verifyJWT");
-const verifyAdminRole = require("../middleware/verifyAdminRole");
 const { cacheMiddleware } = require("../middleware/cache");
 
-router.use(verifyJWT, verifyAdminRole(["superadmin", "manager"]));
+// Справочники доступны всем авторизованным пользователям
+router.use(verifyJWT);
 
 /**
  * Получить все справочники для админ-панели

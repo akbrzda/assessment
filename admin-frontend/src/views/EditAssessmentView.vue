@@ -62,16 +62,8 @@ const loadAssessment = async () => {
       stats: data.stats,
     };
 
-    if (assessment.value.status !== "pending") {
-      error.value = 'Редактировать можно только аттестации в статусе "Ожидает"';
-      return;
-    }
-
-    // Проверка: можно ли редактировать (если есть завершённые попытки)
-    if (data.stats && data.stats.completed_count > 0) {
-      error.value = "Невозможно редактировать аттестацию с уже существующими попытками";
-      return;
-    }
+    // Можно редактировать в любом статусе (вопросы и теорию)
+    // Параметры блокируются внутри формы для не-pending статусов
   } catch (err) {
     console.error("Load assessment error:", err);
     error.value = err.response?.data?.error || "Ошибка загрузки аттестации";

@@ -24,6 +24,7 @@ const adminSettingsRoutes = require("./routes/adminSettingsRoutes");
 const adminGamificationRulesRoutes = require("./routes/adminGamificationRulesRoutes");
 const adminInvitationRoutes = require("./routes/adminInvitationRoutes");
 const adminProfileRoutes = require("./routes/adminProfileRoutes");
+const adminPermissionsRoutes = require("./routes/adminPermissionsRoutes");
 const badgesRoutes = require("./routes/badges");
 const levelsRoutes = require("./routes/levels");
 
@@ -61,6 +62,7 @@ apiRouter.use("/admin/settings", adminSettingsRoutes);
 apiRouter.use("/admin/gamification/rules", adminGamificationRulesRoutes);
 apiRouter.use("/admin/invitations", adminInvitationRoutes);
 apiRouter.use("/admin/profile", adminProfileRoutes);
+apiRouter.use("/admin/permissions", adminPermissionsRoutes);
 apiRouter.use("/admin/badges", badgesRoutes);
 apiRouter.use("/admin/levels", levelsRoutes);
 apiRouter.use("/admin", adminRoutes);

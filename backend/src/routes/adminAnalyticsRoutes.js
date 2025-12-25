@@ -1,12 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const verifyJWT = require("../middleware/verifyJWT");
-const verifyAdminRole = require("../middleware/verifyAdminRole");
+const checkModuleAccess = require("../middleware/checkModuleAccess");
 const adminAnalyticsController = require("../controllers/adminAnalyticsController");
 
-// Все маршруты требуют JWT и роль manager или superadmin
+// Все маршруты требуют JWT и доступ к модулю analytics
 router.use(verifyJWT);
-router.use(verifyAdminRole(["superadmin", "manager"]));
+router.use(checkModuleAccess("analytics"));
 
 // Получить общую статистику
 router.get("/overall", adminAnalyticsController.getOverallStats);

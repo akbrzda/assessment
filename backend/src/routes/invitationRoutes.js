@@ -2,11 +2,11 @@ const express = require("express");
 const invitationController = require("../controllers/invitationController");
 const verifyInitData = require("../middleware/verifyInitData");
 const resolveUser = require("../middleware/resolveUser");
-const requireRole = require("../middleware/requireRole");
+const checkModuleAccess = require("../middleware/checkModuleAccess");
 
 const router = express.Router();
 
-router.use(verifyInitData, resolveUser, requireRole(["superadmin"]));
+router.use(verifyInitData, resolveUser, checkModuleAccess("invitations"));
 
 router.get("/", invitationController.list);
 router.post("/", invitationController.create);

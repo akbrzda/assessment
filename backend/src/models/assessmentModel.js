@@ -149,10 +149,8 @@ async function updateAssessment(assessmentId, { assessment, questions, branchIds
       ]
     );
 
+    // Всегда обновляем вопросы
     await connection.execute("DELETE FROM assessment_questions WHERE assessment_id = ?", [assessmentId]);
-    await connection.execute("DELETE FROM assessment_branch_assignments WHERE assessment_id = ?", [assessmentId]);
-    await connection.execute("DELETE FROM assessment_user_assignments WHERE assessment_id = ?", [assessmentId]);
-    await connection.execute("DELETE FROM assessment_position_assignments WHERE assessment_id = ?", [assessmentId]);
 
     for (let idx = 0; idx < questions.length; idx += 1) {
       const question = questions[idx];
@@ -176,19 +174,26 @@ async function updateAssessment(assessmentId, { assessment, questions, branchIds
       }
     }
 
-    if (Array.isArray(branchIds) && branchIds.length > 0) {
-      const values = branchIds.map((id) => [assessmentId, id]);
-      await connection.query(`INSERT INTO assessment_branch_assignments (assessment_id, branch_id) VALUES ?`, [values]);
-    }
+    // Обновляем назначения только если они переданы (для pending статуса)
+    if (branchIds !== undefined || userIds !== undefined || positionIds !== undefined) {
+      await connection.execute("DELETE FROM assessment_branch_assignments WHERE assessment_id = ?", [assessmentId]);
+      await connection.execute("DELETE FROM assessment_user_assignments WHERE assessment_id = ?", [assessmentId]);
+      await connection.execute("DELETE FROM assessment_position_assignments WHERE assessment_id = ?", [assessmentId]);
 
-    if (Array.isArray(userIds) && userIds.length > 0) {
-      const values = userIds.map((id) => [assessmentId, id]);
-      await connection.query(`INSERT INTO assessment_user_assignments (assessment_id, user_id) VALUES ?`, [values]);
-    }
+      if (Array.isArray(branchIds) && branchIds.length > 0) {
+        const values = branchIds.map((id) => [assessmentId, id]);
+        await connection.query(`INSERT INTO assessment_branch_assignments (assessment_id, branch_id) VALUES ?`, [values]);
+      }
 
-    if (Array.isArray(positionIds) && positionIds.length > 0) {
-      const values = positionIds.map((id) => [assessmentId, id]);
-      await connection.query(`INSERT INTO assessment_position_assignments (assessment_id, position_id) VALUES ?`, [values]);
+      if (Array.isArray(userIds) && userIds.length > 0) {
+        const values = userIds.map((id) => [assessmentId, id]);
+        await connection.query(`INSERT INTO assessment_user_assignments (assessment_id, user_id) VALUES ?`, [values]);
+      }
+
+      if (Array.isArray(positionIds) && positionIds.length > 0) {
+        const values = positionIds.map((id) => [assessmentId, id]);
+        await connection.query(`INSERT INTO assessment_position_assignments (assessment_id, position_id) VALUES ?`, [values]);
+      }
     }
 
     await connection.commit();
@@ -1115,10 +1120,7 @@ const normalizeTextAnswer = (value) => {
   if (typeof value !== "string") {
     return "";
   }
-  return value
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase();
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
 };
 
 async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, textAnswer }) {

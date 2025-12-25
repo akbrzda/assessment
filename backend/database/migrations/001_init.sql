@@ -558,3 +558,49 @@ ALTER TABLE assessment_questions
 ALTER TABLE assessment_answers
   ADD COLUMN selected_option_ids JSON DEFAULT NULL AFTER option_id,
   ADD COLUMN text_answer TEXT DEFAULT NULL AFTER selected_option_ids;
+-- Миграция для системы прав доступа пользователей
+
+-- Таблица для хранения доступных модулей системы
+CREATE TABLE IF NOT EXISTS system_modules (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(64) NOT NULL COMMENT 'Уникальный код модуля',
+  name VARCHAR(128) NOT NULL COMMENT 'Название модуля',
+  description TEXT DEFAULT NULL COMMENT 'Описание модуля',
+  is_active TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'Активен ли модуль',
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_system_modules_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Таблица для хранения прав доступа пользователей к модулям
+CREATE TABLE IF NOT EXISTS user_permissions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL COMMENT 'ID пользователя',
+  module_id INT UNSIGNED NOT NULL COMMENT 'ID модуля',
+  has_access TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'Есть ли доступ к модулю',
+  granted_by INT UNSIGNED DEFAULT NULL COMMENT 'Кто выдал доступ',
+  granted_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Когда выдан доступ',
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_user_module (user_id, module_id),
+  KEY idx_user_permissions_module (module_id),
+  KEY idx_user_permissions_granted_by (granted_by),
+  CONSTRAINT fk_user_permissions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_user_permissions_module FOREIGN KEY (module_id) REFERENCES system_modules(id) ON DELETE CASCADE,
+  CONSTRAINT fk_user_permissions_granted_by FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Заполнение справочника модулей
+INSERT INTO system_modules (code, name, description, is_active) VALUES
+  ('assessments', 'Аттестации', 'Модуль управления аттестациями', 1),
+  ('questions', 'Банк вопросов', 'Модуль управления банком вопросов', 1),
+  ('users', 'Пользователи', 'Модуль управления пользователями', 1),
+  ('branches', 'Филиалы', 'Модуль управления филиалами', 1),
+  ('positions', 'Должности', 'Модуль управления должностями', 1),
+  ('analytics', 'Аналитика', 'Модуль аналитики и отчетов', 1),
+  ('gamification', 'Геймификация', 'Модуль настройки геймификации', 1),
+  ('settings', 'Настройки', 'Модуль системных настроек', 1),
+  ('invitations', 'Приглашения', 'Модуль управления приглашениями пользователей', 1)
+ON DUPLICATE KEY UPDATE
+  name = VALUES(name),
+  description = VALUES(description),
+  is_active = VALUES(is_active);

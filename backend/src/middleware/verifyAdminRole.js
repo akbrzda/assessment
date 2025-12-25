@@ -4,6 +4,10 @@
  */
 module.exports = (allowedRoles) => {
   return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Не авторизован" });
+    }
+
     const { role } = req.user;
 
     if (!allowedRoles.includes(role)) {

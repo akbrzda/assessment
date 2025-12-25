@@ -4,6 +4,15 @@
       <Preloader v-if="loading" />
 
       <div v-else>
+        <!-- Предупреждение для открытых/закрытых аттестаций -->
+        <div v-if="!canEditParameters" class="warning-banner">
+          <p class="warning-title">⚠️ Аттестация уже открыта</p>
+          <p class="warning-text">
+            Вы можете редактировать только вопросы и теорию. Параметры (порог прохождения, количество попыток, время на прохождение, назначения)
+            изменить нельзя.
+          </p>
+        </div>
+
         <!-- Основная информация -->
         <section class="form-section">
           <h3 class="section-title">Основная информация</h3>
@@ -22,11 +31,26 @@
 
             <Input v-model="formData.closeAt" type="date" label="Дата закрытия" required />
 
-            <Input v-model="formData.timeLimitMinutes" type="number" label="Время на прохождение (мин)" :min="1" required />
+            <Input
+              v-model="formData.timeLimitMinutes"
+              type="number"
+              label="Время на прохождение (мин)"
+              :min="1"
+              :disabled="!canEditParameters"
+              required
+            />
 
-            <Input v-model="formData.passScorePercent" type="number" label="Проходной балл (%)" :min="0" :max="100" required />
+            <Input
+              v-model="formData.passScorePercent"
+              type="number"
+              label="Проходной балл (%)"
+              :min="0"
+              :max="100"
+              :disabled="!canEditParameters"
+              required
+            />
 
-            <Input v-model="formData.maxAttempts" type="number" label="Максимум попыток" :min="1" :max="3" required />
+            <Input v-model="formData.maxAttempts" type="number" label="Максимум попыток" :min="1" :max="3" :disabled="!canEditParameters" required />
           </div>
         </section>
 
@@ -57,7 +81,7 @@
         </section>
 
         <!-- Назначения -->
-        <section class="form-section">
+        <section v-if="canEditParameters" class="form-section">
           <h3 class="section-title">Назначение</h3>
 
           <div class="form-group">
@@ -208,6 +232,21 @@ const filteredUsers = computed(() => {
   if (!userSearchQuery.value) return allUsers.value;
   const query = userSearchQuery.value.toLowerCase();
   return allUsers.value.filter((user) => user.first_name.toLowerCase().includes(query) || user.last_name.toLowerCase().includes(query));
+});
+
+// Определить статус аттестации и возможность редактирования параметров
+const assessmentStatus = computed(() => {
+  const now = new Date();
+  const openAt = new Date(props.assessment.open_at);
+  const closeAt = new Date(props.assessment.close_at);
+
+  if (now < openAt) return "pending";
+  if (now >= openAt && now <= closeAt) return "open";
+  return "closed";
+});
+
+const canEditParameters = computed(() => {
+  return assessmentStatus.value === "pending";
 });
 
 const validateTheory = (showMessage = false) => {
@@ -396,14 +435,18 @@ const handleSubmit = async () => {
       description: formData.value.description,
       openAt: formData.value.openAt + "T00:00:00",
       closeAt: formData.value.closeAt + "T23:59:59",
-      timeLimitMinutes: Number(formData.value.timeLimitMinutes),
-      passScorePercent: Number(formData.value.passScorePercent),
-      maxAttempts: Number(formData.value.maxAttempts),
-      branchIds: selectedBranches.value,
-      positionIds: selectedPositions.value,
-      userIds: selectedUsers.value,
       questions: formData.value.questions,
     };
+
+    // Добавить параметры только если можно их редактировать
+    if (canEditParameters.value) {
+      data.timeLimitMinutes = Number(formData.value.timeLimitMinutes);
+      data.passScorePercent = Number(formData.value.passScorePercent);
+      data.maxAttempts = Number(formData.value.maxAttempts);
+      data.branchIds = selectedBranches.value;
+      data.positionIds = selectedPositions.value;
+      data.userIds = selectedUsers.value;
+    }
 
     await updateAssessment(props.assessment.id, data);
 
@@ -475,6 +518,28 @@ onMounted(async () => {
 <style scoped>
 .assessment-edit-form {
   width: 100%;
+}
+
+.warning-banner {
+  padding: 16px;
+  margin-bottom: 24px;
+  background: #fef3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+}
+
+.warning-title {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #856404;
+}
+
+.warning-text {
+  margin: 0;
+  font-size: 14px;
+  color: #856404;
+  line-height: 1.5;
 }
 
 .form-section {

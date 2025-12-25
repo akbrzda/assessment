@@ -1,12 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const verifyJWT = require("../middleware/verifyJWT");
-const verifyAdminRole = require("../middleware/verifyAdminRole");
+const checkModuleAccess = require("../middleware/checkModuleAccess");
 const adminRules = require("../controllers/adminGamificationRulesController");
 const rulesDryRun = require("../controllers/gamificationRulesController");
 
 router.use(verifyJWT);
-router.use(verifyAdminRole(["superadmin"]));
+router.use(checkModuleAccess("gamification"));
 
 router.get("/", adminRules.list);
 router.get("/:id", adminRules.getById);

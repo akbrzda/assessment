@@ -253,7 +253,7 @@ const goToTheory = (id) => {
   router.push(`/assessments/${id}/theory`);
 };
 
-const canEditAssessment = (assessment) => assessment.status === "pending";
+const canEditAssessment = (assessment) => true; // Можно редактировать в любом статусе (вопросы и теорию)
 
 const confirmDelete = async (assessment) => {
   if (confirm(`Вы уверены, что хотите удалить аттестацию "${assessment.title}"?`)) {

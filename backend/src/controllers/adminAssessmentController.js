@@ -462,33 +462,33 @@ exports.updateAssessment = async (req, res, next) => {
       }
     }
 
-    if (assessment.status !== "pending") {
-      return res.status(400).json({ error: 'Редактировать можно только аттестации в статусе "Ожидает"' });
-    }
-
     await connection.beginTransaction();
 
     const { title, description, openAt, closeAt, timeLimitMinutes, passScorePercent, maxAttempts, questions, branchIds, positionIds, userIds } =
       req.body;
 
-    // Обновить основную информацию
-    await connection.query(
-      `
-      UPDATE assessments SET
-        title = ?,
-        description = ?,
-        open_at = ?,
-        close_at = ?,
-        time_limit_minutes = ?,
-        pass_score_percent = ?,
-        max_attempts = ?
-      WHERE id = ?
-    `,
-      [title, description || "", openAt, closeAt, timeLimitMinutes, passScorePercent, maxAttempts, assessmentId]
-    );
+    // Разделяем поля на параметры и контент
+    // Параметры (passScorePercent, maxAttempts, timeLimitMinutes) можно редактировать только для pending
+    // Контент (questions, theory) и основную информацию (title, description, даты) можно редактировать всегда
 
-    // Обновить назначения (если переданы)
-    if (branchIds !== undefined || positionIds !== undefined || userIds !== undefined) {
+    const canEditParameters = assessment.status === "pending";
+
+    // Обновить основную информацию (title, description, даты можно всегда)
+    const updateFields = ["title = ?", "description = ?", "open_at = ?", "close_at = ?"];
+    const updateValues = [title, description || "", openAt, closeAt];
+
+    // Добавляем параметры только если статус pending
+    if (canEditParameters) {
+      updateFields.push("time_limit_minutes = ?", "pass_score_percent = ?", "max_attempts = ?");
+      updateValues.push(timeLimitMinutes, passScorePercent, maxAttempts);
+    }
+
+    updateValues.push(assessmentId);
+
+    await connection.query(`UPDATE assessments SET ${updateFields.join(", ")} WHERE id = ?`, updateValues);
+
+    // Обновить назначения (только для pending статуса)
+    if (canEditParameters && (branchIds !== undefined || positionIds !== undefined || userIds !== undefined)) {
       // Получить текущую роль пользователя
       const currentUser = req.user;
 

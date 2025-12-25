@@ -17,8 +17,21 @@
       </div>
 
       <div class="blocks-list">
-        <div v-for="(block, index) in localValue.requiredBlocks" :key="block.uid" class="block-card">
+        <div
+          v-for="(block, index) in localValue.requiredBlocks"
+          :key="block.uid"
+          class="block-card"
+          draggable="true"
+          @dragstart="handleDragStart($event, index, 'required')"
+          @dragend="handleDragEnd"
+          @dragover.prevent="handleDragOver($event, index, 'required')"
+          @drop="handleDrop($event, index, 'required')"
+          :class="{ dragging: draggedIndex === index && draggedType === 'required' }"
+        >
           <header class="block-header">
+            <div class="drag-handle">
+              <Icon name="grip-vertical" size="20" />
+            </div>
             <div>
               <p class="block-label">Блок #{{ index + 1 }}</p>
               <p class="block-type">{{ getTypeLabel(block.type) }}</p>
@@ -39,9 +52,7 @@
             :rows="block.type === 'text' ? 5 : 3"
             :required="block.type === 'text'"
           />
-          <p v-if="block.type === 'text'" class="reading-hint">
-            Среднее время чтения: {{ getBlockReadingTime(block) }}
-          </p>
+          <p v-if="block.type === 'text'" class="reading-hint">Среднее время чтения: {{ getBlockReadingTime(block) }}</p>
 
           <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" placeholder="https://..." required />
           <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" placeholder="https://..." required />
@@ -54,6 +65,9 @@
         <div>
           <h4>Дополнительные материалы</h4>
           <p class="section-hint">Не влияют на допуск, отображаются в аккордеоне.</p>
+          <p v-if="optionalReadingSeconds > 0" class="reading-summary">
+            Среднее время чтения текстовых блоков: {{ formatReadingTime(optionalReadingSeconds) }}
+          </p>
         </div>
         <div class="header-actions">
           <Button size="sm" variant="secondary" icon="text" @click="addOptionalBlock('text')"> Текст </Button>
@@ -65,8 +79,21 @@
       <div v-if="!localValue.optionalBlocks.length" class="empty-blocks">Дополнительных материалов нет</div>
 
       <div v-else class="blocks-list">
-        <div v-for="(block, index) in localValue.optionalBlocks" :key="block.uid" class="block-card optional">
+        <div
+          v-for="(block, index) in localValue.optionalBlocks"
+          :key="block.uid"
+          class="block-card optional"
+          draggable="true"
+          @dragstart="handleDragStart($event, index, 'optional')"
+          @dragend="handleDragEnd"
+          @dragover.prevent="handleDragOver($event, index, 'optional')"
+          @drop="handleDrop($event, index, 'optional')"
+          :class="{ dragging: draggedIndex === index && draggedType === 'optional' }"
+        >
           <header class="block-header">
+            <div class="drag-handle">
+              <Icon name="grip-vertical" size="20" />
+            </div>
             <div>
               <p class="block-label">Блок #{{ index + 1 }}</p>
               <p class="block-type">{{ getTypeLabel(block.type) }}</p>
@@ -84,9 +111,7 @@
             :label="block.type === 'text' ? 'Текст блока' : 'Описание (опционально)'"
             :rows="block.type === 'text' ? 5 : 3"
           />
-          <p v-if="block.type === 'text'" class="reading-hint">
-            Среднее время чтения: {{ getBlockReadingTime(block) }}
-          </p>
+          <p v-if="block.type === 'text'" class="reading-hint">Среднее время чтения: {{ getBlockReadingTime(block) }}</p>
 
           <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" placeholder="https://..." required />
           <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" placeholder="https://..." required />
@@ -103,6 +128,7 @@ import Select from "./ui/Select.vue";
 import Textarea from "./ui/Textarea.vue";
 import FullscreenTextarea from "./ui/FullscreenTextarea.vue";
 import Button from "./ui/Button.vue";
+import Icon from "./ui/Icon.vue";
 import { cloneTheoryData, createTheoryBlock } from "../utils/theory";
 import { calculateReadingSeconds, formatReadingTime, sumReadingSeconds } from "../utils/readingTime";
 
@@ -124,24 +150,18 @@ const typeOptions = [
   { value: "link", label: "Ссылка" },
 ];
 
-const localValue = ref(cloneTheoryData(props.modelValue));
+// Используем computed с getter/setter для избежания бесконечного цикла
+const localValue = computed({
+  get: () => props.modelValue,
+  set: (value) => emit("update:modelValue", value),
+});
+
 const requiredReadingSeconds = computed(() => sumReadingSeconds(localValue.value.requiredBlocks));
+const optionalReadingSeconds = computed(() => sumReadingSeconds(localValue.value.optionalBlocks));
 
-watch(
-  () => props.modelValue,
-  (next) => {
-    localValue.value = cloneTheoryData(next);
-  },
-  { deep: true }
-);
-
-watch(
-  localValue,
-  (next) => {
-    emit("update:modelValue", cloneTheoryData(next));
-  },
-  { deep: true }
-);
+// Drag and drop state
+const draggedIndex = ref(null);
+const draggedType = ref(null);
 
 const getTypeLabel = (type) => {
   const option = typeOptions.find((item) => item.value === type);
@@ -168,6 +188,40 @@ const removeOptionalBlock = (index) => {
 };
 
 const getBlockReadingTime = (block) => formatReadingTime(calculateReadingSeconds(block.content || ""));
+
+// Drag and drop handlers
+const handleDragStart = (event, index, type) => {
+  draggedIndex.value = index;
+  draggedType.value = type;
+  event.dataTransfer.effectAllowed = "move";
+  event.target.classList.add("dragging");
+};
+
+const handleDragEnd = (event) => {
+  event.target.classList.remove("dragging");
+  draggedIndex.value = null;
+  draggedType.value = null;
+};
+
+const handleDragOver = (event, index, type) => {
+  if (draggedType.value !== type) return;
+  event.dataTransfer.dropEffect = "move";
+};
+
+const handleDrop = (event, dropIndex, type) => {
+  event.preventDefault();
+
+  if (draggedType.value !== type || draggedIndex.value === null) return;
+
+  const blocks = type === "required" ? localValue.value.requiredBlocks : localValue.value.optionalBlocks;
+
+  const draggedBlock = blocks[draggedIndex.value];
+  blocks.splice(draggedIndex.value, 1);
+  blocks.splice(dropIndex, 0, draggedBlock);
+
+  draggedIndex.value = null;
+  draggedType.value = null;
+};
 </script>
 
 <style scoped>
@@ -235,6 +289,18 @@ const getBlockReadingTime = (block) => formatReadingTime(calculateReadingSeconds
   display: flex;
   flex-direction: column;
   gap: 12px;
+  cursor: move;
+  transition: all 0.2s ease;
+}
+
+.block-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.block-card.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
 }
 
 .block-card.optional {
@@ -246,6 +312,25 @@ const getBlockReadingTime = (block) => formatReadingTime(calculateReadingSeconds
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+}
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  cursor: grab;
+  color: var(--text-secondary);
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.drag-handle:hover {
+  color: var(--color-primary);
+  background: var(--bg-primary);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .block-label {

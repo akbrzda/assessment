@@ -81,6 +81,9 @@
           <div>
             <h2>Обязательные блоки</h2>
             <p>Сотрудник должен пройти каждый из них, иначе попытка недоступна.</p>
+            <p v-if="requiredReadingSeconds > 0" class="reading-summary">
+              Среднее время чтения текстовых блоков: {{ formatReadingTime(requiredReadingSeconds) }}
+            </p>
           </div>
           <div class="section-actions">
             <Button size="sm" variant="secondary" icon="text" @click="addRequiredBlock('text')"> Текст </Button>
@@ -126,6 +129,9 @@
           <div>
             <h2>Дополнительные материалы</h2>
             <p>Отображаются в аккордеоне и не влияют на допуск.</p>
+            <p v-if="optionalReadingSeconds > 0" class="reading-summary">
+              Среднее время чтения текстовых блоков: {{ formatReadingTime(optionalReadingSeconds) }}
+            </p>
           </div>
           <div class="section-actions">
             <Button size="sm" variant="secondary" icon="text" @click="addOptionalBlock('text')"> Текст </Button>
@@ -184,6 +190,7 @@ import FullscreenTextarea from "../components/ui/FullscreenTextarea.vue";
 import Preloader from "../components/ui/Preloader.vue";
 import { getAdminTheory, saveTheoryDraft, publishTheory } from "../api/theory";
 import { useToast } from "../composables/useToast";
+import { calculateReadingSeconds, formatReadingTime, sumReadingSeconds } from "../utils/readingTime";
 
 const router = useRouter();
 const route = useRoute();
@@ -259,6 +266,9 @@ const formStatusHint = computed(() => {
   }
   return "Сохраните изменения, чтобы опубликовать";
 });
+
+const requiredReadingSeconds = computed(() => sumReadingSeconds(requiredBlocks.value));
+const optionalReadingSeconds = computed(() => sumReadingSeconds(optionalBlocks.value));
 
 const goBack = () => {
   router.push(`/assessments/${assessmentId.value}`);
@@ -550,6 +560,17 @@ onMounted(() => {
 .section-header p {
   margin: 4px 0 0 0;
   color: var(--text-secondary);
+}
+
+.reading-summary {
+  margin-top: 8px !important;
+  padding: 8px 12px;
+  background: #f0f9ff;
+  border-left: 3px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #1e40af;
+  font-weight: 500;
 }
 
 .section-actions {

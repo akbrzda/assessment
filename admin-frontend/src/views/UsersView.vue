@@ -78,8 +78,20 @@
                 <td class="date-cell">{{ formatDate(user.created_at) }}</td>
                 <td class="actions-cell">
                   <div class="actions-buttons">
-                    <Button class="action-btn action-btn-edit" icon="pencil" title="Редактировать" @click="openEditModal(user)"></Button>
-                    <Button class="action-btn action-btn-delete" title="Удалить" icon="trash" @click="openDeleteModal(user)"></Button>
+                    <Button
+                      v-if="canEditUser(user)"
+                      class="action-btn action-btn-edit"
+                      icon="pencil"
+                      title="Редактировать"
+                      @click="openEditModal(user)"
+                    ></Button>
+                    <Button
+                      v-if="authStore.isSuperAdmin"
+                      class="action-btn action-btn-delete"
+                      title="Удалить"
+                      icon="trash"
+                      @click="openDeleteModal(user)"
+                    ></Button>
                   </div>
                 </td>
               </tr>
@@ -124,8 +136,10 @@
             </div>
 
             <div class="user-card-actions">
-              <Button size="sm" variant="secondary" icon="pencil" fullWidth @click="openEditModal(user)">Редактировать</Button>
-              <Button size="sm" variant="danger" icon="trash" fullWidth @click="openDeleteModal(user)">Удалить</Button>
+              <Button v-if="canEditUser(user)" size="sm" variant="secondary" icon="pencil" fullWidth @click="openEditModal(user)"
+                >Редактировать</Button
+              >
+              <Button v-if="authStore.isSuperAdmin" size="sm" variant="danger" icon="trash" fullWidth @click="openDeleteModal(user)">Удалить</Button>
             </div>
           </div>
         </div>
@@ -143,7 +157,14 @@
 
     <!-- Edit modal -->
     <Modal :show="showEditModal" title="Редактировать пользователя" @close="closeModals">
-      <UserForm v-model="formData" :references="references" :is-edit="true" />
+      <UserForm v-model="formData" :references="references" :is-edit="true" :is-manager="authStore.isManager" :current-user-id="authStore.user?.id" />
+
+      <div v-if="authStore.isSuperAdmin" class="divider"></div>
+
+      <UserPermissionsManager v-if="authStore.isSuperAdmin && selectedUser" :userId="selectedUser.id" />
+
+      <div class="divider"></div>
+
       <div class="password-generator-card">
         <div class="password-generator-head">
           <div>
@@ -300,10 +321,13 @@
                   {{ formatDate(attempt.completed_at || attempt.started_at) }}
                 </div>
               </div>
-              <div v-if="attempt.status === 'completed'" class="history-score">{{ formatScore(attempt.score_percent) }}%</div>
-              <Badge :variant="attempt.status === 'completed' ? 'success' : 'secondary'" size="sm">
-                {{ getAttemptStatusLabel(attempt.status) }}
-              </Badge>
+              <div class="history-actions">
+                <div v-if="attempt.status === 'completed'" class="history-score">{{ formatScore(attempt.score_percent) }}%</div>
+                <Badge :variant="attempt.status === 'completed' ? 'success' : 'secondary'" size="sm">
+                  {{ getAttemptStatusLabel(attempt.status) }}
+                </Badge>
+                <Button size="sm" variant="ghost" icon="RotateCcw" title="Сбросить прогресс" @click="openResetProgressModal(attempt)" />
+              </div>
             </div>
           </div>
           <div v-else class="empty-history">
@@ -319,6 +343,24 @@
         <Button variant="secondary" @click="closeModals">Закрыть</Button>
       </div>
     </Modal>
+
+    <!-- Reset progress modal -->
+    <Modal :show="showResetProgressModal" title="Сбросить прогресс аттестации" @close="closeModals">
+      <p class="modal-text">
+        Вы уверены, что хотите сбросить прогресс аттестации
+        <strong>"{{ selectedAssessment?.title }}"</strong>
+        для пользователя
+        <strong>{{ selectedUser?.first_name }} {{ selectedUser?.last_name }}</strong
+        >?
+      </p>
+      <p class="modal-text warning-text">
+        Это действие удалит все попытки, ответы и завершение теории для этой аттестации. Пользователь сможет пройти её заново.
+      </p>
+      <div class="modal-actions">
+        <Button variant="secondary" @click="closeModals">Отмена</Button>
+        <Button variant="danger" :loading="actionLoading" @click="handleResetProgress">Сбросить прогресс</Button>
+      </div>
+    </Modal>
   </div>
 </template>
 
@@ -326,7 +368,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useAuthStore } from "../stores/auth";
 import apiClient from "../utils/axios";
-import { getUsers, getReferences, createUser, updateUser, deleteUser, resetPassword } from "../api/users";
+import { getUsers, getReferences, createUser, updateUser, deleteUser, resetPassword, resetAssessmentProgress } from "../api/users";
 import Card from "../components/ui/Card.vue";
 import Button from "../components/ui/Button.vue";
 import Input from "../components/ui/Input.vue";
@@ -335,6 +377,7 @@ import Badge from "../components/ui/Badge.vue";
 import Modal from "../components/ui/Modal.vue";
 import Preloader from "../components/ui/Preloader.vue";
 import UserForm from "../components/UserForm.vue";
+import UserPermissionsManager from "../components/UserPermissionsManager.vue";
 import Icon from "../components/ui/Icon.vue";
 import { useToast } from "../composables/useToast";
 import { formatBranchLabel } from "../utils/branch";
@@ -362,8 +405,10 @@ const showEditModal = ref(false);
 const showResetPasswordModal = ref(false);
 const showDeleteModal = ref(false);
 const showProfileModal = ref(false);
+const showResetProgressModal = ref(false);
 
 const selectedUser = ref(null);
+const selectedAssessment = ref(null);
 const userProfile = ref(null);
 const profileLoading = ref(false);
 const newPassword = ref("");
@@ -371,6 +416,19 @@ const { showToast } = useToast();
 const generatedPassword = ref("");
 const passwordGenerating = ref(false);
 const passwordApplying = ref(false);
+
+const canEditUser = (user) => {
+  // Superadmin может редактировать всех
+  if (authStore.isSuperAdmin) return true;
+
+  // Manager может редактировать себя
+  if (authStore.isManager && user.id === authStore.user.id) return true;
+
+  // Manager может редактировать только employee
+  if (authStore.isManager && user.role_name === "employee") return true;
+
+  return false;
+};
 
 const defaultForm = () => ({
   firstName: "",
@@ -602,10 +660,12 @@ const closeModals = () => {
   showResetPasswordModal.value = false;
   showDeleteModal.value = false;
   showProfileModal.value = false;
+  showResetProgressModal.value = false;
   actionLoading.value = false;
   profileLoading.value = false;
   formData.value = defaultForm();
   selectedUser.value = null;
+  selectedAssessment.value = null;
   userProfile.value = null;
   newPassword.value = "";
   generatedPassword.value = "";
@@ -716,6 +776,39 @@ const handleDelete = async () => {
   } catch (error) {
     console.error("Ошибка удаления пользователя", error);
     showToast(error.response?.data?.error || "Не удалось удалить пользователя", "error");
+  } finally {
+    actionLoading.value = false;
+  }
+};
+
+const openResetProgressModal = (attempt) => {
+  if (!attempt.assessment_id && !attempt.id) {
+    showToast("Не удалось определить ID аттестации", "error");
+    return;
+  }
+  selectedAssessment.value = {
+    id: attempt.assessment_id || attempt.id,
+    title: attempt.title,
+  };
+  showResetProgressModal.value = true;
+};
+
+const handleResetProgress = async () => {
+  if (!selectedUser.value || !selectedAssessment.value) return;
+
+  actionLoading.value = true;
+  try {
+    await resetAssessmentProgress(selectedUser.value.id, selectedAssessment.value.id);
+
+    // Обновляем профиль пользователя
+    await openProfileModal(selectedUser.value);
+
+    showResetProgressModal.value = false;
+    selectedAssessment.value = null;
+    showToast("Прогресс аттестации успешно сброшен", "success");
+  } catch (error) {
+    console.error("Ошибка сброса прогресса", error);
+    showToast(error.response?.data?.error || "Не удалось сбросить прогресс", "error");
   } finally {
     actionLoading.value = false;
   }
@@ -1240,6 +1333,14 @@ onMounted(async () => {
   margin-bottom: 24px;
 }
 
+.warning-text {
+  color: #f59e0b;
+  background: #fef3c7;
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 4px solid #f59e0b;
+}
+
 @media (max-width: 1280px) {
   .filters-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1600,6 +1701,12 @@ onMounted(async () => {
   font-weight: bold;
   color: var(--color-primary);
   margin-right: 12px;
+}
+
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .empty-badges,

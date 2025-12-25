@@ -29,91 +29,91 @@ const routes = [
         path: "users",
         name: "Users",
         component: () => import("../views/UsersView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Пользователи" },
+        meta: { roles: ["superadmin", "manager"], module: "users", title: "Пользователи" },
       },
       {
         path: "invitations",
         name: "Invitations",
         component: () => import("../views/InvitationsView.vue"),
-        meta: { roles: ["superadmin"], title: "Приглашения" },
+        meta: { roles: ["superadmin"], module: "invitations", title: "Приглашения" },
       },
       {
         path: "assessments",
         name: "Assessments",
         component: () => import("../views/AssessmentsView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Аттестации" },
+        meta: { roles: ["superadmin", "manager"], module: "assessments", title: "Аттестации" },
       },
       {
         path: "assessments/create",
         name: "CreateAssessment",
         component: () => import("../views/CreateAssessmentView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Создать аттестацию" },
+        meta: { roles: ["superadmin", "manager"], module: "assessments", title: "Создать аттестацию" },
       },
       {
         path: "assessments/:id/edit",
         name: "EditAssessment",
         component: () => import("../views/EditAssessmentView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Редактировать аттестацию" },
+        meta: { roles: ["superadmin", "manager"], module: "assessments", title: "Редактировать аттестацию" },
       },
       {
         path: "assessments/:id",
         name: "AssessmentDetails",
         component: () => import("../views/AssessmentDetailsView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Детали аттестации" },
+        meta: { roles: ["superadmin", "manager"], module: "assessments", title: "Детали аттестации" },
       },
       {
         path: "assessments/:id/theory",
         name: "AssessmentTheory",
         component: () => import("../views/AssessmentTheoryView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Теория аттестации" },
+        meta: { roles: ["superadmin", "manager"], module: "assessments", title: "Теория аттестации" },
       },
       {
         path: "questions",
         name: "Questions",
         component: () => import("../views/QuestionsView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Банк вопросов" },
+        meta: { roles: ["superadmin", "manager"], module: "questions", title: "Банк вопросов" },
       },
       {
         path: "questions/create",
         name: "CreateQuestion",
         component: () => import("../views/CreateQuestionView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Создать вопрос" },
+        meta: { roles: ["superadmin", "manager"], module: "questions", title: "Создать вопрос" },
       },
       {
         path: "questions/:id/edit",
         name: "EditQuestion",
         component: () => import("../views/EditQuestionView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Редактировать вопрос" },
+        meta: { roles: ["superadmin", "manager"], module: "questions", title: "Редактировать вопрос" },
       },
       {
         path: "questions/:id",
         name: "QuestionDetails",
         component: () => import("../views/QuestionDetailsView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Детали вопроса" },
+        meta: { roles: ["superadmin", "manager"], module: "questions", title: "Детали вопроса" },
       },
       {
         path: "reports",
         name: "Reports",
         component: () => import("../views/ReportsView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Отчёты и аналитика" },
+        meta: { roles: ["superadmin", "manager"], module: "analytics", title: "Отчёты и аналитика" },
       },
       {
         path: "branches",
         name: "Branches",
         component: () => import("../views/BranchesView.vue"),
-        meta: { roles: ["superadmin"], title: "Филиалы" },
+        meta: { roles: ["superadmin"], module: "branches", title: "Филиалы" },
       },
       {
         path: "positions",
         name: "Positions",
         component: () => import("../views/PositionsView.vue"),
-        meta: { roles: ["superadmin"], title: "Должности" },
+        meta: { roles: ["superadmin"], module: "positions", title: "Должности" },
       },
       {
         path: "settings",
         name: "Settings",
         component: () => import("../views/SettingsView.vue"),
-        meta: { roles: ["superadmin"], title: "Настройки" },
+        meta: { roles: ["superadmin"], module: "settings", title: "Настройки" },
       },
       {
         path: "profile",
@@ -143,11 +143,12 @@ const router = createRouter({
 });
 
 // Защита маршрутов
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore();
   const requiresAuth = to.matched.some((record) => record.meta?.requiresAuth);
   const roleRestrictedRecord = [...to.matched].reverse().find((record) => Array.isArray(record.meta?.roles));
   const allowedRoles = roleRestrictedRecord?.meta?.roles;
+  const requiredModule = to.meta?.module; // Код модуля, например "branches", "settings"
 
   // Обновить title страницы
   const baseTitle = "Система аттестаций";
@@ -167,9 +168,21 @@ router.beforeEach((to, from, next) => {
     return next("/dashboard");
   }
 
-  // Проверка ролей
-  if (allowedRoles && !allowedRoles.includes(authStore.user?.role)) {
-    return next({ name: "NotFound", query: { type: "forbidden" } });
+  // Загружаем права пользователя если они еще не загружены
+  if (authStore.isAuthenticated && !authStore.permissionsLoaded) {
+    await authStore.loadUserPermissions();
+  }
+
+  // Если указан модуль, проверяем права на модуль (приоритет над ролями)
+  if (requiredModule) {
+    if (!authStore.hasModuleAccess(requiredModule)) {
+      return next({ name: "NotFound", query: { type: "forbidden" } });
+    }
+  } else if (allowedRoles) {
+    // Проверка ролей только если нет модуля
+    if (!allowedRoles.includes(authStore.user?.role)) {
+      return next({ name: "NotFound", query: { type: "forbidden" } });
+    }
   }
 
   next();

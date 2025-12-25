@@ -94,9 +94,6 @@
 
         <!-- Кнопка в конце -->
         <div class="action-button-container">
-          <p v-if="readingTimeLabel && !completion" class="reading-time-note">
-            Кнопка станет активна после ~{{ readingTimeLabel }} чтения обязательных блоков
-          </p>
           <button class="btn btn-primary btn-full" :disabled="!canSubmit || versionOutdated" @click="handlePrimaryAction">
             {{ primaryButtonLabel }}
           </button>
@@ -136,9 +133,7 @@ const requiredBlocks = computed(() => theory.value?.requiredBlocks || []);
 const optionalBlocks = computed(() => theory.value?.optionalBlocks || []);
 const versionId = computed(() => theory.value?.version?.id || null);
 const requiredReadingSeconds = computed(() => sumReadingSeconds(requiredBlocks.value));
-const readingTimeLabel = computed(() =>
-  requiredReadingSeconds.value ? formatReadingTime(requiredReadingSeconds.value) : null
-);
+const readingTimeLabel = computed(() => (requiredReadingSeconds.value ? formatReadingTime(requiredReadingSeconds.value) : null));
 
 const canSubmit = computed(() => {
   if (versionOutdated.value) return false;

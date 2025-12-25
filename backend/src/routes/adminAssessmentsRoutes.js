@@ -1,14 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const verifyJWT = require("../middleware/verifyJWT");
-const verifyAdminRole = require("../middleware/verifyAdminRole");
+const checkModuleAccess = require("../middleware/checkModuleAccess");
 const adminAssessmentController = require("../controllers/adminAssessmentController");
 const adminTheoryController = require("../controllers/adminTheoryController");
 const { cacheMiddleware, invalidateCacheMiddleware } = require("../middleware/cache");
 
-// Все маршруты требуют JWT и роль manager или superadmin
+// Все маршруты требуют JWT и доступ к модулю assessments
 router.use(verifyJWT);
-router.use(verifyAdminRole(["superadmin", "manager"]));
+router.use(checkModuleAccess("assessments"));
 
 // Получить список аттестаций
 router.get("/", cacheMiddleware({ ttl: 120 }), adminAssessmentController.getAssessments);

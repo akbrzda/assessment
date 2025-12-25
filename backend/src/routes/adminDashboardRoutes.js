@@ -2,23 +2,21 @@ const express = require("express");
 const router = express.Router();
 const adminDashboardController = require("../controllers/adminDashboardController");
 const verifyJWT = require("../middleware/verifyJWT");
-const verifyAdminRole = require("../middleware/verifyAdminRole");
+const checkModuleAccess = require("../middleware/checkModuleAccess");
+
+// Все маршруты требуют JWT и доступ к аналитике (дашборд - это часть аналитики)
+router.use(verifyJWT, checkModuleAccess("analytics"));
 
 // Получить метрики Dashboard
-router.get("/metrics", verifyJWT, verifyAdminRole(["superadmin", "manager"]), adminDashboardController.getMetrics);
+router.get("/metrics", adminDashboardController.getMetrics);
 
 // Получить динамику активности
-router.get("/activity-trends", verifyJWT, verifyAdminRole(["superadmin", "manager"]), adminDashboardController.getActivityTrends);
+router.get("/activity-trends", adminDashboardController.getActivityTrends);
 
 // Получить KPI по филиалам
-router.get("/branch-kpi", verifyJWT, verifyAdminRole(["superadmin", "manager"]), adminDashboardController.getBranchKPI);
+router.get("/branch-kpi", adminDashboardController.getBranchKPI);
 
 // Получить последние попытки аттестаций
-router.get(
-  "/latest-assessment-activities",
-  verifyJWT,
-  verifyAdminRole(["superadmin", "manager"]),
-  adminDashboardController.getLatestAssessmentActivities
-);
+router.get("/latest-assessment-activities", adminDashboardController.getLatestAssessmentActivities);
 
 module.exports = router;

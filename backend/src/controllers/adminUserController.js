@@ -47,14 +47,8 @@ async function listUsers(req, res, next) {
 
     const params = [];
 
-    // Если пользователь - manager, показываем только пользователей его филиала
-    if (currentUser.role === "manager") {
-      const [managerData] = await pool.query("SELECT branch_id FROM users WHERE id = ?", [currentUser.id]);
-      if (managerData[0]?.branch_id) {
-        query += " AND u.branch_id = ?";
-        params.push(managerData[0].branch_id);
-      }
-    }
+    // Manager видит всех пользователей
+    // Не добавляем фильтрацию по роли для manager
 
     if (branch) {
       query += " AND u.branch_id = ?";
@@ -94,6 +88,7 @@ async function listUsers(req, res, next) {
 async function updateUser(req, res, next) {
   try {
     const userId = Number(req.params.id);
+    const currentUser = req.user;
     const { error, value } = updateSchema.validate(req.body, { abortEarly: false });
     if (error) {
       return res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
@@ -102,6 +97,41 @@ async function updateUser(req, res, next) {
     const existing = await userModel.findById(userId);
     if (!existing) {
       return res.status(404).json({ error: "User not found" });
+    }
+
+    // Ограничения для manager
+    if (currentUser.role === "manager") {
+      const isEditingSelf = userId === currentUser.id;
+
+      if (!isEditingSelf) {
+        // Manager может редактировать только employee
+        if (existing.roleId !== 1) {
+          // 1 = employee
+          return res.status(403).json({ error: "Вы можете редактировать только сотрудников с ролью employee" });
+        }
+
+        // Manager не может менять роль у employee
+        if (value.roleId && value.roleId !== existing.roleId) {
+          return res.status(403).json({ error: "Вы не можете изменять роль пользователя" });
+        }
+
+        // Manager не может менять логин у employee
+        if (value.login !== undefined && value.login !== existing.login) {
+          return res.status(403).json({ error: "Вы не можете изменять логин сотрудника" });
+        }
+
+        // Устанавливаем значения из existing для полей, которые manager не может менять у employee
+        value.roleId = existing.roleId;
+        value.login = existing.login;
+      } else {
+        // При редактировании себя:
+        // Manager не может менять свою роль
+        if (value.roleId && value.roleId !== existing.roleId) {
+          return res.status(403).json({ error: "Вы не можете изменять свою роль" });
+        }
+        value.roleId = existing.roleId;
+        // Manager может менять свой филиал и другие поля
+      }
     }
 
     const branch = await referenceModel.getBranchById(value.branchId);
@@ -174,6 +204,13 @@ async function updateUser(req, res, next) {
 async function deleteUser(req, res, next) {
   try {
     const userId = Number(req.params.id);
+    const currentUser = req.user;
+
+    // Manager не может удалять пользователей
+    if (currentUser.role === "manager") {
+      return res.status(403).json({ error: "У вас нет прав на удаление пользователей" });
+    }
+
     const existing = await userModel.findById(userId);
     if (!existing) {
       return res.status(404).json({ error: "User not found" });
@@ -441,13 +478,106 @@ module.exports = {
   getUserById,
   getUserDetailedStats,
   exportUsersToExcel,
+  resetAssessmentProgress,
 };
+
+/**
+ * Сбросить прогресс пользователя по аттестации
+ */
+async function resetAssessmentProgress(req, res, next) {
+  const connection = await pool.getConnection();
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const assessmentId = parseInt(req.params.assessmentId, 10);
+
+    if (isNaN(userId) || isNaN(assessmentId)) {
+      return res.status(400).json({ error: "Неверные параметры" });
+    }
+
+    // Проверяем существование пользователя
+    const [users] = await connection.query("SELECT id, first_name, last_name FROM users WHERE id = ?", [userId]);
+    if (users.length === 0) {
+      return res.status(404).json({ error: "Пользователь не найден" });
+    }
+
+    // Проверяем существование аттестации
+    const [assessments] = await connection.query("SELECT id, title FROM assessments WHERE id = ?", [assessmentId]);
+    if (assessments.length === 0) {
+      return res.status(404).json({ error: "Аттестация не найдена" });
+    }
+
+    await connection.beginTransaction();
+
+    // Получаем информацию о попытках перед удалением для логирования
+    const [attempts] = await connection.query(
+      `SELECT id, attempt_number, status, score_percent 
+       FROM assessment_attempts 
+       WHERE user_id = ? AND assessment_id = ?`,
+      [userId, assessmentId]
+    );
+
+    // Удаляем ответы на вопросы
+    await connection.query(
+      `DELETE aa FROM assessment_answers aa
+       INNER JOIN assessment_attempts at ON aa.attempt_id = at.id
+       WHERE at.user_id = ? AND at.assessment_id = ?`,
+      [userId, assessmentId]
+    );
+
+    // Удаляем попытки
+    await connection.query("DELETE FROM assessment_attempts WHERE user_id = ? AND assessment_id = ?", [userId, assessmentId]);
+
+    // Удаляем завершение теории
+    await connection.query("DELETE FROM assessment_theory_completions WHERE user_id = ? AND assessment_id = ?", [userId, assessmentId]);
+
+    await connection.commit();
+
+    // Логируем действие
+    await logAndSend({
+      action: "reset_assessment_progress",
+      entityType: "assessment_attempt",
+      entityId: assessmentId,
+      changes: {
+        userId,
+        assessmentId,
+        deletedAttempts: attempts.length,
+        attempts: attempts.map((a) => ({
+          attemptNumber: a.attempt_number,
+          status: a.status,
+          scorePercent: a.score_percent,
+        })),
+      },
+      metadata: {
+        userName: `${users[0].first_name} ${users[0].last_name}`,
+        assessmentTitle: assessments[0].title,
+        resetBy: req.user.id,
+      },
+    });
+
+    res.json({
+      message: "Прогресс аттестации успешно сброшен",
+      deletedAttempts: attempts.length,
+    });
+  } catch (error) {
+    await connection.rollback();
+    next(error);
+  } finally {
+    connection.release();
+  }
+}
 
 /**
  * Создать нового пользователя (только для суперадмина)
  */
 async function createUser(req, res, next) {
   try {
+    const currentUser = req.user;
+
+    // Только superadmin может создавать пользователей
+    if (currentUser.role !== "superadmin") {
+      return res.status(403).json({ error: "У вас нет прав на создание пользователей" });
+    }
+
     const { firstName, lastName, branchId, positionId, roleId, login, password } = req.body;
 
     // Валидация
@@ -527,15 +657,34 @@ async function createUser(req, res, next) {
 async function resetPassword(req, res, next) {
   try {
     const userId = Number(req.params.id);
+    const currentUser = req.user;
+
     const { newPassword } = req.body;
 
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({ error: "Пароль должен быть не менее 6 символов" });
     }
 
-    const [users] = await pool.query("SELECT * FROM users WHERE id = ?", [userId]);
+    const [users] = await pool.query(
+      `SELECT u.*, r.name as role_name 
+       FROM users u 
+       JOIN roles r ON u.role_id = r.id 
+       WHERE u.id = ?`,
+      [userId]
+    );
     if (users.length === 0) {
       return res.status(404).json({ error: "Пользователь не найден" });
+    }
+
+    const targetUser = users[0];
+
+    // Manager может сбрасывать пароли только employee (и себе)
+    if (currentUser.role === "manager") {
+      if (targetUser.id !== currentUser.id && targetUser.role_name !== "employee") {
+        return res.status(403).json({
+          error: "Вы можете сбрасывать пароли только сотрудникам с ролью employee",
+        });
+      }
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);

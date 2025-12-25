@@ -532,11 +532,9 @@ async function update(req, res, next) {
       return res.status(404).json({ error: "Аттестация не найдена" });
     }
 
-    // Админы и менеджеры могут редактировать в любом статусе
-    const isAdmin = req.currentUser.roleName === "admin" || req.currentUser.roleName === "manager";
-    if (!isAdmin && existing.status !== "pending") {
-      return res.status(403).json({ error: "Редактирование доступно только для аттестаций со статусом 'Ожидает'" });
-    }
+    // Все могут редактировать контент (вопросы, теорию) в любом статусе
+    // Параметры можно редактировать только для pending статуса
+    const canEditParameters = existing.status === "pending";
 
     const payload = {
       ...req.body,
@@ -550,14 +548,15 @@ async function update(req, res, next) {
 
     const targets = await prepareTargets(value, req.currentUser);
 
+    // Данные для обновления - используем старые значения параметров если статус не pending
     const assessmentData = {
       title: value.title.trim(),
       description: value.description?.trim() || "",
       openAt: new Date(value.openAt),
       closeAt: new Date(value.closeAt),
-      timeLimitMinutes: value.timeLimitMinutes,
-      passScorePercent: value.passScorePercent,
-      maxAttempts: value.maxAttempts,
+      timeLimitMinutes: canEditParameters ? value.timeLimitMinutes : existing.timeLimitMinutes,
+      passScorePercent: canEditParameters ? value.passScorePercent : existing.passScorePercent,
+      maxAttempts: canEditParameters ? value.maxAttempts : existing.maxAttempts,
     };
 
     const questions = normalizeQuestionPayload(value.questions);
@@ -565,9 +564,9 @@ async function update(req, res, next) {
     await assessmentModel.updateAssessment(assessmentId, {
       assessment: assessmentData,
       questions,
-      branchIds: targets.branchIds,
-      userIds: targets.userIds,
-      positionIds: targets.positionIds,
+      branchIds: canEditParameters ? targets.branchIds : undefined,
+      userIds: canEditParameters ? targets.userIds : undefined,
+      positionIds: canEditParameters ? targets.positionIds : undefined,
       userId: req.currentUser.id,
     });
 

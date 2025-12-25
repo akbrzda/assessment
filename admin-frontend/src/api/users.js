@@ -48,6 +48,34 @@ export const getReferences = async () => {
   return data;
 };
 
+export const getUserPermissions = async (userId) => {
+  const { data } = await apiClient.get(`/admin/permissions/users/${userId}`, {
+    cacheMaxAge: 60000, // 1 минута
+  });
+  return data;
+};
+
+export const updateUserPermissions = async (userId, modules) => {
+  return mutateWithInvalidation(async () => {
+    const { data } = await apiClient.put(`/admin/permissions/users/${userId}`, { modules });
+    return data;
+  }, new RegExp(`get:/admin/permissions/users/${userId}`));
+};
+
+export const getSystemModules = async () => {
+  const { data } = await apiClient.get("/admin/permissions/modules", {
+    cacheMaxAge: 600000, // 10 минут
+  });
+  return data;
+};
+
+export const resetAssessmentProgress = async (userId, assessmentId) => {
+  return mutateWithInvalidation(async () => {
+    const { data } = await apiClient.delete(`/admin/users/${userId}/assessments/${assessmentId}/progress`);
+    return data;
+  }, new RegExp(`get:/admin/users/${userId}`));
+};
+
 export default {
   getUsers,
   getUserById,
@@ -56,4 +84,8 @@ export default {
   deleteUser,
   resetPassword,
   getReferences,
+  getUserPermissions,
+  updateUserPermissions,
+  getSystemModules,
+  resetAssessmentProgress,
 };

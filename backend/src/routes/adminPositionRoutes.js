@@ -1,12 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const verifyJWT = require("../middleware/verifyJWT");
-const verifyAdminRole = require("../middleware/verifyAdminRole");
+const checkModuleAccess = require("../middleware/checkModuleAccess");
 const adminPositionController = require("../controllers/adminPositionController");
 const { cacheMiddleware, invalidateCacheMiddleware } = require("../middleware/cache");
 
 router.use(verifyJWT);
-router.use(verifyAdminRole(["superadmin"]));
+router.use(checkModuleAccess("positions"));
 
 router.get("/", cacheMiddleware({ ttl: 300 }), adminPositionController.getPositions);
 router.get("/:id", cacheMiddleware({ ttl: 300 }), adminPositionController.getPositionById);

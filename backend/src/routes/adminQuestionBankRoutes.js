@@ -1,12 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const verifyJWT = require("../middleware/verifyJWT");
-const verifyAdminRole = require("../middleware/verifyAdminRole");
+const checkModuleAccess = require("../middleware/checkModuleAccess");
 const adminQuestionBankController = require("../controllers/adminQuestionBankController");
 
-// Все маршруты требуют JWT и роль manager или superadmin
+// Все маршруты требуют JWT и доступ к модулю questions
 router.use(verifyJWT);
-router.use(verifyAdminRole(["superadmin", "manager"]));
+router.use(checkModuleAccess("questions"));
 
 // Категории
 router.get("/categories", adminQuestionBankController.getCategories);

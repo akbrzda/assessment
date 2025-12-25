@@ -1,12 +1,12 @@
 const express = require("express");
 const adminInvitationController = require("../controllers/adminInvitationController");
 const verifyJWT = require("../middleware/verifyJWT");
-const verifyAdminRole = require("../middleware/verifyAdminRole");
+const checkModuleAccess = require("../middleware/checkModuleAccess");
 
 const router = express.Router();
 
-// Все маршруты защищены JWT и доступны superadmin и manager
-router.use(verifyJWT, verifyAdminRole(["superadmin", "manager"]));
+// Все маршруты защищены JWT и доступны через модуль invitations
+router.use(verifyJWT, checkModuleAccess("invitations"));
 
 router.get("/", adminInvitationController.listInvitations);
 router.post("/", adminInvitationController.createInvitation);

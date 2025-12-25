@@ -25,6 +25,7 @@
       placeholder="Выберите филиал"
       required
       :error="errors.branchId"
+      :disabled="isManager && isEdit"
       @blur="validateFieldAndUpdate('branchId')"
     />
 
@@ -45,6 +46,7 @@
       placeholder="Выберите роль"
       required
       :error="errors.roleId"
+      :disabled="isManager"
       @blur="validateFieldAndUpdate('roleId')"
     />
 
@@ -54,6 +56,7 @@
       placeholder="Логин для входа в админ-панель"
       :hint="isEdit ? 'Оставьте пустым, чтобы не менять логин' : undefined"
       :error="errors.login"
+      :disabled="isManager && isEdit && localData.id !== undefined && props.currentUserId !== localData.id"
       @blur="validateFieldAndUpdate('login')"
     />
 
@@ -81,6 +84,8 @@ const props = defineProps({
   modelValue: Object,
   references: Object,
   isEdit: Boolean,
+  isManager: Boolean,
+  currentUserId: Number,
 });
 
 const emit = defineEmits(["update:modelValue"]);
