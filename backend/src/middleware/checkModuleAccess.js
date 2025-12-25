@@ -20,10 +20,7 @@ const checkModuleAccess = (moduleCode) => {
       }
 
       // Получаем модуль
-      const [modules] = await pool.query(
-        "SELECT id FROM system_modules WHERE code = ? AND is_active = 1",
-        [moduleCode]
-      );
+      const [modules] = await pool.query("SELECT id FROM system_modules WHERE code = ? AND is_active = 1", [moduleCode]);
 
       if (modules.length === 0) {
         return res.status(404).json({ error: "Модуль не найден" });
@@ -32,10 +29,7 @@ const checkModuleAccess = (moduleCode) => {
       const moduleId = modules[0].id;
 
       // Проверяем кастомные права пользователя
-      const [permissions] = await pool.query(
-        "SELECT has_access FROM user_permissions WHERE user_id = ? AND module_id = ?",
-        [userId, moduleId]
-      );
+      const [permissions] = await pool.query("SELECT has_access FROM user_permissions WHERE user_id = ? AND module_id = ?", [userId, moduleId]);
 
       // Если есть кастомная настройка, используем её
       if (permissions.length > 0) {

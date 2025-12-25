@@ -41,7 +41,7 @@ export const useAuthStore = defineStore("auth", {
 
       // Ищем право для модуля
       const permission = state.userPermissions.find((p) => p.moduleCode === moduleCode);
-      
+
       // Если есть кастомное право, используем его
       if (permission && permission.isCustom) {
         return permission.hasAccess;
