@@ -66,7 +66,11 @@
             </button>
 
             <button
-              v-else-if="assessment.status === 'open' && assessment.attemptsUsed < assessment.maxAttempts"
+              v-else-if="
+                assessment.status === 'open' &&
+                assessment.attemptsUsed < assessment.maxAttempts &&
+                (!assessment.bestResult || assessment.bestResult.score < 100)
+              "
               class="btn btn-primary btn-full"
               @click.stop="startAssessment(assessment)"
             >
@@ -74,7 +78,11 @@
             </button>
 
             <button
-              v-else-if="assessment.status === 'completed' || assessment.attemptsUsed >= assessment.maxAttempts"
+              v-else-if="
+                assessment.status === 'completed' ||
+                assessment.attemptsUsed >= assessment.maxAttempts ||
+                (assessment.bestResult && assessment.bestResult.score === 100)
+              "
               class="btn btn-secondary btn-full"
               @click.stop="viewResults(assessment.id)"
             >
@@ -270,8 +278,19 @@ export default {
         closed: "closed",
       };
       let status = statusMap[item.status] || "pending";
+
+      // Статус "completed" только если нет возможности пройти снова
+      // (все попытки использованы ИЛИ результат 100%)
       if (bestScore != null || item.lastAttemptStatus === "completed") {
-        status = "completed";
+        const hasAttemptsLeft = attemptsUsed < maxAttempts;
+        const isPerfectScore = bestScore === 100;
+
+        // Если аттестация открыта (active) и есть попытки и результат не 100%, оставляем статус open
+        if (item.status === "active" && hasAttemptsLeft && !isPerfectScore) {
+          status = "open";
+        } else {
+          status = "completed";
+        }
       }
 
       return {

@@ -29,7 +29,7 @@
             Пройти теорию
           </button>
           <button v-else-if="nextAssessment.status === 'open'" class="btn btn-primary btn-full" @click="startAssessment(nextAssessment)">
-            Начать
+            {{ nextAssessment.attemptsUsed > 0 ? "Пройти ещё раз" : "Начать" }}
           </button>
           <button v-else class="btn btn-primary btn-full" disabled>
             {{ nextAssessment.status === "pending" ? "Ожидает открытия" : "Завершена" }}
@@ -219,8 +219,17 @@ export default {
         status = "pending";
       }
 
+      // Статус "completed" только если нет возможности пройти снова
       if (hasPassed || item.lastAttemptStatus === "completed") {
-        status = "completed";
+        const hasAttemptsLeft = attemptsUsed < maxAttempts;
+        const isPerfectScore = bestScore === 100;
+
+        // Если аттестация открыта (active) и есть попытки и результат не 100%, оставляем статус open
+        if (item.status === "active" && hasAttemptsLeft && !isPerfectScore) {
+          status = "open";
+        } else {
+          status = "completed";
+        }
       }
 
       const requiresTheory = Boolean(item.theory?.completionRequired);

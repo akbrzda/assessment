@@ -95,18 +95,29 @@ export default {
     const summaryItem = ref(null);
 
     const canRetake = computed(() => {
-      if (!assessment.value) {
+      if (!assessment.value || !result.value) {
         return false;
       }
-      const attemptsLeft = (assessment.value.maxAttempts || 1) - (result.value.attemptNumber || 0);
+
+      // Если результат 100%, повторное прохождение не требуется
+      if (result.value.score === 100) {
+        return false;
+      }
+
+      // Используем данные из summaryItem для точного подсчета попыток
+      const usedAttempts = summaryItem.value?.lastAttemptNumber || result.value.attemptNumber || 0;
+      const maxAttempts = assessment.value.maxAttempts || 1;
+      const attemptsLeft = maxAttempts - usedAttempts;
+
       return attemptsLeft > 0 && assessment.value.status === "open";
     });
 
     const remainingAttempts = computed(() => {
-      if (!assessment.value || result.value.attemptNumber == null) {
+      if (!assessment.value) {
         return 0;
       }
-      const remaining = (assessment.value.maxAttempts || 1) - result.value.attemptNumber;
+      const usedAttempts = summaryItem.value?.lastAttemptNumber || result.value.attemptNumber || 0;
+      const remaining = (assessment.value.maxAttempts || 1) - usedAttempts;
       return remaining > 0 ? remaining : 0;
     });
 

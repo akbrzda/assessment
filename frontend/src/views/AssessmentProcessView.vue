@@ -47,10 +47,7 @@
               :key="answer.id"
               class="answer-option"
               :class="{
-                selected:
-                  currentQuestion.questionType === 'multiple'
-                    ? selectedMultipleAnswers.includes(answer.id)
-                    : selectedAnswer === answer.id,
+                selected: currentQuestion.questionType === 'multiple' ? selectedMultipleAnswers.includes(answer.id) : selectedAnswer === answer.id,
               }"
               @click="toggleAnswer(answer.id)"
             >
@@ -84,7 +81,12 @@
     <!-- Navigation -->
     <div class="navigation-section">
       <div class="nav-buttons" v-if="currentQuestion">
-        <button v-if="currentQuestionIndex < questions.length - 1" class="btn btn-primary btn-full" :disabled="!canProceedCurrent || isSaving" @click="nextQuestion">
+        <button
+          v-if="currentQuestionIndex < questions.length - 1"
+          class="btn btn-primary btn-full"
+          :disabled="!canProceedCurrent || isSaving"
+          @click="nextQuestion"
+        >
           Далее
         </button>
 
@@ -286,9 +288,7 @@ export default {
         return;
       }
       const orderIds = progress.questionOrder;
-      const map = new Map(
-        questions.value.map((question, index) => [question.id, { question, answer: userAnswers.value[index] || null }])
-      );
+      const map = new Map(questions.value.map((question, index) => [question.id, { question, answer: userAnswers.value[index] || null }]));
       const orderedQuestions = [];
       const orderedAnswers = [];
       orderIds.forEach((id) => {
@@ -519,11 +519,22 @@ export default {
       if (attempt) {
         clearAttemptProgress(attempt);
       }
+
+      // Дожидаемся завершения попытки перед редиректом
       if (attempt) {
         try {
+          isSaving.value = true;
           await apiClient.completeAssessmentAttempt(assessmentId.value, attempt);
+          // Небольшая задержка для гарантии записи данных в БД
+          await new Promise((resolve) => setTimeout(resolve, 300));
         } catch (error) {
           console.error("Не удалось завершить попытку", error);
+          telegramStore.showAlert("Не удалось завершить аттестацию");
+          isCompleted.value = false;
+          isSaving.value = false;
+          return;
+        } finally {
+          isSaving.value = false;
         }
       }
 
@@ -614,11 +625,7 @@ export default {
           if (question.questionType === "single" && meta.selectedOptionId != null) {
             return { type: "single", value: meta.selectedOptionId };
           }
-          if (
-            question.questionType === "multiple" &&
-            Array.isArray(meta.selectedOptionIds) &&
-            meta.selectedOptionIds.length
-          ) {
+          if (question.questionType === "multiple" && Array.isArray(meta.selectedOptionIds) && meta.selectedOptionIds.length) {
             const normalized = meta.selectedOptionIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
             normalized.sort((a, b) => a - b);
             return { type: "multiple", value: normalized };
