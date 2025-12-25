@@ -604,3 +604,42 @@ ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   description = VALUES(description),
   is_active = VALUES(is_active);
+-- Миграция для хранения порядка вопросов в попытке прохождения аттестации
+-- Это решает проблему с рандомизацией вопросов при перезагрузке страницы
+
+CREATE TABLE IF NOT EXISTS assessment_attempt_question_order (
+  attempt_id INT UNSIGNED NOT NULL,
+  question_id INT UNSIGNED NOT NULL,
+  display_order INT UNSIGNED NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (attempt_id, question_id),
+  KEY idx_attempt_order (attempt_id, display_order),
+  CONSTRAINT fk_attempt_order_attempt FOREIGN KEY (attempt_id) 
+    REFERENCES assessment_attempts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_attempt_order_question FOREIGN KEY (question_id) 
+    REFERENCES assessment_questions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Комментарий к таблице
+ALTER TABLE assessment_attempt_question_order 
+COMMENT = 'Хранит фиксированный порядок вопросов для каждой попытки, чтобы избежать проблем с рандомизацией';
+-- Миграция для хранения порядка вариантов ответов в попытке прохождения аттестации
+
+CREATE TABLE IF NOT EXISTS assessment_attempt_option_order (
+  attempt_id INT UNSIGNED NOT NULL,
+  question_id INT UNSIGNED NOT NULL,
+  option_id INT UNSIGNED NOT NULL,
+  display_order INT UNSIGNED NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (attempt_id, question_id, option_id),
+  KEY idx_attempt_question_order (attempt_id, question_id, display_order),
+  CONSTRAINT fk_attempt_option_attempt FOREIGN KEY (attempt_id) 
+    REFERENCES assessment_attempts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_attempt_option_question FOREIGN KEY (question_id) 
+    REFERENCES assessment_questions(id) ON DELETE CASCADE,
+  CONSTRAINT fk_attempt_option_option FOREIGN KEY (option_id) 
+    REFERENCES assessment_question_options(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE assessment_attempt_option_order 
+COMMENT = 'Хранит фиксированный порядок вариантов ответов для каждого вопроса в попытке';

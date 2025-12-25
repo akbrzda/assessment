@@ -4,7 +4,9 @@
       <div class="page-header">
         <div>
           <h1 class="title-large">Теория</h1>
-          <p class="body-small text-secondary">Обновлено: {{ formatDate(theory?.version?.publishedAt) || "—" }}</p>
+          <p class="body-small text-secondary">
+            Обновлено: {{ formatDate(theory?.version?.publishedAt) || "—" }} | Время на чтение: {{ readingTimeLabel }}
+          </p>
         </div>
       </div>
 

@@ -498,17 +498,24 @@ export default {
     }
 
     async function finishAssessment(isEarlyExit = false) {
-      if (isCompleted.value) {
+      if (isCompleted.value || isSaving.value) {
         return;
       }
       isCompleted.value = true;
+      isSaving.value = true;
 
       try {
+        // Сохраняем текущий ответ если он есть
         if (canProceedCurrent.value) {
-          await saveCurrentAnswer();
+          try {
+            await saveCurrentAnswer();
+          } catch (error) {
+            console.warn("Не удалось сохранить последний ответ перед завершением", error);
+            // Продолжаем завершение
+          }
         }
       } catch (error) {
-        // если ответ не сохранился, продолжаем завершение, чтобы попытка не зависла
+        console.warn("Ошибка при попытке сохранить ответ", error);
       }
 
       if (timer.value) {
@@ -523,21 +530,19 @@ export default {
       // Дожидаемся завершения попытки перед редиректом
       if (attempt) {
         try {
-          isSaving.value = true;
           await apiClient.completeAssessmentAttempt(assessmentId.value, attempt);
-          // Небольшая задержка для гарантии записи данных в БД
-          await new Promise((resolve) => setTimeout(resolve, 300));
+          // Увеличенная задержка для гарантии записи данных в БД
+          await new Promise((resolve) => setTimeout(resolve, 500));
         } catch (error) {
           console.error("Не удалось завершить попытку", error);
           telegramStore.showAlert("Не удалось завершить аттестацию");
           isCompleted.value = false;
           isSaving.value = false;
           return;
-        } finally {
-          isSaving.value = false;
         }
       }
 
+      isSaving.value = false;
       document.body.style.overflow = "";
       telegramStore.hapticFeedback("impact", "medium");
 
@@ -641,14 +646,16 @@ export default {
           attemptId.value = payload.latestAttempt.id;
           const remaining = payload.latestAttempt.remainingSeconds;
           timeRemaining.value = Number.isFinite(remaining) ? Number(remaining) : timeLimitSeconds;
+
+          // НЕ применяем сохраненный порядок из localStorage - используем порядок из БД
           const storedProgress = getAttemptProgress(attemptId.value);
-          applyStoredQuestionOrder(storedProgress);
           const resumeIndex = resolveResumeIndex(storedProgress);
           currentQuestionIndex.value = resumeIndex;
           applyStoredAnswer(resumeIndex);
 
           // Не в режиме ожидания - попытка уже начата
           awaitingStart.value = false;
+          // Сохраняем текущий порядок вопросов в localStorage (для отслеживания позиции)
           persistQuestionOrder();
         } else {
           if (payload.latestAttempt?.id) {
@@ -684,6 +691,26 @@ export default {
       try {
         const attempt = await apiClient.startAssessmentAttempt(assessmentId.value);
         attemptId.value = attempt.id;
+
+        // Перезагружаем аттестацию чтобы получить правильный порядок вопросов
+        // который был сохранен при создании попытки
+        const response = await apiClient.getUserAssessment(assessmentId.value);
+        const payload = response?.assessment;
+        if (!payload) {
+          throw new Error("Не удалось загрузить вопросы");
+        }
+
+        // Обновляем вопросы с правильным порядком
+        questions.value = (payload.questions || []).map((question) => ({
+          id: question.id,
+          text: question.text,
+          questionType: question.questionType || "single",
+          answers: (question.options || []).map((option) => ({
+            id: option.id,
+            text: option.text,
+          })),
+        }));
+
         const remaining = attempt.remainingSeconds;
         const timeLimitSeconds = assessment.value?.timeLimitSeconds || null;
         timeRemaining.value = Number.isFinite(remaining) ? Number(remaining) : timeLimitSeconds;
@@ -691,6 +718,8 @@ export default {
         currentQuestionIndex.value = 0;
         resetSelectionState();
         awaitingStart.value = false;
+
+        // Сохраняем новый порядок вопросов после перезагрузки
         persistQuestionOrder();
         startTimer();
       } catch (attemptError) {

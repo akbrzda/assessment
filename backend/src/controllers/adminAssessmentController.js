@@ -812,7 +812,7 @@ exports.getAssessmentDetails = async (req, res, next) => {
       question.answerStats = stats;
     }
 
-    // Участники с результатами (показываем лучшую попытку или текущую in_progress)
+    // Участники с результатами (показываем текущую in_progress или лучшую завершенную попытку)
     const [participants] = await pool.query(
       `
       SELECT 
@@ -822,14 +822,15 @@ exports.getAssessmentDetails = async (req, res, next) => {
         u.telegram_id,
         b.name as branch_name,
         p.name as position_name,
-        COALESCE(best_completed.id, in_progress.id) as attempt_id,
-        COALESCE(best_completed.status, in_progress.status) as attempt_status,
-        best_completed.score_percent,
-        best_completed.correct_answers,
-        best_completed.total_questions,
-        COALESCE(best_completed.started_at, in_progress.started_at) as started_at,
-        best_completed.completed_at,
-        TIMESTAMPDIFF(SECOND, best_completed.started_at, best_completed.completed_at) as time_spent_seconds,
+        COALESCE(in_progress.id, best_completed.id) as attempt_id,
+        COALESCE(in_progress.status, best_completed.status) as attempt_status,
+        COALESCE(in_progress.score_percent, best_completed.score_percent) as score_percent,
+        COALESCE(in_progress.correct_answers, best_completed.correct_answers) as correct_answers,
+        COALESCE(in_progress.total_questions, best_completed.total_questions) as total_questions,
+        COALESCE(in_progress.started_at, best_completed.started_at) as started_at,
+        COALESCE(in_progress.completed_at, best_completed.completed_at) as completed_at,
+        TIMESTAMPDIFF(SECOND, COALESCE(in_progress.started_at, best_completed.started_at), 
+                              COALESCE(in_progress.completed_at, best_completed.completed_at)) as time_spent_seconds,
         tc.time_spent_seconds as theory_time_seconds,
         tc.completed_at as theory_completed_at
       FROM assessment_user_assignments aua
@@ -839,23 +840,23 @@ exports.getAssessmentDetails = async (req, res, next) => {
       LEFT JOIN (
         SELECT aa.*
         FROM (
-          SELECT aa1.*, 
-                 ROW_NUMBER() OVER (PARTITION BY aa1.user_id ORDER BY aa1.score_percent DESC, aa1.completed_at DESC) as rn
-          FROM assessment_attempts aa1
-          WHERE aa1.assessment_id = ? AND aa1.status = 'completed'
-        ) aa
-        WHERE aa.rn = 1
-      ) best_completed ON best_completed.user_id = u.id
-      LEFT JOIN (
-        SELECT aa.*
-        FROM (
           SELECT aa2.*, 
                  ROW_NUMBER() OVER (PARTITION BY aa2.user_id ORDER BY aa2.started_at DESC) as rn
           FROM assessment_attempts aa2
           WHERE aa2.assessment_id = ? AND aa2.status = 'in_progress'
         ) aa
         WHERE aa.rn = 1
-      ) in_progress ON in_progress.user_id = u.id AND best_completed.id IS NULL
+      ) in_progress ON in_progress.user_id = u.id
+      LEFT JOIN (
+        SELECT aa.*
+        FROM (
+          SELECT aa1.*, 
+                 ROW_NUMBER() OVER (PARTITION BY aa1.user_id ORDER BY aa1.score_percent DESC, aa1.completed_at DESC) as rn
+          FROM assessment_attempts aa1
+          WHERE aa1.assessment_id = ? AND aa1.status = 'completed'
+        ) aa
+        WHERE aa.rn = 1
+      ) best_completed ON best_completed.user_id = u.id AND in_progress.id IS NULL
       LEFT JOIN assessment_theory_completions tc ON tc.assessment_id = aua.assessment_id 
         AND tc.user_id = u.id
         AND tc.version_id = (SELECT current_theory_version_id FROM assessments WHERE id = aua.assessment_id)
@@ -982,7 +983,7 @@ exports.exportAssessmentToExcel = async (req, res, next) => {
 
     const assessment = assessments[0];
 
-    // Получить результаты участников
+    // Получить результаты участников (приоритет отдается текущей попытке in_progress)
     const [results] = await pool.query(
       `
       SELECT 
@@ -990,22 +991,42 @@ exports.exportAssessmentToExcel = async (req, res, next) => {
         u.last_name,
         b.name as branch_name,
         p.name as position_name,
-        aa.status,
-        aa.score_percent,
-        aa.correct_answers,
-        aa.total_questions,
-        aa.started_at,
-        aa.completed_at,
-        TIMESTAMPDIFF(SECOND, aa.started_at, aa.completed_at) as time_spent_seconds
+        COALESCE(in_progress.status, best_completed.status) as status,
+        COALESCE(in_progress.score_percent, best_completed.score_percent) as score_percent,
+        COALESCE(in_progress.correct_answers, best_completed.correct_answers) as correct_answers,
+        COALESCE(in_progress.total_questions, best_completed.total_questions) as total_questions,
+        COALESCE(in_progress.started_at, best_completed.started_at) as started_at,
+        COALESCE(in_progress.completed_at, best_completed.completed_at) as completed_at,
+        TIMESTAMPDIFF(SECOND, COALESCE(in_progress.started_at, best_completed.started_at), 
+                              COALESCE(in_progress.completed_at, best_completed.completed_at)) as time_spent_seconds
       FROM assessment_user_assignments aua
       JOIN users u ON aua.user_id = u.id
       LEFT JOIN branches b ON u.branch_id = b.id
       LEFT JOIN positions p ON u.position_id = p.id
-      LEFT JOIN assessment_attempts aa ON aa.assessment_id = aua.assessment_id AND aa.user_id = u.id
+      LEFT JOIN (
+        SELECT aa.*
+        FROM (
+          SELECT aa1.*, 
+                 ROW_NUMBER() OVER (PARTITION BY aa1.user_id ORDER BY aa1.started_at DESC) as rn
+          FROM assessment_attempts aa1
+          WHERE aa1.assessment_id = ? AND aa1.status = 'in_progress'
+        ) aa
+        WHERE aa.rn = 1
+      ) in_progress ON in_progress.user_id = u.id
+      LEFT JOIN (
+        SELECT aa.*
+        FROM (
+          SELECT aa2.*, 
+                 ROW_NUMBER() OVER (PARTITION BY aa2.user_id ORDER BY aa2.score_percent DESC, aa2.completed_at DESC) as rn
+          FROM assessment_attempts aa2
+          WHERE aa2.assessment_id = ? AND aa2.status = 'completed'
+        ) aa
+        WHERE aa.rn = 1
+      ) best_completed ON best_completed.user_id = u.id AND in_progress.id IS NULL
       WHERE aua.assessment_id = ?
       ORDER BY u.last_name, u.first_name
     `,
-      [assessmentId]
+      [assessmentId, assessmentId, assessmentId]
     );
 
     // Создать Excel workbook

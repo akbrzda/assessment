@@ -391,6 +391,8 @@ async function submitAnswer(req, res, next) {
     const assessmentId = Number(req.params.id);
     const attemptId = Number(req.params.attemptId);
 
+    console.log(`[submitAnswer Controller] assessmentId=${assessmentId}, attemptId=${attemptId}, body=`, JSON.stringify(req.body));
+
     if (!assessmentId || !attemptId) {
       return res.status(400).json({ error: "Некорректные параметры" });
     }
@@ -405,6 +407,8 @@ async function submitAnswer(req, res, next) {
       userId: req.currentUser.id,
       questionId: value.questionId,
       optionId: value.optionId,
+      optionIds: value.optionIds,
+      textAnswer: value.textAnswer,
     });
 
     // Применяем правила геймификации на уровне ответа (если включены)
