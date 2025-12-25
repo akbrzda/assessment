@@ -39,6 +39,22 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// Флаг для предотвращения множественных одновременных обновлений токена
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+
+  failedQueue = [];
+};
+
 // Обновление токена при 401
 apiClient.interceptors.response.use(
   (response) => {
@@ -54,31 +70,57 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        // Если уже идёт обновление токена, добавляем запрос в очередь
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return apiClient(originalRequest);
+          })
+          .catch((err) => {
+            return Promise.reject(err);
+          });
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
 
       try {
         const refreshToken = localStorage.getItem("refreshToken");
+        if (!refreshToken) {
+          throw new Error("No refresh token available");
+        }
+
         const { data } = await axios.post(`${DEFAULT_API_BASE_URL}/admin/auth/refresh`, {
           refreshToken,
         });
 
-        localStorage.setItem("accessToken", data.accessToken);
-        originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+        const newAccessToken = data.accessToken;
+        localStorage.setItem("accessToken", newAccessToken);
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
         // Синхронно обновляем токен в store и переподключаем WebSocket
         const { useAuthStore } = await import("@/stores/auth");
         const authStore = useAuthStore();
-        authStore.setTokenAndReconnectWS(data.accessToken);
+        authStore.setTokenAndReconnectWS(newAccessToken);
+
+        // Обрабатываем очередь запросов с новым токеном
+        processQueue(null, newAccessToken);
 
         return apiClient(originalRequest);
       } catch (refreshError) {
-        console.error("Failed to refresh token:", refreshError);
+        processQueue(refreshError, null);
+        console.error("❌ Failed to refresh token:", refreshError);
         localStorage.clear();
         // Перенаправляем на login только если мы не на странице login
         if (window.location.pathname !== "/login") {
           window.location.href = "/login";
         }
         return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
 

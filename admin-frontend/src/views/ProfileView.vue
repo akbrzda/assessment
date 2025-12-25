@@ -130,9 +130,9 @@ const editForm = ref({
 
 const getRoleBadgeVariant = (role) => {
   const variants = {
-    superadmin: "danger",
+    superadmin: "primary",
     manager: "warning",
-    user: "success",
+    employee: "success",
   };
   return variants[role] || "default";
 };
@@ -141,7 +141,7 @@ const getRoleLabel = (role) => {
   const labels = {
     superadmin: "Суперадмин",
     manager: "Управляющий",
-    user: "Пользователь",
+    employee: "Сотрудник",
   };
   return labels[role] || role;
 };
@@ -215,7 +215,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-
 .page-header {
   margin-bottom: 1.5rem;
 }

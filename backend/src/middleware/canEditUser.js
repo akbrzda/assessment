@@ -37,8 +37,8 @@ const canEditUser = async (req, res, next) => {
 
       // Проверяем что это employee
       if (target.role_name !== "employee") {
-        return res.status(403).json({ 
-          error: "Вы можете редактировать только сотрудников с ролью employee" 
+        return res.status(403).json({
+          error: "Вы можете редактировать только сотрудников с ролью employee",
         });
       }
 

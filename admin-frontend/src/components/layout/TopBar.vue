@@ -37,17 +37,51 @@
             </button>
           </div>
         </div>
+
+        <!-- Профильное меню -->
+        <div class="profile-menu" :class="{ 'is-open': isProfileMenuOpen }">
+          <button @click="toggleProfileMenu" class="profile-trigger" title="Меню профиля">
+            <div class="profile-avatar">
+              <img v-if="authStore.user?.avatarUrl" :src="authStore.user.avatarUrl" alt="Avatar" />
+              <Icon v-else name="User" size="18" />
+            </div>
+            <div class="profile-info">
+              <p class="profile-name">{{ getUserFullName }}</p>
+              <p class="profile-role">{{ getRoleLabel(authStore.user?.role) }}</p>
+            </div>
+            <Icon name="ChevronDown" size="16" class="profile-chevron" />
+          </button>
+
+          <transition name="dropdown">
+            <div v-if="isProfileMenuOpen" class="profile-dropdown">
+              <router-link to="/profile" class="dropdown-item" @click="handleProfileClick">
+                <Icon name="User" size="16" />
+                <span>Профиль</span>
+              </router-link>
+              <button @click="handleLogout" class="dropdown-item">
+                <Icon name="LogOut" size="16" />
+                <span>Выйти</span>
+              </button>
+            </div>
+          </transition>
+        </div>
       </div>
     </div>
   </header>
 </template>
 
 <script setup>
-import { computed } from "vue";
-import { useRoute } from "vue-router";
+import { computed, ref, onMounted, onUnmounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useThemeStore } from "../../stores/theme";
+import { useAuthStore } from "../../stores/auth";
 import { useWebSocket } from "../../composables/useWebSocket";
 import Icon from "../ui/Icon.vue";
+
+const authStore = useAuthStore();
+const router = useRouter();
+const isProfileMenuOpen = ref(false);
+const profileMenuRef = ref(null);
 
 defineProps({
   sidebarCollapsed: {
@@ -101,6 +135,51 @@ const pageTitle = computed(() => {
     logs: "Журнал действий",
   };
   return titles[route.name?.toLowerCase()] || "Админ-панель";
+});
+
+const getUserFullName = computed(() => {
+  const firstName = authStore.user?.firstName || authStore.user?.first_name || "";
+  const lastName = authStore.user?.lastName || authStore.user?.last_name || "";
+  return `${firstName} ${lastName}`.trim() || "Пользователь";
+});
+
+const getRoleLabel = (role) => {
+  const labels = {
+    superadmin: "Суперадмин",
+    manager: "Управляющий",
+    user: "Пользователь",
+  };
+  return labels[role] || role;
+};
+
+const toggleProfileMenu = () => {
+  isProfileMenuOpen.value = !isProfileMenuOpen.value;
+};
+
+const handleProfileClick = () => {
+  isProfileMenuOpen.value = false;
+};
+
+const handleLogout = async () => {
+  isProfileMenuOpen.value = false;
+  await authStore.logout();
+  router.push("/login");
+};
+
+// Закрытие меню при клике вне его
+const handleClickOutside = (event) => {
+  const profileMenu = document.querySelector('.profile-menu');
+  if (profileMenu && !profileMenu.contains(event.target)) {
+    isProfileMenuOpen.value = false;
+  }
+};
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside);
 });
 </script>
 
@@ -340,9 +419,158 @@ const pageTitle = computed(() => {
   }
 }
 
+/* Profile Menu */
+.profile-menu {
+  position: relative;
+}
+
+.profile-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: none;
+  background: var(--surface-card);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-primary);
+}
+
+.profile-trigger:hover {
+  background: var(--nav-hover-bg);
+}
+
+.profile-menu.is-open .profile-trigger {
+  background: var(--nav-hover-bg);
+}
+
+.profile-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-info {
+  text-align: left;
+  min-width: 0;
+}
+
+.profile-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-role {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-chevron {
+  flex-shrink: 0;
+  transition: transform 0.2s;
+  color: var(--text-secondary);
+}
+
+.profile-menu.is-open .profile-chevron {
+  transform: rotate(180deg);
+}
+
+.profile-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--surface-card);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  margin-top: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  min-width: 200px;
+  z-index: 50;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.dropdown-item:hover {
+  background: var(--nav-hover-bg);
+}
+
+.dropdown-item:not(:last-child) {
+  border-bottom: 1px solid var(--divider);
+}
+
+/* Dropdown Animation */
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: all 0.2s ease;
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.dropdown-enter-to,
+.dropdown-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 @media (max-width: 1024px) {
   .topbar-content {
     padding: 0 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-info {
+    display: none;
+  }
+  
+  .profile-chevron {
+    display: none;
+  }
+  
+  .profile-trigger {
+    padding: 8px;
   }
 }
 

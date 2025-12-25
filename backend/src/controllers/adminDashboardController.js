@@ -87,20 +87,9 @@ exports.getMetrics = async (req, res) => {
     );
 
     // Всего сотрудников
-    const [totalUsers] = await pool.query(
-      `SELECT COUNT(*) as count FROM users u
-       WHERE u.role_id IN (SELECT id FROM roles WHERE name = 'employee')
-       ${whereClause}`,
-      filterParams
-    );
+    const [totalUsers] = await pool.query(`SELECT COUNT(*) as count FROM users`, filterParams);
 
-    const [prevTotalUsers] = await pool.query(
-      `SELECT COUNT(*) as count FROM users u
-       WHERE u.role_id IN (SELECT id FROM roles WHERE name = 'employee')
-       AND u.created_at < ?
-       ${whereClause}`,
-      [prevDateTo, ...prevFilterParams]
-    );
+    const [prevTotalUsers] = await pool.query(`SELECT COUNT(*) as count FROM users`, [prevDateTo, ...prevFilterParams]);
 
     // Филиалы и должности
     const [totalBranches] = await pool.query("SELECT COUNT(*) as count FROM branches");

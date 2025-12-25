@@ -47,7 +47,8 @@ exports.login = async (req, res) => {
     }
 
     // Генерировать токены
-    const accessToken = jwt.sign({ id: user.id, role: user.role_name }, process.env.JWT_SECRET || "your_secret_key_here", { expiresIn: "15m" });
+    // Access token живёт 30 минут (увеличено с 15 для стабильности)
+    const accessToken = jwt.sign({ id: user.id, role: user.role_name }, process.env.JWT_SECRET || "your_secret_key_here", { expiresIn: "30m" });
 
     const refreshToken = jwt.sign({ id: user.id }, process.env.JWT_REFRESH_SECRET || "your_refresh_secret_key_here", { expiresIn: "7d" });
 
@@ -106,8 +107,8 @@ exports.refresh = async (req, res) => {
 
     const user = users[0];
 
-    // Генерировать новый access token
-    const accessToken = jwt.sign({ id: user.id, role: user.role_name }, process.env.JWT_SECRET || "your_secret_key_here", { expiresIn: "15m" });
+    // Генерировать новый access token (30 минут)
+    const accessToken = jwt.sign({ id: user.id, role: user.role_name }, process.env.JWT_SECRET || "your_secret_key_here", { expiresIn: "30m" });
 
     res.json({ accessToken });
   } catch (error) {
