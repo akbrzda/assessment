@@ -16,48 +16,42 @@
         </div>
       </div>
 
-      <div class="blocks-list">
-        <div
-          v-for="(block, index) in localValue.requiredBlocks"
-          :key="block.uid"
-          class="block-card"
-          draggable="true"
-          @dragstart="handleDragStart($event, index, 'required')"
-          @dragend="handleDragEnd"
-          @dragover.prevent="handleDragOver($event, index, 'required')"
-          @drop="handleDrop($event, index, 'required')"
-          :class="{ dragging: draggedIndex === index && draggedType === 'required' }"
-        >
-          <header class="block-header">
-            <div class="drag-handle">
-              <Icon name="grip-vertical" size="20" />
-            </div>
-            <div>
-              <p class="block-label">Блок #{{ index + 1 }}</p>
-              <p class="block-type">{{ getTypeLabel(block.type) }}</p>
-            </div>
-            <Button size="sm" variant="ghost" icon="trash" :disabled="localValue.requiredBlocks.length === 1" @click="removeRequiredBlock(index)">
-              Удалить
-            </Button>
-          </header>
+      <draggable v-model="localValue.requiredBlocks" :animation="200" handle=".drag-handle" item-key="uid" class="blocks-list">
+        <template #item="{ element: block, index }">
+          <div class="block-card">
+            <header class="block-header">
+              <div class="block-header-left">
+                <div class="drag-handle">
+                  <GripVertical :size="20" />
+                </div>
+                <div>
+                  <p class="block-label">Блок #{{ index + 1 }}</p>
+                  <p class="block-type">{{ getTypeLabel(block.type) }}</p>
+                </div>
+              </div>
+              <Button size="sm" variant="ghost" icon="trash" :disabled="localValue.requiredBlocks.length === 1" @click="removeRequiredBlock(index)">
+                Удалить
+              </Button>
+            </header>
 
-          <div class="block-grid">
-            <Input v-model="block.title" label="Заголовок" placeholder="Например, «Введение»" required />
-            <Select v-model="block.type" label="Тип" :options="typeOptions" />
+            <div class="block-grid">
+              <Input v-model="block.title" label="Заголовок" placeholder="Например, «Введение»" required />
+              <Select v-model="block.type" label="Тип" :options="typeOptions" />
+            </div>
+
+            <FullscreenTextarea
+              v-model="block.content"
+              :label="block.type === 'text' ? 'Текст блока' : 'Описание (опционально)'"
+              :rows="block.type === 'text' ? 5 : 3"
+              :required="block.type === 'text'"
+            />
+            <p v-if="block.type === 'text'" class="reading-hint">Среднее время чтения: {{ getBlockReadingTime(block) }}</p>
+
+            <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" placeholder="https://..." required />
+            <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" placeholder="https://..." required />
           </div>
-
-          <FullscreenTextarea
-            v-model="block.content"
-            :label="block.type === 'text' ? 'Текст блока' : 'Описание (опционально)'"
-            :rows="block.type === 'text' ? 5 : 3"
-            :required="block.type === 'text'"
-          />
-          <p v-if="block.type === 'text'" class="reading-hint">Среднее время чтения: {{ getBlockReadingTime(block) }}</p>
-
-          <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" placeholder="https://..." required />
-          <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" placeholder="https://..." required />
-        </div>
-      </div>
+        </template>
+      </draggable>
     </section>
 
     <section class="theory-section">
@@ -78,57 +72,52 @@
 
       <div v-if="!localValue.optionalBlocks.length" class="empty-blocks">Дополнительных материалов нет</div>
 
-      <div v-else class="blocks-list">
-        <div
-          v-for="(block, index) in localValue.optionalBlocks"
-          :key="block.uid"
-          class="block-card optional"
-          draggable="true"
-          @dragstart="handleDragStart($event, index, 'optional')"
-          @dragend="handleDragEnd"
-          @dragover.prevent="handleDragOver($event, index, 'optional')"
-          @drop="handleDrop($event, index, 'optional')"
-          :class="{ dragging: draggedIndex === index && draggedType === 'optional' }"
-        >
-          <header class="block-header">
-            <div class="drag-handle">
-              <Icon name="grip-vertical" size="20" />
-            </div>
-            <div>
-              <p class="block-label">Блок #{{ index + 1 }}</p>
-              <p class="block-type">{{ getTypeLabel(block.type) }}</p>
-            </div>
-            <Button size="sm" variant="ghost" icon="trash" @click="removeOptionalBlock(index)">Удалить</Button>
-          </header>
+      <draggable v-else v-model="localValue.optionalBlocks" :animation="200" handle=".drag-handle" item-key="uid" class="blocks-list">
+        <template #item="{ element: block, index }">
+          <div class="block-card optional">
+            <header class="block-header">
+              <div class="block-header-left">
+                <div class="drag-handle">
+                  <GripVertical :size="20" />
+                </div>
+                <div>
+                  <p class="block-label">Блок #{{ index + 1 }}</p>
+                  <p class="block-type">{{ getTypeLabel(block.type) }}</p>
+                </div>
+              </div>
+              <Button size="sm" variant="ghost" icon="trash" @click="removeOptionalBlock(index)">Удалить</Button>
+            </header>
 
-          <div class="block-grid">
-            <Input v-model="block.title" label="Заголовок" placeholder="Название блока" required />
-            <Select v-model="block.type" label="Тип" :options="typeOptions" />
+            <div class="block-grid">
+              <Input v-model="block.title" label="Заголовок" placeholder="Название блока" required />
+              <Select v-model="block.type" label="Тип" :options="typeOptions" />
+            </div>
+
+            <FullscreenTextarea
+              v-model="block.content"
+              :label="block.type === 'text' ? 'Текст блока' : 'Описание (опционально)'"
+              :rows="block.type === 'text' ? 5 : 3"
+            />
+            <p v-if="block.type === 'text'" class="reading-hint">Среднее время чтения: {{ getBlockReadingTime(block) }}</p>
+
+            <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" placeholder="https://..." required />
+            <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" placeholder="https://..." required />
           </div>
-
-          <FullscreenTextarea
-            v-model="block.content"
-            :label="block.type === 'text' ? 'Текст блока' : 'Описание (опционально)'"
-            :rows="block.type === 'text' ? 5 : 3"
-          />
-          <p v-if="block.type === 'text'" class="reading-hint">Среднее время чтения: {{ getBlockReadingTime(block) }}</p>
-
-          <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" placeholder="https://..." required />
-          <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" placeholder="https://..." required />
-        </div>
-      </div>
+        </template>
+      </draggable>
     </section>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, computed } from "vue";
+import { computed } from "vue";
+import draggable from "vuedraggable";
+import { GripVertical } from "lucide-vue-next";
 import Input from "./ui/Input.vue";
 import Select from "./ui/Select.vue";
 import Textarea from "./ui/Textarea.vue";
 import FullscreenTextarea from "./ui/FullscreenTextarea.vue";
 import Button from "./ui/Button.vue";
-import Icon from "./ui/Icon.vue";
 import { cloneTheoryData, createTheoryBlock } from "../utils/theory";
 import { calculateReadingSeconds, formatReadingTime, sumReadingSeconds } from "../utils/readingTime";
 
@@ -159,10 +148,6 @@ const localValue = computed({
 const requiredReadingSeconds = computed(() => sumReadingSeconds(localValue.value.requiredBlocks));
 const optionalReadingSeconds = computed(() => sumReadingSeconds(localValue.value.optionalBlocks));
 
-// Drag and drop state
-const draggedIndex = ref(null);
-const draggedType = ref(null);
-
 const getTypeLabel = (type) => {
   const option = typeOptions.find((item) => item.value === type);
   return option ? option.label : type;
@@ -188,40 +173,6 @@ const removeOptionalBlock = (index) => {
 };
 
 const getBlockReadingTime = (block) => formatReadingTime(calculateReadingSeconds(block.content || ""));
-
-// Drag and drop handlers
-const handleDragStart = (event, index, type) => {
-  draggedIndex.value = index;
-  draggedType.value = type;
-  event.dataTransfer.effectAllowed = "move";
-  event.target.classList.add("dragging");
-};
-
-const handleDragEnd = (event) => {
-  event.target.classList.remove("dragging");
-  draggedIndex.value = null;
-  draggedType.value = null;
-};
-
-const handleDragOver = (event, index, type) => {
-  if (draggedType.value !== type) return;
-  event.dataTransfer.dropEffect = "move";
-};
-
-const handleDrop = (event, dropIndex, type) => {
-  event.preventDefault();
-
-  if (draggedType.value !== type || draggedIndex.value === null) return;
-
-  const blocks = type === "required" ? localValue.value.requiredBlocks : localValue.value.optionalBlocks;
-
-  const draggedBlock = blocks[draggedIndex.value];
-  blocks.splice(draggedIndex.value, 1);
-  blocks.splice(dropIndex, 0, draggedBlock);
-
-  draggedIndex.value = null;
-  draggedType.value = null;
-};
 </script>
 
 <style scoped>
@@ -289,18 +240,12 @@ const handleDrop = (event, dropIndex, type) => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  cursor: move;
   transition: all 0.2s ease;
 }
 
 .block-card:hover {
   border-color: var(--color-primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.block-card.dragging {
-  opacity: 0.5;
-  transform: scale(0.95);
 }
 
 .block-card.optional {
@@ -310,6 +255,12 @@ const handleDrop = (event, dropIndex, type) => {
 .block-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.block-header-left {
+  display: flex;
   align-items: center;
   gap: 12px;
 }
@@ -325,8 +276,8 @@ const handleDrop = (event, dropIndex, type) => {
 }
 
 .drag-handle:hover {
-  color: var(--color-primary);
-  background: var(--bg-primary);
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
 }
 
 .drag-handle:active {

@@ -92,36 +92,43 @@
           </div>
         </div>
 
-        <div class="blocks-list">
-          <div v-for="(block, index) in requiredBlocks" :key="block.uid" class="block-card">
-            <div class="block-card-header">
-              <div>
-                <p class="block-order">#{{ index + 1 }}</p>
-                <p class="block-type">{{ getBlockTypeLabel(block.type) }}</p>
+        <draggable v-model="requiredBlocks" :animation="200" handle=".drag-handle" item-key="uid" class="blocks-list">
+          <template #item="{ element: block, index }">
+            <div class="block-card">
+              <div class="block-card-header">
+                <div class="block-header-left">
+                  <div class="drag-handle">
+                    <GripVertical :size="20" />
+                  </div>
+                  <div>
+                    <p class="block-order">#{{ index + 1 }}</p>
+                    <p class="block-type">{{ getBlockTypeLabel(block.type) }}</p>
+                  </div>
+                </div>
+                <Button icon="trash" variant="ghost" size="sm" :disabled="requiredBlocks.length === 1" @click="removeBlock('required', block.uid)">
+                  Удалить
+                </Button>
               </div>
-              <Button icon="trash" variant="ghost" size="sm" :disabled="requiredBlocks.length === 1" @click="removeBlock('required', block.uid)">
-                Удалить
-              </Button>
+
+              <div class="block-grid">
+                <Input v-model="block.title" label="Заголовок" required placeholder='Например, "Введение"' />
+                <Select v-model="block.type" label="Тип блока" :options="blockTypeOptions" />
+              </div>
+
+              <FullscreenTextarea
+                v-model="block.content"
+                :label="block.type === 'text' ? 'Содержимое' : 'Описание (опционально)'"
+                :required="block.type === 'text'"
+                :rows="block.type === 'text' ? 6 : 3"
+                placeholder="Опишите содержание блока"
+              />
+
+              <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" required placeholder="https://" />
+
+              <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" required placeholder="https://" />
             </div>
-
-            <div class="block-grid">
-              <Input v-model="block.title" label="Заголовок" required placeholder='Например, "Введение"' />
-              <Select v-model="block.type" label="Тип блока" :options="blockTypeOptions" />
-            </div>
-
-            <FullscreenTextarea
-              v-model="block.content"
-              :label="block.type === 'text' ? 'Содержимое' : 'Описание (опционально)'"
-              :required="block.type === 'text'"
-              :rows="block.type === 'text' ? 6 : 3"
-              placeholder="Опишите содержание блока"
-            />
-
-            <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" required placeholder="https://" />
-
-            <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" required placeholder="https://" />
-          </div>
-        </div>
+          </template>
+        </draggable>
       </Card>
 
       <Card>
@@ -145,34 +152,49 @@
 
         <div v-if="!optionalBlocks.length" class="empty-blocks">Нет дополнительных блоков</div>
 
-        <div v-else class="blocks-list" v-show="optionalExpanded">
-          <div v-for="(block, index) in optionalBlocks" :key="block.uid" class="block-card">
-            <div class="block-card-header">
-              <div>
-                <p class="block-order">#{{ index + 1 }}</p>
-                <p class="block-type">{{ getBlockTypeLabel(block.type) }}</p>
+        <draggable
+          v-else
+          v-model="optionalBlocks"
+          :animation="200"
+          handle=".drag-handle"
+          item-key="uid"
+          class="blocks-list"
+          v-show="optionalExpanded"
+        >
+          <template #item="{ element: block, index }">
+            <div class="block-card">
+              <div class="block-card-header">
+                <div class="block-header-left">
+                  <div class="drag-handle">
+                    <GripVertical :size="20" />
+                  </div>
+                  <div>
+                    <p class="block-order">#{{ index + 1 }}</p>
+                    <p class="block-type">{{ getBlockTypeLabel(block.type) }}</p>
+                  </div>
+                </div>
+                <Button icon="trash" variant="ghost" size="sm" @click="removeBlock('optional', block.uid)"> Удалить </Button>
               </div>
-              <Button icon="trash" variant="ghost" size="sm" @click="removeBlock('optional', block.uid)"> Удалить </Button>
+
+              <div class="block-grid">
+                <Input v-model="block.title" label="Заголовок" required placeholder="Название блока" />
+                <Select v-model="block.type" label="Тип блока" :options="blockTypeOptions" />
+              </div>
+
+              <FullscreenTextarea
+                v-model="block.content"
+                :label="block.type === 'text' ? 'Содержимое' : 'Описание (опционально)'"
+                :rows="block.type === 'text' ? 6 : 3"
+                :required="block.type === 'text'"
+                placeholder="Опишите содержание блока"
+              />
+
+              <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" required placeholder="https://" />
+
+              <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" required placeholder="https://" />
             </div>
-
-            <div class="block-grid">
-              <Input v-model="block.title" label="Заголовок" required placeholder="Название блока" />
-              <Select v-model="block.type" label="Тип блока" :options="blockTypeOptions" />
-            </div>
-
-            <FullscreenTextarea
-              v-model="block.content"
-              :label="block.type === 'text' ? 'Содержимое' : 'Описание (опционально)'"
-              :rows="block.type === 'text' ? 6 : 3"
-              :required="block.type === 'text'"
-              placeholder="Опишите содержание блока"
-            />
-
-            <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" required placeholder="https://" />
-
-            <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" required placeholder="https://" />
-          </div>
-        </div>
+          </template>
+        </draggable>
       </Card>
     </div>
   </div>
@@ -181,6 +203,8 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import draggable from "vuedraggable";
+import { GripVertical } from "lucide-vue-next";
 import Button from "../components/ui/Button.vue";
 import Card from "../components/ui/Card.vue";
 import Input from "../components/ui/Input.vue";
@@ -599,6 +623,31 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.block-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.drag-handle:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .block-order {

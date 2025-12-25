@@ -33,29 +33,50 @@
           <p class="body-small text-secondary">Вы можете перейти к аттестации.</p>
         </div>
 
-        <!-- Основной контент - как статья -->
-        <article class="theory-article card mb-16">
-          <template v-for="block in requiredBlocks" :key="block.id">
-            <section class="theory-section">
-              <h2 class="section-title">{{ block.title }}</h2>
+        <!-- Индикатор прогресса -->
+        <div v-if="requiredBlocks.length > 1" class="progress-indicator mb-16">
+          <div class="progress-dots">
+            <button
+              v-for="(block, index) in requiredBlocks"
+              :key="block.id"
+              class="progress-dot"
+              :class="{ active: index === currentPageIndex, completed: index < currentPageIndex }"
+              @click="goToPage(index)"
+              :disabled="index > currentPageIndex && !completion"
+            >
+              <span class="dot-number">{{ index + 1 }}</span>
+            </button>
+          </div>
+          <p class="progress-label body-small text-secondary">Страница {{ currentPageIndex + 1 }} из {{ requiredBlocks.length }}</p>
+        </div>
 
-              <div v-if="block.type === 'text'" class="text-content">
-                <p class="body-text" v-html="formatText(block.content)"></p>
-              </div>
+        <!-- Основной контент - текущий блок -->
+        <article v-if="currentBlock" class="theory-article card mb-16">
+          <section class="theory-section">
+            <h2 class="section-title">{{ currentBlock.title }}</h2>
 
-              <div v-else-if="block.type === 'video'" class="video-content">
-                <div class="video-wrapper">
-                  <iframe v-if="block.videoUrl" :src="block.videoUrl" frameborder="0" allowfullscreen referrerpolicy="no-referrer"></iframe>
-                </div>
-              </div>
+            <div v-if="currentBlock.type === 'text'" class="text-content">
+              <p class="body-text" v-html="formatText(currentBlock.content)"></p>
+            </div>
 
-              <div v-else-if="block.type === 'link'" class="link-content">
-                <a :href="block.externalUrl" target="_blank" rel="noopener" class="external-link">
-                  {{ block.externalUrl }}
-                </a>
+            <div v-else-if="currentBlock.type === 'video'" class="video-content">
+              <div class="video-wrapper">
+                <iframe
+                  v-if="currentBlock.videoUrl"
+                  :src="currentBlock.videoUrl"
+                  frameborder="0"
+                  allowfullscreen
+                  referrerpolicy="no-referrer"
+                ></iframe>
               </div>
-            </section>
-          </template>
+            </div>
+
+            <div v-else-if="currentBlock.type === 'link'" class="link-content">
+              <a :href="currentBlock.externalUrl" target="_blank" rel="noopener" class="external-link">
+                {{ currentBlock.externalUrl }}
+              </a>
+            </div>
+          </section>
         </article>
 
         <!-- Дополнительные материалы -->
@@ -94,9 +115,13 @@
           </details>
         </section>
 
-        <!-- Кнопка в конце -->
-        <div class="action-button-container">
-          <button class="btn btn-primary btn-full" :disabled="!canSubmit || versionOutdated" @click="handlePrimaryAction">
+        <!-- Навигация -->
+        <div class="navigation-buttons">
+          <button v-if="currentPageIndex > 0" class="btn btn-secondary" @click="previousPage">← Назад</button>
+          <div v-else></div>
+
+          <button v-if="!isLastPage" class="btn btn-primary" :disabled="!canGoNext" @click="nextPage">Далее →</button>
+          <button v-else class="btn btn-primary" :disabled="!canSubmit || versionOutdated" @click="handlePrimaryAction">
             {{ primaryButtonLabel }}
           </button>
         </div>
@@ -130,6 +155,8 @@ const theoryStartTime = ref(null);
 let versionCheckInterval = null;
 let readingTimerInterval = null;
 
+const currentPageIndex = ref(0);
+
 const assessmentId = computed(() => Number(route.params.id));
 const requiredBlocks = computed(() => theory.value?.requiredBlocks || []);
 const optionalBlocks = computed(() => theory.value?.optionalBlocks || []);
@@ -137,10 +164,17 @@ const versionId = computed(() => theory.value?.version?.id || null);
 const requiredReadingSeconds = computed(() => sumReadingSeconds(requiredBlocks.value));
 const readingTimeLabel = computed(() => (requiredReadingSeconds.value ? formatReadingTime(requiredReadingSeconds.value) : null));
 
+const currentBlock = computed(() => requiredBlocks.value[currentPageIndex.value] || null);
+const isLastPage = computed(() => currentPageIndex.value >= requiredBlocks.value.length - 1);
+const canGoNext = computed(() => {
+  if (completion.value) return true;
+  return hasReadTheory.value;
+});
+
 const canSubmit = computed(() => {
   if (versionOutdated.value) return false;
   if (completion.value) return true;
-  return hasReadTheory.value;
+  return hasReadTheory.value && isLastPage.value;
 });
 
 const primaryButtonLabel = computed(() => {
@@ -206,7 +240,10 @@ function startReadingTimer() {
     return;
   }
 
-  const waitSeconds = requiredReadingSeconds.value > 0 ? requiredReadingSeconds.value : 15;
+  // Рассчитываем время для текущего блока
+  const currentBlockTime = currentBlock.value?.readingTimeSeconds || 0;
+  const waitSeconds = currentBlockTime > 0 ? currentBlockTime : 15;
+
   let secondsElapsed = 0;
   readingTimerInterval = setInterval(() => {
     secondsElapsed++;
@@ -216,7 +253,52 @@ function startReadingTimer() {
       clearInterval(readingTimerInterval);
       readingTimerInterval = null;
     }
-  }, 1000); // Проверка каждую секунду
+  }, 1000);
+}
+
+function resetReadingTimer() {
+  hasReadTheory.value = false;
+  if (readingTimerInterval) {
+    clearInterval(readingTimerInterval);
+    readingTimerInterval = null;
+  }
+  startReadingTimer();
+}
+
+function nextPage() {
+  if (currentPageIndex.value < requiredBlocks.value.length - 1) {
+    currentPageIndex.value++;
+    resetReadingTimer();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+}
+
+function previousPage() {
+  if (currentPageIndex.value > 0) {
+    currentPageIndex.value--;
+    hasReadTheory.value = true; // На предыдущих страницах можно сразу идти дальше
+    if (readingTimerInterval) {
+      clearInterval(readingTimerInterval);
+      readingTimerInterval = null;
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+}
+
+function goToPage(index) {
+  if (completion.value || index <= currentPageIndex.value) {
+    currentPageIndex.value = index;
+    if (index < requiredBlocks.value.length - 1 || completion.value) {
+      hasReadTheory.value = true;
+      if (readingTimerInterval) {
+        clearInterval(readingTimerInterval);
+        readingTimerInterval = null;
+      }
+    } else {
+      resetReadingTimer();
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 }
 
 async function loadTheory() {
@@ -242,6 +324,7 @@ async function loadTheory() {
 async function reloadTheory() {
   versionOutdated.value = false;
   hasReadTheory.value = false;
+  currentPageIndex.value = 0;
   if (readingTimerInterval) {
     clearInterval(readingTimerInterval);
     readingTimerInterval = null;
@@ -482,6 +565,81 @@ details summary::-webkit-details-marker {
   margin-bottom: 12px;
 }
 
+.progress-indicator {
+  text-align: center;
+}
+
+.progress-dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.progress-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--divider);
+  background: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.progress-dot:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.progress-dot.active {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue);
+}
+
+.progress-dot.completed {
+  border-color: var(--accent-green, #00b45e);
+  background: var(--accent-green, #00b45e);
+}
+
+.dot-number {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.progress-dot.active .dot-number,
+.progress-dot.completed .dot-number {
+  color: white;
+}
+
+.progress-label {
+  text-align: center;
+  margin: 0;
+}
+
+.navigation-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
+.navigation-buttons .btn {
+  flex: 1;
+  min-width: 120px;
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--divider);
+}
+
 @media (max-width: 480px) {
   .theory-article {
     padding: 16px;
@@ -493,6 +651,20 @@ details summary::-webkit-details-marker {
 
   .body-text {
     font-size: 15px;
+  }
+
+  .progress-dot {
+    width: 32px;
+    height: 32px;
+  }
+
+  .dot-number {
+    font-size: 12px;
+  }
+
+  .navigation-buttons .btn {
+    min-width: 100px;
+    font-size: 14px;
   }
 }
 </style>
