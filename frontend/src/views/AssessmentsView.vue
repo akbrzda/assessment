@@ -255,12 +255,12 @@ export default {
 
     function getStartButtonText(assessment) {
       if (!assessment) return "Начать";
-      
+
       // Если теория требуется, но не пройдена
       if (assessment.requiresTheory && !assessment.theoryCompleted) {
         return "Пройти теорию";
       }
-      
+
       // Если есть попытки или теория пройдена
       return assessment.attemptsUsed > 0 ? "Пройти ещё раз" : "Начать";
     }
