@@ -1,0 +1,90 @@
+name: Deploy Bot
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "bot/**"
+      - ".github/workflows/deploy-bot.yml"
+
+jobs:
+  deploy:
+    name: Deploy Bot to Server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: bot/package-lock.json
+
+      - name: Install dependencies
+        working-directory: bot
+        run: npm ci --production
+
+      - name: Create .env file
+        working-directory: bot
+        run: |
+          cat << EOF > .env
+          BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+          MINI_APP_URL=${{ secrets.BOT_MINI_APP_URL }}
+          LOG_CHAT_ID=${{ secrets.BOT_LOG_CHAT_ID }}
+          LOG_THREAD_ID=${{ secrets.BOT_LOG_THREAD_ID }}
+          EOF
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            --exclude 'node_modules' \
+            --exclude '.git' \
+            bot/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/backend.akbrzda.ru/bot/
+
+      - name: Install dependencies on server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /var/www/backend.akbrzda.ru/bot
+            npm ci --production
+
+      - name: Restart bot with PM2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /var/www/backend.akbrzda.ru/bot
+            pm2 describe assessment-bot > /dev/null
+            if [ $? -eq 0 ]; then
+              pm2 restart assessment-bot
+            else
+              pm2 start src/index.js --name assessment-bot
+              pm2 save
+            fi
+
+      - name: Check bot status
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            pm2 status assessment-bot
+            pm2 logs assessment-bot --lines 50 --nostream

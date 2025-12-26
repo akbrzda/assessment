@@ -1,0 +1,65 @@
+name: Deploy Admin
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "admin-frontend/**"
+      - ".github/workflows/deploy-admin.yml"
+
+jobs:
+  deploy:
+    name: Deploy Admin Panel to Server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: admin-frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: admin-frontend
+        run: npm ci
+
+      - name: Create .env file
+        working-directory: admin-frontend
+        run: |
+          cat << EOF > .env
+          API_BASE_URL=${{ secrets.ADMIN_API_BASE_URL }}
+          INVITE_EXPIRATION_DAYS=${{ secrets.ADMIN_INVITE_EXPIRATION_DAYS }}
+          BOT_USERNAME=${{ secrets.ADMIN_BOT_USERNAME }}
+          EOF
+
+      - name: Build application
+        working-directory: admin-frontend
+        run: npm run build
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            admin-frontend/dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/admin.akbrzda.ru/
+
+      - name: Verify deployment
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            ls -la /var/www/admin.akbrzda.ru
+            echo "Deployment completed successfully"

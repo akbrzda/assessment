@@ -1,0 +1,65 @@
+name: Deploy MiniApp
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "frontend/**"
+      - ".github/workflows/deploy-miniapp.yml"
+
+jobs:
+  deploy:
+    name: Deploy MiniApp to Server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Create .env file
+        working-directory: frontend
+        run: |
+          cat << EOF > .env
+          API_BASE_URL=${{ secrets.MINIAPP_API_BASE_URL }}
+          INVITE_EXPIRATION_DAYS=${{ secrets.MINIAPP_INVITE_EXPIRATION_DAYS }}
+          BOT_USERNAME=${{ secrets.MINIAPP_BOT_USERNAME }}
+          EOF
+
+      - name: Build application
+        working-directory: frontend
+        run: npm run build
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            frontend/dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/miniapp.akbrzda.ru/
+
+      - name: Verify deployment
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            ls -la /var/www/miniapp.akbrzda.ru
+            echo "Deployment completed successfully"

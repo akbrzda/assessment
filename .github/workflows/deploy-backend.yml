@@ -1,0 +1,117 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+
+jobs:
+  deploy:
+    name: Deploy Backend to Server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci --production
+
+      - name: Create .env file
+        working-directory: backend
+        run: |
+          cat << EOF > .env
+          NODE_ENV=${{ secrets.BACKEND_NODE_ENV }}
+          PORT=${{ secrets.BACKEND_PORT }}
+          ALLOWED_ORIGINS=${{ secrets.BACKEND_ALLOWED_ORIGINS }}
+
+          DB_HOST=${{ secrets.BACKEND_DB_HOST }}
+          DB_PORT=${{ secrets.BACKEND_DB_PORT }}
+          DB_NAME=${{ secrets.BACKEND_DB_NAME }}
+          DB_USER=${{ secrets.BACKEND_DB_USER }}
+          DB_PASSWORD=${{ secrets.BACKEND_DB_PASSWORD }}
+
+          BOT_TOKEN=${{ secrets.BACKEND_BOT_TOKEN }}
+          LOG_BOT_TOKEN=${{ secrets.BACKEND_LOG_BOT_TOKEN }}
+          LOG_CHAT_ID=${{ secrets.BACKEND_LOG_CHAT_ID }}
+          LOG_THREAD_ID=${{ secrets.BACKEND_LOG_THREAD_ID }}
+
+          JWT_SECRET=${{ secrets.BACKEND_JWT_SECRET }}
+          JWT_REFRESH_SECRET=${{ secrets.BACKEND_JWT_REFRESH_SECRET }}
+
+          INVITE_EXPIRATION_DAYS=${{ secrets.BACKEND_INVITE_EXPIRATION_DAYS }}
+          SUPERADMIN_IDS=${{ secrets.BACKEND_SUPERADMIN_IDS }}
+          EOF
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            --exclude 'node_modules' \
+            --exclude '.git' \
+            --exclude 'logs' \
+            backend/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/backend.akbrzda.ru/
+
+      - name: Install dependencies on server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /var/www/backend.akbrzda.ru
+            npm ci --production
+
+      - name: Run migrations
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /var/www/backend.akbrzda.ru
+            npm run migrate
+
+      - name: Restart application with PM2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /var/www/backend.akbrzda.ru
+            pm2 describe assessment-backend > /dev/null
+            if [ $? -eq 0 ]; then
+              pm2 restart assessment-backend
+            else
+              pm2 start src/server.js --name assessment-backend
+              pm2 save
+            fi
+
+      - name: Check application status
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            pm2 status assessment-backend
+            pm2 logs assessment-backend --lines 50 --nostream
