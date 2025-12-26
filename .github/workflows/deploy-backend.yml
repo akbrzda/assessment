@@ -93,16 +93,6 @@ jobs:
             cd /var/www/backend.akbrzda.ru
             npm ci --production
 
-      - name: Run migrations
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd /var/www/backend.akbrzda.ru
-            npm run migrate
-
       - name: Restart application with PM2
         uses: appleboy/ssh-action@v1.0.0
         with:
