@@ -33,6 +33,12 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
+// Защита от индексации поисковыми системами
+app.use((req, res, next) => {
+  res.setHeader("X-Robots-Tag", "noindex, nofollow");
+  next();
+});
+
 // Статические файлы (иконки бейджей)
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
