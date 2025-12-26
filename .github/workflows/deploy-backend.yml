@@ -56,10 +56,23 @@ jobs:
 
       - name: Setup SSH
         run: |
+          if [ -z "${{ secrets.SSH_HOST }}" ]; then
+            echo "ERROR: SSH_HOST secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SSH_USER }}" ]; then
+            echo "ERROR: SSH_USER secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "ERROR: SSH_PRIVATE_KEY secret is not set"
+            exit 1
+          fi
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          echo "SSH setup completed successfully"
 
       - name: Deploy to server
         run: |
