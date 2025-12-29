@@ -81,7 +81,7 @@ jobs:
             --exclude 'node_modules' \
             --exclude '.git' \
             --exclude 'logs' \
-            backend/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/backend.akbrzda.ru/
+            backend/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/backend.theorica.ru/
 
       - name: Install dependencies on server
         uses: appleboy/ssh-action@v1.0.0
@@ -90,7 +90,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /var/www/backend.akbrzda.ru
+            cd /var/www/backend.theorica.ru
             npm ci --production
 
       - name: Restart application with PM2
@@ -100,7 +100,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /var/www/backend.akbrzda.ru
+            cd /var/www/backend.theorica.ru
             pm2 describe assessment-backend > /dev/null
             if [ $? -eq 0 ]; then
               pm2 restart assessment-backend

@@ -1,4 +1,17 @@
 /**
+ * Получает часовой пояс пользователя из браузера
+ * @returns {string} - IANA timezone (например, 'Asia/Tashkent')
+ */
+export function getUserTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (error) {
+    console.error("Ошибка определения часового пояса:", error);
+    return "UTC";
+  }
+}
+
+/**
  * Форматирует дату в читаемый формат
  * @param {string|Date} date - Дата для форматирования
  * @param {boolean} includeTime - Включать ли время

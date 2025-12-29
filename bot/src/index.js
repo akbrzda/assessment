@@ -27,7 +27,9 @@ const miniAppUrl = (MINI_APP_URL || "").trim();
 
 function buildWelcomeMessage(firstName) {
   const name = firstName ? `, ${firstName}` : "";
-  return [`Привет${name}!`, "Это официальный бот системы аттестаций сотрудников.", "Чтобы продолжить, открой MiniApp по кнопке ниже."].join("\n");
+  return [`Привет${name}!`, "Добро пожаловать в Theorica. Это приложение для обучения.", "Чтобы продолжить, открой MiniApp по кнопке ниже."].join(
+    "\n"
+  );
 }
 
 bot.start(async (ctx) => {

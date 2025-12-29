@@ -286,11 +286,7 @@ async function updateProfile(req, res, next) {
 
 async function getReferences(req, res, next) {
   try {
-    const [branches, positions, roles] = await Promise.all([
-      referenceModel.getBranches(),
-      referenceModel.getPositions(),
-      referenceModel.getRoles(),
-    ]);
+    const [branches, positions, roles] = await Promise.all([referenceModel.getBranches(), referenceModel.getPositions(), referenceModel.getRoles()]);
 
     res.json({ branches, positions, roles });
   } catch (error) {
@@ -312,6 +308,29 @@ async function getAdminReferences(req, res, next) {
   }
 }
 
+const timezoneSchema = Joi.object({
+  timezone: Joi.string().trim().min(1).max(64).required(),
+});
+
+async function updateTimezone(req, res, next) {
+  try {
+    if (!req.currentUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { error, value } = timezoneSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
+    }
+
+    await userModel.updateTimezone(req.currentUser.id, value.timezone);
+
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getStatus,
   register,
@@ -319,4 +338,5 @@ module.exports = {
   updateProfile,
   getReferences,
   getAdminReferences,
+  updateTimezone,
 };

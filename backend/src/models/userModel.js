@@ -18,6 +18,7 @@ function mapUserRow(row) {
     positionName: row.position_name,
     level: row.level,
     points: row.points,
+    timezone: row.timezone || "UTC",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -26,7 +27,7 @@ function mapUserRow(row) {
 async function findByTelegramId(telegramId) {
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -57,7 +58,7 @@ async function updateProfile(userId, { firstName, lastName }) {
 async function getDashboardData(userId) {
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -75,7 +76,7 @@ async function getDashboardData(userId) {
 async function listUsers() {
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -91,7 +92,7 @@ async function listUsers() {
 async function findById(userId) {
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -163,7 +164,7 @@ async function findByIds(ids) {
   const placeholders = ids.map(() => "?").join(",");
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -177,6 +178,10 @@ async function findByIds(ids) {
   return rows.map(mapUserRow);
 }
 
+async function updateTimezone(userId, timezone) {
+  await pool.execute("UPDATE users SET timezone = ?, updated_at = NOW() WHERE id = ?", [timezone, userId]);
+}
+
 module.exports = {
   findByTelegramId,
   createUser,
@@ -188,4 +193,5 @@ module.exports = {
   deleteUser,
   updateAvatar,
   findByIds,
+  updateTimezone,
 };

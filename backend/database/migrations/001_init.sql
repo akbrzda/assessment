@@ -617,3 +617,11 @@ ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   description = VALUES(description),
   is_active = VALUES(is_active);
+-- Добавление поля timezone в таблицу users
+-- Дата создания: 2025-12-26
+
+ALTER TABLE users 
+ADD COLUMN timezone VARCHAR(64) DEFAULT 'UTC' AFTER password;
+
+-- Добавление индекса для ускорения поиска
+CREATE INDEX idx_timezone ON users(timezone);

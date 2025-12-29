@@ -73,6 +73,12 @@ export const apiClient = {
       body: JSON.stringify(payload),
     });
   },
+  updateTimezone(timezone) {
+    return request("/auth/timezone", {
+      method: "PATCH",
+      body: JSON.stringify({ timezone }),
+    });
+  },
   getReferences() {
     return request("/auth/references");
   },

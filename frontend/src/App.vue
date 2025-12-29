@@ -14,6 +14,7 @@ import { useTelegramStore } from "./stores/telegram";
 import { useThemeStore } from "./stores/theme";
 import { useUserStore } from "./stores/user";
 import { useBackButton } from "./composables/useBackButton";
+import { useTimezone } from "./composables/useTimezone";
 import BottomNavigation from "./components/BottomNavigation.vue";
 import Preloader from "./components/Preloader.vue";
 
@@ -28,6 +29,7 @@ export default {
     const telegramStore = useTelegramStore();
     const themeStore = useThemeStore();
     const userStore = useUserStore();
+    const { initTimezone } = useTimezone();
 
     const { platform } = storeToRefs(telegramStore);
 
@@ -58,6 +60,11 @@ export default {
       themeStore.initTheme();
       try {
         await userStore.ensureStatus();
+
+        // Инициализируем timezone после успешной аутентификации
+        if (userStore.isAuthenticated) {
+          initTimezone();
+        }
       } catch (error) {
         console.error("Не удалось инициализировать пользователя", error);
       }

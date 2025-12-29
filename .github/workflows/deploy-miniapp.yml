@@ -65,7 +65,7 @@ jobs:
         run: |
           rsync -avz --delete \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            frontend/dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/miniapp.akbrzda.ru/
+            frontend/dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/miniapp.theorica.ru/
 
       - name: Verify deployment
         uses: appleboy/ssh-action@v1.0.0
@@ -74,5 +74,5 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            ls -la /var/www/miniapp.akbrzda.ru
+            ls -la /var/www/miniapp.theorica.ru
             echo "Deployment completed successfully"

@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const errorHandler = require("./middleware/errorHandler");
+const timezoneMiddleware = require("./middleware/timezone");
 const authRoutes = require("./routes/authRoutes");
 const invitationRoutes = require("./routes/invitationRoutes");
 const adminRoutes = require("./routes/adminRoutes");
@@ -43,6 +44,9 @@ app.use((req, res, next) => {
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 const apiRouter = express.Router();
+
+// Middleware для конвертации дат в часовой пояс пользователя
+apiRouter.use(timezoneMiddleware);
 
 apiRouter.get("/health", async (req, res, next) => {
   try {

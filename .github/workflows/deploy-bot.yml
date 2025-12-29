@@ -64,7 +64,7 @@ jobs:
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             --exclude 'node_modules' \
             --exclude '.git' \
-            bot/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/backend.akbrzda.ru/bot/
+            bot/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/backend.theorica.ru/bot/
 
       - name: Install dependencies on server
         uses: appleboy/ssh-action@v1.0.0
@@ -73,7 +73,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /var/www/backend.akbrzda.ru/bot
+            cd /var/www/backend.theorica.ru/bot
             npm ci --production
 
       - name: Restart bot with PM2
@@ -83,7 +83,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /var/www/backend.akbrzda.ru/bot
+            cd /var/www/backend.theorica.ru/bot
             pm2 describe assessment-bot > /dev/null
             if [ $? -eq 0 ]; then
               pm2 restart assessment-bot
