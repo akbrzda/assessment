@@ -6,6 +6,7 @@ const DEFAULT_API_BASE_URL = API_BASE_URL || "http://localhost:3001/api";
 
 const apiClient = axios.create({
   baseURL: DEFAULT_API_BASE_URL,
+  withCredentials: true,
 });
 
 // Добавление токена в каждый запрос
@@ -88,13 +89,8 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = localStorage.getItem("refreshToken");
-        if (!refreshToken) {
-          throw new Error("No refresh token available");
-        }
-
-        const { data } = await axios.post(`${DEFAULT_API_BASE_URL}/admin/auth/refresh`, {
-          refreshToken,
+        const { data } = await axios.post(`${DEFAULT_API_BASE_URL}/admin/auth/refresh`, null, {
+          withCredentials: true,
         });
 
         const newAccessToken = data.accessToken;

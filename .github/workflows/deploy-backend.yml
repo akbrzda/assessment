@@ -43,12 +43,13 @@ jobs:
           DB_PASSWORD=${{ secrets.BACKEND_DB_PASSWORD }}
 
           BOT_TOKEN=${{ secrets.BACKEND_BOT_TOKEN }}
-          LOG_BOT_TOKEN=${{ secrets.BACKEND_LOG_BOT_TOKEN }}
-          LOG_CHAT_ID=${{ secrets.BACKEND_LOG_CHAT_ID }}
-          LOG_THREAD_ID=${{ secrets.BACKEND_LOG_THREAD_ID }}
 
           JWT_SECRET=${{ secrets.BACKEND_JWT_SECRET }}
           JWT_REFRESH_SECRET=${{ secrets.BACKEND_JWT_REFRESH_SECRET }}
+          JWT_ACCESS_TTL=${{ secrets.BACKEND_JWT_ACCESS_TTL }}
+          JWT_REFRESH_TTL=${{ secrets.BACKEND_JWT_REFRESH_TTL }}
+          COOKIE_DOMAIN=${{ secrets.BACKEND_COOKIE_DOMAIN }}
+          COOKIE_SAMESITE=${{ secrets.BACKEND_COOKIE_SAMESITE }}
 
           INVITE_EXPIRATION_DAYS=${{ secrets.BACKEND_INVITE_EXPIRATION_DAYS }}
           SUPERADMIN_IDS=${{ secrets.BACKEND_SUPERADMIN_IDS }}

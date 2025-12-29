@@ -1,6 +1,8 @@
 const express = require("express");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 const path = require("path");
+const config = require("./config/env");
 const errorHandler = require("./middleware/errorHandler");
 const timezoneMiddleware = require("./middleware/timezone");
 const authRoutes = require("./routes/authRoutes");
@@ -31,8 +33,14 @@ const levelsRoutes = require("./routes/levels");
 
 const app = express();
 
-app.use(cors({ origin: true, credentials: true }));
+const corsOptions = {
+  origin: config.allowedOrigins.length ? config.allowedOrigins : true,
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
+app.use(cookieParser());
 
 // Защита от индексации поисковыми системами
 app.use((req, res, next) => {

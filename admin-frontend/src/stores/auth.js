@@ -7,7 +7,6 @@ export const useAuthStore = defineStore("auth", {
   state: () => ({
     user: JSON.parse(localStorage.getItem("user")) || null,
     accessToken: localStorage.getItem("accessToken") || null,
-    refreshToken: localStorage.getItem("refreshToken") || null,
     tokenRefreshTimer: null,
     isRefreshing: false,
     userPermissions: null, // Индивидуальные права пользователя
@@ -64,11 +63,9 @@ export const useAuthStore = defineStore("auth", {
 
         this.user = data.user;
         this.accessToken = data.accessToken;
-        this.refreshToken = data.refreshToken;
 
         localStorage.setItem("user", JSON.stringify(data.user));
         localStorage.setItem("accessToken", data.accessToken);
-        localStorage.setItem("refreshToken", data.refreshToken);
 
         // Подключаем WebSocket после успешного логина
         websocketService.connect();
@@ -171,7 +168,6 @@ export const useAuthStore = defineStore("auth", {
 
         this.user = null;
         this.accessToken = null;
-        this.refreshToken = null;
         this.userPermissions = null;
         this.permissionsLoaded = false;
         localStorage.clear();

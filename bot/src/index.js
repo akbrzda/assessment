@@ -14,7 +14,7 @@ for (const filename of envFiles) {
   }
 }
 
-const { BOT_TOKEN, MINI_APP_URL, LOG_CHAT_ID, LOG_THREAD_ID } = process.env;
+const { BOT_TOKEN, MINI_APP_URL } = process.env;
 
 if (!BOT_TOKEN) {
   console.error("[bot] BOT_TOKEN is not set. Check bot/.env.");

@@ -34,8 +34,6 @@ jobs:
           cat << EOF > .env
           BOT_TOKEN=${{ secrets.BOT_TOKEN }}
           MINI_APP_URL=${{ secrets.BOT_MINI_APP_URL }}
-          LOG_CHAT_ID=${{ secrets.BOT_LOG_CHAT_ID }}
-          LOG_THREAD_ID=${{ secrets.BOT_LOG_THREAD_ID }}
           EOF
 
       - name: Setup SSH

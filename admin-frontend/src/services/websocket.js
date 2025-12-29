@@ -166,14 +166,6 @@ class WebSocketService {
 
     try {
       const authStore = useAuthStore();
-      const refreshToken = authStore.refreshToken;
-
-      if (!refreshToken) {
-        console.error("WebSocket: нет refresh токена для обновления");
-        this.isAuthErrorHandling = false;
-        this.disconnect();
-        return;
-      }
 
       // Импортируем authApi динамически чтобы избежать циклических зависимостей
       const { default: authApi } = await import("@/api/auth");

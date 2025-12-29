@@ -43,15 +43,6 @@ module.exports = {
     password: process.env.DB_PASSWORD,
   },
   botToken: process.env.BOT_TOKEN,
-  logBotToken: process.env.LOG_BOT_TOKEN,
-  logChatId: process.env.LOG_CHAT_ID,
-  logThreadId: (() => {
-    if (!process.env.LOG_THREAD_ID) {
-      return null;
-    }
-    const parsed = Number(process.env.LOG_THREAD_ID);
-    return Number.isFinite(parsed) ? parsed : null;
-  })(),
   jwtSecret: process.env.JWT_SECRET || "your_secret_key_here",
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || "your_refresh_secret_key_here",
   inviteExpirationDays: Number(process.env.INVITE_EXPIRATION_DAYS || 7),
