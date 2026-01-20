@@ -119,7 +119,6 @@ export default {
   components: {
     CheckCircle,
     FileText,
-    Hand,
     XCircle,
   },
   setup() {
