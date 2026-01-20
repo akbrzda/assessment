@@ -72,17 +72,23 @@
             <div class="leader-position">{{ getPositionName(leader.positionName) }} • {{ getBranchName(leader.branchName) }}</div>
           </div>
 
-          <div class="leader-stats">
-            <div class="stat-item">
-              <span class="stat-icon">⭐</span>
+            <div class="leader-stats">
+              <div class="stat-item">
+              <span class="stat-icon">
+                <Star />
+              </span>
               <span class="stat-value">{{ leader.points }}</span>
             </div>
             <div class="stat-item">
-              <span class="stat-icon">⏱</span>
+              <span class="stat-icon">
+                <Timer />
+              </span>
               <span class="stat-value">{{ leader.averageTime }}</span>
             </div>
             <div class="stat-item">
-              <span class="stat-icon">✅</span>
+              <span class="stat-icon">
+                <CheckCircle />
+              </span>
               <span class="stat-value">{{ leader.accuracy }}%</span>
             </div>
           </div>
@@ -91,7 +97,9 @@
 
       <!-- Empty State -->
       <div v-else class="empty-state">
-        <div class="empty-icon">🏆</div>
+        <div class="empty-icon">
+          <Trophy />
+        </div>
         <h3 class="title-small mb-8">Рейтинг пока недоступен</h3>
         <p class="body-small text-secondary">Данные появятся после первых аттестаций</p>
       </div>
@@ -123,15 +131,21 @@
 
             <div class="leader-stats">
               <div class="stat-item">
-                <span class="stat-icon">⭐</span>
+                <span class="stat-icon">
+                  <Star />
+                </span>
                 <span class="stat-value">{{ currentUserPosition.points }}</span>
               </div>
               <div class="stat-item">
-                <span class="stat-icon">⏱</span>
+                <span class="stat-icon">
+                  <Timer />
+                </span>
                 <span class="stat-value">{{ currentUserPosition.averageTime }}</span>
               </div>
               <div class="stat-item">
-                <span class="stat-icon">✅</span>
+                <span class="stat-icon">
+                  <CheckCircle />
+                </span>
                 <span class="stat-value">{{ currentUserPosition.accuracy }}%</span>
               </div>
             </div>
@@ -144,12 +158,19 @@
 
 <script>
 import { ref, computed, onMounted } from "vue";
+import { CheckCircle, Star, Timer, Trophy } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 import { apiClient } from "../services/apiClient";
 
 export default {
   name: "LeaderboardView",
+  components: {
+    CheckCircle,
+    Star,
+    Timer,
+    Trophy,
+  },
   setup() {
     const userStore = useUserStore();
     const telegramStore = useTelegramStore();
@@ -556,7 +577,14 @@ export default {
 }
 
 .stat-icon {
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon svg {
+  width: 14px;
+  height: 14px;
 }
 
 .stat-value {
@@ -578,8 +606,15 @@ export default {
 }
 
 .empty-icon {
-  font-size: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 20px;
+}
+
+.empty-icon svg {
+  width: 64px;
+  height: 64px;
 }
 
 .text-secondary {

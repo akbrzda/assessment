@@ -18,7 +18,7 @@
         <!-- Action Buttons -->
         <div class="action-buttons mb-24">
           <button class="btn-icon profile-edit" @click="editProfile">
-            <EditIcon />
+            <Pencil />
           </button>
         </div>
       </div>
@@ -107,7 +107,7 @@
         <div class="modal-header">
           <h2 class="title-medium">Редактировать профиль</h2>
           <button class="btn-icon profile-edit" @click="closeEditModal">
-            <CloseIcon />
+            <X />
           </button>
         </div>
 
@@ -136,17 +136,16 @@
 <script>
 import { ref, computed, reactive, onMounted } from "vue";
 import { useRouter } from "vue-router";
+import { Pencil, X } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 import { apiClient } from "../services/apiClient";
-import EditIcon from "../components/icons/EditIcon.vue";
-import CloseIcon from "../components/icons/CloseIcon.vue";
 
 export default {
   name: "ProfileView",
   components: {
-    EditIcon,
-    CloseIcon,
+    Pencil,
+    X,
   },
   setup() {
     const router = useRouter();

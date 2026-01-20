@@ -155,7 +155,10 @@
   <div v-if="showExitWarningModal" class="modal-overlay">
     <div class="modal-content">
       <div class="modal-body text-center">
-        <h2 class="title-medium mb-16 text-warning">⚠️ Преждевременное завершение</h2>
+        <h2 class="title-medium mb-16 text-warning">
+          <AlertTriangle class="title-icon" />
+          Преждевременное завершение
+        </h2>
         <p class="body-medium mb-16">Если вы покинете аттестацию сейчас:</p>
         <ul class="warning-list mb-20">
           <li>• Результат будет <strong>0%</strong></li>
@@ -174,12 +177,16 @@
 <script>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { AlertTriangle } from "lucide-vue-next";
 import { useTelegramStore } from "../stores/telegram";
 import { useUserStore } from "../stores/user";
 import { apiClient } from "../services/apiClient";
 
 export default {
   name: "AssessmentProcessView",
+  components: {
+    AlertTriangle,
+  },
   setup() {
     const route = useRoute();
     const router = useRouter();
@@ -1373,6 +1380,13 @@ export default {
 
 .text-warning {
   color: var(--warning, #ff9500) !important;
+}
+
+.title-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  vertical-align: -2px;
 }
 
 .warning-list {

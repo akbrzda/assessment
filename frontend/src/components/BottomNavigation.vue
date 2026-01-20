@@ -14,18 +14,13 @@
 
 <script>
 import { computed } from "vue";
+import { Home, ClipboardList, Trophy, User } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
-import HomeIcon from "./icons/HomeIcon.vue";
-import AssessmentIcon from "./icons/AssessmentIcon.vue";
-import TrophyIcon from "./icons/TrophyIcon.vue";
 import UserAvatar from "./UserAvatar.vue";
 
 export default {
   name: "BottomNavigation",
   components: {
-    HomeIcon,
-    AssessmentIcon,
-    TrophyIcon,
     UserAvatar,
   },
   setup() {
@@ -36,25 +31,25 @@ export default {
         name: "dashboard",
         to: "/dashboard",
         label: "Главная",
-        icon: HomeIcon,
+        icon: Home,
       },
       {
         name: "assessments",
         to: "/assessments",
         label: "Аттестации",
-        icon: AssessmentIcon,
+        icon: ClipboardList,
       },
       {
         name: "leaderboard",
         to: "/leaderboard",
         label: "Рейтинг",
-        icon: TrophyIcon,
+        icon: Trophy,
       },
       {
         name: "profile",
         to: "/profile",
         label: "Профиль",
-        icon: UserAvatar,
+        icon: User,
       },
     ]);
 

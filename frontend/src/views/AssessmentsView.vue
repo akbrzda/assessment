@@ -90,7 +90,9 @@
 
       <!-- Empty State -->
       <div v-else class="empty-state">
-        <div class="empty-icon">📄</div>
+        <div class="empty-icon">
+          <FileText />
+        </div>
         <h3 class="title-small mb-8">{{ getEmptyStateTitle() }}</h3>
         <p class="body-small text-secondary">{{ getEmptyStateDescription() }}</p>
       </div>
@@ -101,12 +103,16 @@
 <script>
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
+import { FileText } from "lucide-vue-next";
 import { useTelegramStore } from "../stores/telegram";
 import { useUserStore } from "../stores/user";
 import { apiClient } from "../services/apiClient";
 
 export default {
   name: "AssessmentsView",
+  components: {
+    FileText,
+  },
   setup() {
     const router = useRouter();
     const telegramStore = useTelegramStore();
@@ -470,8 +476,15 @@ export default {
 }
 
 .empty-icon {
-  font-size: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 20px;
+}
+
+.empty-icon svg {
+  width: 64px;
+  height: 64px;
 }
 
 .text-secondary {

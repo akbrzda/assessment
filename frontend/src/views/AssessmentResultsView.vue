@@ -3,8 +3,9 @@
     <div class="container">
       <!-- Results Header -->
       <div class="results-header">
-        <div class="result-icon mb-16">
-          {{ result.passed ? "✅" : "❌" }}
+        <div class="result-icon mb-16" :class="result.passed ? 'success' : 'error'">
+          <CheckCircle v-if="result.passed" />
+          <XCircle v-else />
         </div>
 
         <h1 class="title-large mb-8">{{ result.passed ? "Успешно!" : "Не пройдено" }}</h1>
@@ -50,7 +51,8 @@
             <div class="question-number">
               <span class="number">{{ index + 1 }}</span>
               <div class="result-indicator" :class="{ correct: question.isCorrect }">
-                {{ question.isCorrect ? "✓" : "✗" }}
+                <Check v-if="question.isCorrect" />
+                <X v-else />
               </div>
             </div>
             <div class="question-summary">
@@ -77,12 +79,19 @@
 <script>
 import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { Check, CheckCircle, X, XCircle } from "lucide-vue-next";
 import { useTelegramStore } from "../stores/telegram";
 import { useUserStore } from "../stores/user";
 import { apiClient } from "../services/apiClient";
 
 export default {
   name: "AssessmentResultsView",
+  components: {
+    Check,
+    CheckCircle,
+    X,
+    XCircle,
+  },
   setup() {
     const route = useRoute();
     const router = useRouter();
@@ -226,7 +235,7 @@ export default {
             if (result.value.isEarlyExit) {
               telegramStore.hapticFeedback("notification", "error");
               telegramStore.showAlert(
-                `Аттестация завершена преждевременно.\n\nРезультат: 0%\nПопытка засчитана.\n\nОсталось попыток: ${remainingAttempts.value}`
+                `Аттестация завершена преждевременно.\n\nРезультат: 0%\nПопытка засчитана.\n\nОсталось попыток: ${remainingAttempts.value}`,
               );
             } else if (result.value.passed) {
               telegramStore.hapticFeedback("notification", "success");
@@ -274,8 +283,23 @@ export default {
 }
 
 .result-icon {
-  font-size: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 16px;
+}
+
+.result-icon svg {
+  width: 64px;
+  height: 64px;
+}
+
+.result-icon.success svg {
+  color: var(--success);
+}
+
+.result-icon.error svg {
+  color: var(--error);
 }
 
 .results-summary {
@@ -389,17 +413,24 @@ export default {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background-color: var(--error);
+  background-color: rgba(255, 59, 48, 0.1);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
+}
+
+.result-indicator svg {
+  width: 12px;
+  height: 12px;
+  color: var(--error);
+}
+.result-indicator.correct svg {
+  color: var(--success);
 }
 
 .result-indicator.correct {
-  background-color: var(--success);
+  background-color: rgba(52, 199, 89, 0.1);
 }
 
 .question-summary {

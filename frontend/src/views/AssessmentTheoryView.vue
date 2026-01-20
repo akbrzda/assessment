@@ -12,7 +12,10 @@
 
       <!-- Баннер обновления версии -->
       <div v-if="versionOutdated" class="card warning-card mb-16">
-        <h3 class="title-small mb-4">⚠️ Теория обновлена</h3>
+        <h3 class="title-small mb-4">
+          <AlertTriangle class="title-icon" />
+          Теория обновлена
+        </h3>
         <p class="body-small text-secondary mb-12">Материалы были обновлены. Пожалуйста, изучите новую версию теории.</p>
         <button class="btn btn-primary btn-full" @click="reloadTheory">Загрузить новую версию</button>
       </div>
@@ -29,7 +32,10 @@
 
       <div v-else class="theory-content">
         <div v-if="completion" class="card success-card mb-16">
-          <h3 class="title-small mb-4">✅ Теория уже пройдена</h3>
+          <h3 class="title-small mb-4">
+            <CheckCircle class="title-icon" />
+            Теория уже пройдена
+          </h3>
           <p class="body-small text-secondary">Вы можете перейти к аттестации.</p>
         </div>
 
@@ -117,7 +123,10 @@
 
         <!-- Навигация -->
         <div class="navigation-buttons">
-          <button v-if="currentPageIndex > 0" class="btn btn-secondary" @click="previousPage">← Назад</button>
+          <button v-if="currentPageIndex > 0" class="btn btn-secondary" @click="previousPage">
+            <ArrowLeft class="btn-icon-left" />
+            Назад
+          </button>
           <div v-else></div>
 
           <button v-if="!isLastPage" class="btn btn-primary" :disabled="!canGoNext" @click="nextPage">Далее →</button>
@@ -133,6 +142,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { AlertTriangle, ArrowLeft, CheckCircle } from "lucide-vue-next";
 import { apiClient } from "../services/apiClient";
 import { useTelegramStore } from "../stores/telegram";
 import { sumReadingSeconds, formatReadingTime } from "../utils/readingTime";
@@ -394,6 +404,20 @@ onUnmounted(() => {
   padding-bottom: 20px;
   min-height: 100vh;
   overflow-y: auto;
+}
+
+.title-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+.btn-icon-left {
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
 }
 
 .card {

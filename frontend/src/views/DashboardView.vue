@@ -37,7 +37,9 @@
         </div>
 
         <div v-else class="no-assessment">
-          <div class="empty-icon mb-16">📄</div>
+          <div class="empty-icon mb-16">
+            <FileText />
+          </div>
           <h3 class="title-small mb-8">Нет активных аттестаций</h3>
           <p class="body-small text-secondary">Новые аттестации появятся здесь</p>
         </div>
@@ -83,7 +85,9 @@
 
         <div v-if="recentActivity.length" class="activity-list">
           <div v-for="activity in recentActivity" :key="activity.id" class="activity-item">
-            <div class="activity-icon">{{ activity.icon }}</div>
+            <div class="activity-icon" :class="activity.result.success ? 'success' : 'error'">
+              <component :is="activity.icon" />
+            </div>
             <div class="activity-content">
               <div class="activity-title">{{ activity.title }}</div>
               <div class="activity-date">{{ formatDate(activity.date) }}</div>
@@ -105,12 +109,19 @@
 <script>
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
+import { CheckCircle, FileText, XCircle } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 import { apiClient } from "../services/apiClient";
 
 export default {
   name: "DashboardView",
+  components: {
+    CheckCircle,
+    FileText,
+    Hand,
+    XCircle,
+  },
   setup() {
     const router = useRouter();
     const userStore = useUserStore();
@@ -308,7 +319,7 @@ export default {
             const timestamp = assessment.lastCompletedAt || assessment.lastStartedAt;
             return {
               id: `${assessment.id}-${timestamp}`,
-              icon: assessment.bestResult?.passed ? "✅" : assessment.bestResult ? "❌" : "📄",
+              icon: assessment.bestResult?.passed ? CheckCircle : assessment.bestResult ? XCircle : FileText,
               title: assessment.title,
               date: timestamp,
               result: assessment.bestResult
@@ -354,6 +365,12 @@ export default {
   padding-top: 20px;
 }
 
+.welcome-icon {
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+}
+
 .assessment-card {
   text-align: center;
 }
@@ -374,8 +391,15 @@ export default {
 }
 
 .empty-icon {
-  font-size: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 16px;
+}
+
+.empty-icon svg {
+  width: 48px;
+  height: 48px;
 }
 
 .level-info {
@@ -429,9 +453,28 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
 }
 
+.activity-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.activity-icon.error {
+  background-color: rgba(255, 59, 48, 0.1);
+}
+
+.activity-icon.error svg {
+  color: var(--error);
+}
+
+.activity-icon.success {
+  background-color: rgba(52, 199, 89, 0.1);
+  color: var(--success);
+}
+
+.activity-icon.success svg {
+  color: var(--success);
+}
 .activity-content {
   flex: 1;
 }

@@ -10,7 +10,9 @@
       <!-- Invitation Info -->
       <div v-if="invitation" class="card invitation-card">
         <div class="invitation-header mb-16">
-          <div class="invitation-icon">👋</div>
+          <div class="invitation-icon">
+            <Hand />
+          </div>
           <h2 class="title-medium">Вы приглашены!</h2>
         </div>
 
@@ -45,7 +47,9 @@
 
       <!-- No Invitation -->
       <div v-else class="card empty-state">
-        <div class="empty-icon">❌</div>
+        <div class="empty-icon">
+          <XCircle />
+        </div>
         <h3 class="title-small mb-8">Приглашение недоступно</h3>
         <p class="body-small text-secondary">Приглашение не найдено или истекло. Попросите администратора отправить новую ссылку.</p>
 
@@ -60,11 +64,16 @@
 <script>
 import { computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
+import { Hand, XCircle } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 
 export default {
   name: "InvitationView",
+  components: {
+    Hand,
+    XCircle,
+  },
   setup() {
     const router = useRouter();
     const userStore = useUserStore();
@@ -141,8 +150,15 @@ export default {
 }
 
 .invitation-icon {
-  font-size: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 16px;
+}
+
+.invitation-icon svg {
+  width: 48px;
+  height: 48px;
 }
 
 .invitation-details {
@@ -184,8 +200,15 @@ export default {
 }
 
 .empty-icon {
-  font-size: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 16px;
+}
+
+.empty-icon svg {
+  width: 48px;
+  height: 48px;
 }
 
 .empty-actions {
