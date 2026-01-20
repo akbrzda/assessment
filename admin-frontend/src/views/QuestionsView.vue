@@ -168,9 +168,10 @@ const categoryOptions = computed(() => [
 ]);
 
 const typeOptions = [
-  { value: "single", label: "Один вариант" },
-  { value: "multiple", label: "Множественный выбор" },
-  { value: "text", label: "Текстовый ответ" },
+  { value: "single", label: "Одиночный" },
+  { value: "multiple", label: "Множественный" },
+  { value: "text", label: "Эталонный ответ" },
+  { value: "matching", label: "Сопоставление" },
 ];
 
 const getQuestionTypeLabel = (type) => {

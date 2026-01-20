@@ -133,7 +133,9 @@ exports.getAssessmentById = async (req, res, next) => {
       SELECT 
         q.id,
         q.question_text,
-        q.order_index
+        q.order_index,
+        q.question_type,
+        q.correct_text_answer
       FROM assessment_questions q
       WHERE q.assessment_id = ?
       ORDER BY q.order_index
@@ -145,7 +147,7 @@ exports.getAssessmentById = async (req, res, next) => {
     for (const question of questions) {
       const [options] = await pool.query(
         `
-        SELECT id, option_text, is_correct, order_index
+        SELECT id, option_text, match_text, is_correct, order_index
         FROM assessment_question_options
         WHERE question_id = ?
         ORDER BY order_index
@@ -165,13 +167,39 @@ exports.getAssessmentById = async (req, res, next) => {
         u.telegram_id,
         b.name as branch_name,
         p.name as position_name
-      FROM assessment_user_assignments aua
-      JOIN users u ON aua.user_id = u.id
+      FROM users u
+      JOIN (
+        SELECT aua.user_id AS user_id
+        FROM assessment_user_assignments aua
+        WHERE aua.assessment_id = ?
+          AND aua.is_direct = 1
+        UNION
+        SELECT u.id AS user_id
+        FROM assessment_branch_assignments aba
+        JOIN users u ON u.branch_id = aba.branch_id
+        WHERE aba.assessment_id = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM assessment_position_assignments apa WHERE apa.assessment_id = aba.assessment_id
+          )
+        UNION
+        SELECT u.id AS user_id
+        FROM assessment_position_assignments apa
+        JOIN users u ON u.position_id = apa.position_id
+        WHERE apa.assessment_id = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM assessment_branch_assignments aba WHERE aba.assessment_id = apa.assessment_id
+          )
+        UNION
+        SELECT u.id AS user_id
+        FROM assessment_branch_assignments aba
+        JOIN assessment_position_assignments apa ON apa.assessment_id = aba.assessment_id
+        JOIN users u ON u.branch_id = aba.branch_id AND u.position_id = apa.position_id
+        WHERE aba.assessment_id = ?
+      ) assigned ON assigned.user_id = u.id
       LEFT JOIN branches b ON u.branch_id = b.id
       LEFT JOIN positions p ON u.position_id = p.id
-      WHERE aua.assessment_id = ?
     `,
-      [assessmentId]
+      [assessmentId, assessmentId, assessmentId, assessmentId]
     );
 
     // Получить результаты попыток
@@ -304,6 +332,31 @@ exports.createAssessment = async (req, res, next) => {
       const question = questions[i];
       const questionType = question.questionType || "single";
       const correctTextAnswer = questionType === "text" ? question.correctTextAnswer || "" : null;
+      if (!["single", "multiple", "text", "matching"].includes(questionType)) {
+        return res.status(400).json({ error: "Недопустимый тип вопроса" });
+      }
+      if (questionType === "text" && !correctTextAnswer) {
+        return res.status(400).json({ error: "Для текстового вопроса необходимо указать эталонный ответ" });
+      }
+      if (questionType !== "text") {
+        if (!question.options || question.options.length < 2 || question.options.length > 6) {
+          return res.status(400).json({ error: "Необходимо указать от 2 до 6 вариантов ответов" });
+        }
+        if (questionType === "matching") {
+          const allPairsFilled = question.options.every((opt) => opt.text && opt.matchText && opt.matchText.trim().length > 0);
+          if (!allPairsFilled) {
+            return res.status(400).json({ error: "Для сопоставления необходимо заполнить все пары" });
+          }
+        } else {
+          const correctCount = question.options.filter((opt) => opt.isCorrect).length;
+          if (questionType === "single" && correctCount !== 1) {
+            return res.status(400).json({ error: "Для типа 'один вариант' должен быть ровно один правильный ответ" });
+          }
+          if (questionType === "multiple" && correctCount < 2) {
+            return res.status(400).json({ error: "Для типа 'множественный выбор' должно быть минимум 2 правильных ответа" });
+          }
+        }
+      }
       const [qResult] = await connection.query(
         `
         INSERT INTO assessment_questions (assessment_id, question_text, order_index, question_type, correct_text_answer)
@@ -317,7 +370,7 @@ exports.createAssessment = async (req, res, next) => {
       if (questionType !== "text" && question.options) {
         for (let j = 0; j < question.options.length; j++) {
           const option = question.options[j];
-          const isCorrectValue = option.isCorrect ? 1 : 0;
+          const isCorrectValue = questionType === "single" || questionType === "multiple" ? (option.isCorrect ? 1 : 0) : 0;
           console.log(
             `[createAssessment] Saving option: questionId=${questionId}, text="${option.text}", isCorrect=${
               option.isCorrect
@@ -325,17 +378,17 @@ exports.createAssessment = async (req, res, next) => {
           );
           await connection.query(
             `
-            INSERT INTO assessment_question_options (question_id, option_text, is_correct, order_index)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO assessment_question_options (question_id, option_text, match_text, is_correct, order_index)
+            VALUES (?, ?, ?, ?, ?)
           `,
-            [questionId, option.text, isCorrectValue, j]
+            [questionId, option.text, questionType === "matching" ? option.matchText || "" : null, isCorrectValue, j]
           );
         }
       }
     }
 
     // Назначить пользователей
-    let assignedUserIds = [];
+    let autoUserIds = [];
 
     // Сохранить назначения по филиалам
     if (finalBranchIds && finalBranchIds.length > 0) {
@@ -359,7 +412,7 @@ exports.createAssessment = async (req, res, next) => {
         [finalBranchIds, finalPositionIds]
       );
       console.log("Users from branch+position:", usersFromBoth);
-      assignedUserIds.push(...usersFromBoth.map((u) => u.id));
+      autoUserIds.push(...usersFromBoth.map((u) => u.id));
     } else if (finalBranchIds && finalBranchIds.length > 0) {
       // Только филиалы
       const [usersFromBranches] = await connection.query(
@@ -368,7 +421,7 @@ exports.createAssessment = async (req, res, next) => {
         [finalBranchIds]
       );
       console.log("Users from branches:", usersFromBranches);
-      assignedUserIds.push(...usersFromBranches.map((u) => u.id));
+      autoUserIds.push(...usersFromBranches.map((u) => u.id));
     } else if (finalPositionIds && finalPositionIds.length > 0) {
       // Только должности
       const [usersFromPositions] = await connection.query(
@@ -377,28 +430,34 @@ exports.createAssessment = async (req, res, next) => {
         [finalPositionIds]
       );
       console.log("Users from positions:", usersFromPositions);
-      assignedUserIds.push(...usersFromPositions.map((u) => u.id));
+      autoUserIds.push(...usersFromPositions.map((u) => u.id));
     }
 
     // Назначить по userIds напрямую
-    if (finalUserIds && finalUserIds.length > 0) {
-      assignedUserIds.push(...finalUserIds);
-    }
-
-    // Убрать дубликаты
-    assignedUserIds = [...new Set(assignedUserIds)];
+    const directUserIds = Array.isArray(finalUserIds) ? [...new Set(finalUserIds)] : [];
+    autoUserIds = [...new Set(autoUserIds)];
+    const assignedUserIds = [...new Set([...autoUserIds, ...directUserIds])];
 
     console.log("=== Assignment Debug ===");
     console.log("Final Branch IDs:", finalBranchIds);
     console.log("Final Position IDs:", finalPositionIds);
     console.log("Final User IDs:", finalUserIds);
     console.log("Assigned User IDs:", assignedUserIds);
+    console.log("Direct User IDs:", directUserIds);
+    console.log("Auto User IDs:", autoUserIds);
     console.log("=======================");
 
     // Вставить назначения
     if (assignedUserIds.length > 0) {
-      const assignmentValues = assignedUserIds.map((uid) => [assessmentId, uid]);
-      await connection.query("INSERT INTO assessment_user_assignments (assessment_id, user_id) VALUES ?", [assignmentValues]);
+      const autoValues = autoUserIds.map((uid) => [assessmentId, uid, 0]);
+      const directValues = directUserIds.map((uid) => [assessmentId, uid, 1]);
+      const assignmentValues = [...autoValues, ...directValues];
+      await connection.query(
+        `INSERT INTO assessment_user_assignments (assessment_id, user_id, is_direct)
+         VALUES ?
+         ON DUPLICATE KEY UPDATE is_direct = GREATEST(is_direct, VALUES(is_direct))`,
+        [assignmentValues]
+      );
     } else {
       console.warn("Warning: No users assigned to assessment", assessmentId);
     }
@@ -524,7 +583,7 @@ exports.updateAssessment = async (req, res, next) => {
       }
 
       // Получить список пользователей на основе назначений
-      let assignedUserIds = [];
+      let autoUserIds = [];
 
       if (finalBranchIds && finalBranchIds.length > 0 && finalPositionIds && finalPositionIds.length > 0) {
         // Комбинация: филиал + должность (пользователи должны соответствовать ОБОИМ критериям)
@@ -534,29 +593,33 @@ exports.updateAssessment = async (req, res, next) => {
              AND u.position_id IN (?)`,
           [finalBranchIds, finalPositionIds]
         );
-        assignedUserIds.push(...usersFromBoth.map((u) => u.id));
+        autoUserIds.push(...usersFromBoth.map((u) => u.id));
       } else if (finalBranchIds && finalBranchIds.length > 0) {
         // Только филиалы
         const [usersFromBranches] = await connection.query(`SELECT DISTINCT u.id FROM users u WHERE u.branch_id IN (?)`, [finalBranchIds]);
-        assignedUserIds.push(...usersFromBranches.map((u) => u.id));
+        autoUserIds.push(...usersFromBranches.map((u) => u.id));
       } else if (finalPositionIds && finalPositionIds.length > 0) {
         // Только должности
         const [usersFromPositions] = await connection.query(`SELECT DISTINCT u.id FROM users u WHERE u.position_id IN (?)`, [finalPositionIds]);
-        assignedUserIds.push(...usersFromPositions.map((u) => u.id));
+        autoUserIds.push(...usersFromPositions.map((u) => u.id));
       }
 
       // Добавить напрямую выбранных пользователей
-      if (finalUserIds && finalUserIds.length > 0) {
-        assignedUserIds.push(...finalUserIds);
-      }
-
-      // Убрать дубликаты
-      assignedUserIds = [...new Set(assignedUserIds)];
+      const directUserIds = Array.isArray(finalUserIds) ? [...new Set(finalUserIds)] : [];
+      autoUserIds = [...new Set(autoUserIds)];
+      const assignedUserIds = [...new Set([...autoUserIds, ...directUserIds])];
 
       // Добавить записи в assessment_user_assignments
       if (assignedUserIds.length > 0) {
-        const userAssignmentValues = assignedUserIds.map((uid) => [assessmentId, uid]);
-        await connection.query("INSERT INTO assessment_user_assignments (assessment_id, user_id) VALUES ?", [userAssignmentValues]);
+        const autoValues = autoUserIds.map((uid) => [assessmentId, uid, 0]);
+        const directValues = directUserIds.map((uid) => [assessmentId, uid, 1]);
+        const userAssignmentValues = [...autoValues, ...directValues];
+        await connection.query(
+          `INSERT INTO assessment_user_assignments (assessment_id, user_id, is_direct)
+           VALUES ?
+           ON DUPLICATE KEY UPDATE is_direct = GREATEST(is_direct, VALUES(is_direct))`,
+          [userAssignmentValues]
+        );
       }
 
       console.log(
@@ -574,6 +637,31 @@ exports.updateAssessment = async (req, res, next) => {
         const question = questions[i];
         const questionType = question.questionType || "single";
         const correctTextAnswer = questionType === "text" ? question.correctTextAnswer || "" : null;
+        if (!["single", "multiple", "text", "matching"].includes(questionType)) {
+          return res.status(400).json({ error: "Недопустимый тип вопроса" });
+        }
+        if (questionType === "text" && !correctTextAnswer) {
+          return res.status(400).json({ error: "Для текстового вопроса необходимо указать эталонный ответ" });
+        }
+        if (questionType !== "text") {
+          if (!question.options || question.options.length < 2 || question.options.length > 6) {
+            return res.status(400).json({ error: "Необходимо указать от 2 до 6 вариантов ответов" });
+          }
+          if (questionType === "matching") {
+            const allPairsFilled = question.options.every((opt) => opt.text && opt.matchText && opt.matchText.trim().length > 0);
+            if (!allPairsFilled) {
+              return res.status(400).json({ error: "Для сопоставления необходимо заполнить все пары" });
+            }
+          } else {
+            const correctCount = question.options.filter((opt) => opt.isCorrect).length;
+            if (questionType === "single" && correctCount !== 1) {
+              return res.status(400).json({ error: "Для типа 'один вариант' должен быть ровно один правильный ответ" });
+            }
+            if (questionType === "multiple" && correctCount < 2) {
+              return res.status(400).json({ error: "Для типа 'множественный выбор' должно быть минимум 2 правильных ответа" });
+            }
+          }
+        }
         const [qResult] = await connection.query(
           `
           INSERT INTO assessment_questions (assessment_id, question_text, order_index, question_type, correct_text_answer)
@@ -589,10 +677,16 @@ exports.updateAssessment = async (req, res, next) => {
             const option = question.options[j];
             await connection.query(
               `
-              INSERT INTO assessment_question_options (question_id, option_text, is_correct, order_index)
-              VALUES (?, ?, ?, ?)
+              INSERT INTO assessment_question_options (question_id, option_text, match_text, is_correct, order_index)
+              VALUES (?, ?, ?, ?, ?)
             `,
-              [questionId, option.text, option.isCorrect ? 1 : 0, j]
+              [
+                questionId,
+                option.text,
+                questionType === "matching" ? option.matchText || "" : null,
+                questionType === "single" || questionType === "multiple" ? (option.isCorrect ? 1 : 0) : 0,
+                j,
+              ]
             );
           }
         }
@@ -774,7 +868,9 @@ exports.getAssessmentDetails = async (req, res, next) => {
       SELECT 
         q.id,
         q.question_text,
-        q.order_index
+        q.order_index,
+        q.question_type,
+        q.correct_text_answer
       FROM assessment_questions q
       WHERE q.assessment_id = ?
       ORDER BY q.order_index
@@ -786,7 +882,7 @@ exports.getAssessmentDetails = async (req, res, next) => {
     for (const question of questions) {
       const [options] = await pool.query(
         `
-        SELECT id, option_text, is_correct, order_index
+        SELECT id, option_text, match_text, is_correct, order_index
         FROM assessment_question_options
         WHERE question_id = ?
         ORDER BY order_index

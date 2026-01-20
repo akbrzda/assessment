@@ -69,6 +69,7 @@ function mapAssessmentRow(row) {
 
 async function createAssessment({ assessment, questions, branchIds, userIds, positionIds, userId }) {
   const connection = await pool.getConnection();
+  let committed = false;
   try {
     await connection.beginTransaction();
 
@@ -86,7 +87,7 @@ async function createAssessment({ assessment, questions, branchIds, userIds, pos
         assessment.maxAttempts,
         userId,
         userId,
-      ]
+      ],
     );
 
     const assessmentId = assessmentResult.insertId;
@@ -98,17 +99,23 @@ async function createAssessment({ assessment, questions, branchIds, userIds, pos
       const [questionResult] = await connection.execute(
         `INSERT INTO assessment_questions (assessment_id, order_index, question_text, question_type, correct_text_answer)
          VALUES (?, ?, ?, ?, ?)`,
-        [assessmentId, idx + 1, question.text, questionType, correctTextAnswer]
+        [assessmentId, idx + 1, question.text, questionType, correctTextAnswer],
       );
       const questionId = questionResult.insertId;
 
       if (questionType !== "text" && question.options && question.options.length) {
-        const optionValues = question.options.map((option, optionIdx) => [questionId, optionIdx + 1, option.text, option.isCorrect ? 1 : 0]);
+        const optionValues = question.options.map((option, optionIdx) => [
+          questionId,
+          optionIdx + 1,
+          option.text,
+          questionType === "matching" ? option.matchText || "" : null,
+          questionType === "single" || questionType === "multiple" ? (option.isCorrect ? 1 : 0) : 0,
+        ]);
 
         await connection.query(
-          `INSERT INTO assessment_question_options (question_id, order_index, option_text, is_correct)
+          `INSERT INTO assessment_question_options (question_id, order_index, option_text, match_text, is_correct)
          VALUES ?`,
-          [optionValues]
+          [optionValues],
         );
       }
     }
@@ -119,8 +126,8 @@ async function createAssessment({ assessment, questions, branchIds, userIds, pos
     }
 
     if (Array.isArray(userIds) && userIds.length > 0) {
-      const values = userIds.map((id) => [assessmentId, id]);
-      await connection.query(`INSERT INTO assessment_user_assignments (assessment_id, user_id) VALUES ?`, [values]);
+      const values = userIds.map((id) => [assessmentId, id, 1]);
+      await connection.query(`INSERT INTO assessment_user_assignments (assessment_id, user_id, is_direct) VALUES ?`, [values]);
     }
 
     if (Array.isArray(positionIds) && positionIds.length > 0) {
@@ -140,6 +147,7 @@ async function createAssessment({ assessment, questions, branchIds, userIds, pos
 
 async function updateAssessment(assessmentId, { assessment, questions, branchIds, userIds, positionIds, userId }) {
   const connection = await pool.getConnection();
+  let committed = false;
   try {
     await connection.beginTransaction();
 
@@ -164,7 +172,7 @@ async function updateAssessment(assessmentId, { assessment, questions, branchIds
         assessment.maxAttempts,
         userId,
         assessmentId,
-      ]
+      ],
     );
 
     // Всегда обновляем вопросы
@@ -177,17 +185,23 @@ async function updateAssessment(assessmentId, { assessment, questions, branchIds
       const [questionResult] = await connection.execute(
         `INSERT INTO assessment_questions (assessment_id, order_index, question_text, question_type, correct_text_answer)
          VALUES (?, ?, ?, ?, ?)`,
-        [assessmentId, idx + 1, question.text, questionType, correctTextAnswer]
+        [assessmentId, idx + 1, question.text, questionType, correctTextAnswer],
       );
       const questionId = questionResult.insertId;
 
       if (questionType !== "text" && question.options && question.options.length) {
-        const optionValues = question.options.map((option, optionIdx) => [questionId, optionIdx + 1, option.text, option.isCorrect ? 1 : 0]);
+        const optionValues = question.options.map((option, optionIdx) => [
+          questionId,
+          optionIdx + 1,
+          option.text,
+          questionType === "matching" ? option.matchText || "" : null,
+          questionType === "single" || questionType === "multiple" ? (option.isCorrect ? 1 : 0) : 0,
+        ]);
 
         await connection.query(
-          `INSERT INTO assessment_question_options (question_id, order_index, option_text, is_correct)
+          `INSERT INTO assessment_question_options (question_id, order_index, option_text, match_text, is_correct)
          VALUES ?`,
-          [optionValues]
+          [optionValues],
         );
       }
     }
@@ -204,8 +218,8 @@ async function updateAssessment(assessmentId, { assessment, questions, branchIds
       }
 
       if (Array.isArray(userIds) && userIds.length > 0) {
-        const values = userIds.map((id) => [assessmentId, id]);
-        await connection.query(`INSERT INTO assessment_user_assignments (assessment_id, user_id) VALUES ?`, [values]);
+        const values = userIds.map((id) => [assessmentId, id, 1]);
+        await connection.query(`INSERT INTO assessment_user_assignments (assessment_id, user_id, is_direct) VALUES ?`, [values]);
       }
 
       if (Array.isArray(positionIds) && positionIds.length > 0) {
@@ -305,7 +319,7 @@ async function listAssessmentsForManager({ userId, roleName, branchId }) {
      FROM assessments a
      ${whereClause}
      ORDER BY a.created_at DESC`,
-    params
+    params,
   );
 
   console.log("[listAssessmentsForManager] Найдено аттестаций:", rows.length);
@@ -392,7 +406,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
      FROM assessments a
      ${whereClause}
      LIMIT 1`,
-    params
+    params,
   );
 
   if (!rows.length) {
@@ -413,12 +427,13 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
        o.id AS option_id,
        o.order_index AS option_order,
        o.option_text,
+       o.match_text,
        o.is_correct
      FROM assessment_questions q
      LEFT JOIN assessment_question_options o ON o.question_id = q.id
      WHERE q.assessment_id = ?
      ORDER BY q.order_index ASC, o.order_index ASC`,
-    [assessmentId]
+    [assessmentId],
   );
 
   const questionMap = new Map();
@@ -439,6 +454,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
         id: row.option_id,
         order: row.option_order,
         text: row.option_text,
+        matchText: row.match_text,
         isCorrect: Boolean(row.is_correct),
       };
 
@@ -459,7 +475,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
        JOIN positions p ON p.id = apa.position_id
       WHERE apa.assessment_id = ?
       ORDER BY p.name ASC`,
-    [assessmentId]
+    [assessmentId],
   );
   base.positions = positionRows;
 
@@ -469,7 +485,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
        JOIN branches b ON b.id = aba.branch_id
       WHERE aba.assessment_id = ?
       ORDER BY b.name ASC`,
-    [assessmentId]
+    [assessmentId],
   );
   base.branches = branchRows;
 
@@ -487,7 +503,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
        LEFT JOIN positions p ON p.id = u.position_id
       WHERE aua.assessment_id = ?
       ORDER BY u.last_name ASC, u.first_name ASC`,
-    [assessmentId]
+    [assessmentId],
   );
   base.users = userRows.map((row) => ({
     id: row.id,
@@ -565,7 +581,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
        ON best.assessment_id = ?
       AND best.user_id = assigned.user_id
      ORDER BY u.last_name ASC, u.first_name ASC`,
-    [assessmentId, assessmentId, assessmentId, assessmentId, assessmentId, assessmentId]
+    [assessmentId, assessmentId, assessmentId, assessmentId, assessmentId, assessmentId],
   );
 
   base.participants = participantRows.map((row) => {
@@ -623,7 +639,7 @@ async function listAssignableUsers({ roleName, branchId }) {
      LEFT JOIN positions p ON p.id = u.position_id
      ${whereClause}
      ORDER BY u.last_name ASC, u.first_name ASC`,
-    params
+    params,
   );
 
   return rows.map((row) => ({
@@ -645,7 +661,7 @@ async function listAssignablePositions({ roleName, branchId }) {
          JOIN users u ON u.position_id = p.id
         WHERE u.branch_id = ?
         ORDER BY p.name ASC`,
-      [branchId]
+      [branchId],
     );
     return rows;
   }
@@ -671,32 +687,74 @@ async function listAssignedUserIds(assessmentId) {
          SELECT aua.user_id AS user_id
          FROM assessment_user_assignments aua
          WHERE aua.assessment_id = ?
-         UNION
-         SELECT u.id AS user_id
-         FROM assessment_position_assignments apa
-         JOIN users u ON u.position_id = apa.position_id
-         WHERE apa.assessment_id = ?
+           AND aua.is_direct = 1
          UNION
          SELECT u.id AS user_id
          FROM assessment_branch_assignments aba
          JOIN users u ON u.branch_id = aba.branch_id
          WHERE aba.assessment_id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM assessment_position_assignments apa WHERE apa.assessment_id = aba.assessment_id
+           )
+         UNION
+         SELECT u.id AS user_id
+         FROM assessment_position_assignments apa
+         JOIN users u ON u.position_id = apa.position_id
+         WHERE apa.assessment_id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM assessment_branch_assignments aba WHERE aba.assessment_id = apa.assessment_id
+           )
+         UNION
+         SELECT u.id AS user_id
+         FROM assessment_branch_assignments aba
+         JOIN assessment_position_assignments apa ON apa.assessment_id = aba.assessment_id
+         JOIN users u ON u.branch_id = aba.branch_id AND u.position_id = apa.position_id
+         WHERE aba.assessment_id = ?
        ) AS assigned`,
-    [assessmentId, assessmentId, assessmentId]
+    [assessmentId, assessmentId, assessmentId, assessmentId],
   );
   return rows.map((row) => row.user_id);
 }
 
 async function assignUserToMatchingAssessments({ userId, branchId, positionId }) {
-  if (!userId || (!branchId && !positionId)) {
+  if (!userId) {
     return;
   }
 
+  const normalizeId = (value) => {
+    if (Array.isArray(value)) {
+      value = value[0];
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            value = parsed[0];
+          }
+        } catch (error) {
+          value = trimmed;
+        }
+      } else {
+        value = trimmed;
+      }
+    }
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+  };
+
+  const normalizedBranchId = normalizeId(branchId);
+  const normalizedPositionId = normalizeId(positionId);
+
   const connection = await pool.getConnection();
+  let committed = false;
   try {
+    await connection.beginTransaction();
+
     const assessmentIds = new Set();
 
-    if (branchId) {
+    if (normalizedBranchId) {
       const [branchOnly] = await connection.execute(
         `SELECT aba.assessment_id AS id
            FROM assessment_branch_assignments aba
@@ -704,12 +762,12 @@ async function assignUserToMatchingAssessments({ userId, branchId, positionId })
             AND NOT EXISTS (
               SELECT 1 FROM assessment_position_assignments apa WHERE apa.assessment_id = aba.assessment_id
             )`,
-        [branchId]
+        [normalizedBranchId],
       );
       branchOnly.forEach((row) => assessmentIds.add(row.id));
     }
 
-    if (positionId) {
+    if (normalizedPositionId) {
       const [positionOnly] = await connection.execute(
         `SELECT apa.assessment_id AS id
            FROM assessment_position_assignments apa
@@ -717,34 +775,48 @@ async function assignUserToMatchingAssessments({ userId, branchId, positionId })
             AND NOT EXISTS (
               SELECT 1 FROM assessment_branch_assignments aba WHERE aba.assessment_id = apa.assessment_id
             )`,
-        [positionId]
+        [normalizedPositionId],
       );
       positionOnly.forEach((row) => assessmentIds.add(row.id));
     }
 
-    if (branchId && positionId) {
+    if (normalizedBranchId && normalizedPositionId) {
       const [intersection] = await connection.execute(
         `SELECT DISTINCT aba.assessment_id AS id
            FROM assessment_branch_assignments aba
            JOIN assessment_position_assignments apa ON apa.assessment_id = aba.assessment_id
           WHERE aba.branch_id = ? AND apa.position_id = ?`,
-        [branchId, positionId]
+        [normalizedBranchId, normalizedPositionId],
       );
       intersection.forEach((row) => assessmentIds.add(row.id));
     }
 
     if (!assessmentIds.size) {
-      return;
+      assessmentIds.clear();
     }
 
-    const values = Array.from(assessmentIds).map((assessmentId) => [assessmentId, userId]);
-    await connection.query(
-      `INSERT INTO assessment_user_assignments (assessment_id, user_id)
-         VALUES ?
-       ON DUPLICATE KEY UPDATE assessment_id = VALUES(assessment_id)`,
-      [values]
-    );
+    await connection.execute("DELETE FROM assessment_user_assignments WHERE user_id = ? AND is_direct = 0", [userId]);
+
+    const values = Array.from(assessmentIds).map((assessmentId) => [assessmentId, userId, 0]);
+    if (values.length) {
+      await connection.query(
+        `INSERT INTO assessment_user_assignments (assessment_id, user_id, is_direct)
+           VALUES ?
+         ON DUPLICATE KEY UPDATE is_direct = GREATEST(is_direct, VALUES(is_direct))`,
+        [values],
+      );
+    }
+
+    await connection.commit();
+    committed = true;
   } finally {
+    if (!committed) {
+      try {
+        await connection.rollback();
+      } catch (error) {
+        // ignore rollback errors
+      }
+    }
     connection.release();
   }
 }
@@ -780,18 +852,31 @@ async function listAssessmentsForUser(userId) {
        best_attempts.best_score_percent
      FROM assessments a
      JOIN (
-       SELECT assessment_id
-       FROM assessment_user_assignments
-       WHERE user_id = ?
+       SELECT aua.assessment_id
+       FROM assessment_user_assignments aua
+       WHERE aua.user_id = ?
+         AND aua.is_direct = 1
+       UNION
+       SELECT aba.assessment_id
+       FROM assessment_branch_assignments aba
+       JOIN users u ON u.branch_id = aba.branch_id
+       WHERE u.id = ?
+         AND NOT EXISTS (
+           SELECT 1 FROM assessment_position_assignments apa WHERE apa.assessment_id = aba.assessment_id
+         )
        UNION
        SELECT apa.assessment_id
        FROM assessment_position_assignments apa
        JOIN users u ON u.position_id = apa.position_id
        WHERE u.id = ?
+         AND NOT EXISTS (
+           SELECT 1 FROM assessment_branch_assignments aba WHERE aba.assessment_id = apa.assessment_id
+         )
        UNION
        SELECT aba.assessment_id
        FROM assessment_branch_assignments aba
-       JOIN users u ON u.branch_id = aba.branch_id
+       JOIN assessment_position_assignments apa ON apa.assessment_id = aba.assessment_id
+       JOIN users u ON u.branch_id = aba.branch_id AND u.position_id = apa.position_id
        WHERE u.id = ?
      ) assigned ON assigned.assessment_id = a.id
      LEFT JOIN (
@@ -816,7 +901,7 @@ async function listAssessmentsForUser(userId) {
      LEFT JOIN assessment_theory_versions tv ON tv.id = a.current_theory_version_id AND tv.status = 'published'
      LEFT JOIN assessment_theory_completions tc ON tc.assessment_id = a.id AND tc.user_id = ? AND tc.version_id = tv.id
       ORDER BY a.open_at ASC`,
-    [userId, userId, userId, userId, userId, userId, userId]
+    [userId, userId, userId, userId, userId, userId, userId, userId],
   );
 
   return rows.map((row) => ({
@@ -884,20 +969,38 @@ async function getAssessmentForUser(assessmentId, userId) {
      FROM assessments a
      WHERE a.id = ?
        AND EXISTS (
-         SELECT 1 FROM assessment_user_assignments aua WHERE aua.assessment_id = a.id AND aua.user_id = ?
-         UNION
          SELECT 1
-         FROM assessment_position_assignments apa
-         JOIN users u ON u.position_id = apa.position_id
-         WHERE apa.assessment_id = a.id AND u.id = ?
+         FROM assessment_user_assignments aua
+         WHERE aua.assessment_id = a.id
+           AND aua.user_id = ?
+           AND aua.is_direct = 1
          UNION
          SELECT 1
          FROM assessment_branch_assignments aba
          JOIN users u ON u.branch_id = aba.branch_id
+         WHERE aba.assessment_id = a.id
+           AND u.id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM assessment_position_assignments apa WHERE apa.assessment_id = aba.assessment_id
+           )
+         UNION
+         SELECT 1
+         FROM assessment_position_assignments apa
+         JOIN users u ON u.position_id = apa.position_id
+         WHERE apa.assessment_id = a.id
+           AND u.id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM assessment_branch_assignments aba WHERE aba.assessment_id = apa.assessment_id
+           )
+         UNION
+         SELECT 1
+         FROM assessment_branch_assignments aba
+         JOIN assessment_position_assignments apa ON apa.assessment_id = aba.assessment_id
+         JOIN users u ON u.branch_id = aba.branch_id AND u.position_id = apa.position_id
          WHERE aba.assessment_id = a.id AND u.id = ?
        )
      LIMIT 1`,
-    [assessmentId, userId, userId, userId]
+    [assessmentId, userId, userId, userId, userId],
   );
 
   if (!rows.length) {
@@ -926,12 +1029,13 @@ async function getAssessmentForUser(assessmentId, userId) {
        o.id AS option_id,
        o.order_index AS option_order,
        o.option_text,
+       o.match_text,
        o.is_correct
      FROM assessment_questions q
      LEFT JOIN assessment_question_options o ON o.question_id = q.id
      WHERE q.assessment_id = ?
      ORDER BY q.order_index ASC, o.order_index ASC`,
-    [assessmentId]
+    [assessmentId],
   );
 
   const questionMap = new Map();
@@ -950,6 +1054,7 @@ async function getAssessmentForUser(assessmentId, userId) {
         id: row.option_id,
         order: row.option_order,
         text: row.option_text,
+        matchText: row.match_text,
       });
     }
   });
@@ -962,7 +1067,7 @@ async function getAssessmentForUser(assessmentId, userId) {
       WHERE assessment_id = ? AND user_id = ?
       ORDER BY attempt_number DESC
       LIMIT 1`,
-    [assessmentId, userId]
+    [assessmentId, userId],
   );
 
   base.questions = questionsArray;
@@ -993,7 +1098,7 @@ async function getAssessmentForUser(assessmentId, userId) {
     if (attempt.status === "in_progress") {
       const [answerRows] = await pool.execute(
         "SELECT question_id, option_id, selected_option_ids, text_answer FROM assessment_answers WHERE attempt_id = ?",
-        [attempt.id]
+        [attempt.id],
       );
       const answerMap = new Map(answerRows.map((row) => [row.question_id, row]));
       base.questions = base.questions.map((question) => {
@@ -1004,7 +1109,7 @@ async function getAssessmentForUser(assessmentId, userId) {
         if (question.questionType === "single") {
           return { ...question, selectedOptionId: saved.option_id || null };
         }
-        if (question.questionType === "multiple") {
+        if (question.questionType === "multiple" || question.questionType === "matching") {
           let selectedOptionIds = [];
           if (saved.selected_option_ids) {
             try {
@@ -1015,6 +1120,34 @@ async function getAssessmentForUser(assessmentId, userId) {
             } catch (error) {
               console.warn("Failed to parse saved multi-answer", error);
             }
+          }
+          if (question.questionType === "matching") {
+            const matchPairs = {};
+            if (saved.selected_option_ids) {
+              try {
+                const parsed = JSON.parse(saved.selected_option_ids);
+                if (Array.isArray(parsed)) {
+                  parsed.forEach((pair) => {
+                    const leftId = Number(pair?.leftOptionId);
+                    const rightId = Number(pair?.rightOptionId);
+                    if (Number.isInteger(leftId) && leftId > 0 && Number.isInteger(rightId) && rightId > 0) {
+                      matchPairs[leftId] = rightId;
+                    }
+                  });
+                } else if (parsed && typeof parsed === "object") {
+                  Object.entries(parsed).forEach(([left, right]) => {
+                    const leftId = Number(left);
+                    const rightId = Number(right);
+                    if (Number.isInteger(leftId) && leftId > 0 && Number.isInteger(rightId) && rightId > 0) {
+                      matchPairs[leftId] = rightId;
+                    }
+                  });
+                }
+              } catch (error) {
+                console.warn("Failed to parse saved matching answer", error);
+              }
+            }
+            return { ...question, selectedMatchPairs: matchPairs };
           }
           return { ...question, selectedOptionIds };
         }
@@ -1037,7 +1170,7 @@ async function createAttempt(assessment, userId) {
          FROM assessment_attempts
         WHERE assessment_id = ? AND user_id = ? AND status = 'in_progress'
         LIMIT 1`,
-      [assessment.id, userId]
+      [assessment.id, userId],
     );
 
     if (existingAttemptRows.length) {
@@ -1061,7 +1194,7 @@ async function createAttempt(assessment, userId) {
     logWithTime("createAttempt", "Блокируем запись аттестации для проверки ограничений");
     const [assessmentRow] = await connection.execute(
       "SELECT id, title, open_at, close_at, max_attempts, time_limit_minutes, created_by FROM assessments WHERE id = ? FOR UPDATE",
-      [assessment.id]
+      [assessment.id],
     );
 
     if (!assessmentRow.length) {
@@ -1101,7 +1234,7 @@ async function createAttempt(assessment, userId) {
     const [insertResult] = await connection.execute(
       `INSERT INTO assessment_attempts (assessment_id, user_id, attempt_number, status, started_at, created_at, updated_at)
        VALUES (?, ?, ?, 'in_progress', UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
-      [assessment.id, userId, attemptNumber]
+      [assessment.id, userId, attemptNumber],
     );
 
     const attemptId = insertResult.insertId;
@@ -1143,7 +1276,7 @@ const normalizeTextAnswer = (value) => {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 };
 
-async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, textAnswer }) {
+async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, textAnswer, matchPairs }) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -1155,11 +1288,12 @@ async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, 
       optionId,
       optionIds,
       textAnswer,
+      matchPairs,
     });
 
     const [attemptRows] = await connection.execute(
       "SELECT id, assessment_id, status FROM assessment_attempts WHERE id = ? AND user_id = ? FOR UPDATE",
-      [attemptId, userId]
+      [attemptId, userId],
     );
     if (!attemptRows.length) {
       const error = new Error("Попытка не найдена");
@@ -1176,7 +1310,7 @@ async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, 
 
     const [questionRows] = await connection.execute(
       "SELECT id, question_type, correct_text_answer FROM assessment_questions WHERE id = ? AND assessment_id = ?",
-      [questionId, attempt.assessment_id]
+      [questionId, attempt.assessment_id],
     );
     if (!questionRows.length) {
       const error = new Error("Вопрос не найден");
@@ -1214,7 +1348,7 @@ async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, 
       }
       resolvedOptionId = optionRows[0].id;
       isCorrect = optionRows[0].is_correct ? 1 : 0;
-    } else if (question.question_type === "multiple") {
+    } else if (question.question_type === "multiple" || question.question_type === "matching") {
       if (!Array.isArray(optionIds) || optionIds.length === 0) {
         const error = new Error("Не выбраны варианты ответа");
         error.status = 400;
@@ -1250,6 +1384,50 @@ async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, 
       const normalizedUser = normalizeTextAnswer(resolvedTextAnswer);
       const normalizedCorrect = normalizeTextAnswer(question.correct_text_answer || "");
       isCorrect = normalizedUser && normalizedCorrect && normalizedUser === normalizedCorrect ? 1 : 0;
+    } else if (question.question_type === "matching") {
+      if (!Array.isArray(matchPairs) || matchPairs.length === 0) {
+        const error = new Error("Не указаны пары для сопоставления");
+        error.status = 400;
+        throw error;
+      }
+      const [options] = await connection.execute("SELECT id FROM assessment_question_options WHERE question_id = ?", [questionId]);
+      const validIds = new Set(options.map((opt) => opt.id));
+      const leftIds = new Set();
+      const rightIds = new Set();
+      const normalizedPairs = [];
+
+      for (const pair of matchPairs) {
+        const leftId = Number(pair.leftOptionId);
+        const rightId = Number(pair.rightOptionId);
+        if (!Number.isInteger(leftId) || leftId <= 0 || !Number.isInteger(rightId) || rightId <= 0) {
+          const error = new Error("Некорректные пары для сопоставления");
+          error.status = 400;
+          throw error;
+        }
+        if (!validIds.has(leftId) || !validIds.has(rightId)) {
+          const error = new Error("Выбрана недопустимая пара");
+          error.status = 400;
+          throw error;
+        }
+        if (leftIds.has(leftId) || rightIds.has(rightId)) {
+          const error = new Error("Пары должны быть уникальными");
+          error.status = 400;
+          throw error;
+        }
+        leftIds.add(leftId);
+        rightIds.add(rightId);
+        normalizedPairs.push({ leftOptionId: leftId, rightOptionId: rightId });
+      }
+
+      if (leftIds.size !== options.length || rightIds.size !== options.length) {
+        const error = new Error("Не все пары выбраны");
+        error.status = 400;
+        throw error;
+      }
+
+      normalizedPairs.sort((a, b) => a.leftOptionId - b.leftOptionId);
+      selectedOptionIdsJson = JSON.stringify(normalizedPairs);
+      isCorrect = normalizedPairs.every((pair) => pair.leftOptionId === pair.rightOptionId) ? 1 : 0;
     }
 
     logWithTime("saveAnswer", "Сохраняем ответ", {
@@ -1263,7 +1441,7 @@ async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, 
       `INSERT INTO assessment_answers (attempt_id, question_id, option_id, selected_option_ids, text_answer, is_correct, answered_at, created_at)
        VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
        ON DUPLICATE KEY UPDATE option_id = VALUES(option_id), selected_option_ids = VALUES(selected_option_ids), text_answer = VALUES(text_answer), is_correct = VALUES(is_correct), answered_at = UTC_TIMESTAMP()`,
-      [attemptId, questionId, resolvedOptionId, selectedOptionIdsJson, resolvedTextAnswer, isCorrect]
+      [attemptId, questionId, resolvedOptionId, selectedOptionIdsJson, resolvedTextAnswer, isCorrect],
     );
 
     logWithTime("saveAnswer", "Ответ сохранён", { questionId });
@@ -1281,6 +1459,166 @@ async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, 
   }
 }
 
+async function saveAnswersBatch({ attemptId, userId, answers }) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [attemptRows] = await connection.execute(
+      "SELECT id, assessment_id, status FROM assessment_attempts WHERE id = ? AND user_id = ? FOR UPDATE",
+      [attemptId, userId],
+    );
+    if (!attemptRows.length) {
+      const error = new Error("Попытка не найдена");
+      error.status = 404;
+      throw error;
+    }
+    const attempt = attemptRows[0];
+    if (attempt.status !== "in_progress") {
+      const error = new Error("Попытка уже завершена");
+      error.status = 400;
+      throw error;
+    }
+
+    const results = [];
+
+    for (const payload of answers) {
+      const { questionId, optionId, optionIds, textAnswer, matchPairs } = payload;
+      const [questionRows] = await connection.execute(
+        "SELECT id, question_type, correct_text_answer FROM assessment_questions WHERE id = ? AND assessment_id = ?",
+        [questionId, attempt.assessment_id],
+      );
+      if (!questionRows.length) {
+        const error = new Error("Вопрос не найден");
+        error.status = 404;
+        throw error;
+      }
+
+      const question = questionRows[0];
+      let resolvedOptionId = null;
+      let selectedOptionIdsJson = null;
+      let resolvedTextAnswer = null;
+      let isCorrect = 0;
+
+      if (question.question_type === "single") {
+        if (!optionId) {
+          const error = new Error("Не указан вариант ответа");
+          error.status = 400;
+          throw error;
+        }
+        const [optionRows] = await connection.execute("SELECT id, is_correct FROM assessment_question_options WHERE id = ? AND question_id = ?", [
+          optionId,
+          questionId,
+        ]);
+        if (!optionRows.length) {
+          const error = new Error("Ответ не найден");
+          error.status = 404;
+          throw error;
+        }
+        resolvedOptionId = optionRows[0].id;
+        isCorrect = optionRows[0].is_correct ? 1 : 0;
+      } else if (question.question_type === "multiple" || question.question_type === "matching") {
+        if (!Array.isArray(optionIds) || optionIds.length === 0) {
+          const error = new Error("Не выбраны варианты ответа");
+          error.status = 400;
+          throw error;
+        }
+        const normalizedIds = [...new Set(optionIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
+        if (!normalizedIds.length) {
+          const error = new Error("Некорректные варианты ответа");
+          error.status = 400;
+          throw error;
+        }
+        const [options] = await connection.execute("SELECT id, is_correct FROM assessment_question_options WHERE question_id = ?", [questionId]);
+        const validIds = new Set(options.map((opt) => opt.id));
+        if (!normalizedIds.every((id) => validIds.has(id))) {
+          const error = new Error("Выбран недопустимый вариант ответа");
+          error.status = 400;
+          throw error;
+        }
+        const correctIds = options.filter((opt) => opt.is_correct).map((opt) => opt.id);
+        const sortedSelected = normalizedIds.slice().sort((a, b) => a - b);
+        const sortedCorrect = correctIds.slice().sort((a, b) => a - b);
+        const equalLength = sortedSelected.length === sortedCorrect.length;
+        const match = equalLength && sortedSelected.every((id, idx) => id === sortedCorrect[idx]);
+        isCorrect = match ? 1 : 0;
+        selectedOptionIdsJson = JSON.stringify(sortedSelected);
+      } else if (question.question_type === "text") {
+        if (typeof textAnswer !== "string") {
+          const error = new Error("Ответ должен быть текстом");
+          error.status = 400;
+          throw error;
+        }
+        resolvedTextAnswer = textAnswer.trim();
+        const normalizedUser = normalizeTextAnswer(resolvedTextAnswer);
+        const normalizedCorrect = normalizeTextAnswer(question.correct_text_answer || "");
+        isCorrect = normalizedUser && normalizedCorrect && normalizedUser === normalizedCorrect ? 1 : 0;
+      } else if (question.question_type === "matching") {
+        if (!Array.isArray(matchPairs) || matchPairs.length === 0) {
+          const error = new Error("Не указаны пары для сопоставления");
+          error.status = 400;
+          throw error;
+        }
+        const [options] = await connection.execute("SELECT id FROM assessment_question_options WHERE question_id = ?", [questionId]);
+        const validIds = new Set(options.map((opt) => opt.id));
+        const leftIds = new Set();
+        const rightIds = new Set();
+        const normalizedPairs = [];
+
+        for (const pair of matchPairs) {
+          const leftId = Number(pair.leftOptionId);
+          const rightId = Number(pair.rightOptionId);
+          if (!Number.isInteger(leftId) || leftId <= 0 || !Number.isInteger(rightId) || rightId <= 0) {
+            const error = new Error("Некорректные пары для сопоставления");
+            error.status = 400;
+            throw error;
+          }
+          if (!validIds.has(leftId) || !validIds.has(rightId)) {
+            const error = new Error("Выбрана недопустимая пара");
+            error.status = 400;
+            throw error;
+          }
+          if (leftIds.has(leftId) || rightIds.has(rightId)) {
+            const error = new Error("Пары должны быть уникальными");
+            error.status = 400;
+            throw error;
+          }
+          leftIds.add(leftId);
+          rightIds.add(rightId);
+          normalizedPairs.push({ leftOptionId: leftId, rightOptionId: rightId });
+        }
+
+        if (leftIds.size !== options.length || rightIds.size !== options.length) {
+          const error = new Error("Не все пары выбраны");
+          error.status = 400;
+          throw error;
+        }
+
+        normalizedPairs.sort((a, b) => a.leftOptionId - b.leftOptionId);
+        selectedOptionIdsJson = JSON.stringify(normalizedPairs);
+        isCorrect = normalizedPairs.every((pair) => pair.leftOptionId === pair.rightOptionId) ? 1 : 0;
+      }
+
+      await connection.execute(
+        `INSERT INTO assessment_answers (attempt_id, question_id, option_id, selected_option_ids, text_answer, is_correct, answered_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+         ON DUPLICATE KEY UPDATE option_id = VALUES(option_id), selected_option_ids = VALUES(selected_option_ids), text_answer = VALUES(text_answer), is_correct = VALUES(is_correct), answered_at = UTC_TIMESTAMP()`,
+        [attemptId, questionId, resolvedOptionId, selectedOptionIdsJson, resolvedTextAnswer, isCorrect],
+      );
+
+      results.push({ questionId, isCorrect: !!isCorrect, assessmentId: attempt.assessment_id });
+    }
+
+    await connection.commit();
+    return results;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 async function completeAttempt(attemptId, userId) {
   const connection = await pool.getConnection();
   try {
@@ -1289,7 +1627,7 @@ async function completeAttempt(attemptId, userId) {
 
     const [attemptRows] = await connection.execute(
       "SELECT id, assessment_id, status, started_at, attempt_number FROM assessment_attempts WHERE id = ? AND user_id = ? FOR UPDATE",
-      [attemptId, userId]
+      [attemptId, userId],
     );
     if (!attemptRows.length) {
       const error = new Error("Попытка не найдена");
@@ -1306,7 +1644,7 @@ async function completeAttempt(attemptId, userId) {
 
     const [assessmentRows] = await connection.execute(
       "SELECT id, title, pass_score_percent, time_limit_minutes, created_by FROM assessments WHERE id = ?",
-      [attempt.assessment_id]
+      [attempt.assessment_id],
     );
     if (!assessmentRows.length) {
       const error = new Error("Аттестация не найдена");
@@ -1328,7 +1666,7 @@ async function completeAttempt(attemptId, userId) {
     // Получим все ответы для отладки
     const [allAnswers] = await connection.execute(
       "SELECT question_id, option_id, selected_option_ids, text_answer, is_correct FROM assessment_answers WHERE attempt_id = ?",
-      [attemptId]
+      [attemptId],
     );
     logWithTime("completeAttempt", "Список всех ответов", allAnswers);
 
@@ -1344,12 +1682,12 @@ async function completeAttempt(attemptId, userId) {
              completed_at = UTC_TIMESTAMP(),
              updated_at = UTC_TIMESTAMP()
        WHERE id = ?`,
-      [scorePercent, correctAnswers, totalQuestions, attemptId]
+      [scorePercent, correctAnswers, totalQuestions, attemptId],
     );
 
     const [[updatedAttempt]] = await connection.execute(
       "SELECT score_percent, correct_answers, total_questions, time_spent_seconds FROM assessment_attempts WHERE id = ?",
-      [attemptId]
+      [attemptId],
     );
 
     await connection.commit();
@@ -1408,7 +1746,7 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
         AND aa.assessment_id = ?
         AND aa.user_id = ?
       LIMIT 1`,
-    [attemptId, assessmentId, userId]
+    [attemptId, assessmentId, userId],
   );
 
   if (!attemptRows.length) {
@@ -1452,15 +1790,36 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
      ) correct ON correct.question_id = q.id
      WHERE q.assessment_id = ?
      ORDER BY q.order_index ASC`,
-    [attemptId, assessmentId]
+    [attemptId, assessmentId],
   );
 
   const questions = questionRows.map((row) => {
     let selectedOptionIds = [];
+    let selectedMatchPairs = null;
     if (row.selected_option_ids) {
       try {
         const parsed = JSON.parse(row.selected_option_ids);
-        if (Array.isArray(parsed)) {
+        if (row.question_type === "matching") {
+          const matchPairs = {};
+          if (Array.isArray(parsed)) {
+            parsed.forEach((pair) => {
+              const leftId = Number(pair?.leftOptionId);
+              const rightId = Number(pair?.rightOptionId);
+              if (Number.isInteger(leftId) && leftId > 0 && Number.isInteger(rightId) && rightId > 0) {
+                matchPairs[leftId] = rightId;
+              }
+            });
+          } else if (parsed && typeof parsed === "object") {
+            Object.entries(parsed).forEach(([left, right]) => {
+              const leftId = Number(left);
+              const rightId = Number(right);
+              if (Number.isInteger(leftId) && leftId > 0 && Number.isInteger(rightId) && rightId > 0) {
+                matchPairs[leftId] = rightId;
+              }
+            });
+          }
+          selectedMatchPairs = matchPairs;
+        } else if (Array.isArray(parsed)) {
           selectedOptionIds = parsed.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
         }
       } catch (error) {
@@ -1474,6 +1833,7 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
       questionType: row.question_type || "single",
       selectedOptionId: row.selected_option_id || null,
       selectedOptionIds,
+      selectedMatchPairs,
       selectedTextAnswer: row.selected_text_answer || null,
       selectedOptionText: row.selected_option_text || null,
       correctOptionId: row.correct_option_id || null,
@@ -1495,7 +1855,7 @@ async function getAttemptResult({ assessmentId, attemptId, userId }) {
        FROM assessment_attempts
       WHERE assessment_id = ? AND user_id = ?
       ORDER BY attempt_number ASC`,
-    [assessmentId, userId]
+    [assessmentId, userId],
   );
 
   const history = historyRows.map((row) => ({
@@ -1550,7 +1910,7 @@ async function getRecentlyOpenedAssessments(now) {
     FROM assessments
     WHERE open_at >= ? AND open_at <= ? AND close_at > ?
     ORDER BY open_at DESC`,
-    [fiveMinAgo, now, now]
+    [fiveMinAgo, now, now],
   );
   return rows.map(mapAssessmentRow);
 }
@@ -1568,7 +1928,7 @@ async function getOpenAssessments(now) {
     FROM assessments
     WHERE open_at <= ? AND close_at > ?
     ORDER BY close_at ASC`,
-    [now, now]
+    [now, now],
   );
   return rows.map(mapAssessmentRow);
 }
@@ -1599,7 +1959,7 @@ async function getUsersWithIncompleteAttempts(assessmentId) {
       SELECT 1 FROM attempts a
       WHERE a.user_id = u.id AND a.assessment_id = ? AND a.completed_at IS NOT NULL
     )`,
-    [assessmentId, assessmentId, assessmentId, assessmentId]
+    [assessmentId, assessmentId, assessmentId, assessmentId],
   );
   return rows;
 }
@@ -1642,6 +2002,7 @@ module.exports = {
   getAssessmentForUser,
   createAttempt,
   saveAnswer,
+  saveAnswersBatch,
   completeAttempt,
   getAttemptResult,
   getRecentlyOpenedAssessments,

@@ -29,7 +29,7 @@ router.post("/", verifyAdminRole(["superadmin"]), invalidateCacheMiddleware(/^ht
 router.patch(
   "/:id",
   canEditUser,
-  invalidateCacheMiddleware((req) => new RegExp(`^http:GET:.*\/api\/admin\/users(\/|\\?|$)`)),
+  invalidateCacheMiddleware((req) => new RegExp(`^http:GET:.*\/api\/admin\/(users|assessments)(\/|\\?|$)`)),
   adminUserController.updateUser
 );
 

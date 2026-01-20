@@ -139,6 +139,49 @@ async function getCurrentTheoryMeta(assessmentId) {
 }
 
 async function getTheoryForUser({ assessmentId, userId }) {
+  const [accessRows] = await pool.execute(
+    `SELECT 1
+       FROM assessments a
+      WHERE a.id = ?
+        AND EXISTS (
+          SELECT 1
+          FROM assessment_user_assignments aua
+          WHERE aua.assessment_id = a.id
+            AND aua.user_id = ?
+            AND aua.is_direct = 1
+          UNION
+          SELECT 1
+          FROM assessment_branch_assignments aba
+          JOIN users u ON u.branch_id = aba.branch_id
+          WHERE aba.assessment_id = a.id
+            AND u.id = ?
+            AND NOT EXISTS (
+              SELECT 1 FROM assessment_position_assignments apa WHERE apa.assessment_id = aba.assessment_id
+            )
+          UNION
+          SELECT 1
+          FROM assessment_position_assignments apa
+          JOIN users u ON u.position_id = apa.position_id
+          WHERE apa.assessment_id = a.id
+            AND u.id = ?
+            AND NOT EXISTS (
+              SELECT 1 FROM assessment_branch_assignments aba WHERE aba.assessment_id = apa.assessment_id
+            )
+          UNION
+          SELECT 1
+          FROM assessment_branch_assignments aba
+          JOIN assessment_position_assignments apa ON apa.assessment_id = aba.assessment_id
+          JOIN users u ON u.branch_id = aba.branch_id AND u.position_id = apa.position_id
+          WHERE aba.assessment_id = a.id AND u.id = ?
+        )
+      LIMIT 1`,
+    [assessmentId, userId, userId, userId, userId]
+  );
+
+  if (!accessRows.length) {
+    return null;
+  }
+
   const [rows] = await pool.execute(
     `SELECT
        a.id AS assessment_id,
@@ -215,13 +258,48 @@ async function saveCompletion({ assessmentId, versionId, userId, timeSpentSecond
   try {
     await connection.beginTransaction();
 
-    const [assessmentRows] = await connection.execute("SELECT id, current_theory_version_id FROM assessments WHERE id = ? FOR UPDATE", [
-      assessmentId,
-    ]);
+    const [assessmentRows] = await connection.execute(
+      `SELECT a.id, a.current_theory_version_id
+         FROM assessments a
+        WHERE a.id = ?
+          AND EXISTS (
+            SELECT 1
+            FROM assessment_user_assignments aua
+            WHERE aua.assessment_id = a.id
+              AND aua.user_id = ?
+              AND aua.is_direct = 1
+            UNION
+            SELECT 1
+            FROM assessment_branch_assignments aba
+            JOIN users u ON u.branch_id = aba.branch_id
+            WHERE aba.assessment_id = a.id
+              AND u.id = ?
+              AND NOT EXISTS (
+                SELECT 1 FROM assessment_position_assignments apa WHERE apa.assessment_id = aba.assessment_id
+              )
+            UNION
+            SELECT 1
+            FROM assessment_position_assignments apa
+            JOIN users u ON u.position_id = apa.position_id
+            WHERE apa.assessment_id = a.id
+              AND u.id = ?
+              AND NOT EXISTS (
+                SELECT 1 FROM assessment_branch_assignments aba WHERE aba.assessment_id = apa.assessment_id
+              )
+            UNION
+            SELECT 1
+            FROM assessment_branch_assignments aba
+            JOIN assessment_position_assignments apa ON apa.assessment_id = aba.assessment_id
+            JOIN users u ON u.branch_id = aba.branch_id AND u.position_id = apa.position_id
+            WHERE aba.assessment_id = a.id AND u.id = ?
+          )
+        FOR UPDATE`,
+      [assessmentId, userId, userId, userId, userId]
+    );
 
     if (!assessmentRows.length) {
-      const error = new Error("Аттестация не найдена");
-      error.status = 404;
+      const error = new Error("Нет доступа к аттестации");
+      error.status = 403;
       throw error;
     }
 

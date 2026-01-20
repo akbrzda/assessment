@@ -16,6 +16,7 @@ router.get('/:id/theory', requireRole(['employee', 'manager', 'superadmin']), th
 router.post('/:id/theory/completion', requireRole(['employee', 'manager', 'superadmin']), theoryController.completeTheory);
 router.post('/:id/attempts', requireRole(['employee', 'manager', 'superadmin']), assessmentController.startAttempt);
 router.post('/:id/attempts/:attemptId/answers', requireRole(['employee', 'manager', 'superadmin']), assessmentController.submitAnswer);
+router.post('/:id/attempts/:attemptId/answers/batch', requireRole(['employee', 'manager', 'superadmin']), assessmentController.submitAnswersBatch);
 router.post('/:id/attempts/:attemptId/complete', requireRole(['employee', 'manager', 'superadmin']), assessmentController.completeAttempt);
 router.get('/:id/attempts/:attemptId', requireRole(['employee', 'manager', 'superadmin']), assessmentController.getAttemptResultController);
 router.get('/admin', requireRole(['superadmin', 'manager']), assessmentController.listManaged);

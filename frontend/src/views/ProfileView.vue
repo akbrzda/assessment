@@ -17,7 +17,7 @@
 
         <!-- Action Buttons -->
         <div class="action-buttons mb-24">
-          <button class="btn-icon" @click="editProfile">
+          <button class="btn-icon profile-edit" @click="editProfile">
             <EditIcon />
           </button>
         </div>
@@ -99,7 +99,6 @@
         <div class="skeleton-line mb-8 w-70"></div>
         <div class="skeleton-line mb-8 w-60"></div>
       </div>
-
     </div>
 
     <!-- Edit Profile Modal -->
@@ -107,7 +106,7 @@
       <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h2 class="title-medium">Редактировать профиль</h2>
-          <button class="btn-icon" @click="closeEditModal">
+          <button class="btn-icon profile-edit" @click="closeEditModal">
             <CloseIcon />
           </button>
         </div>
@@ -240,12 +239,10 @@ export default {
         await userStore.ensureStatus();
       }
 
-      const leaderboardPromise = apiClient
-        .getLeaderboardUsers()
-        .catch((error) => {
-          console.warn("Не удалось получить лидерборд", error);
-          return null;
-        });
+      const leaderboardPromise = apiClient.getLeaderboardUsers().catch((error) => {
+        console.warn("Не удалось получить лидерборд", error);
+        return null;
+      });
 
       const [overviewResponse, assessmentsResponse, leaderboard] = await Promise.all([
         userStore.loadOverview(),
@@ -349,6 +346,9 @@ export default {
   font-weight: 700;
   font-size: 32px;
   overflow: hidden;
+}
+.profile-edit {
+  background: var(--bg-secondary);
 }
 
 .avatar-large img {

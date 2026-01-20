@@ -18,6 +18,7 @@
       <p class="form-hint">
         <template v-if="form.questionType === 'single'">Один правильный вариант из списка</template>
         <template v-else-if="form.questionType === 'multiple'">Несколько правильных вариантов</template>
+        <template v-else-if="form.questionType === 'matching'">Сопоставление элементов</template>
         <template v-else>Сотрудник вводит текст, который сравнивается с эталонным</template>
       </p>
 
@@ -44,12 +45,18 @@
 
         <div class="options-list">
           <div v-for="(option, index) in form.options" :key="index" class="option-row">
-            <Input v-model="option.text" type="text" placeholder="Текст варианта" required />
-            <label class="option-checkbox-label">
-              <input v-if="form.questionType === 'multiple'" type="checkbox" v-model="option.isCorrect" />
-              <input v-else type="radio" :name="'correct-option'" :checked="option.isCorrect" @change="() => setCorrectOption(index)" />
-              <span>Правильный</span>
-            </label>
+            <template v-if="form.questionType === 'matching'">
+              <Input v-model="option.text" type="text" placeholder="Левая колонка" required />
+              <Input v-model="option.matchText" type="text" placeholder="Правая колонка" required />
+            </template>
+            <template v-else>
+              <Input v-model="option.text" type="text" placeholder="Текст варианта" required />
+              <label class="option-checkbox-label">
+                <input v-if="form.questionType === 'multiple'" type="checkbox" v-model="option.isCorrect" />
+                <input v-else type="radio" :name="'correct-option'" :checked="option.isCorrect" @change="() => setCorrectOption(index)" />
+                <span>Правильный</span>
+              </label>
+            </template>
             <Button @click="removeOption(index)" :disabled="form.options.length <= 2" variant="danger" size="sm" icon="trash" />
           </div>
         </div>
@@ -57,7 +64,8 @@
 
         <p class="form-hint">
           <template v-if="form.questionType === 'single'">Отметьте один правильный ответ</template>
-          <template v-else>Отметьте минимум 2 правильных ответа</template>
+          <template v-else-if="form.questionType === 'multiple'">Отметьте минимум 2 правильных ответа</template>
+          <template v-else>Заполните все пары</template>
         </p>
       </div>
 
@@ -104,9 +112,15 @@ const form = ref({
   questionText: "",
   correctTextAnswer: "",
   options: [
-    { text: "", isCorrect: true },
-    { text: "", isCorrect: false },
+    { text: "", matchText: "", isCorrect: true },
+    { text: "", matchText: "", isCorrect: false },
   ],
+});
+const typeCache = ref({
+  text: { correctTextAnswer: "" },
+  single: { options: [] },
+  multiple: { options: [] },
+  matching: { options: [] },
 });
 
 const isFormValid = computed(() => {
@@ -119,7 +133,10 @@ const isFormValid = computed(() => {
   if (form.value.options.length < 2 || form.value.options.length > 6) return false;
 
   // Проверить, что все варианты заполнены
-  const allFilled = form.value.options.every((opt) => opt.text.trim().length > 0);
+  const allFilled =
+    form.value.questionType === "matching"
+      ? form.value.options.every((opt) => opt.text.trim().length > 0 && opt.matchText && opt.matchText.trim().length > 0)
+      : form.value.options.every((opt) => opt.text.trim().length > 0);
   if (!allFilled) return false;
 
   // Проверить правильные ответы
@@ -131,7 +148,7 @@ const isFormValid = computed(() => {
     return correctCount >= 2;
   }
 
-  return false;
+  return form.value.questionType === "matching";
 });
 
 const categoryOptions = computed(() => [
@@ -143,25 +160,56 @@ const categoryOptions = computed(() => [
 ]);
 
 const questionTypeOptions = [
-  { value: "single", label: "Один вариант ответа" },
-  { value: "multiple", label: "Множественный выбор" },
-  { value: "text", label: "Текстовый ответ" },
+  { value: "single", label: "Одиночный" },
+  { value: "multiple", label: "Множественный" },
+  { value: "text", label: "Эталонный ответ" },
+  { value: "matching", label: "Сопоставление" },
 ];
 
 // При смене типа вопроса сбрасываем данные
 watch(
   () => form.value.questionType,
   (newType, oldType) => {
+    if (oldType === "text") {
+      typeCache.value.text.correctTextAnswer = form.value.correctTextAnswer || "";
+    } else {
+      typeCache.value[oldType] = {
+        options: (form.value.options || []).map((opt) => ({
+          text: opt.text || "",
+          matchText: opt.matchText || "",
+          isCorrect: Boolean(opt.isCorrect),
+        })),
+      };
+    }
+
     if (newType === "text") {
-      form.value.correctTextAnswer = "";
+      form.value.correctTextAnswer = typeCache.value.text.correctTextAnswer || "";
       form.value.options = [];
     } else if (oldType === "text") {
       form.value.correctTextAnswer = "";
-      form.value.options = [
-        { text: "", isCorrect: true },
-        { text: "", isCorrect: false },
-      ];
+      const cachedOptions = typeCache.value[newType]?.options;
+      form.value.options =
+        cachedOptions && cachedOptions.length
+          ? cachedOptions.map((opt) => ({ ...opt }))
+          : [
+              { text: "", matchText: "", isCorrect: true },
+              { text: "", matchText: "", isCorrect: false },
+            ];
+    } else if (newType === "matching") {
+      const cachedOptions = typeCache.value.matching?.options;
+      form.value.options =
+        cachedOptions && cachedOptions.length
+          ? cachedOptions.map((opt) => ({ ...opt, isCorrect: false }))
+          : form.value.options.map((opt) => ({
+              text: opt.text || "",
+              matchText: opt.matchText || "",
+              isCorrect: false,
+            }));
     } else if (newType === "single") {
+      const cachedOptions = typeCache.value.single?.options;
+      if (cachedOptions && cachedOptions.length) {
+        form.value.options = cachedOptions.map((opt) => ({ ...opt }));
+      }
       // При переключении на single оставляем только один правильный
       let foundCorrect = false;
       form.value.options.forEach((opt) => {
@@ -173,6 +221,11 @@ watch(
       });
       if (!foundCorrect && form.value.options.length > 0) {
         form.value.options[0].isCorrect = true;
+      }
+    } else if (newType === "multiple") {
+      const cachedOptions = typeCache.value.multiple?.options;
+      if (cachedOptions && cachedOptions.length) {
+        form.value.options = cachedOptions.map((opt) => ({ ...opt }));
       }
     }
   }
@@ -194,10 +247,22 @@ const loadQuestion = async () => {
       options: question.options
         ? question.options.map((opt) => ({
             text: opt.option_text,
+            matchText: opt.match_text || "",
             isCorrect: opt.is_correct === 1,
           }))
         : [],
     };
+    if (form.value.questionType === "text") {
+      typeCache.value.text.correctTextAnswer = form.value.correctTextAnswer || "";
+    } else {
+      typeCache.value[form.value.questionType] = {
+        options: (form.value.options || []).map((opt) => ({
+          text: opt.text || "",
+          matchText: opt.matchText || "",
+          isCorrect: Boolean(opt.isCorrect),
+        })),
+      };
+    }
   } catch (error) {
     console.error("Load question error:", error);
     showToast("Ошибка загрузки вопроса", "error");
@@ -210,6 +275,7 @@ const addOption = () => {
   if (form.value.options.length < 6) {
     form.value.options.push({
       text: "",
+      matchText: "",
       isCorrect: false,
     });
   }
@@ -233,6 +299,8 @@ const handleSubmit = async () => {
       showToast("Пожалуйста, заполните текст вопроса и эталонный ответ", "warning");
     } else if (form.value.questionType === "single") {
       showToast("Пожалуйста, заполните все поля и отметьте один правильный ответ", "warning");
+    } else if (form.value.questionType === "matching") {
+      showToast("Пожалуйста, заполните все пары", "warning");
     } else {
       showToast("Пожалуйста, заполните все поля и отметьте минимум 2 правильных ответа", "warning");
     }

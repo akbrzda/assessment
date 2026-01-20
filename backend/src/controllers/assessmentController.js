@@ -9,12 +9,13 @@ const { logAndSend, buildActorFromRequest } = require("../services/auditService"
 
 const optionSchema = Joi.object({
   text: Joi.string().trim().min(1).max(512).required(),
-  isCorrect: Joi.boolean().required(),
+  isCorrect: Joi.boolean().default(false),
+  matchText: Joi.string().trim().min(1).max(512).allow("", null),
 });
 
 const questionSchema = Joi.object({
   text: Joi.string().trim().min(1).required(),
-  questionType: Joi.string().valid("single", "multiple", "text").default("single"),
+  questionType: Joi.string().valid("single", "multiple", "text", "matching").default("single"),
   correctTextAnswer: Joi.when("questionType", {
     is: "text",
     then: Joi.string().trim().min(1).required(),
@@ -35,7 +36,13 @@ const questionSchema = Joi.object({
   if (value.questionType === "multiple") {
     const correctCount = value.options.filter((option) => option.isCorrect).length;
     if (correctCount < 2) {
-      return helpers.message("Для множественного выбора необходимо выбрать минимум два правильных варианта");
+      return helpers.message("Для вопросов с несколькими ответами необходимо выбрать минимум два правильных варианта");
+    }
+  }
+  if (value.questionType === "matching") {
+    const allPairsFilled = value.options.every((option) => option.matchText && option.matchText.trim().length > 0);
+    if (!allPairsFilled) {
+      return helpers.message("Для сопоставления необходимо заполнить все пары");
     }
   }
   if (value.questionType === "text" && !value.correctTextAnswer?.trim()) {
@@ -48,10 +55,32 @@ const answerSchema = Joi.object({
   questionId: Joi.number().integer().positive().required(),
   optionId: Joi.number().integer().positive(),
   optionIds: Joi.array().items(Joi.number().integer().positive()).min(1),
+  matchPairs: Joi.array().items(
+    Joi.object({
+      leftOptionId: Joi.number().integer().positive().required(),
+      rightOptionId: Joi.number().integer().positive().required(),
+    })
+  ),
   textAnswer: Joi.string().allow("", null),
 }).custom((value, helpers) => {
-  if (value.optionId == null && (!value.optionIds || value.optionIds.length === 0) && (value.textAnswer == null || value.textAnswer === "")) {
+  if (
+    value.optionId == null &&
+    (!value.optionIds || value.optionIds.length === 0) &&
+    (!value.matchPairs || value.matchPairs.length === 0) &&
+    (value.textAnswer == null || value.textAnswer === "")
+  ) {
     return helpers.message("Не указан ответ");
+  }
+  return value;
+});
+
+const answerBatchSchema = Joi.object({
+  answers: Joi.array().items(answerSchema).min(1).required(),
+}).custom((value, helpers) => {
+  const ids = value.answers.map((answer) => answer.questionId);
+  const unique = new Set(ids);
+  if (unique.size !== ids.length) {
+    return helpers.message("В ответах не должно быть дубликатов вопросов");
   }
   return value;
 });
@@ -87,6 +116,7 @@ function normalizeQuestionPayload(questions) {
     options: Array.isArray(question.options)
       ? question.options.map((option) => ({
           text: option.text.trim(),
+          matchText: option.matchText ? option.matchText.trim() : "",
           isCorrect: Boolean(option.isCorrect),
         }))
       : [],
@@ -409,6 +439,7 @@ async function submitAnswer(req, res, next) {
       optionId: value.optionId,
       optionIds: value.optionIds,
       textAnswer: value.textAnswer,
+      matchPairs: value.matchPairs,
     });
 
     // Применяем правила геймификации на уровне ответа (если включены)
@@ -422,6 +453,46 @@ async function submitAnswer(req, res, next) {
       });
     } catch (gerr) {
       logger.error("Gamification answer event failed for attempt %s: %s", attemptId, gerr.message);
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function submitAnswersBatch(req, res, next) {
+  try {
+    const assessmentId = Number(req.params.id);
+    const attemptId = Number(req.params.attemptId);
+
+    if (!assessmentId || !attemptId) {
+      return res.status(400).json({ error: "Некорректные параметры" });
+    }
+
+    const { error, value } = answerBatchSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
+    }
+
+    const results = await assessmentModel.saveAnswersBatch({
+      attemptId,
+      userId: req.currentUser.id,
+      answers: value.answers,
+    });
+
+    for (const result of results) {
+      try {
+        await gamificationService.processAnswerEvent({
+          userId: req.currentUser.id,
+          attemptId,
+          assessmentId: result.assessmentId,
+          questionId: result.questionId,
+          answerCorrect: result.isCorrect,
+        });
+      } catch (gerr) {
+        logger.error("Gamification answer event failed for attempt %s: %s", attemptId, gerr.message);
+      }
     }
 
     res.status(204).send();
@@ -657,6 +728,7 @@ module.exports = {
   remove,
   startAttempt,
   submitAnswer,
+  submitAnswersBatch,
   completeAttempt,
   getAttemptResultController,
 };

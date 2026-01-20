@@ -146,19 +146,64 @@
 
               <Input v-model="question.text" label="Текст вопроса" placeholder="Введите текст вопроса" required />
 
-              <div class="form-group">
-                <label>Варианты ответов</label>
+              <div class="question-type-toggle">
+                <label v-for="typeOption in questionTypeOptions" :key="typeOption.value" class="type-option">
+                  <input
+                    type="radio"
+                    :value="typeOption.value"
+                    :checked="question.questionType === typeOption.value"
+                    @change="() => handleQuestionTypeChange(qIndex, typeOption.value)"
+                  />
+                  <span>{{ typeOption.label }}</span>
+                </label>
+              </div>
+
+              <p class="hint">
+                <template v-if="question.questionType === 'single'">Один правильный вариант из списка</template>
+                <template v-else-if="question.questionType === 'multiple'">Несколько правильных вариантов</template>
+                <template v-else-if="question.questionType === 'matching'">Сопоставление элементов</template>
+                <template v-else>Сотрудник вводит текст, который сравнивается с эталонным</template>
+              </p>
+
+              <Textarea
+                v-if="question.questionType === 'text'"
+                v-model="question.correctTextAnswer"
+                label="Эталонный ответ"
+                :rows="2"
+                placeholder="Введите правильный ответ"
+              />
+
+              <div v-else class="form-group">
+                <label>Варианты ответов (2-6)</label>
                 <div class="options-list">
                   <div v-for="(option, oIndex) in question.options" :key="oIndex" class="option-item">
-                    <Input v-model="option.text" placeholder="Вариант ответа" required />
-                    <label class="checkbox-label">
-                      <input type="checkbox" v-model="option.isCorrect" />
-                      <span>Правильный</span>
-                    </label>
+                    <template v-if="question.questionType === 'matching'">
+                      <Input v-model="option.text" placeholder="Левая колонка" required />
+                      <Input v-model="option.matchText" placeholder="Правая колонка" required />
+                    </template>
+                    <template v-else>
+                      <Input v-model="option.text" placeholder="Вариант ответа" required />
+                      <label class="checkbox-label">
+                        <input v-if="question.questionType === 'multiple'" type="checkbox" v-model="option.isCorrect" />
+                        <input
+                          v-else
+                          type="radio"
+                          :name="`correct-${qIndex}`"
+                          :checked="option.isCorrect"
+                          @change="() => setCorrectOption(qIndex, oIndex)"
+                        />
+                        <span>Правильный</span>
+                      </label>
+                    </template>
                     <Button size="sm" variant="danger" icon="x" @click="removeOption(qIndex, oIndex)" />
                   </div>
                 </div>
                 <Button size="sm" variant="secondary" icon="plus" @click="addOption(qIndex)">Добавить вариант</Button>
+                <p class="hint">
+                  <template v-if="question.questionType === 'single'">Отметьте один правильный ответ</template>
+                  <template v-else-if="question.questionType === 'multiple'">Отметьте минимум 2 правильных ответа</template>
+                  <template v-else>Заполните все пары</template>
+                </p>
               </div>
             </Card>
           </div>
@@ -216,6 +261,12 @@ const theoryEnabled = ref(false);
 const theoryData = ref(createEmptyTheory());
 const theoryError = ref("");
 const theoryLoading = ref(false);
+const questionTypeOptions = [
+  { value: "single", label: "Одиночный" },
+  { value: "multiple", label: "Множественный" },
+  { value: "text", label: "Эталонный ответ" },
+  { value: "matching", label: "Сопоставление" },
+];
 
 const formData = ref({
   title: "",
@@ -359,9 +410,17 @@ const loadTheory = async () => {
 const addQuestion = () => {
   formData.value.questions.push({
     text: "",
+    questionType: "single",
+    correctTextAnswer: "",
+    _typeCache: {
+      text: { correctTextAnswer: "" },
+      single: { options: [] },
+      multiple: { options: [] },
+      matching: { options: [] },
+    },
     options: [
-      { text: "", isCorrect: false },
-      { text: "", isCorrect: false },
+      { text: "", matchText: "", isCorrect: true },
+      { text: "", matchText: "", isCorrect: false },
     ],
   });
 };
@@ -371,14 +430,111 @@ const removeQuestion = (index) => {
 };
 
 const addOption = (questionIndex) => {
-  formData.value.questions[questionIndex].options.push({ text: "", isCorrect: false });
+  const question = formData.value.questions[questionIndex];
+  if (!question || question.questionType === "text") {
+    return;
+  }
+  if (question.options.length >= 6) {
+    return;
+  }
+  question.options.push({ text: "", matchText: "", isCorrect: false });
 };
 
 const removeOption = (questionIndex, optionIndex) => {
-  if (formData.value.questions[questionIndex].options.length > 2) {
-    formData.value.questions[questionIndex].options.splice(optionIndex, 1);
+  const question = formData.value.questions[questionIndex];
+  if (!question || question.questionType === "text") {
+    return;
+  }
+  if (question.options.length > 2) {
+    question.options.splice(optionIndex, 1);
   } else {
     showToast("Должно быть минимум 2 варианта ответа", "warning");
+  }
+};
+
+const setCorrectOption = (qIndex, oIndex) => {
+  const question = formData.value.questions[qIndex];
+  if (!question || question.questionType !== "single") {
+    return;
+  }
+  question.options.forEach((opt, idx) => {
+    opt.isCorrect = idx === oIndex;
+  });
+};
+
+const handleQuestionTypeChange = (qIndex, type) => {
+  const question = formData.value.questions[qIndex];
+  if (!question) {
+    return;
+  }
+  const cache = question._typeCache || {
+    text: { correctTextAnswer: "" },
+    single: { options: [] },
+    multiple: { options: [] },
+    matching: { options: [] },
+  };
+  if (question.questionType === "text") {
+    cache.text.correctTextAnswer = question.correctTextAnswer || "";
+  } else {
+    cache[question.questionType] = {
+      options: (question.options || []).map((option) => ({
+        text: option.text || "",
+        matchText: option.matchText || "",
+        isCorrect: Boolean(option.isCorrect),
+      })),
+    };
+  }
+  question._typeCache = cache;
+  question.questionType = type;
+  if (type === "text") {
+    question.options = [];
+    question.correctTextAnswer = cache.text.correctTextAnswer || "";
+    return;
+  }
+  if (!Array.isArray(question.options) || question.options.length < 2) {
+    question.options = [
+      { text: "", matchText: "", isCorrect: true },
+      { text: "", matchText: "", isCorrect: false },
+    ];
+  }
+  question.correctTextAnswer = "";
+  if (type === "single") {
+    const cachedOptions = cache.single?.options;
+    if (cachedOptions && cachedOptions.length) {
+      question.options = cachedOptions.map((opt) => ({ ...opt }));
+    }
+    let hasCorrect = false;
+    question.options.forEach((option) => {
+      if (option.isCorrect && !hasCorrect) {
+        hasCorrect = true;
+      } else {
+        option.isCorrect = false;
+      }
+    });
+    if (!hasCorrect && question.options.length > 0) {
+      question.options[0].isCorrect = true;
+    }
+  } else if (type === "multiple") {
+    const cachedOptions = cache.multiple?.options;
+    if (cachedOptions && cachedOptions.length) {
+      question.options = cachedOptions.map((opt) => ({ ...opt }));
+    }
+    const correctCount = question.options.filter((opt) => opt.isCorrect).length;
+    if (correctCount < 2) {
+      question.options.forEach((option, idx) => {
+        option.isCorrect = idx < 2;
+      });
+    }
+  } else if (type === "matching") {
+    const cachedOptions = cache.matching?.options;
+    question.options =
+      cachedOptions && cachedOptions.length
+        ? cachedOptions.map((opt) => ({ ...opt, isCorrect: false }))
+        : question.options.map((option) => ({
+            text: option.text || "",
+            matchText: option.matchText || "",
+            isCorrect: false,
+          }));
   }
 };
 
@@ -412,13 +568,34 @@ const handleSubmit = async () => {
       showToast("Все вопросы должны иметь текст", "warning");
       return;
     }
-    if (question.options.length < 2) {
+    if (question.questionType === "text") {
+      if (!question.correctTextAnswer || !question.correctTextAnswer.trim()) {
+        showToast("Для текстового вопроса необходимо указать эталонный ответ", "warning");
+        return;
+      }
+      continue;
+    }
+    if (!question.options || question.options.length < 2) {
       showToast("У каждого вопроса должно быть минимум 2 варианта ответа", "warning");
       return;
     }
+    if (question.questionType === "matching") {
+      const allPairsFilled = question.options.every(
+        (opt) => opt.text && opt.text.trim().length > 0 && opt.matchText && opt.matchText.trim().length > 0
+      );
+      if (!allPairsFilled) {
+        showToast("Для сопоставления необходимо заполнить все пары", "warning");
+        return;
+      }
+      continue;
+    }
     const correctCount = question.options.filter((opt) => opt.isCorrect).length;
-    if (correctCount !== 1) {
+    if (question.questionType === "single" && correctCount !== 1) {
       showToast("У каждого вопроса должен быть ровно 1 правильный ответ", "warning");
+      return;
+    }
+    if (question.questionType === "multiple" && correctCount < 2) {
+      showToast("Для множественного выбора должно быть минимум 2 правильных ответа", "warning");
       return;
     }
   }
@@ -435,7 +612,19 @@ const handleSubmit = async () => {
       description: formData.value.description,
       openAt: formData.value.openAt + "T00:00:00",
       closeAt: formData.value.closeAt + "T23:59:59",
-      questions: formData.value.questions,
+      questions: formData.value.questions.map((question) => ({
+        text: question.text.trim(),
+        questionType: question.questionType || "single",
+        correctTextAnswer: question.questionType === "text" ? (question.correctTextAnswer || "").trim() : "",
+        options:
+          question.questionType === "text"
+            ? []
+            : (question.options || []).map((option) => ({
+                text: option.text.trim(),
+                matchText: option.matchText ? option.matchText.trim() : "",
+                isCorrect: Boolean(option.isCorrect),
+              })),
+      })),
     };
 
     // Добавить параметры только если можно их редактировать
@@ -486,12 +675,38 @@ onMounted(async () => {
     maxAttempts: props.assessment.max_attempts,
     questions: props.assessment.questions.map((q) => ({
       text: q.question_text,
-      options: q.options.map((opt) => ({
-        text: opt.option_text,
-        isCorrect: opt.is_correct === 1,
-      })),
+      questionType: q.question_type || q.questionType || (q.correct_text_answer || q.correctTextAnswer ? "text" : "single"),
+      correctTextAnswer: q.correct_text_answer || q.correctTextAnswer || "",
+      _typeCache: {
+        text: { correctTextAnswer: q.correct_text_answer || q.correctTextAnswer || "" },
+        single: { options: [] },
+        multiple: { options: [] },
+        matching: { options: [] },
+      },
+      options:
+        (q.question_type || q.questionType) === "text" || q.correct_text_answer || q.correctTextAnswer
+          ? []
+          : (q.options || []).map((opt) => ({
+              text: opt.option_text,
+              matchText: opt.match_text || "",
+              isCorrect: opt.is_correct === 1,
+            })),
     })),
   };
+
+  formData.value.questions.forEach((question) => {
+    if (question.questionType === "text") {
+      question._typeCache.text.correctTextAnswer = question.correctTextAnswer || "";
+    } else {
+      question._typeCache[question.questionType] = {
+        options: (question.options || []).map((option) => ({
+          text: option.text || "",
+          matchText: option.matchText || "",
+          isCorrect: Boolean(option.isCorrect),
+        })),
+      };
+    }
+  });
 
   // Загрузить текущие назначения из accessibility
   if (props.assessment.accessibility) {
@@ -613,6 +828,21 @@ onMounted(async () => {
   color: var(--text-primary);
 }
 
+.question-type-toggle {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.type-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
 .options-list {
   display: flex;
   flex-direction: column;
@@ -622,7 +852,7 @@ onMounted(async () => {
 
 .option-item {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr 1fr auto;
   gap: 8px;
   align-items: center;
 }
@@ -664,6 +894,12 @@ onMounted(async () => {
   flex: 1;
   color: var(--text-primary);
   font-size: 14px;
+}
+
+.hint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .assigned-preview {

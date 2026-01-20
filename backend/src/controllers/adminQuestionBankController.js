@@ -73,7 +73,7 @@ exports.getQuestions = async (req, res, next) => {
     // Загружаем опции для каждого вопроса
     for (const question of questions) {
       const [options] = await pool.query(
-        "SELECT id, option_text, is_correct, order_index FROM question_bank_options WHERE question_id = ? ORDER BY order_index",
+        "SELECT id, option_text, match_text, is_correct, order_index FROM question_bank_options WHERE question_id = ? ORDER BY order_index",
         [question.id]
       );
       question.options = options;
@@ -114,7 +114,7 @@ exports.getQuestionById = async (req, res, next) => {
     // Для типов с вариантами ответов загружаем опции
     if (question.question_type !== "text") {
       const [options] = await pool.query(
-        "SELECT id, option_text, is_correct, order_index FROM question_bank_options WHERE question_id = ? ORDER BY order_index",
+        "SELECT id, option_text, match_text, is_correct, order_index FROM question_bank_options WHERE question_id = ? ORDER BY order_index",
         [questionId]
       );
       question.options = options;
@@ -140,7 +140,7 @@ exports.createQuestion = async (req, res, next) => {
     const { categoryId, questionText, questionType, correctTextAnswer, options } = req.body;
 
     // Валидация типа
-    if (!["single", "multiple", "text"].includes(questionType)) {
+    if (!["single", "multiple", "text", "matching"].includes(questionType)) {
       return res.status(400).json({ error: "Недопустимый тип вопроса" });
     }
 
@@ -152,19 +152,26 @@ exports.createQuestion = async (req, res, next) => {
     }
 
     // Валидация для типов с вариантами ответов
-    if (questionType === "single" || questionType === "multiple") {
+    if (questionType === "single" || questionType === "multiple" || questionType === "matching") {
       if (!options || options.length < 2 || options.length > 6) {
         return res.status(400).json({ error: "Необходимо указать от 2 до 6 вариантов ответов" });
       }
 
-      const correctOptions = options.filter((opt) => opt.isCorrect);
+      if (questionType === "matching") {
+        const allPairsFilled = options.every((opt) => opt.text && opt.matchText && opt.matchText.trim().length > 0);
+        if (!allPairsFilled) {
+          return res.status(400).json({ error: "Для сопоставления необходимо заполнить все пары" });
+        }
+      } else {
+        const correctOptions = options.filter((opt) => opt.isCorrect);
 
-      if (questionType === "single" && correctOptions.length !== 1) {
-        return res.status(400).json({ error: "Для типа 'один вариант' должен быть ровно один правильный ответ" });
-      }
+        if (questionType === "single" && correctOptions.length !== 1) {
+          return res.status(400).json({ error: "Для типа 'один вариант' должен быть ровно один правильный ответ" });
+        }
 
-      if (questionType === "multiple" && correctOptions.length < 2) {
-        return res.status(400).json({ error: "Для типа 'множественный выбор' должно быть минимум 2 правильных ответа" });
+        if (questionType === "multiple" && correctOptions.length < 2) {
+          return res.status(400).json({ error: "Для типа 'множественный выбор' должно быть минимум 2 правильных ответа" });
+        }
       }
     }
 
@@ -185,10 +192,10 @@ exports.createQuestion = async (req, res, next) => {
         const option = options[i];
         await connection.query(
           `
-          INSERT INTO question_bank_options (question_id, option_text, is_correct, order_index)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO question_bank_options (question_id, option_text, match_text, is_correct, order_index)
+          VALUES (?, ?, ?, ?, ?)
         `,
-          [questionId, option.text, option.isCorrect ? 1 : 0, i]
+          [questionId, option.text, questionType === "matching" ? option.matchText || "" : null, option.isCorrect ? 1 : 0, i]
         );
       }
     }
@@ -228,7 +235,7 @@ exports.updateQuestion = async (req, res, next) => {
     const { categoryId, questionText, questionType, correctTextAnswer, options } = req.body;
 
     // Валидация типа
-    if (!["single", "multiple", "text"].includes(questionType)) {
+    if (!["single", "multiple", "text", "matching"].includes(questionType)) {
       return res.status(400).json({ error: "Недопустимый тип вопроса" });
     }
 
@@ -240,19 +247,26 @@ exports.updateQuestion = async (req, res, next) => {
     }
 
     // Валидация для типов с вариантами ответов
-    if (questionType === "single" || questionType === "multiple") {
+    if (questionType === "single" || questionType === "multiple" || questionType === "matching") {
       if (!options || options.length < 2 || options.length > 6) {
         return res.status(400).json({ error: "Необходимо указать от 2 до 6 вариантов ответов" });
       }
 
-      const correctOptions = options.filter((opt) => opt.isCorrect);
+      if (questionType === "matching") {
+        const allPairsFilled = options.every((opt) => opt.text && opt.matchText && opt.matchText.trim().length > 0);
+        if (!allPairsFilled) {
+          return res.status(400).json({ error: "Для сопоставления необходимо заполнить все пары" });
+        }
+      } else {
+        const correctOptions = options.filter((opt) => opt.isCorrect);
 
-      if (questionType === "single" && correctOptions.length !== 1) {
-        return res.status(400).json({ error: "Для типа 'один вариант' должен быть ровно один правильный ответ" });
-      }
+        if (questionType === "single" && correctOptions.length !== 1) {
+          return res.status(400).json({ error: "Для типа 'один вариант' должен быть ровно один правильный ответ" });
+        }
 
-      if (questionType === "multiple" && correctOptions.length < 2) {
-        return res.status(400).json({ error: "Для типа 'множественный выбор' должно быть минимум 2 правильных ответа" });
+        if (questionType === "multiple" && correctOptions.length < 2) {
+          return res.status(400).json({ error: "Для типа 'множественный выбор' должно быть минимум 2 правильных ответа" });
+        }
       }
     }
 
@@ -275,10 +289,10 @@ exports.updateQuestion = async (req, res, next) => {
         const option = options[i];
         await connection.query(
           `
-          INSERT INTO question_bank_options (question_id, option_text, is_correct, order_index)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO question_bank_options (question_id, option_text, match_text, is_correct, order_index)
+          VALUES (?, ?, ?, ?, ?)
         `,
-          [questionId, option.text, option.isCorrect ? 1 : 0, i]
+          [questionId, option.text, questionType === "matching" ? option.matchText || "" : null, option.isCorrect ? 1 : 0, i]
         );
       }
     }

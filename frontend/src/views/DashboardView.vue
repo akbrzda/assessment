@@ -255,11 +255,11 @@ export default {
                 passed: hasPassed,
               }
             : lastScore != null
-            ? {
-                score: lastScore,
-                passed: threshold != null ? lastScore >= threshold : false,
-              }
-            : null,
+              ? {
+                  score: lastScore,
+                  passed: threshold != null ? lastScore >= threshold : false,
+                }
+              : null,
         requiresTheory,
         theoryCompleted,
       };

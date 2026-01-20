@@ -41,18 +41,34 @@
             ></textarea>
           </div>
 
-          <div v-else class="answers-list" :class="{ multiple: currentQuestion.questionType === 'multiple' }">
+          <div v-else-if="currentQuestion.questionType === 'matching'" class="matching-block">
+            <div v-for="answer in currentQuestion.answers" :key="answer.id" class="matching-row">
+              <div class="matching-left">{{ answer.text }}</div>
+              <select
+                class="matching-select"
+                :value="selectedMatchingPairs[answer.id] || ''"
+                @change="(event) => handleMatchingChange(answer.id, event.target.value)"
+              >
+                <option value="">Выберите пару</option>
+                <option v-for="option in getMatchingOptions(answer.id)" :key="option.id" :value="option.id">
+                  {{ option.text }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div v-else class="answers-list" :class="{ multiple: isMultiChoice(currentQuestion.questionType) }">
             <label
               v-for="answer in currentQuestion.answers"
               :key="answer.id"
               class="answer-option"
               :class="{
-                selected: currentQuestion.questionType === 'multiple' ? selectedMultipleAnswers.includes(answer.id) : selectedAnswer === answer.id,
+                selected: isMultiChoice(currentQuestion.questionType) ? selectedMultipleAnswers.includes(answer.id) : selectedAnswer === answer.id,
               }"
-              @click="toggleAnswer(answer.id)"
+              @click.prevent="toggleAnswer(answer.id)"
             >
               <input
-                v-if="currentQuestion.questionType === 'multiple'"
+                v-if="isMultiChoice(currentQuestion.questionType)"
                 type="checkbox"
                 :checked="selectedMultipleAnswers.includes(answer.id)"
                 style="display: none"
@@ -65,7 +81,7 @@
                 :checked="selectedAnswer === answer.id"
                 style="display: none"
               />
-              <div class="indicator" :class="{ checkbox: currentQuestion.questionType === 'multiple' }"></div>
+              <div class="indicator" :class="{ checkbox: isMultiChoice(currentQuestion.questionType) }"></div>
               <span class="answer-text">{{ answer.text }}</span>
             </label>
           </div>
@@ -176,6 +192,7 @@ export default {
     const selectedAnswer = ref(null);
     const selectedMultipleAnswers = ref([]);
     const selectedTextAnswer = ref("");
+    const selectedMatchingPairs = ref({});
     const userAnswers = ref([]);
     const attemptId = ref(null);
     const awaitingStart = ref(true);
@@ -191,6 +208,7 @@ export default {
     const assessmentId = computed(() => Number(route.params.id));
 
     const currentQuestion = computed(() => questions.value[currentQuestionIndex.value] || null);
+    const isMultiChoice = (questionType) => questionType === "multiple";
 
     const progressPercentage = computed(() => {
       if (!questions.value.length) {
@@ -204,7 +222,12 @@ export default {
       if (!question) {
         return false;
       }
-      if (question.questionType === "multiple") {
+      if (question.questionType === "matching") {
+        const total = question.answers?.length || 0;
+        const selectedCount = Object.keys(selectedMatchingPairs.value || {}).length;
+        return total > 0 && selectedCount === total;
+      }
+      if (isMultiChoice(question.questionType)) {
         return selectedMultipleAnswers.value.length > 0;
       }
       if (question.questionType === "text") {
@@ -283,6 +306,69 @@ export default {
       }
     };
 
+    const normalizeStoredAnswer = (question, stored) => {
+      if (!stored || stored.type !== question.questionType) {
+        return null;
+      }
+      if (question.questionType === "single") {
+        return Number.isInteger(stored.value) ? { type: "single", value: stored.value } : null;
+      }
+      if (question.questionType === "matching") {
+        if (!stored.value || typeof stored.value !== "object") {
+          return null;
+        }
+        const normalized = {};
+        Object.entries(stored.value).forEach(([left, right]) => {
+          const leftId = Number(left);
+          const rightId = Number(right);
+          if (Number.isInteger(leftId) && leftId > 0 && Number.isInteger(rightId) && rightId > 0) {
+            normalized[leftId] = rightId;
+          }
+        });
+        return Object.keys(normalized).length ? { type: "matching", value: normalized } : null;
+      }
+      if (isMultiChoice(question.questionType)) {
+        if (!Array.isArray(stored.value)) {
+          return null;
+        }
+        const normalized = stored.value.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+        return normalized.length ? { type: question.questionType, value: normalized } : null;
+      }
+      if (question.questionType === "text") {
+        return typeof stored.value === "string" && stored.value.trim().length ? { type: "text", value: stored.value } : null;
+      }
+      return null;
+    };
+
+    const buildAnswerStore = () => {
+      const answers = {};
+      questions.value.forEach((question, index) => {
+        const answer = userAnswers.value[index];
+        if (answer) {
+          answers[String(question.id)] = answer;
+        }
+      });
+      return answers;
+    };
+
+    const applyStoredAnswers = (storedAnswers) => {
+      if (!storedAnswers || typeof storedAnswers !== "object") {
+        return;
+      }
+      userAnswers.value = questions.value.map((question, index) => {
+        const stored = storedAnswers[String(question.id)];
+        const normalized = normalizeStoredAnswer(question, stored);
+        return normalized || userAnswers.value[index] || null;
+      });
+    };
+
+    const persistAnswers = () => {
+      if (!attemptId.value) {
+        return;
+      }
+      saveAttemptProgress(attemptId.value, { answers: buildAnswerStore() });
+    };
+
     const applyStoredQuestionOrder = (progress) => {
       if (!progress?.questionOrder?.length || !questions.value.length) {
         return;
@@ -335,22 +421,11 @@ export default {
       });
     };
 
-    const arraysEqual = (a = [], b = []) => {
-      if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
-        return false;
-      }
-      for (let idx = 0; idx < a.length; idx += 1) {
-        if (a[idx] !== b[idx]) {
-          return false;
-        }
-      }
-      return true;
-    };
-
     const resetSelectionState = () => {
       selectedAnswer.value = null;
       selectedMultipleAnswers.value = [];
       selectedTextAnswer.value = "";
+      selectedMatchingPairs.value = {};
     };
 
     const applyStoredAnswer = (index) => {
@@ -366,18 +441,72 @@ export default {
 
       if (question.questionType === "single") {
         selectedAnswer.value = stored.value ?? null;
-      } else if (question.questionType === "multiple") {
+      } else if (question.questionType === "matching") {
+        selectedMatchingPairs.value = stored.value && typeof stored.value === "object" ? { ...stored.value } : {};
+      } else if (isMultiChoice(question.questionType)) {
         selectedMultipleAnswers.value = Array.isArray(stored.value) ? [...stored.value] : [];
       } else {
         selectedTextAnswer.value = stored.value || "";
       }
     };
 
+    const getMatchingOptions = (leftId) => {
+      const question = currentQuestion.value;
+      if (!question || question.questionType !== "matching") {
+        return [];
+      }
+      const selected = selectedMatchingPairs.value || {};
+      const usedIds = new Set(
+        Object.entries(selected)
+          .filter(([key]) => Number(key) !== Number(leftId))
+          .map(([, value]) => Number(value))
+          .filter((value) => Number.isInteger(value) && value > 0),
+      );
+      return (question.answers || [])
+        .map((answer) => ({
+          id: answer.id,
+          text: answer.matchText || answer.text,
+        }))
+        .filter((option) => !usedIds.has(option.id) || Number(selected[leftId]) === option.id);
+    };
+
+    const handleMatchingChange = (leftId, rightValue) => {
+      const question = currentQuestion.value;
+      if (!question || question.questionType !== "matching") {
+        return;
+      }
+      const rightId = Number(rightValue);
+      const next = { ...selectedMatchingPairs.value };
+      if (!Number.isInteger(rightId) || rightId <= 0) {
+        delete next[leftId];
+      } else {
+        next[leftId] = rightId;
+      }
+      selectedMatchingPairs.value = next;
+
+      const leftIds = (question.answers || []).map((answer) => answer.id);
+      const selectedRightIds = new Set(
+        Object.values(next)
+          .map((value) => Number(value))
+          .filter((value) => Number.isInteger(value) && value > 0),
+      );
+      const remainingLeft = leftIds.filter((id) => !next[id]);
+      const remainingRight = (question.answers || []).map((answer) => answer.id).filter((id) => !selectedRightIds.has(id));
+
+      if (remainingLeft.length === 1 && remainingRight.length === 1) {
+        next[remainingLeft[0]] = remainingRight[0];
+        selectedMatchingPairs.value = { ...next };
+      }
+
+      syncCurrentAnswer();
+      telegramStore.hapticFeedback("selection");
+    };
+
     function toggleAnswer(optionId) {
       if (!currentQuestion.value) {
         return;
       }
-      if (currentQuestion.value.questionType === "multiple") {
+      if (isMultiChoice(currentQuestion.value.questionType)) {
         const index = selectedMultipleAnswers.value.indexOf(optionId);
         if (index === -1) {
           selectedMultipleAnswers.value.push(optionId);
@@ -387,71 +516,64 @@ export default {
       } else {
         selectedAnswer.value = optionId;
       }
+      syncCurrentAnswer();
       telegramStore.hapticFeedback("selection");
     }
 
-    async function saveCurrentAnswer() {
+    function syncCurrentAnswer() {
       const attempt = attemptId.value;
       const question = currentQuestion.value;
       if (!attempt || !question) {
-        return;
+        return false;
       }
 
-      const payload = {
-        questionId: question.id,
-      };
       const index = currentQuestionIndex.value;
-      const previous = userAnswers.value[index];
       let snapshot = null;
 
       if (question.questionType === "single") {
         if (selectedAnswer.value == null) {
-          return;
+          return false;
         }
         const optionId = selectedAnswer.value;
-        if (previous && previous.type === "single" && previous.value === optionId) {
-          return;
-        }
-        payload.optionId = optionId;
         snapshot = optionId;
-      } else if (question.questionType === "multiple") {
+      } else if (isMultiChoice(question.questionType)) {
         if (!selectedMultipleAnswers.value.length) {
-          return;
+          return false;
         }
         const normalized = [...selectedMultipleAnswers.value].map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
         normalized.sort((a, b) => a - b);
-        if (previous && previous.type === "multiple" && arraysEqual(previous.value, normalized)) {
-          return;
-        }
-        payload.optionIds = normalized;
         snapshot = normalized;
+      } else if (question.questionType === "matching") {
+        const pairs = selectedMatchingPairs.value || {};
+        const leftIds = (question.answers || []).map((answer) => answer.id);
+        const selectedCount = Object.keys(pairs).length;
+        if (leftIds.length === 0 || selectedCount !== leftIds.length) {
+          return false;
+        }
+        snapshot = {};
+        leftIds.forEach((leftId) => {
+          const rightId = Number(pairs[leftId]);
+          if (Number.isInteger(rightId) && rightId > 0) {
+            snapshot[leftId] = rightId;
+          }
+        });
       } else {
         const textValue = selectedTextAnswer.value ? selectedTextAnswer.value.trim() : "";
         if (!textValue) {
-          return;
+          return false;
         }
-        if (previous && previous.type === "text" && previous.value === textValue) {
-          return;
-        }
-        payload.textAnswer = selectedTextAnswer.value;
         snapshot = textValue;
       }
 
-      isSaving.value = true;
-      try {
-        await apiClient.submitAssessmentAnswer(assessmentId.value, attempt, payload);
-        if (question.questionType === "multiple" && Array.isArray(snapshot)) {
-          userAnswers.value[index] = { type: question.questionType, value: [...snapshot] };
-        } else {
-          userAnswers.value[index] = { type: question.questionType, value: snapshot };
-        }
-      } catch (error) {
-        console.error("Не удалось сохранить ответ", error);
-        telegramStore.showAlert(error.message || "Не удалось сохранить ответ");
-        throw error;
-      } finally {
-        isSaving.value = false;
+      if (isMultiChoice(question.questionType) && Array.isArray(snapshot)) {
+        userAnswers.value[index] = { type: question.questionType, value: [...snapshot] };
+      } else if (question.questionType === "matching" && snapshot && typeof snapshot === "object") {
+        userAnswers.value[index] = { type: question.questionType, value: { ...snapshot } };
+      } else {
+        userAnswers.value[index] = { type: question.questionType, value: snapshot };
       }
+      persistAnswers();
+      return true;
     }
 
     async function nextQuestion() {
@@ -459,11 +581,7 @@ export default {
         return;
       }
 
-      try {
-        await saveCurrentAnswer();
-      } catch (error) {
-        return;
-      }
+      syncCurrentAnswer();
 
       currentQuestionIndex.value += 1;
       applyStoredAnswer(currentQuestionIndex.value);
@@ -508,7 +626,7 @@ export default {
         // Сохраняем текущий ответ если он есть
         if (canProceedCurrent.value) {
           try {
-            await saveCurrentAnswer();
+            syncCurrentAnswer();
           } catch (error) {
             console.warn("Не удалось сохранить последний ответ перед завершением", error);
             // Продолжаем завершение
@@ -530,6 +648,10 @@ export default {
       // Дожидаемся завершения попытки перед редиректом
       if (attempt) {
         try {
+          const answersPayload = buildBatchPayload();
+          if (answersPayload.length) {
+            await apiClient.submitAssessmentAnswersBatch(assessmentId.value, attempt, { answers: answersPayload });
+          }
           await apiClient.completeAssessmentAttempt(assessmentId.value, attempt);
           // Увеличенная задержка для гарантии записи данных в БД
           await new Promise((resolve) => setTimeout(resolve, 500));
@@ -618,6 +740,7 @@ export default {
           answers: (question.options || []).map((option) => ({
             id: option.id,
             text: option.text,
+            matchText: option.matchText || "",
           })),
         }));
 
@@ -630,10 +753,23 @@ export default {
           if (question.questionType === "single" && meta.selectedOptionId != null) {
             return { type: "single", value: meta.selectedOptionId };
           }
-          if (question.questionType === "multiple" && Array.isArray(meta.selectedOptionIds) && meta.selectedOptionIds.length) {
+          if (isMultiChoice(question.questionType) && Array.isArray(meta.selectedOptionIds) && meta.selectedOptionIds.length) {
             const normalized = meta.selectedOptionIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
             normalized.sort((a, b) => a - b);
-            return { type: "multiple", value: normalized };
+            return { type: question.questionType, value: normalized };
+          }
+          if (question.questionType === "matching" && meta.selectedMatchPairs && typeof meta.selectedMatchPairs === "object") {
+            const normalized = {};
+            Object.entries(meta.selectedMatchPairs).forEach(([left, right]) => {
+              const leftId = Number(left);
+              const rightId = Number(right);
+              if (Number.isInteger(leftId) && leftId > 0 && Number.isInteger(rightId) && rightId > 0) {
+                normalized[leftId] = rightId;
+              }
+            });
+            if (Object.keys(normalized).length) {
+              return { type: "matching", value: normalized };
+            }
           }
           if (question.questionType === "text" && meta.textAnswer) {
             return { type: "text", value: meta.textAnswer };
@@ -649,6 +785,7 @@ export default {
 
           // НЕ применяем сохраненный порядок из localStorage - используем порядок из БД
           const storedProgress = getAttemptProgress(attemptId.value);
+          applyStoredAnswers(storedProgress?.answers);
           const resumeIndex = resolveResumeIndex(storedProgress);
           currentQuestionIndex.value = resumeIndex;
           applyStoredAnswer(resumeIndex);
@@ -657,6 +794,7 @@ export default {
           awaitingStart.value = false;
           // Сохраняем текущий порядок вопросов в localStorage (для отслеживания позиции)
           persistQuestionOrder();
+          persistAnswers();
         } else {
           if (payload.latestAttempt?.id) {
             clearAttemptProgress(payload.latestAttempt.id);
@@ -689,13 +827,15 @@ export default {
     async function startAttempt() {
       if (attemptId.value || !assessmentId.value) return;
       try {
-        const attempt = await apiClient.startAssessmentAttempt(assessmentId.value);
-        attemptId.value = attempt.id;
+        const response = await apiClient.startAssessmentAttempt(assessmentId.value);
+        const attempt = response?.attempt || response;
+        attemptId.value = attempt?.id || null;
+        clearAttemptProgress(attemptId.value);
 
         // Перезагружаем аттестацию чтобы получить правильный порядок вопросов
         // который был сохранен при создании попытки
-        const response = await apiClient.getUserAssessment(assessmentId.value);
-        const payload = response?.assessment;
+        const assessmentResponse = await apiClient.getUserAssessment(assessmentId.value);
+        const payload = assessmentResponse?.assessment;
         if (!payload) {
           throw new Error("Не удалось загрузить вопросы");
         }
@@ -708,10 +848,11 @@ export default {
           answers: (question.options || []).map((option) => ({
             id: option.id,
             text: option.text,
+            matchText: option.matchText || "",
           })),
         }));
 
-        const remaining = attempt.remainingSeconds;
+        const remaining = attempt?.remainingSeconds;
         const timeLimitSeconds = assessment.value?.timeLimitSeconds || null;
         timeRemaining.value = Number.isFinite(remaining) ? Number(remaining) : timeLimitSeconds;
         userAnswers.value = new Array(questions.value.length).fill(null);
@@ -721,6 +862,7 @@ export default {
 
         // Сохраняем новый порядок вопросов после перезагрузки
         persistQuestionOrder();
+        persistAnswers();
         startTimer();
       } catch (attemptError) {
         if (attemptError.status === 409 && attemptError.code === "THEORY_NOT_COMPLETED") {
@@ -752,6 +894,37 @@ export default {
       window._assessmentBeforeUnloadHandler = handleBeforeUnload;
     });
 
+    const buildBatchPayload = () => {
+      const answers = [];
+      questions.value.forEach((question, index) => {
+        const stored = userAnswers.value[index];
+        if (!stored || stored.type !== question.questionType) {
+          return;
+        }
+        if (stored.type === "single" && stored.value != null) {
+          answers.push({ questionId: question.id, optionId: stored.value });
+        } else if (stored.type === "multiple" && Array.isArray(stored.value) && stored.value.length) {
+          answers.push({ questionId: question.id, optionIds: stored.value });
+        } else if (stored.type === "matching" && stored.value && typeof stored.value === "object") {
+          const matchPairs = Object.entries(stored.value)
+            .map(([leftId, rightId]) => ({
+              leftOptionId: Number(leftId),
+              rightOptionId: Number(rightId),
+            }))
+            .filter(
+              (pair) =>
+                Number.isInteger(pair.leftOptionId) && pair.leftOptionId > 0 && Number.isInteger(pair.rightOptionId) && pair.rightOptionId > 0,
+            );
+          if (matchPairs.length) {
+            answers.push({ questionId: question.id, matchPairs });
+          }
+        } else if (stored.type === "text" && stored.value && stored.value.trim()) {
+          answers.push({ questionId: question.id, textAnswer: stored.value });
+        }
+      });
+      return answers;
+    };
+
     watch(
       currentQuestionIndex,
       (newIndex) => {
@@ -761,12 +934,62 @@ export default {
         saveAttemptProgress(attemptId.value, { currentQuestionIndex: newIndex });
         applyStoredAnswer(newIndex);
       },
-      { flush: "post" }
+      { flush: "post" },
+    );
+
+    watch(
+      selectedAnswer,
+      () => {
+        if (currentQuestion.value?.questionType === "single") {
+          syncCurrentAnswer();
+        }
+      },
+      { flush: "post" },
+    );
+
+    watch(
+      selectedMultipleAnswers,
+      () => {
+        if (isMultiChoice(currentQuestion.value?.questionType)) {
+          syncCurrentAnswer();
+        }
+      },
+      { deep: true, flush: "post" },
+    );
+
+    watch(
+      selectedMatchingPairs,
+      () => {
+        if (currentQuestion.value?.questionType === "matching") {
+          syncCurrentAnswer();
+        }
+      },
+      { deep: true, flush: "post" },
+    );
+
+    let textSyncTimer = null;
+    watch(
+      selectedTextAnswer,
+      () => {
+        if (currentQuestion.value?.questionType !== "text") {
+          return;
+        }
+        if (textSyncTimer) {
+          clearTimeout(textSyncTimer);
+        }
+        textSyncTimer = setTimeout(() => {
+          syncCurrentAnswer();
+        }, 400);
+      },
+      { flush: "post" },
     );
 
     onUnmounted(() => {
       if (timer.value) {
         clearInterval(timer.value);
+      }
+      if (textSyncTimer) {
+        clearTimeout(textSyncTimer);
       }
 
       document.body.style.overflow = "";
@@ -783,6 +1006,7 @@ export default {
       currentQuestionIndex,
       selectedAnswer,
       selectedMultipleAnswers,
+      selectedMatchingPairs,
       selectedTextAnswer,
       userAnswers,
       timeRemaining,
@@ -793,6 +1017,9 @@ export default {
       progressPercentage,
       canProceedCurrent,
       formatTime,
+      isMultiChoice,
+      getMatchingOptions,
+      handleMatchingChange,
       toggleAnswer,
       nextQuestion,
       finishAssessment,
@@ -802,6 +1029,7 @@ export default {
       confirmEarlyExit,
       startAttempt,
       awaitingStart,
+      isSaving,
     };
   },
 };
@@ -915,17 +1143,49 @@ export default {
 }
 
 .question-text {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 700;
   line-height: 1.4;
   margin: 0 0 24px 0;
+  color: var(--text-primary);
+}
+
+.matching-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.matching-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+}
+
+.matching-left {
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.matching-select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--divider);
+  background-color: var(--bg-primary);
   color: var(--text-primary);
 }
 
 .answers-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
   flex: 1;
 }
 
@@ -939,7 +1199,7 @@ export default {
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
-  gap: 16px;
+  gap: 8px;
   user-select: none;
 }
 
@@ -1150,16 +1410,20 @@ export default {
   }
 
   .question-text {
-    font-size: 16px;
+    font-size: 24px;
   }
 
   .answer-text {
     font-size: 15px;
   }
 
+  .matching-row {
+    grid-template-columns: 1fr;
+  }
+
   .answer-option {
-    padding: 14px 16px;
-    gap: 12px;
+    padding: 8px 12px;
+    gap: 8px;
   }
 
   .indicator {
@@ -1190,7 +1454,7 @@ export default {
 
 @media (max-height: 700px) {
   .answer-option {
-    padding: 12px 16px;
+    padding: 8px 12px;
   }
 
   .navigation-section {

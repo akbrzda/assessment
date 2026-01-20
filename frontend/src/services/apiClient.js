@@ -99,6 +99,12 @@ export const apiClient = {
       body: JSON.stringify(payload),
     });
   },
+  submitAssessmentAnswersBatch(assessmentId, attemptId, payload) {
+    return request(`/assessments/${assessmentId}/attempts/${attemptId}/answers/batch`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
   completeAssessmentAttempt(assessmentId, attemptId) {
     return request(`/assessments/${assessmentId}/attempts/${attemptId}/complete`, {
       method: "POST",

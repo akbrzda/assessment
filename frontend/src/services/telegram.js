@@ -35,31 +35,6 @@ export function ensureReady() {
   return webApp;
 }
 
-export function onThemeChange(handler) {
-  const webApp = resolveWebApp();
-  if (!webApp) {
-    return () => {};
-  }
-
-  const wrapper = () => handler(webApp.themeParams || {});
-  themeListeners.add(wrapper);
-  webApp.onEvent("themeChanged", wrapper);
-  return () => {
-    webApp.offEvent("themeChanged", wrapper);
-    themeListeners.delete(wrapper);
-  };
-}
-
-export function getThemeParams() {
-  const webApp = resolveWebApp();
-  return webApp?.themeParams || {};
-}
-
-export function getColorScheme() {
-  const webApp = resolveWebApp();
-  return webApp?.colorScheme || "light";
-}
-
 export function onViewportChanged(handler) {
   const webApp = resolveWebApp();
   if (!webApp) {
@@ -100,17 +75,17 @@ export function getStartParam() {
 export function getInvitationCode() {
   // Проверяем start параметр из Telegram
   const startParam = getStartParam();
-  if (startParam && startParam.startsWith('invite_')) {
-    return startParam.replace('invite_', '');
+  if (startParam && startParam.startsWith("invite_")) {
+    return startParam.replace("invite_", "");
   }
-  
+
   // Проверяем URL параметры (fallback)
   const urlParams = new URLSearchParams(window.location.search);
-  const code = urlParams.get('invite') || urlParams.get('code');
+  const code = urlParams.get("invite") || urlParams.get("code");
   if (code) {
     return code;
   }
-  
+
   return null;
 }
 
@@ -213,7 +188,7 @@ export async function setCloudItem(key, value, { fallback = true } = {}) {
 export async function getCloudItem(key, { fallback = true } = {}) {
   try {
     const raw = await callCloudStorage("getItem", key);
-    return typeof raw === "string" ? raw : raw ?? null;
+    return typeof raw === "string" ? raw : (raw ?? null);
   } catch (error) {
     if (!fallback) {
       throw error;
@@ -224,7 +199,7 @@ export async function getCloudItem(key, { fallback = true } = {}) {
   try {
     const data = await requestCloudStorageFallback(`${CLOUD_STORAGE_ENDPOINT}/${encodeURIComponent(key)}`, { method: "GET" });
     const value = data?.value;
-    return typeof value === "string" ? value : value ?? null;
+    return typeof value === "string" ? value : (value ?? null);
   } catch (fallbackError) {
     console.error("Backend fallback getCloudItem failed", fallbackError);
     throw fallbackError;

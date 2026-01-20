@@ -31,12 +31,19 @@
         <h4 class="section-title">
           Варианты ответов:
           <span v-if="question.question_type === 'multiple'" class="multiple-hint"> (несколько правильных) </span>
+          <span v-else-if="question.question_type === 'matching'" class="multiple-hint"> (пары) </span>
         </h4>
         <div class="options-list">
-          <div v-for="(option, index) in question.options" :key="option.id" class="option-item" :class="{ 'option-correct': option.is_correct }">
+          <div
+            v-for="(option, index) in question.options"
+            :key="option.id"
+            class="option-item"
+            :class="{ 'option-correct': question.question_type !== 'matching' && option.is_correct }"
+          >
             <span class="option-number">{{ index + 1 }}.</span>
             <span class="option-text">{{ option.option_text }}</span>
-            <span v-if="option.is_correct" class="option-badge"><Icon name="check" />Правильный</span>
+            <span v-if="question.question_type === 'matching'" class="option-text">→ {{ option.match_text }}</span>
+            <span v-else-if="option.is_correct" class="option-badge"><Icon name="check" />Правильный</span>
           </div>
         </div>
       </div>
@@ -78,9 +85,10 @@ const { showToast } = useToast();
 
 const getQuestionTypeLabel = (type) => {
   const labels = {
-    single: "Один вариант",
-    multiple: "Множественный выбор",
-    text: "Текстовый ответ",
+    single: "Одиночный",
+    multiple: "Множественный",
+    text: "Эталонный ответ",
+    matching: "Сопоставление",
   };
   return labels[type] || type;
 };

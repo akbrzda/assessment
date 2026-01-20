@@ -50,7 +50,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   padding-bottom: 76px; /* Space for bottom navigation */
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 #app {
@@ -534,7 +536,9 @@ body {
 /* Icons */
 svg {
   color: var(--text-secondary);
-  transition: color 0.2s ease, transform 0.2s ease;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 
 .card-icon svg,
@@ -568,9 +572,6 @@ button svg {
 .modal-content {
   background-color: var(--bg-primary);
   border-radius: 20px;
-  padding: 32px 24px;
-  margin: 20px;
-  max-width: 320px;
   width: 100%;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
   border: 1px solid var(--divider);
