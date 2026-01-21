@@ -329,7 +329,7 @@ const stats = computed(() => {
   };
 });
 
-const canEditAssessment = computed(() => details.value?.assessment?.status === "pending");
+const canEditAssessment = computed(() => Boolean(details.value?.assessment));
 
 const loadDetails = async () => {
   loading.value = true;

@@ -67,6 +67,7 @@ defineEmits(["update:modelValue"]);
 }
 
 .textarea {
+  min-height: 96px;
   width: 100%;
   padding: 10px 16px;
   border: 1px solid var(--divider);

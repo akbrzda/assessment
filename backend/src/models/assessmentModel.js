@@ -97,9 +97,9 @@ async function createAssessment({ assessment, questions, branchIds, userIds, pos
       const questionType = question.questionType || "single";
       const correctTextAnswer = questionType === "text" ? question.correctTextAnswer || "" : null;
       const [questionResult] = await connection.execute(
-        `INSERT INTO assessment_questions (assessment_id, order_index, question_text, question_type, correct_text_answer)
-         VALUES (?, ?, ?, ?, ?)`,
-        [assessmentId, idx + 1, question.text, questionType, correctTextAnswer],
+        `INSERT INTO assessment_questions (assessment_id, question_bank_id, order_index, question_text, question_type, correct_text_answer)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [assessmentId, question.questionBankId || null, idx + 1, question.text, questionType, correctTextAnswer],
       );
       const questionId = questionResult.insertId;
 
@@ -183,9 +183,9 @@ async function updateAssessment(assessmentId, { assessment, questions, branchIds
       const questionType = question.questionType || "single";
       const correctTextAnswer = questionType === "text" ? question.correctTextAnswer || "" : null;
       const [questionResult] = await connection.execute(
-        `INSERT INTO assessment_questions (assessment_id, order_index, question_text, question_type, correct_text_answer)
-         VALUES (?, ?, ?, ?, ?)`,
-        [assessmentId, idx + 1, question.text, questionType, correctTextAnswer],
+        `INSERT INTO assessment_questions (assessment_id, question_bank_id, order_index, question_text, question_type, correct_text_answer)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [assessmentId, question.questionBankId || null, idx + 1, question.text, questionType, correctTextAnswer],
       );
       const questionId = questionResult.insertId;
 
@@ -420,6 +420,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
     `SELECT
        q.id,
        q.assessment_id,
+       q.question_bank_id,
        q.order_index,
        q.question_text,
        q.question_type,
@@ -442,6 +443,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
       questionMap.set(row.id, {
         id: row.id,
         order: row.order_index,
+        questionBankId: row.question_bank_id,
         text: row.question_text,
         questionType: row.question_type || "single",
         correctTextAnswer: row.correct_text_answer,

@@ -41,7 +41,7 @@ router.get("/:id", cacheMiddleware({ ttl: 180 }), adminAssessmentController.getA
 // Создать новую аттестацию
 router.post("/", invalidateCacheMiddleware(/^http:GET:.*\/api\/admin\/assessments(\/|\\?|$)/), adminAssessmentController.createAssessment);
 
-// Обновить аттестацию (только pending)
+// Обновить аттестацию
 router.put(
   "/:id",
   invalidateCacheMiddleware((req) => new RegExp(`^http:GET:.*\/api\/admin\/assessments(\/${req.params.id}|\/|\\?)`)),

@@ -302,7 +302,7 @@
             </div>
             <div class="preview-row">
               <span class="preview-label">Вопросов:</span>
-              <span class="preview-value">{{ formData.questions.length }}</span>
+              <span class="preview-value">{{ questionsCount }}</span>
             </div>
             <div class="preview-row">
               <span class="preview-label">Сроки:</span>
@@ -327,7 +327,7 @@
 
       <Button v-if="currentStep < steps.length" @click="nextStep" :disabled="!canProceed">Далее</Button>
 
-      <Button v-else @click="submitAssessment" :loading="submitting" :disabled="!isFormValid" icon="check">Создать аттестацию </Button>
+      <Button v-else @click="submitAssessment" :loading="submitting" :disabled="!isFormValid" icon="check">{{ submitLabel }}</Button>
     </div>
   </div>
 </template>
@@ -335,7 +335,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue";
 import { useAuthStore } from "../stores/auth";
-import { createAssessment } from "../api/assessments";
+import { createAssessment, updateAssessment } from "../api/assessments";
 import { getReferences, getUsers } from "../api/users";
 import { getQuestions, getCategories } from "../api/questionBank";
 import { validateDate, validateDateRange, dateToISOWithMidnight } from "../utils/dateValidation";
@@ -345,14 +345,26 @@ import Input from "./ui/Input.vue";
 import Select from "./ui/Select.vue";
 import Textarea from "./ui/Textarea.vue";
 import AssessmentTheoryBuilder from "./AssessmentTheoryBuilder.vue";
-import { saveTheoryDraft, publishTheory } from "../api/theory";
-import { createEmptyTheory, validateTheoryData, buildTheoryPayload, hasTheoryBlocks } from "../utils/theory";
+import { getAdminTheory, saveTheoryDraft, publishTheory } from "../api/theory";
+import { createEmptyTheory, validateTheoryData, buildTheoryPayload, hasTheoryBlocks, mapVersionToTheoryData } from "../utils/theory";
 import { useToast } from "../composables/useToast";
 import { formatBranchLabel } from "../utils/branch";
+
+const props = defineProps({
+  mode: {
+    type: String,
+    default: "create",
+  },
+  initialAssessment: {
+    type: Object,
+    default: null,
+  },
+});
 
 const emit = defineEmits(["submit", "cancel"]);
 const authStore = useAuthStore();
 
+const isEditMode = computed(() => props.mode === "edit");
 const loading = ref(false);
 const submitting = ref(false);
 const currentStep = ref(1);
@@ -407,6 +419,8 @@ const filteredUsers = computed(() => {
   const query = userSearchQuery.value.toLowerCase();
   return allUsers.value.filter((user) => user.first_name.toLowerCase().includes(query) || user.last_name.toLowerCase().includes(query));
 });
+const questionsCount = computed(() => (questionsMode.value === "bank" ? selectedBankQuestions.value.length : formData.value.questions.length));
+const submitLabel = computed(() => (isEditMode.value ? "Сохранить изменения" : "Создать аттестацию"));
 
 const validateTheory = (showMessage = false) => {
   if (!theoryEnabled.value) {
@@ -432,6 +446,127 @@ const persistTheoryVersion = async (assessmentId) => {
   const payload = buildTheoryPayload(theoryData.value);
   await saveTheoryDraft(assessmentId, payload);
   await publishTheory(assessmentId, "new");
+};
+
+const formatDateForInput = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+};
+
+const mapAssessmentQuestionToForm = (question) => {
+  const questionType = question.question_type || question.questionType || (question.correct_text_answer || question.correctTextAnswer ? "text" : "single");
+  const correctText = question.correct_text_answer || question.correctTextAnswer || "";
+  const options = questionType === "text" ? [] : (question.options || []).map((opt) => ({
+    text: opt.option_text || opt.text || "",
+    matchText: opt.match_text || opt.matchText || "",
+    isCorrect: opt.is_correct === 1 || opt.isCorrect === true,
+  }));
+
+  return {
+    text: question.question_text || question.text || "",
+    questionType,
+    correctTextAnswer: correctText,
+    _typeCache: {
+      text: { correctTextAnswer: correctText },
+      single: { options: [] },
+      multiple: { options: [] },
+      matching: { options: [] },
+    },
+    options,
+  };
+};
+
+const mapAssessmentQuestionToBank = (question) => {
+  const questionType = question.question_type || question.questionType || "single";
+  const bankId = question.questionBankId || question.question_bank_id;
+  return {
+    id: bankId,
+    question_text: question.question_text || question.text || "",
+    question_type: questionType,
+    correct_text_answer: question.correct_text_answer || question.correctTextAnswer || "",
+    options:
+      questionType === "text"
+        ? []
+        : (question.options || []).map((opt, idx) => ({
+            id: opt.id || `${bankId || question.id}-${idx + 1}`,
+            option_text: opt.option_text || opt.text || "",
+            match_text: opt.match_text || opt.matchText || "",
+            is_correct: opt.is_correct === 1 || opt.isCorrect === true ? 1 : 0,
+            order_index: opt.order_index || opt.order || idx + 1,
+          })),
+  };
+};
+
+const applyInitialAssessment = (assessment) => {
+  formData.value = {
+    title: assessment.title || "",
+    description: assessment.description || "",
+    openAt: formatDateForInput(assessment.open_at || assessment.openAt),
+    closeAt: formatDateForInput(assessment.close_at || assessment.closeAt),
+    timeLimitMinutes: assessment.time_limit_minutes ?? assessment.timeLimitMinutes ?? 30,
+    passScorePercent: assessment.pass_score_percent ?? assessment.passScorePercent ?? 70,
+    maxAttempts: assessment.max_attempts ?? assessment.maxAttempts ?? 3,
+    branchIds: (assessment.accessibility?.branches || []).map((branch) => branch.id),
+    positionIds: (assessment.accessibility?.positions || []).map((position) => position.id),
+    userIds: (assessment.accessibility?.users || []).map((user) => user.id),
+    questions: [],
+  };
+
+  const questions = Array.isArray(assessment.questions) ? assessment.questions : [];
+  const bankQuestions = questions.filter((question) => question.questionBankId || question.question_bank_id);
+  const customQuestions = questions.filter((question) => !question.questionBankId && !question.question_bank_id);
+
+  if (bankQuestions.length === questions.length && bankQuestions.length > 0) {
+    questionsMode.value = "bank";
+    selectedBankQuestions.value = bankQuestions.map((question) => mapAssessmentQuestionToBank(question));
+  } else {
+    questionsMode.value = "custom";
+    selectedBankQuestions.value = [];
+    formData.value.questions = customQuestions.map((question) => mapAssessmentQuestionToForm(question));
+  }
+
+  formData.value.questions.forEach((question) => {
+    if (question.questionType === "text") {
+      question._typeCache.text.correctTextAnswer = question.correctTextAnswer || "";
+    } else {
+      const cachedOptions = (question.options || []).map((opt) => ({
+        text: opt.text || "",
+        matchText: opt.matchText || "",
+        isCorrect: Boolean(opt.isCorrect),
+      }));
+      question._typeCache[question.questionType] = { options: cachedOptions };
+    }
+  });
+
+  if (formData.value.userIds.length > 0) {
+    assignmentMode.value = "users";
+  } else if (formData.value.positionIds.length > 0) {
+    assignmentMode.value = "positions";
+  } else {
+    assignmentMode.value = "branches";
+  }
+};
+
+const loadTheoryForEdit = async (assessmentId) => {
+  if (!assessmentId) return;
+  try {
+    const response = await getAdminTheory(assessmentId);
+    const theory = response?.theory || null;
+    const version = theory?.draftVersion || theory?.currentVersion || null;
+    if (version && (version.requiredBlocks?.length || version.optionalBlocks?.length)) {
+      theoryEnabled.value = true;
+      theoryData.value = mapVersionToTheoryData(version);
+    } else {
+      theoryEnabled.value = false;
+      theoryData.value = createEmptyTheory();
+    }
+  } catch (error) {
+    console.error("Load theory error:", error);
+    theoryEnabled.value = false;
+    theoryData.value = createEmptyTheory();
+  }
 };
 
 const categoryOptions = computed(() => [
@@ -566,7 +701,7 @@ const loadReferences = async () => {
     const data = await getReferences();
     references.value = data;
 
-    if (authStore.isManager) {
+    if (authStore.isManager && (!isEditMode.value || formData.value.branchIds.length === 0)) {
       const allowedBranches = getManagerBranchIds(data?.branches);
       if (allowedBranches.length) {
         formData.value.branchIds = [...new Set(allowedBranches)];
@@ -574,6 +709,15 @@ const loadReferences = async () => {
     }
   } catch (error) {
     console.error("Load references error:", error);
+  }
+};
+
+const loadUsers = async () => {
+  try {
+    const { users } = await getUsers({});
+    allUsers.value = users || [];
+  } catch (error) {
+    console.error("Load users error:", error);
   }
 };
 
@@ -762,6 +906,7 @@ const handleQuestionTypeChange = (qIndex, type) => {
 const mapCustomQuestion = (question) => {
   const questionType = question.questionType || "single";
   return {
+    questionBankId: question.questionBankId || null,
     text: question.text.trim(),
     questionType,
     correctTextAnswer: questionType === "text" ? (question.correctTextAnswer || "").trim() : "",
@@ -895,19 +1040,19 @@ const submitAssessment = async () => {
   try {
     // Преобразуем даты в формат с временем 00:00
     const transformBankQuestion = (question) => {
-      const questionType = question.question_type || "single";
+      const questionType = question.question_type || question.questionType || "single";
       return {
-        question_id: question.id,
-        text: question.question_text,
+        questionBankId: question.id,
+        text: question.question_text || question.text || "",
         questionType,
-        correctTextAnswer: questionType === "text" ? (question.correct_text_answer || "") : "",
+        correctTextAnswer: questionType === "text" ? (question.correct_text_answer || question.correctTextAnswer || "") : "",
         options:
           questionType === "text"
             ? []
             : (question.options || []).map((opt) => ({
-                text: opt.option_text,
-                matchText: opt.match_text || "",
-                isCorrect: opt.is_correct === 1,
+                text: opt.option_text || opt.text || "",
+                matchText: opt.match_text || opt.matchText || "",
+                isCorrect: opt.is_correct === 1 || opt.isCorrect === true,
               })),
       };
     };
@@ -922,8 +1067,10 @@ const submitAssessment = async () => {
           : getCustomQuestionsPayload(),
     };
 
-    const result = await createAssessment(assessmentData);
-    const createdAssessmentId = result?.assessmentId ?? result?.assessment?.id;
+    const result = isEditMode.value
+      ? await updateAssessment(props.initialAssessment.id, assessmentData)
+      : await createAssessment(assessmentData);
+    const createdAssessmentId = isEditMode.value ? props.initialAssessment.id : result?.assessmentId ?? result?.assessment?.id;
 
     if (theoryEnabled.value && hasTheoryBlocks(theoryData.value) && createdAssessmentId) {
       try {
@@ -934,7 +1081,7 @@ const submitAssessment = async () => {
       }
     }
 
-    showToast("Аттестация успешно создана!", "success");
+    showToast(isEditMode.value ? "Аттестация успешно обновлена!" : "Аттестация успешно создана!", "success");
     emit("submit");
   } catch (error) {
     console.error("Create assessment error:", error);
@@ -944,10 +1091,18 @@ const submitAssessment = async () => {
   }
 };
 
-onMounted(() => {
-  loadReferences();
-  loadCategories();
-  searchBankQuestions();
+onMounted(async () => {
+  loading.value = true;
+  await Promise.all([loadReferences(), loadCategories()]);
+
+  if (isEditMode.value && props.initialAssessment) {
+    applyInitialAssessment(props.initialAssessment);
+    await loadUsers();
+    await loadTheoryForEdit(props.initialAssessment.id);
+  }
+
+  await searchBankQuestions();
+  loading.value = false;
 });
 </script>
 

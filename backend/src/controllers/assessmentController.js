@@ -14,6 +14,7 @@ const optionSchema = Joi.object({
 });
 
 const questionSchema = Joi.object({
+  questionBankId: Joi.number().integer().positive().allow(null),
   text: Joi.string().trim().min(1).required(),
   questionType: Joi.string().valid("single", "multiple", "text", "matching").default("single"),
   correctTextAnswer: Joi.when("questionType", {
@@ -110,6 +111,7 @@ const baseSchema = Joi.object({
 
 function normalizeQuestionPayload(questions) {
   return questions.map((question) => ({
+    questionBankId: question.questionBankId ?? null,
     text: question.text.trim(),
     questionType: question.questionType || "single",
     correctTextAnswer: question.questionType === "text" ? question.correctTextAnswer?.trim() || "" : "",
@@ -607,9 +609,7 @@ async function update(req, res, next) {
       return res.status(404).json({ error: "Аттестация не найдена" });
     }
 
-    // Все могут редактировать контент (вопросы, теорию) в любом статусе
-    // Параметры можно редактировать только для pending статуса
-    const canEditParameters = existing.status === "pending";
+    const canEditParameters = true;
 
     const payload = {
       ...req.body,

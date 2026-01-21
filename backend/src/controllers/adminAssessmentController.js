@@ -133,6 +133,7 @@ exports.getAssessmentById = async (req, res, next) => {
       SELECT 
         q.id,
         q.question_text,
+        q.question_bank_id,
         q.order_index,
         q.question_type,
         q.correct_text_answer
@@ -359,10 +360,10 @@ exports.createAssessment = async (req, res, next) => {
       }
       const [qResult] = await connection.query(
         `
-        INSERT INTO assessment_questions (assessment_id, question_text, order_index, question_type, correct_text_answer)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO assessment_questions (assessment_id, question_bank_id, question_text, order_index, question_type, correct_text_answer)
+        VALUES (?, ?, ?, ?, ?, ?)
       `,
-        [assessmentId, question.text, i, questionType, correctTextAnswer]
+        [assessmentId, question.questionBankId || null, question.text, i, questionType, correctTextAnswer]
       );
 
       const questionId = qResult.insertId;
@@ -526,28 +527,21 @@ exports.updateAssessment = async (req, res, next) => {
     const { title, description, openAt, closeAt, timeLimitMinutes, passScorePercent, maxAttempts, questions, branchIds, positionIds, userIds } =
       req.body;
 
-    // Разделяем поля на параметры и контент
-    // Параметры (passScorePercent, maxAttempts, timeLimitMinutes) можно редактировать только для pending
-    // Контент (questions, theory) и основную информацию (title, description, даты) можно редактировать всегда
-
-    const canEditParameters = assessment.status === "pending";
+    const canEditParameters = true;
 
     // Обновить основную информацию (title, description, даты можно всегда)
     const updateFields = ["title = ?", "description = ?", "open_at = ?", "close_at = ?"];
     const updateValues = [title, description || "", openAt, closeAt];
 
-    // Добавляем параметры только если статус pending
-    if (canEditParameters) {
-      updateFields.push("time_limit_minutes = ?", "pass_score_percent = ?", "max_attempts = ?");
-      updateValues.push(timeLimitMinutes, passScorePercent, maxAttempts);
-    }
+    updateFields.push("time_limit_minutes = ?", "pass_score_percent = ?", "max_attempts = ?");
+    updateValues.push(timeLimitMinutes, passScorePercent, maxAttempts);
 
     updateValues.push(assessmentId);
 
     await connection.query(`UPDATE assessments SET ${updateFields.join(", ")} WHERE id = ?`, updateValues);
 
-    // Обновить назначения (только для pending статуса)
-    if (canEditParameters && (branchIds !== undefined || positionIds !== undefined || userIds !== undefined)) {
+    // Обновить назначения
+    if (branchIds !== undefined || positionIds !== undefined || userIds !== undefined) {
       // Получить текущую роль пользователя
       const currentUser = req.user;
 
@@ -662,13 +656,13 @@ exports.updateAssessment = async (req, res, next) => {
             }
           }
         }
-        const [qResult] = await connection.query(
-          `
-          INSERT INTO assessment_questions (assessment_id, question_text, order_index, question_type, correct_text_answer)
-          VALUES (?, ?, ?, ?, ?)
+      const [qResult] = await connection.query(
+        `
+          INSERT INTO assessment_questions (assessment_id, question_bank_id, question_text, order_index, question_type, correct_text_answer)
+          VALUES (?, ?, ?, ?, ?, ?)
         `,
-          [assessmentId, question.text, i, questionType, correctTextAnswer]
-        );
+        [assessmentId, question.questionBankId || null, question.text, i, questionType, correctTextAnswer]
+      );
 
         const questionId = qResult.insertId;
 
@@ -868,6 +862,7 @@ exports.getAssessmentDetails = async (req, res, next) => {
       SELECT 
         q.id,
         q.question_text,
+        q.question_bank_id,
         q.order_index,
         q.question_type,
         q.correct_text_answer

@@ -15,7 +15,7 @@
       </div>
 
       <!-- Форма редактирования -->
-      <AssessmentEditForm v-if="assessment" :assessment="assessment" @submit="handleSubmit" @cancel="goBack" />
+      <AssessmentWizard v-if="assessment" mode="edit" :initial-assessment="assessment" @submit="handleSubmit" @cancel="goBack" />
     </div>
   </div>
 </template>
@@ -26,7 +26,7 @@ import { useRouter, useRoute } from "vue-router";
 import { getAssessmentDetails } from "../api/assessments";
 import Preloader from "../components/ui/Preloader.vue";
 import Button from "../components/ui/Button.vue";
-import AssessmentEditForm from "../components/AssessmentEditForm.vue";
+import AssessmentWizard from "../components/AssessmentWizard.vue";
 
 const router = useRouter();
 const route = useRoute();
