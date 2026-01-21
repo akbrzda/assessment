@@ -162,9 +162,19 @@
           </div>
         </Card>
 
-        <Card class="stat-card" v-if="stats.theory_completed_count > 0">
+        <Card class="stat-card">
           <div class="stat-icon">
-            <Icon name="book-open" size="40" />
+            <Icon name="book-open-check" size="40" />
+          </div>
+          <div class="stat-content">
+            <div class="stat-value">{{ stats.theory_completed_count }}</div>
+            <div class="stat-label">Прошли теорию</div>
+          </div>
+        </Card>
+
+        <Card class="stat-card">
+          <div class="stat-icon">
+            <Icon name="clock" size="40" />
           </div>
           <div class="stat-content">
             <div class="stat-value">{{ formatTheoryTime(stats.avg_theory_time_seconds) }}</div>
@@ -239,7 +249,7 @@
                   {{ formatDate(participant.completed_at || participant.started_at) }}
                 </td>
                 <td class="actions-cell">
-                  <Button size="sm" variant="ghost" icon="book-open" @click="openTheory">Теория</Button>
+                  <Button size="sm" variant="ghost" icon="user" @click="openUserProgress(participant.id)">Прогресс</Button>
                 </td>
               </tr>
             </tbody>
@@ -264,7 +274,19 @@
 
           <p class="question-text">{{ question.question_text }}</p>
 
-          <div class="options-list">
+          <div v-if="question.question_type === 'text'" class="correct-answer">
+            <strong>Эталонный ответ:</strong> {{ question.correct_text_answer || "—" }}
+          </div>
+
+          <div v-else-if="question.question_type === 'matching'" class="matching-answers">
+            <h4>Правильные пары</h4>
+            <div v-if="getCorrectPairs(question).length === 0" class="score-empty">—</div>
+            <div v-for="pair in getCorrectPairs(question)" :key="pair.key" class="pair-row">
+              {{ pair.left }} — {{ pair.right }}
+            </div>
+          </div>
+
+          <div v-else class="options-list">
             <div v-for="option in question.options" :key="option.id" class="option-item" :class="{ 'option-correct': option.is_correct }">
               <div class="option-text">
                 <span v-if="option.is_correct" class="correct-marker">✓</span>
@@ -277,6 +299,29 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <div class="user-answers">
+            <h4>Ответы пользователей</h4>
+            <div v-if="!question.userAnswers || question.userAnswers.length === 0" class="score-empty">Нет ответов</div>
+            <table v-else class="answers-table">
+              <thead>
+                <tr>
+                  <th>Пользователь</th>
+                  <th>Ответ</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(answer, aIndex) in question.userAnswers" :key="`${answer.user.id}-${aIndex}`">
+                  <td>{{ answer.user.first_name }} {{ answer.user.last_name }}</td>
+                  <td>{{ formatUserAnswer(question, answer) }}</td>
+                  <td>
+                    <Badge :variant="getAnswerStatusVariant(answer)" size="sm">{{ getAnswerStatusLabel(answer) }}</Badge>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </Card>
       </div>
@@ -355,6 +400,10 @@ const handleExport = async () => {
 
 const openTheory = () => {
   router.push({ name: "AssessmentTheory", params: { id: props.assessmentId } });
+};
+
+const openUserProgress = (userId) => {
+  router.push({ name: "AssessmentUserProgress", params: { id: props.assessmentId, userId } });
 };
 
 const goToEdit = () => {
@@ -457,6 +506,75 @@ const getSelectionPercentage = (stats, optionId) => {
   if (total === 0) return 0;
   const count = getSelectionCount(stats, optionId);
   return ((count / total) * 100).toFixed(1);
+};
+
+const getCorrectPairs = (question) => {
+  if (!question?.options) return [];
+  return question.options
+    .filter((option) => option.match_text)
+    .map((option) => ({
+      key: `${option.id}-correct`,
+      left: option.option_text,
+      right: option.match_text,
+    }));
+};
+
+const getOptionText = (question, optionId, useMatchText = false) => {
+  const option = (question.options || []).find((item) => item.id === optionId);
+  if (!option) {
+    return "—";
+  }
+  if (useMatchText && option.match_text) {
+    return option.match_text;
+  }
+  return option.option_text;
+};
+
+const formatMatchingPairs = (question, pairs) => {
+  if (!pairs || typeof pairs !== "object") {
+    return "—";
+  }
+  const entries = Object.entries(pairs);
+  if (!entries.length) {
+    return "—";
+  }
+  return entries
+    .map(
+      ([leftId, rightId]) =>
+        `${getOptionText(question, Number(leftId))} — ${getOptionText(question, Number(rightId), true)}`
+    )
+    .join("; ");
+};
+
+const formatUserAnswer = (question, answer) => {
+  if (!answer) return "—";
+  if (question.question_type === "text") {
+    return answer.selectedTextAnswer || "—";
+  }
+  if (question.question_type === "matching") {
+    return formatMatchingPairs(question, answer.selectedMatchPairs);
+  }
+  if (Array.isArray(answer.selectedOptionIds) && answer.selectedOptionIds.length > 0) {
+    return answer.selectedOptionIds.map((id) => getOptionText(question, id)).join(", ");
+  }
+  if (answer.selectedOptionId) {
+    return getOptionText(question, answer.selectedOptionId);
+  }
+  return "—";
+};
+
+const getAnswerStatusLabel = (answer) => {
+  if (answer.isCorrect === null || answer.isCorrect === undefined) {
+    return "Нет ответа";
+  }
+  return answer.isCorrect ? "Верно" : "Неверно";
+};
+
+const getAnswerStatusVariant = (answer) => {
+  if (answer.isCorrect === null || answer.isCorrect === undefined) {
+    return "secondary";
+  }
+  return answer.isCorrect ? "success" : "danger";
 };
 
 onMounted(() => {
@@ -721,6 +839,39 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.correct-answer {
+  margin: 12px 0;
+  color: var(--text-primary);
+}
+
+.matching-answers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.pair-row {
+  color: var(--text-primary);
+}
+
+.user-answers {
+  margin-top: 16px;
+}
+
+.answers-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.answers-table th,
+.answers-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--divider);
 }
 
 .question-header {

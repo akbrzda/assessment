@@ -90,7 +90,9 @@ exports.getAssessments = async (req, res, next) => {
         (
           SELECT COUNT(*)
           FROM assessment_attempts aa
-          WHERE aa.assessment_id = a.id AND aa.status = 'completed'
+          WHERE aa.assessment_id = a.id
+            AND aa.status = 'completed'
+            AND aa.score_percent >= a.pass_score_percent
         ) AS completed_attempts,
         (
           SELECT AVG(aa.score_percent)
@@ -173,7 +175,6 @@ exports.getAssessmentById = async (req, res, next) => {
         SELECT aua.user_id AS user_id
         FROM assessment_user_assignments aua
         WHERE aua.assessment_id = ?
-          AND aua.is_direct = 1
         UNION
         SELECT u.id AS user_id
         FROM assessment_branch_assignments aba
@@ -913,6 +914,8 @@ exports.getAssessmentDetails = async (req, res, next) => {
         u.telegram_id,
         b.name as branch_name,
         p.name as position_name,
+        in_progress.id as in_progress_attempt_id,
+        best_completed.id as best_completed_attempt_id,
         COALESCE(in_progress.id, best_completed.id) as attempt_id,
         COALESCE(in_progress.status, best_completed.status) as attempt_status,
         COALESCE(in_progress.score_percent, best_completed.score_percent) as score_percent,
@@ -957,6 +960,101 @@ exports.getAssessmentDetails = async (req, res, next) => {
       [assessmentId, assessmentId, assessmentId]
     );
 
+    const questionMap = new Map();
+    questions.forEach((question) => {
+      questionMap.set(question.id, question);
+      question.userAnswers = [];
+    });
+
+    const attemptUserMap = new Map();
+    participants.forEach((participant) => {
+      const attemptId = participant.best_completed_attempt_id || null;
+      if (attemptId) {
+        attemptUserMap.set(attemptId, {
+          id: participant.id,
+          first_name: participant.first_name,
+          last_name: participant.last_name,
+        });
+      }
+    });
+
+    const attemptIds = Array.from(attemptUserMap.keys());
+    if (attemptIds.length > 0) {
+      const [answerRows] = await pool.query(
+        `
+        SELECT attempt_id, question_id, option_id, selected_option_ids, text_answer, is_correct
+        FROM assessment_answers
+        WHERE attempt_id IN (?)
+      `,
+        [attemptIds]
+      );
+
+      const parseSelectedOptions = (questionType, selectedOptionIds) => {
+        if (!selectedOptionIds) {
+          return { selectedOptionIds: [], selectedMatchPairs: null };
+        }
+        try {
+          const parsed = JSON.parse(selectedOptionIds);
+          if (questionType === "matching") {
+            const matchPairs = {};
+            if (Array.isArray(parsed) && parsed.length && typeof parsed[0] === "object") {
+              parsed.forEach((pair) => {
+                const leftId = Number(pair?.leftOptionId);
+                const rightId = Number(pair?.rightOptionId);
+                if (leftId && rightId) {
+                  matchPairs[leftId] = rightId;
+                }
+              });
+            } else if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+              Object.entries(parsed).forEach(([left, right]) => {
+                const leftId = Number(left);
+                const rightId = Number(right);
+                if (leftId && rightId) {
+                  matchPairs[leftId] = rightId;
+                }
+              });
+            } else if (Array.isArray(parsed)) {
+              return {
+                selectedOptionIds: parsed.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0),
+                selectedMatchPairs: null,
+              };
+            }
+            return {
+              selectedOptionIds: [],
+              selectedMatchPairs: Object.keys(matchPairs).length ? matchPairs : null,
+            };
+          }
+          if (Array.isArray(parsed)) {
+            return {
+              selectedOptionIds: parsed.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0),
+              selectedMatchPairs: null,
+            };
+          }
+        } catch (error) {
+          console.warn("Failed to parse selected_option_ids", error);
+        }
+        return { selectedOptionIds: [], selectedMatchPairs: null };
+      };
+
+      answerRows.forEach((answer) => {
+        const user = attemptUserMap.get(answer.attempt_id);
+        const question = questionMap.get(answer.question_id);
+        if (!user || !question) {
+          return;
+        }
+
+        const { selectedOptionIds, selectedMatchPairs } = parseSelectedOptions(question.question_type, answer.selected_option_ids);
+        question.userAnswers.push({
+          user,
+          selectedOptionId: answer.option_id,
+          selectedOptionIds,
+          selectedMatchPairs,
+          selectedTextAnswer: answer.text_answer || "",
+          isCorrect: answer.is_correct === 1,
+        });
+      });
+    }
+
     // Статистика (на основе лучшей завершенной попытки каждого пользователя)
     const [stats] = await pool.query(
       `
@@ -969,8 +1067,8 @@ exports.getAssessmentDetails = async (req, res, next) => {
         MIN(CASE WHEN latest.status = 'completed' THEN latest.score_percent END) as min_score,
         MAX(CASE WHEN latest.status = 'completed' THEN latest.score_percent END) as max_score,
         COUNT(DISTINCT CASE WHEN latest.score_percent >= ? THEN latest.user_id END) as passed_count,
-        AVG(tc.time_spent_seconds) as avg_theory_time_seconds,
-        COUNT(DISTINCT tc.user_id) as theory_completed_count
+        COALESCE(AVG(tc.time_spent_seconds), 0) as avg_theory_time_seconds,
+        COALESCE(COUNT(DISTINCT tc.user_id), 0) as theory_completed_count
       FROM assessment_user_assignments aua
       LEFT JOIN (
         SELECT aa1.*
@@ -1053,6 +1151,318 @@ exports.getAssessmentDetails = async (req, res, next) => {
     });
   } catch (error) {
     console.error("Get assessment details error:", error);
+    next(error);
+  }
+};
+
+exports.getUserAssessmentProgress = async (req, res, next) => {
+  try {
+    const assessmentId = Number(req.params.id);
+    const userId = Number(req.params.userId);
+    const attemptId = req.query.attemptId ? Number(req.query.attemptId) : null;
+
+    if (!assessmentId || !userId) {
+      return res.status(400).json({ error: "Некорректные параметры" });
+    }
+
+    const [assessments] = await pool.query(
+      `
+      SELECT 
+        id,
+        title,
+        pass_score_percent,
+        CASE
+          WHEN UTC_TIMESTAMP() < open_at THEN 'pending'
+          WHEN UTC_TIMESTAMP() BETWEEN open_at AND close_at THEN 'open'
+          ELSE 'closed'
+        END as status
+      FROM assessments 
+      WHERE id = ?
+    `,
+      [assessmentId]
+    );
+
+    if (assessments.length === 0) {
+      return res.status(404).json({ error: "Аттестация не найдена" });
+    }
+
+    const assessment = assessments[0];
+    const userRole = req.user.role;
+
+    if (userRole === "manager") {
+      const [access] = await pool.query(
+        `SELECT 1 
+         FROM assessments a
+         WHERE a.id = ?
+           AND (
+             a.created_by = ?
+             OR EXISTS (
+               SELECT 1
+               FROM assessment_user_assignments aua
+               JOIN users u ON u.id = aua.user_id
+               WHERE aua.assessment_id = a.id
+                 AND u.branch_id = (SELECT branch_id FROM users WHERE id = ?)
+             )
+           )`,
+        [assessmentId, req.user.id, req.user.id]
+      );
+
+      if (access.length === 0) {
+        return res.status(403).json({ error: "Нет доступа к этой аттестации" });
+      }
+    }
+
+    const [users] = await pool.query(
+      `
+      SELECT 
+        u.id,
+        u.first_name,
+        u.last_name,
+        u.telegram_id,
+        b.name as branch_name,
+        p.name as position_name
+      FROM users u
+      JOIN (
+        SELECT aua.user_id AS user_id
+        FROM assessment_user_assignments aua
+        WHERE aua.assessment_id = ?
+        UNION
+        SELECT u.id AS user_id
+        FROM assessment_branch_assignments aba
+        JOIN users u ON u.branch_id = aba.branch_id
+        WHERE aba.assessment_id = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM assessment_position_assignments apa WHERE apa.assessment_id = aba.assessment_id
+          )
+        UNION
+        SELECT u.id AS user_id
+        FROM assessment_position_assignments apa
+        JOIN users u ON u.position_id = apa.position_id
+        WHERE apa.assessment_id = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM assessment_branch_assignments aba WHERE aba.assessment_id = apa.assessment_id
+          )
+        UNION
+        SELECT u.id AS user_id
+        FROM assessment_branch_assignments aba
+        JOIN assessment_position_assignments apa ON apa.assessment_id = aba.assessment_id
+        JOIN users u ON u.branch_id = aba.branch_id AND u.position_id = apa.position_id
+        WHERE aba.assessment_id = ?
+      ) assigned ON assigned.user_id = u.id
+      LEFT JOIN branches b ON u.branch_id = b.id
+      LEFT JOIN positions p ON u.position_id = p.id
+      WHERE u.id = ?
+      LIMIT 1
+    `,
+      [assessmentId, assessmentId, assessmentId, assessmentId, userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: "Пользователь не назначен на аттестацию" });
+    }
+
+    const user = users[0];
+
+    const [attempts] = await pool.query(
+      `
+      SELECT 
+        id,
+        attempt_number,
+        status,
+        score_percent,
+        correct_answers,
+        total_questions,
+        time_spent_seconds,
+        started_at,
+        completed_at
+      FROM assessment_attempts
+      WHERE assessment_id = ? AND user_id = ?
+      ORDER BY attempt_number DESC, started_at DESC
+    `,
+      [assessmentId, userId]
+    );
+
+    const attemptIds = new Set(attempts.map((item) => item.id));
+    const completedAttempts = attempts.filter((item) => item.status === "completed");
+    const bestAttempt = completedAttempts.reduce((best, current) => {
+      if (!best) {
+        return current;
+      }
+      const bestScore = Number(best.score_percent ?? -1);
+      const currentScore = Number(current.score_percent ?? -1);
+      if (currentScore > bestScore) {
+        return current;
+      }
+      if (currentScore === bestScore) {
+        const bestCompleted = best.completed_at ? new Date(best.completed_at).getTime() : 0;
+        const currentCompleted = current.completed_at ? new Date(current.completed_at).getTime() : 0;
+        return currentCompleted > bestCompleted ? current : best;
+      }
+      return best;
+    }, null);
+    const selectedAttemptId = attemptIds.has(attemptId) ? attemptId : (bestAttempt?.id || (attempts.length ? attempts[0].id : null));
+
+    let questions = [];
+    let selectedAttempt = null;
+    if (selectedAttemptId) {
+      selectedAttempt = attempts.find((item) => item.id === selectedAttemptId) || null;
+
+      const [questionRows] = await pool.query(
+        `
+        SELECT 
+          q.id,
+          q.question_text,
+          q.order_index,
+          q.question_type,
+          q.correct_text_answer,
+          o.id AS option_id,
+          o.option_text,
+          o.match_text,
+          o.is_correct,
+          o.order_index AS option_order
+        FROM assessment_questions q
+        LEFT JOIN assessment_question_options o ON o.question_id = q.id
+        WHERE q.assessment_id = ?
+        ORDER BY q.order_index, o.order_index
+      `,
+        [assessmentId]
+      );
+
+      const [answerRows] = await pool.query(
+        `
+        SELECT question_id, option_id, selected_option_ids, text_answer, is_correct
+        FROM assessment_answers
+        WHERE attempt_id = ?
+      `,
+        [selectedAttemptId]
+      );
+
+      const answersMap = new Map();
+      answerRows.forEach((row) => {
+        answersMap.set(row.question_id, row);
+      });
+
+      const questionMap = new Map();
+      questionRows.forEach((row) => {
+        if (!questionMap.has(row.id)) {
+          questionMap.set(row.id, {
+            id: row.id,
+            question_text: row.question_text,
+            question_type: row.question_type,
+            correct_text_answer: row.correct_text_answer,
+            options: [],
+            correctOptionIds: [],
+            selectedOptionId: null,
+            selectedOptionIds: [],
+            selectedTextAnswer: "",
+            selectedMatchPairs: null,
+            isCorrect: null,
+          });
+        }
+        if (row.option_id) {
+          const option = {
+            id: row.option_id,
+            option_text: row.option_text,
+            match_text: row.match_text,
+            is_correct: row.is_correct === 1,
+            order_index: row.option_order,
+          };
+          const question = questionMap.get(row.id);
+          question.options.push(option);
+          if (option.is_correct) {
+            question.correctOptionIds.push(option.id);
+          }
+        }
+      });
+
+      questionMap.forEach((question) => {
+        const answer = answersMap.get(question.id);
+        if (!answer) {
+          return;
+        }
+
+        if (answer.option_id) {
+          question.selectedOptionId = answer.option_id;
+        }
+
+        if (answer.text_answer) {
+          question.selectedTextAnswer = answer.text_answer;
+        }
+
+        if (answer.selected_option_ids) {
+          try {
+            const parsed = JSON.parse(answer.selected_option_ids);
+            if (question.question_type === "matching") {
+              const matchPairs = {};
+              if (Array.isArray(parsed) && parsed.length && typeof parsed[0] === "object") {
+                parsed.forEach((pair) => {
+                  const leftId = Number(pair?.leftOptionId);
+                  const rightId = Number(pair?.rightOptionId);
+                  if (leftId && rightId) {
+                    matchPairs[leftId] = rightId;
+                  }
+                });
+              } else if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                Object.entries(parsed).forEach(([left, right]) => {
+                  const leftId = Number(left);
+                  const rightId = Number(right);
+                  if (leftId && rightId) {
+                    matchPairs[leftId] = rightId;
+                  }
+                });
+              } else if (Array.isArray(parsed)) {
+                question.selectedOptionIds = parsed.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+              }
+              if (Object.keys(matchPairs).length) {
+                question.selectedMatchPairs = matchPairs;
+              }
+            } else if (Array.isArray(parsed)) {
+              question.selectedOptionIds = parsed.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+            }
+          } catch (error) {
+            console.warn("Failed to parse selected_option_ids", error);
+          }
+        }
+
+        question.isCorrect = answer.is_correct === 1;
+      });
+
+      questions = Array.from(questionMap.values()).sort((a, b) => a.id - b.id);
+    }
+
+    const [theoryRows] = await pool.query(
+      `
+      SELECT tc.time_spent_seconds, tc.completed_at
+      FROM assessment_theory_completions tc
+      JOIN assessments a ON a.id = tc.assessment_id
+      WHERE tc.assessment_id = ? AND tc.user_id = ? AND tc.version_id = a.current_theory_version_id
+      LIMIT 1
+    `,
+      [assessmentId, userId]
+    );
+
+    const theory = theoryRows.length
+      ? {
+          time_spent_seconds: theoryRows[0].time_spent_seconds,
+          completed_at: theoryRows[0].completed_at,
+        }
+      : null;
+
+    res.json({
+      assessment: {
+        id: assessment.id,
+        title: assessment.title,
+        pass_score_percent: assessment.pass_score_percent,
+        status: assessment.status,
+      },
+      user,
+      attempts,
+      selectedAttempt,
+      questions,
+      theory,
+    });
+  } catch (error) {
+    console.error("Get user assessment progress error:", error);
     next(error);
   }
 };

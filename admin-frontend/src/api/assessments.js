@@ -80,6 +80,20 @@ export const getAssessmentDetails = async (id) => {
 };
 
 /**
+ * Получить прогресс пользователя по аттестации
+ * @param {Number} assessmentId - ID аттестации
+ * @param {Number} userId - ID пользователя
+ * @param {Number} attemptId - ID попытки
+ */
+export const getAssessmentUserProgress = async (assessmentId, userId, attemptId = null) => {
+  const response = await axios.get(`/admin/assessments/${assessmentId}/users/${userId}/progress`, {
+    params: attemptId ? { attemptId } : {},
+    cacheMaxAge: 60000, // 1 минута
+  });
+  return response.data;
+};
+
+/**
  * Экспортировать результаты аттестации в Excel
  * @param {Number} id - ID аттестации
  */

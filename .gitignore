@@ -9,3 +9,4 @@ docs/
 .env
 .env.local
 .env.*.local
+TASKS.md

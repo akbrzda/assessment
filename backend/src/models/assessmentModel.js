@@ -857,7 +857,6 @@ async function listAssessmentsForUser(userId) {
        SELECT aua.assessment_id
        FROM assessment_user_assignments aua
        WHERE aua.user_id = ?
-         AND aua.is_direct = 1
        UNION
        SELECT aba.assessment_id
        FROM assessment_branch_assignments aba
@@ -972,10 +971,9 @@ async function getAssessmentForUser(assessmentId, userId) {
      WHERE a.id = ?
        AND EXISTS (
          SELECT 1
-         FROM assessment_user_assignments aua
-         WHERE aua.assessment_id = a.id
-           AND aua.user_id = ?
-           AND aua.is_direct = 1
+        FROM assessment_user_assignments aua
+        WHERE aua.assessment_id = a.id
+          AND aua.user_id = ?
          UNION
          SELECT 1
          FROM assessment_branch_assignments aba

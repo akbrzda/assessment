@@ -78,13 +78,6 @@
                       icon="pencil"
                     ></Button>
                     <Button
-                      v-if="canEditAssessment(assessment)"
-                      @click="goToTheory(assessment.id)"
-                      class="action-btn action-btn-info"
-                      title="Теория"
-                      icon="book-open-check"
-                    ></Button>
-                    <Button
                       v-if="assessment.status === 'pending'"
                       @click="confirmDelete(assessment)"
                       class="action-btn action-btn-delete"

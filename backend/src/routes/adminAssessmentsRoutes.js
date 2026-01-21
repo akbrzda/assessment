@@ -19,6 +19,9 @@ router.get("/:id/export", adminAssessmentController.exportAssessmentToExcel);
 // Получить детализацию аттестации
 router.get("/:id/details", cacheMiddleware({ ttl: 180 }), adminAssessmentController.getAssessmentDetails);
 
+// Прогресс пользователя по аттестации
+router.get("/:id/users/:userId/progress", cacheMiddleware({ ttl: 60 }), adminAssessmentController.getUserAssessmentProgress);
+
 // Получить результаты аттестации
 router.get("/:id/results", cacheMiddleware({ ttl: 60 }), adminAssessmentController.getAssessmentResults);
 
