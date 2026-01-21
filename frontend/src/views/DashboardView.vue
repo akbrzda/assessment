@@ -3,7 +3,10 @@
     <div class="container">
       <!-- Welcome Section -->
       <div class="welcome-section mb-24">
-        <h1 class="title-large">Привет, {{ userStore.user?.firstName }} 👋</h1>
+        <div class="welcome-header">
+          <h1 class="title-large">Привет, {{ userStore.user?.firstName }} 👋</h1>
+          <button v-if="debugConsoleReady" class="btn-icon debug-btn" @click="toggleDebugConsole" title="Консоль отладки">🔧</button>
+        </div>
       </div>
 
       <!-- Next Assessment Card -->
@@ -112,6 +115,7 @@ import { useRouter } from "vue-router";
 import { CheckCircle, FileText, XCircle } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
+import { useDebugConsole } from "../composables/useDebugConsole";
 import { apiClient } from "../services/apiClient";
 
 export default {
@@ -125,6 +129,7 @@ export default {
     const router = useRouter();
     const userStore = useUserStore();
     const telegramStore = useTelegramStore();
+    const { initializeEruda, toggle, isErudaLoaded } = useDebugConsole();
 
     const nextAssessment = ref(null);
     const userStats = ref({
@@ -134,6 +139,8 @@ export default {
     });
     const recentActivity = ref([]);
     const isDataLoading = ref(false);
+
+    const debugConsoleReady = computed(() => isErudaLoaded.value);
 
     const progressPercentage = computed(() => {
       const user = userStore.user;
@@ -280,6 +287,11 @@ export default {
         await userStore.ensureStatus();
       }
 
+      // Инициализируем debug console после загрузки пользователя
+      if (userStore.user?.telegramId) {
+        await initializeEruda(userStore.user.telegramId);
+      }
+
       isDataLoading.value = true;
       try {
         const [, assessmentsResponse] = await Promise.all([userStore.loadOverview(), apiClient.listUserAssessments()]);
@@ -341,6 +353,10 @@ export default {
       loadDashboardData();
     });
 
+    function toggleDebugConsole() {
+      toggle();
+    }
+
     return {
       userStore,
       nextAssessment,
@@ -348,12 +364,14 @@ export default {
       recentActivity,
       progressPercentage,
       isDataLoading,
+      debugConsoleReady,
       getStatusClass,
       getStatusText,
       formatDate,
       formatDateRange,
       startAssessment,
       openTheory,
+      toggleDebugConsole,
     };
   },
 };
@@ -362,6 +380,19 @@ export default {
 <style scoped>
 .welcome-section {
   padding-top: 20px;
+}
+
+.welcome-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.debug-btn {
+  font-size: 18px;
+  padding: 8px;
+  flex-shrink: 0;
 }
 
 .welcome-icon {
