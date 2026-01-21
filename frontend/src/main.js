@@ -1,3 +1,10 @@
+// Защита от ошибок Eruda с TelegramGameProxy
+if (typeof window !== "undefined" && !window.TelegramGameProxy) {
+  window.TelegramGameProxy = {
+    receiveEvent: () => {},
+  };
+}
+
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import "./style.css";

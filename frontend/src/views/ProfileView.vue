@@ -20,6 +20,7 @@
           <button class="btn-icon profile-edit" @click="editProfile">
             <Pencil />
           </button>
+          <button v-if="debugConsoleReady" class="btn-icon debug-btn" @click="toggleDebugConsole" title="Консоль отладки">🔧</button>
         </div>
       </div>
 
@@ -139,6 +140,7 @@ import { useRouter } from "vue-router";
 import { Pencil, X } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
+import { useDebugConsole } from "../composables/useDebugConsole";
 import { apiClient } from "../services/apiClient";
 
 export default {
@@ -151,10 +153,15 @@ export default {
     const router = useRouter();
     const userStore = useUserStore();
     const telegramStore = useTelegramStore();
+    const { initializeEruda, toggle, isErudaLoaded } = useDebugConsole();
 
     const user = computed(() => userStore.user);
     const isLoading = computed(() => userStore.isLoading);
     const overviewReady = computed(() => Boolean(userStore.overview) && !userStore.overviewLoading);
+    const debugConsoleReady = computed(() => {
+      console.log("🔍 ProfileView: debugConsoleReady вычисляется, isErudaLoaded.value =", isErudaLoaded.value);
+      return isErudaLoaded.value;
+    });
 
     const showEditModal = ref(false);
     const badges = ref([]);
@@ -238,6 +245,12 @@ export default {
         await userStore.ensureStatus();
       }
 
+      // Инициализируем debug console после загрузки пользователя
+      console.log("🔍 ProfileView: loadProfileData - userStore.user?.telegramId =", userStore.user?.telegramId);
+      if (userStore.user?.telegramId) {
+        await initializeEruda(userStore.user.telegramId);
+      }
+
       const leaderboardPromise = apiClient.getLeaderboardUsers().catch((error) => {
         console.warn("Не удалось получить лидерборд", error);
         return null;
@@ -301,11 +314,16 @@ export default {
       loadProfileData();
     });
 
+    function toggleDebugConsole() {
+      toggle();
+    }
+
     return {
       userStore,
       user,
       isLoading,
       overviewReady,
+      debugConsoleReady,
       showEditModal,
       badges,
       userStats,
@@ -317,6 +335,7 @@ export default {
       closeEditModal,
       saveProfile,
       showBadgeDetails,
+      toggleDebugConsole,
     };
   },
 };
@@ -527,6 +546,11 @@ export default {
   background: linear-gradient(90deg, rgba(148, 163, 184, 0.2), rgba(148, 163, 184, 0.35), rgba(148, 163, 184, 0.2));
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.debug-btn {
+  font-size: 18px;
+  padding: 8px;
 }
 
 .skeleton-title {
