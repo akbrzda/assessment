@@ -123,7 +123,14 @@
                 placeholder="Опишите содержание блока"
               />
 
-              <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" required placeholder="https://" />
+              <Input
+                v-if="block.type === 'video'"
+                :modelValue="block.videoUrl"
+                label="Ссылка на видео"
+                required
+                placeholder="https://"
+                @update:modelValue="(value) => handleVideoUrlInput(block, value)"
+              />
 
               <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" required placeholder="https://" />
             </div>
@@ -189,7 +196,14 @@
                 placeholder="Опишите содержание блока"
               />
 
-              <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" required placeholder="https://" />
+              <Input
+                v-if="block.type === 'video'"
+                :modelValue="block.videoUrl"
+                label="Ссылка на видео"
+                required
+                placeholder="https://"
+                @update:modelValue="(value) => handleVideoUrlInput(block, value)"
+              />
 
               <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" required placeholder="https://" />
             </div>
@@ -215,6 +229,7 @@ import Preloader from "../components/ui/Preloader.vue";
 import { getAdminTheory, saveTheoryDraft, publishTheory } from "../api/theory";
 import { useToast } from "../composables/useToast";
 import { calculateReadingSeconds, formatReadingTime, sumReadingSeconds } from "../utils/readingTime";
+import { normalizeVideoUrl } from "../utils/videoUrl";
 
 const router = useRouter();
 const route = useRoute();
@@ -405,7 +420,7 @@ const validateBlocks = () => {
       showToast(`Блок "${block.title}" должен содержать текст`, "error");
       return false;
     }
-    if (block.type === "video" && !block.videoUrl.trim()) {
+    if (block.type === "video" && !normalizeVideoUrl(block.videoUrl || "")) {
       showToast(`Укажите ссылку на видео для блока "${block.title}"`, "error");
       return false;
     }
@@ -423,7 +438,7 @@ const buildPayload = () => ({
     title: block.title.trim(),
     type: block.type,
     content: block.type === "text" ? block.content.trim() : block.content?.trim() || "",
-    videoUrl: block.type === "video" ? block.videoUrl.trim() : null,
+    videoUrl: block.type === "video" ? normalizeVideoUrl(block.videoUrl || "") : null,
     externalUrl: block.type === "link" ? block.externalUrl.trim() : null,
     metadata: block.metadata || {},
   })),
@@ -431,11 +446,20 @@ const buildPayload = () => ({
     title: block.title.trim(),
     type: block.type,
     content: block.content?.trim() || "",
-    videoUrl: block.type === "video" ? block.videoUrl.trim() : null,
+    videoUrl: block.type === "video" ? normalizeVideoUrl(block.videoUrl || "") : null,
     externalUrl: block.type === "link" ? block.externalUrl.trim() : null,
     metadata: block.metadata || {},
   })),
 });
+
+const handleVideoUrlInput = (block, value) => {
+  const raw = String(value || "");
+  if (/[<>\s]/.test(raw) || raw.toLowerCase().includes("iframe") || raw.toLowerCase().includes("src=")) {
+    block.videoUrl = normalizeVideoUrl(raw);
+    return;
+  }
+  block.videoUrl = raw;
+};
 
 const persistDraft = async () => {
   const payload = buildPayload();

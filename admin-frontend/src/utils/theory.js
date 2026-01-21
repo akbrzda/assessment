@@ -1,3 +1,5 @@
+import { normalizeVideoUrl } from "./videoUrl";
+
 const generateUid = () => `block-${Math.random().toString(36).slice(2, 11)}`;
 
 export function createTheoryBlock(type = "text") {
@@ -59,7 +61,7 @@ export function buildTheoryPayload(data) {
       metadata: block.metadata || {},
     };
     if (payload.type === "video") {
-      payload.videoUrl = (block.videoUrl || "").trim();
+      payload.videoUrl = normalizeVideoUrl(block.videoUrl || "");
     }
     if (payload.type === "link") {
       payload.externalUrl = (block.externalUrl || "").trim();
@@ -85,7 +87,7 @@ export function validateTheoryData(data) {
     if (block.type === "text" && (!block.content || !block.content.trim())) {
       return { valid: false, message: `Блок "${block.title}" должен содержать текст` };
     }
-    if (block.type === "video" && (!block.videoUrl || !block.videoUrl.trim())) {
+    if (block.type === "video" && !normalizeVideoUrl(block.videoUrl || "")) {
       return { valid: false, message: `Укажите ссылку на видео для блока "${block.title}"` };
     }
     if (block.type === "link" && (!block.externalUrl || !block.externalUrl.trim())) {

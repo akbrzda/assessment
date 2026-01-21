@@ -47,7 +47,14 @@
             />
             <p v-if="block.type === 'text'" class="reading-hint">Среднее время чтения: {{ getBlockReadingTime(block) }}</p>
 
-            <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" placeholder="https://..." required />
+            <Input
+              v-if="block.type === 'video'"
+              :modelValue="block.videoUrl"
+              label="Ссылка на видео"
+              placeholder="https://..."
+              required
+              @update:modelValue="(value) => handleVideoUrlInput(block, value)"
+            />
             <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" placeholder="https://..." required />
           </div>
         </template>
@@ -100,7 +107,14 @@
             />
             <p v-if="block.type === 'text'" class="reading-hint">Среднее время чтения: {{ getBlockReadingTime(block) }}</p>
 
-            <Input v-if="block.type === 'video'" v-model="block.videoUrl" label="Ссылка на видео" placeholder="https://..." required />
+            <Input
+              v-if="block.type === 'video'"
+              :modelValue="block.videoUrl"
+              label="Ссылка на видео"
+              placeholder="https://..."
+              required
+              @update:modelValue="(value) => handleVideoUrlInput(block, value)"
+            />
             <Input v-if="block.type === 'link'" v-model="block.externalUrl" label="Ссылка на материал" placeholder="https://..." required />
           </div>
         </template>
@@ -119,6 +133,7 @@ import Textarea from "./ui/Textarea.vue";
 import FullscreenTextarea from "./ui/FullscreenTextarea.vue";
 import Button from "./ui/Button.vue";
 import { cloneTheoryData, createTheoryBlock } from "../utils/theory";
+import { normalizeVideoUrl } from "../utils/videoUrl";
 import { calculateReadingSeconds, formatReadingTime, sumReadingSeconds } from "../utils/readingTime";
 
 const props = defineProps({
@@ -173,6 +188,15 @@ const removeOptionalBlock = (index) => {
 };
 
 const getBlockReadingTime = (block) => formatReadingTime(calculateReadingSeconds(block.content || ""));
+
+const handleVideoUrlInput = (block, value) => {
+  const raw = String(value || "");
+  if (/[<>\s]/.test(raw) || raw.toLowerCase().includes("iframe") || raw.toLowerCase().includes("src=")) {
+    block.videoUrl = normalizeVideoUrl(raw);
+    return;
+  }
+  block.videoUrl = raw;
+};
 </script>
 
 <style scoped>
