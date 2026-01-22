@@ -310,23 +310,34 @@
           </div>
         </div>
 
-        <!-- История аттестаций -->
+        <!-- Сводка по аттестациям -->
         <div class="profile-section">
-          <h3>История аттестаций {{ userProfile.history && userProfile.history.length > 0 ? `(${userProfile.history.length})` : "" }}</h3>
-          <div v-if="userProfile.history && userProfile.history.length > 0" class="history-list">
-            <div v-for="attempt in userProfile.history" :key="attempt.id" class="history-item">
+          <h3>
+            Аттестации
+            {{ userProfile.assessmentsSummary && userProfile.assessmentsSummary.length > 0 ? `(${userProfile.assessmentsSummary.length})` : "" }}
+          </h3>
+          <div v-if="userProfile.assessmentsSummary && userProfile.assessmentsSummary.length > 0" class="history-header">
+            <span>Аттестация</span>
+            <span>Дата</span>
+            <span>Лучший %</span>
+            <span>Попыток</span>
+            <span>Время</span>
+            <span>Статус</span>
+          </div>
+          <div v-if="userProfile.assessmentsSummary && userProfile.assessmentsSummary.length > 0" class="history-list">
+            <div v-for="summary in userProfile.assessmentsSummary" :key="summary.id" class="history-item">
               <div class="history-info">
-                <div class="history-title">{{ attempt.title }}</div>
-                <div class="history-date">
-                  {{ formatDate(attempt.completed_at || attempt.started_at) }}
+                <div class="history-line">
+                  <span class="history-title">{{ summary.title }}</span>
+                  <span>{{ formatDateTime(summary.last_attempt_at) }}</span>
+                  <span>{{ formatScore(summary.best_score_percent) }}%</span>
+                  <span>{{ summary.attempts_count }}</span>
+                  <span>{{ formatTimeSpent(summary.time_spent_seconds) }}</span>
+                  <span>{{ formatAssessmentResult(summary) }}</span>
                 </div>
               </div>
               <div class="history-actions">
-                <div v-if="attempt.status === 'completed'" class="history-score">{{ formatScore(attempt.score_percent) }}%</div>
-                <Badge :variant="attempt.status === 'completed' ? 'success' : 'secondary'" size="sm">
-                  {{ getAttemptStatusLabel(attempt.status) }}
-                </Badge>
-                <Button size="sm" variant="ghost" icon="RotateCcw" title="Сбросить прогресс" @click="openResetProgressModal(attempt)" />
+                <Button size="sm" variant="ghost" icon="RotateCcw" title="Сбросить прогресс" @click="openResetProgressModal(summary)" />
               </div>
             </div>
           </div>
@@ -334,7 +345,7 @@
             <div class="empty-icon">
               <Icon name="ClipboardList" size="96" />
             </div>
-            <p>История аттестаций пуста</p>
+            <p>Аттестаций нет</p>
           </div>
         </div>
       </div>
@@ -609,16 +620,14 @@ const handleExportExcel = async () => {
 };
 
 const formatScore = (score) => {
-  return score ? Math.round(score) : 0;
-};
-
-const getAttemptStatusLabel = (status) => {
-  const labels = {
-    completed: "Завершён",
-    in_progress: "В процессе",
-    not_started: "Не начат",
-  };
-  return labels[status] || status;
+  if (score === null || score === undefined || score === "") {
+    return 0;
+  }
+  const numericScore = Number(score);
+  if (Number.isNaN(numericScore)) {
+    return 0;
+  }
+  return Math.round(numericScore);
 };
 
 const openCreateModal = () => {
@@ -781,14 +790,14 @@ const handleDelete = async () => {
   }
 };
 
-const openResetProgressModal = (attempt) => {
-  if (!attempt.assessment_id && !attempt.id) {
+const openResetProgressModal = (assessment) => {
+  if (!assessment?.id) {
     showToast("Не удалось определить ID аттестации", "error");
     return;
   }
   selectedAssessment.value = {
-    id: attempt.assessment_id || attempt.id,
-    title: attempt.title,
+    id: assessment.id,
+    title: assessment.title,
   };
   showResetProgressModal.value = true;
 };
@@ -854,6 +863,43 @@ const formatDate = (value) => {
   });
 };
 
+const formatDateTime = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const formatTimeSpent = (seconds) => {
+  const totalSeconds = Number(seconds);
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return "—";
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = Math.floor(totalSeconds % 60);
+  if (hours > 0) {
+    return `${hours}ч ${minutes}м ${secs}с`;
+  }
+  if (minutes > 0) {
+    return `${minutes}м ${secs}с`;
+  }
+  return `${secs}с`;
+};
+
+const formatAssessmentResult = (summary) => {
+  if (!summary) return "—";
+  const passScore = Number(summary.pass_score_percent);
+  const bestScore = Number(summary.best_score_percent);
+  if (Number.isFinite(passScore) && Number.isFinite(bestScore)) {
+    return bestScore >= passScore ? "Сдана" : "Не сдана";
+  }
+  return "—";
+};
 const normalizeUserProfile = (profile) => {
   const safeProfile = profile || {};
   const user = safeProfile.user || {};
@@ -862,7 +908,7 @@ const normalizeUserProfile = (profile) => {
     stats: safeProfile.stats || {},
     rank: safeProfile.rank || {},
     badges: safeProfile.badges || [],
-    history: safeProfile.history || [],
+    assessmentsSummary: safeProfile.assessmentsSummary || [],
     user,
     nextLevel: safeProfile.nextLevel || null,
     progressToNextLevel: safeProfile.progressToNextLevel ?? 0,
@@ -1374,6 +1420,15 @@ onMounted(async () => {
   .filters-grid {
     grid-template-columns: 1fr;
   }
+
+  .history-header {
+    display: none;
+  }
+
+  .history-line {
+    grid-template-columns: 1.6fr 1fr;
+    row-gap: 6px;
+  }
 }
 
 /* Новые стили для расширенного функционала */
@@ -1453,7 +1508,7 @@ onMounted(async () => {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--bg-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1461,7 +1516,6 @@ onMounted(async () => {
   font-weight: bold;
   color: white;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px #667eea4d;
 }
 
 .profile-info {
@@ -1683,25 +1737,35 @@ onMounted(async () => {
   flex: 1;
 }
 
-.history-title {
+.history-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 0.7fr 1.1fr 0.8fr 0.8fr;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
   font-weight: 600;
-  color: var(--color-heading);
-  margin-bottom: 6px;
-  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+  padding: 0 20px;
 }
 
-.history-date {
+.history-line {
+  display: grid;
+  grid-template-columns: 2fr 1fr 0.7fr 1.1fr 0.8fr 0.8fr;
+  gap: 12px;
   font-size: 13px;
   color: var(--color-text-secondary);
   font-weight: 500;
+  align-items: center;
 }
 
-.history-score {
-  font-size: 24px;
-  font-weight: bold;
-  color: var(--color-primary);
-  margin-right: 12px;
+.history-title {
+  font-weight: 600;
+  color: var(--color-heading);
+  font-size: 14px;
 }
+
 
 .history-actions {
   display: flex;

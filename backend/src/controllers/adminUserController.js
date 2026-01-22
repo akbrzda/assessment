@@ -270,34 +270,37 @@ async function getUserDetailedStats(req, res, next) {
     const [assessmentStats] = await pool.query(
       `SELECT 
         COUNT(DISTINCT aa.assessment_id) as total_assessments,
-        COUNT(DISTINCT CASE WHEN aa.status = 'completed' THEN aa.id END) as completed_attempts,
+        COUNT(
+          DISTINCT CASE 
+            WHEN aa.status = 'completed' AND aa.score_percent >= a.pass_score_percent THEN aa.id 
+          END
+        ) as completed_attempts,
         AVG(CASE WHEN aa.status = 'completed' THEN aa.score_percent END) as avg_score,
         SUM(CASE WHEN aa.score_percent >= 90 THEN 1 ELSE 0 END) as excellent_count,
         SUM(CASE WHEN aa.score_percent >= 70 AND aa.score_percent < 90 THEN 1 ELSE 0 END) as good_count,
         MIN(aa.started_at) as first_attempt_date,
         MAX(aa.completed_at) as last_attempt_date
       FROM assessment_attempts aa
+      JOIN assessments a ON a.id = aa.assessment_id
       WHERE aa.user_id = ?`,
       [userId]
     );
 
-    // История аттестаций
-    const [assessmentHistory] = await pool.query(
+    // Сводка по аттестациям
+    const [assessmentSummary] = await pool.query(
       `SELECT 
-        a.id, a.title,
-        aa.attempt_number,
-        aa.status,
-        aa.score_percent,
-        aa.correct_answers,
-        aa.total_questions,
-        aa.time_spent_seconds,
-        aa.started_at,
-        aa.completed_at
+        a.id,
+        a.title,
+        a.pass_score_percent,
+        MAX(aa.score_percent) as best_score_percent,
+        COUNT(*) as attempts_count,
+        SUM(aa.time_spent_seconds) as time_spent_seconds,
+        MAX(COALESCE(aa.completed_at, aa.started_at)) as last_attempt_at
       FROM assessment_attempts aa
       JOIN assessments a ON aa.assessment_id = a.id
       WHERE aa.user_id = ?
-      ORDER BY aa.started_at DESC
-      LIMIT 10`,
+      GROUP BY a.id, a.title, a.pass_score_percent
+      ORDER BY last_attempt_at DESC`,
       [userId]
     );
 
@@ -340,7 +343,7 @@ async function getUserDetailedStats(req, res, next) {
     res.json({
       user: users[0],
       stats: assessmentStats[0] || {},
-      history: assessmentHistory,
+      assessmentsSummary: assessmentSummary,
       badges,
       rank: rankData[0] || { user_rank: 0, total_users: 0 },
       nextLevel,
