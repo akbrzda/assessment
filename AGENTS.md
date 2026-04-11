@@ -1,148 +1,245 @@
-# General Rules
+# AGENTS.md — Universal Instructions for AI Agents
 
-- Always reply and write in Russian in chat.
-- Do not create documentation, instructions, reports, or any similar files unless explicitly stated in the request or task.
-  For example, README.md, Instruction.md, CONFIG, IMPLEMENTATION, etc.
-- Break all incoming requests into smaller tasks, complete them step by step, and ask clarifying questions if necessary.
-- Write clear and understandable comments; do not write long or meaningless ones. Everything is clear, understandable, and concise.
-- First read technical specifications before writing code and do tasks.
-- Dont write long comments in code files, keep them short and meaningful.
-- Always follow the coding style and conventions used in the existing codebase.
+## General Principles
 
-# Vue.js rules
+- All communication, code comments, documentation and commit messages must be written in Russian
+- Always focus on the meaning of the task, not just execution
+- Do not assume — if something is unclear, ask or minimize risky changes
+- Do not introduce unnecessary complexity
+- Prefer simple and predictable solutions
 
-- Use the Composition API with `<script setup>` for better type inference and organization
-- Define props with type definitions and defaults
-- Use emits for component events
-- Use v-model for two-way binding
-- Use computed properties for derived state
-- Use watchers for side effects
-- Use provide/inject for deep component communication
-- Use async components for code-splitting
+---
 
-# Express.js rules
+## Project Awareness
 
-- Use proper middleware order: body parsers, custom middleware, routes, error handlers
-- Organize routes using Express Router for modular code structure
-- Use async/await with proper error handling and try/catch blocks
-- Create a centralized error handler middleware as the last middleware
-- Use environment variables for configuration with a config module
-- Implement request validation using libraries like express-validator
-- Use middleware for authentication and authorization
-- Use appropriate HTTP status codes in responses
+Before starting any task:
 
-# MySQL rules
+1. Read available documentation:
+   - `README.md`
+   - `docs/`
+   - `TASKS.md`
 
-- Use appropriate data types to optimize storage and performance (e.g., INT for IDs, VARCHAR with appropriate length)
-- Create indexes for columns used in WHERE, JOIN, and ORDER BY clauses
-- Use foreign keys to maintain referential integrity
-- Use EXPLAIN to analyze and optimize queries
-- Avoid using SELECT \* and only retrieve needed columns
-- Use prepared statements to prevent SQL injection
-- Use appropriate character set and collation (e.g., utf8mb4_unicode_ci)
-- Use transactions for operations that must be atomic
+2. Understand project structure and conventions
+3. Reuse existing patterns instead of inventing new ones
 
-# Task List Management
+---
 
-Guidelines for creating and managing task lists in Markdown files to track project progress
+## Architecture (Generic)
 
-## Task List Creation
+Most projects follow this structure:
 
-1. Create task lists in a markdown file (in the project root):
+- `backend/` — API, business logic, database
+- `admin-panel/` — admin interface (if exists)
+- `client/` or `miniapp/` — user-facing app
+- `docs/` — documentation
+- `TASKS.md` — current task tracking
 
-   - Use `TASKS.md` or a descriptive name relevant to the feature (e.g., `ASSISTANT_CHAT.md`)
-   - Include a clear title and description of the feature being implemented
+Do not break existing structure without strong reason.
 
-2. Structure the file with these sections:
+---
 
-   ```markdown
-   # Feature Name Implementation
+## TASKS.md Management
 
-   Brief description of the feature and its purpose.
+### Rules:
 
-   ## Completed Tasks
+1. If all tasks are completed — clear the file
+2. Always break tasks into subtasks with `[ ]`
+3. Update statuses: `[ ]` → `[x]`
+4. Remove completed blocks
+5. Keep only current work
 
-   - [x] Task 1 that has been completed
-   - [x] Task 2 that has been completed
+---
 
-   ## In Progress Tasks
+## Commit Message Rules
 
-   - [ ] Task 3 currently being worked on
-   - [ ] Task 4 to be completed soon
+### General Rules
 
-   ## Future Tasks
+- Always write commits in Russian
+- Keep one consistent style across the project
+- Do not use Conventional Commits:
+  - `feat:`
+  - `fix:`
+  - `refactor:`
+  - `chore:`
+  - `docs:`
 
-   - [ ] Task 5 planned for future implementation
-   - [ ] Task 6 planned for future implementation
+### Format
 
-   ## Implementation Plan
+Commit message must be written as a result, not an action:
 
-   Detailed description of how the feature will be implemented.
+- Добавлен
+- Исправлен
+- Улучшен
+- Удален
+- Обновлен
+- Реализован
+- Упрощен
+- Стабилизирован
+- Переработан
+- Унифицирован
 
-   ### Relevant Files
+### Content Rules
 
-   - path/to/file1.ts - Description of purpose
-   - path/to/file2.ts - Description of purpose
-   ```
+A commit must describe:
 
-## Task List Maintenance
+- what changed in behavior
+- what was improved
+- what was fixed
+- what was simplified
+- what was added or removed
 
-1. Update the task list as you progress:
+A commit must NOT include:
 
-   - Mark tasks as completed by changing `[ ]` to `[x]`
-   - Add new tasks as they are identified
-   - Move tasks between sections as appropriate
+- file names
+- paths
+- endpoints
+- functions/classes/variables
+- database tables or migrations
+- internal implementation details
 
-2. Keep "Relevant Files" section updated with:
+Do not turn commit into:
 
-   - File paths that have been created or modified
-   - Brief descriptions of each file's purpose
-   - Status indicators (e.g., ✅) for completed components
+- changelog
+- diff summary
+- technical report
 
-3. Add implementation details:
-   - Architecture decisions
-   - Data flow descriptions
-   - Technical components needed
-   - Environment configuration
+Example commit messages:
+Стабилизирована работа бонусной системы и упрощена логика расчета
 
-## AI Instructions
+- устранены расхождения в балансе
+- улучшена обработка начислений и списаний
+- снижено влияние legacy-логики
 
-When working with task lists, the AI should:
+### Size
 
-1. Regularly update the task list file after implementing significant components
-2. Mark completed tasks with [x] when finished
-3. Add new tasks discovered during implementation
-4. Maintain the "Relevant Files" section with accurate file paths and descriptions
-5. Document implementation details, especially for complex features
-6. When implementing tasks one by one, first check which task to implement next
-7. After implementing a task, update the file to reflect progress
+Small change:
 
-## Example Task Update
+- one short line
 
-When updating a task from "In Progress" to "Completed":
+Example:
 
-```markdown
-## In Progress Tasks
+- Исправлен переход между экранами
 
-- [ ] Implement database schema
-- [ ] Create API endpoints for data access
+Large change:
 
-## Completed Tasks
+- one main line
+- optionally a few short high-level lines
 
-- [x] Set up project structure
-- [x] Configure environment variables
-```
+### Agent Rule
 
-Should become:
+When user asks for commit:
 
-```markdown
-## In Progress Tasks
+- return commit text in chat
+- do NOT run git commit automatically
 
-- [ ] Create API endpoints for data access
+---
 
-## Completed Tasks
+## Code Style
 
-- [x] Set up project structure
-- [x] Configure environment variables
-- [x] Implement database schema
-```
+### Comments
+
+Comment only when necessary:
+
+- complex business logic
+- non-obvious decisions
+- workarounds (with TODO/FIXME)
+
+Do NOT comment obvious code.
+
+### File Size
+
+- > 500 lines → must be split
+- Split by logical responsibility
+
+### Naming
+
+- Components — PascalCase
+- Variables/functions — camelCase
+- Constants — UPPER_SNAKE_CASE
+
+---
+
+## Dependency Management
+
+Before installing any library:
+
+1. Ask user permission
+2. Explain why it is needed
+3. Check existing alternatives
+
+Do NOT:
+
+- install "just in case"
+- duplicate existing functionality
+
+---
+
+## Running Services
+
+Before starting anything:
+
+1. Check if service is already running
+2. Do not start duplicates
+3. Do not open unnecessary terminals
+
+---
+
+## Error Handling
+
+- Always use try/catch for async operations
+- Show user-friendly errors
+- Log detailed errors in console
+
+---
+
+## Security
+
+- Validate all input data
+- Never trust client input
+- Do not log sensitive data
+- Use parameterized queries
+
+---
+
+## Performance
+
+Avoid:
+
+- unnecessary data loading
+- missing pagination
+- duplicated logic
+
+Prefer:
+
+- caching
+- batching
+- optimized queries
+
+---
+
+## Pre-Commit Checklist
+
+- No debug `console.log`
+- No unused code
+- No duplicated logic
+- Error handling present
+- Input validation present
+
+---
+
+## Prohibited
+
+- Auto-committing without user confirmation
+- Installing dependencies without approval
+- Creating unnecessary files
+- Breaking existing architecture without reason
+
+---
+
+## Good Practices
+
+- Think before writing code
+- Keep solutions simple
+- Follow existing patterns
+- Write consistent commits
+- Focus on result, not implementation

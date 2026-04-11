@@ -14,6 +14,7 @@ const cloudStorageRoutes = require("./routes/cloudStorageRoutes");
 const { healthCheck } = require("./config/database");
 const gamificationRoutes = require("./routes/gamificationRoutes");
 const leaderboardRoutes = require("./routes/leaderboardRoutes");
+const courseRoutes = require("./routes/courseRoutes");
 const adminAuthRoutes = require("./routes/adminAuthRoutes");
 const adminDashboardRoutes = require("./routes/adminDashboardRoutes");
 const adminUsersRoutes = require("./routes/adminUsersRoutes");
@@ -28,6 +29,7 @@ const adminGamificationRulesRoutes = require("./routes/adminGamificationRulesRou
 const adminInvitationRoutes = require("./routes/adminInvitationRoutes");
 const adminProfileRoutes = require("./routes/adminProfileRoutes");
 const adminPermissionsRoutes = require("./routes/adminPermissionsRoutes");
+const adminCoursesRoutes = require("./routes/adminCoursesRoutes");
 const badgesRoutes = require("./routes/badges");
 const levelsRoutes = require("./routes/levels");
 
@@ -81,6 +83,7 @@ apiRouter.use("/admin/gamification/rules", adminGamificationRulesRoutes);
 apiRouter.use("/admin/invitations", adminInvitationRoutes);
 apiRouter.use("/admin/profile", adminProfileRoutes);
 apiRouter.use("/admin/permissions", adminPermissionsRoutes);
+apiRouter.use("/admin/courses", adminCoursesRoutes);
 apiRouter.use("/admin/badges", badgesRoutes);
 apiRouter.use("/admin/levels", levelsRoutes);
 apiRouter.use("/admin", adminRoutes);
@@ -89,6 +92,7 @@ apiRouter.use("/analytics", analyticsRoutes);
 apiRouter.use("/cloud-storage", cloudStorageRoutes);
 apiRouter.use("/gamification", gamificationRoutes);
 apiRouter.use("/leaderboard", leaderboardRoutes);
+apiRouter.use("/courses", courseRoutes);
 
 app.use("/api", apiRouter);
 

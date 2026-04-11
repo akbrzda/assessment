@@ -32,6 +32,24 @@ function parseList(value) {
     .map((item) => item.replace(/\/$/, ""));
 }
 
+function parseBoolean(value, defaultValue = false) {
+  if (value === undefined || value === null || value === "") {
+    return defaultValue;
+  }
+  return String(value).toLowerCase() === "true";
+}
+
+function parseIdList(value) {
+  if (!value) {
+    return [];
+  }
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => /^\d+$/.test(item))
+    .map((item) => Number(item));
+}
+
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT || 3001),
@@ -48,4 +66,10 @@ module.exports = {
   inviteExpirationDays: Number(process.env.INVITE_EXPIRATION_DAYS || 7),
   allowedOrigins: parseList(process.env.ALLOWED_ORIGINS),
   superAdminIds: parseList(process.env.SUPERADMIN_IDS),
+  courses: {
+    enabled: parseBoolean(process.env.COURSES_ENABLED, false),
+    enabledConfigured: process.env.COURSES_ENABLED !== undefined,
+    branchIds: parseIdList(process.env.COURSES_ENABLED_BRANCH_IDS),
+    positionIds: parseIdList(process.env.COURSES_ENABLED_POSITION_IDS),
+  },
 };
