@@ -3,6 +3,9 @@ const router = express.Router();
 const verifyJWT = require("../middleware/verifyJWT");
 const checkModuleAccess = require("../middleware/checkModuleAccess");
 const adminAssessmentController = require("../controllers/adminAssessmentController");
+const {
+  controller: adminAssessmentsModuleController,
+} = require("../modules/admin/assessments");
 const adminTheoryController = require("../controllers/adminTheoryController");
 const { cacheMiddleware, invalidateCacheMiddleware } = require("../middleware/cache");
 
@@ -11,7 +14,7 @@ router.use(verifyJWT);
 router.use(checkModuleAccess("assessments"));
 
 // Получить список аттестаций
-router.get("/", cacheMiddleware({ ttl: 120 }), adminAssessmentController.getAssessments);
+router.get("/", cacheMiddleware({ ttl: 120 }), adminAssessmentsModuleController.getAssessments);
 
 // Экспорт аттестации в Excel (до /:id чтобы не конфликтовало)
 router.get("/:id/export", adminAssessmentController.exportAssessmentToExcel);
@@ -39,7 +42,7 @@ router.post(
 );
 
 // Получить аттестацию по ID с вопросами и результатами
-router.get("/:id", cacheMiddleware({ ttl: 180 }), adminAssessmentController.getAssessmentById);
+router.get("/:id", cacheMiddleware({ ttl: 180 }), adminAssessmentsModuleController.getAssessmentById);
 
 // Создать новую аттестацию
 router.post("/", invalidateCacheMiddleware(/^http:GET:.*\/api\/admin\/assessments(\/|\\?|$)/), adminAssessmentController.createAssessment);
