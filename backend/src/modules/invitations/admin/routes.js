@@ -1,7 +1,7 @@
-const express = require("express");
+﻿const express = require("express");
 const verifyJWT = require("../../../middleware/verifyJWT");
 const checkModuleAccess = require("../../../middleware/checkModuleAccess");
-const invitationsController = require("./invitations.controller");
+const invitationsController = require("./controller");
 
 const router = express.Router();
 
@@ -14,3 +14,4 @@ router.post("/:id/extend", invitationsController.extendInvitation);
 router.delete("/:id", invitationsController.deleteInvitation);
 
 module.exports = router;
+

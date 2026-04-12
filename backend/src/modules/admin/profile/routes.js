@@ -1,7 +1,7 @@
-const express = require("express");
+﻿const express = require("express");
 const verifyJWT = require("../../../middleware/verifyJWT");
 const verifyAdminRole = require("../../../middleware/verifyAdminRole");
-const profileController = require("./profile.controller");
+const profileController = require("./controller");
 
 const router = express.Router();
 
@@ -11,3 +11,4 @@ router.get("/", profileController.getProfile);
 router.put("/", profileController.updateProfile);
 
 module.exports = router;
+

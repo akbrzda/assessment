@@ -1,5 +1,5 @@
 module.exports = {
-  auth: require("./auth"),
+  auth: require("../auth/admin/routes"),
   dashboard: require("./dashboard"),
   users: require("./users"),
   branches: require("./branches"),
@@ -9,11 +9,11 @@ module.exports = {
   questionBank: require("./question-bank"),
   analytics: require("../analytics/admin/routes"),
   settings: require("./settings"),
-  gamificationRules: require("./gamification-rules"),
+  gamificationRules: require("../gamification/admin/rules/routes"),
   invitations: require("../invitations/admin/routes"),
   profile: require("./profile"),
   permissions: require("./permissions"),
   courses: require("../courses/admin/routes"),
-  badges: require("./badges"),
-  levels: require("./levels"),
+  badges: require("../gamification/admin/badges/routes"),
+  levels: require("../gamification/admin/levels/routes"),
 };

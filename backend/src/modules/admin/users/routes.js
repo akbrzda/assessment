@@ -1,4 +1,4 @@
-const express = require("express");
+﻿const express = require("express");
 const verifyJWT = require("../../../middleware/verifyJWT");
 const verifyAdminRole = require("../../../middleware/verifyAdminRole");
 const checkModuleAccess = require("../../../middleware/checkModuleAccess");
@@ -7,11 +7,11 @@ const {
   cacheMiddleware,
   invalidateCacheMiddleware,
 } = require("../../../middleware/cache");
-const usersController = require("./users.controller");
+const usersController = require("./controller");
 
 const router = express.Router();
 
-// Все маршруты защищены JWT и доступны через проверку модуля users
+// Р’СЃРµ РјР°СЂС€СЂСѓС‚С‹ Р·Р°С‰РёС‰РµРЅС‹ JWT Рё РґРѕСЃС‚СѓРїРЅС‹ С‡РµСЂРµР· РїСЂРѕРІРµСЂРєСѓ РјРѕРґСѓР»СЏ users
 router.use(verifyJWT, checkModuleAccess("users"));
 
 router.get("/", cacheMiddleware({ ttl: 60 }), usersController.listUsers);
@@ -48,3 +48,4 @@ router.delete(
 );
 
 module.exports = router;
+

@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const adminModule = require("../src/modules/admin");
 const assessmentsModule = require("../src/modules/assessment/admin");
 const usersRoutes = require("../src/modules/admin/users");
-const authRoutes = require("../src/modules/admin/auth");
+const authRoutes = require("../src/modules/auth/admin/routes");
 const analyticsRoutes = require("../src/modules/analytics/admin/routes");
 
 function assertRouter(router, moduleName) {

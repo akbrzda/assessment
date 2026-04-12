@@ -1,11 +1,11 @@
-const express = require("express");
+﻿const express = require("express");
 const verifyJWT = require("../../../middleware/verifyJWT");
 const checkModuleAccess = require("../../../middleware/checkModuleAccess");
-const dashboardController = require("./dashboard.controller");
+const dashboardController = require("./controller");
 
 const router = express.Router();
 
-// Все маршруты требуют JWT и доступ к аналитике (дашборд - это часть аналитики)
+// Р’СЃРµ РјР°СЂС€СЂСѓС‚С‹ С‚СЂРµР±СѓСЋС‚ JWT Рё РґРѕСЃС‚СѓРї Рє Р°РЅР°Р»РёС‚РёРєРµ (РґР°С€Р±РѕСЂРґ - СЌС‚Рѕ С‡Р°СЃС‚СЊ Р°РЅР°Р»РёС‚РёРєРё)
 router.use(verifyJWT, checkModuleAccess("analytics"));
 
 router.get("/metrics", dashboardController.getMetrics);
@@ -17,3 +17,4 @@ router.get(
 );
 
 module.exports = router;
+

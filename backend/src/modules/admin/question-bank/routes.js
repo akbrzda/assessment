@@ -1,11 +1,11 @@
-const express = require("express");
+﻿const express = require("express");
 const verifyJWT = require("../../../middleware/verifyJWT");
 const checkModuleAccess = require("../../../middleware/checkModuleAccess");
-const questionBankController = require("./question-bank.controller");
+const questionBankController = require("./controller");
 
 const router = express.Router();
 
-// Все маршруты требуют JWT и доступ к модулю questions
+// Р’СЃРµ РјР°СЂС€СЂСѓС‚С‹ С‚СЂРµР±СѓСЋС‚ JWT Рё РґРѕСЃС‚СѓРї Рє РјРѕРґСѓР»СЋ questions
 router.use(verifyJWT);
 router.use(checkModuleAccess("questions"));
 
@@ -21,3 +21,4 @@ router.put("/:id", questionBankController.updateQuestion);
 router.delete("/:id", questionBankController.deleteQuestion);
 
 module.exports = router;
+

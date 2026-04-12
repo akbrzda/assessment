@@ -1,4 +1,4 @@
-const express = require("express");
+﻿const express = require("express");
 const verifyJWT = require("../../../middleware/verifyJWT");
 const checkModuleAccess = require("../../../middleware/checkModuleAccess");
 const {
@@ -6,7 +6,7 @@ const {
   invalidateCacheMiddleware,
 } = require("../../../middleware/cache");
 const assessmentsController = require("./controller");
-const theoryController = require("./theory/assessments-theory.controller");
+const theoryController = require("./theory/controller");
 
 const router = express.Router();
 
@@ -57,3 +57,4 @@ router.delete(
 );
 
 module.exports = router;
+

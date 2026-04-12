@@ -1,11 +1,11 @@
-const express = require("express");
+﻿const express = require("express");
 const verifyJWT = require("../../../middleware/verifyJWT");
 const checkModuleAccess = require("../../../middleware/checkModuleAccess");
 const {
   cacheMiddleware,
   invalidateCacheMiddleware,
 } = require("../../../middleware/cache");
-const branchController = require("./branches.controller");
+const branchController = require("./controller");
 
 const router = express.Router();
 
@@ -47,3 +47,4 @@ router.delete(
 );
 
 module.exports = router;
+

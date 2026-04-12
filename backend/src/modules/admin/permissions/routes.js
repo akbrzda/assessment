@@ -1,8 +1,8 @@
-const express = require("express");
+﻿const express = require("express");
 const router = express.Router();
 const verifyJWT = require("../../../middleware/verifyJWT");
 const verifyAdminRole = require("../../../middleware/verifyAdminRole");
-const permissionsController = require("./permissions.controller");
+const permissionsController = require("./controller");
 
 router.use(verifyJWT);
 
@@ -12,3 +12,4 @@ router.put("/users/:userId", verifyAdminRole(["superadmin"]), permissionsControl
 router.get("/users/:userId/check", permissionsController.checkUserAccess);
 
 module.exports = router;
+

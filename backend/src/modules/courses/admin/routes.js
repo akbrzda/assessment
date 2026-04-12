@@ -1,7 +1,7 @@
-const express = require("express");
+﻿const express = require("express");
 const verifyJWT = require("../../../middleware/verifyJWT");
 const checkModuleAccess = require("../../../middleware/checkModuleAccess");
-const coursesController = require("./courses.controller");
+const coursesController = require("./controller");
 
 const router = express.Router();
 
@@ -20,3 +20,4 @@ router.patch("/modules/:moduleId", coursesController.updateModule);
 router.delete("/modules/:moduleId", coursesController.deleteModule);
 
 module.exports = router;
+

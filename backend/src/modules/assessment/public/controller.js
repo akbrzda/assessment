@@ -1,6 +1,6 @@
-﻿const assessmentController = require("./core/assessment.controller");
-const theoryController = require("./core/theory.controller");
-const adminTheoryController = require("../admin/theory/assessments-theory.controller");
+﻿const assessmentController = require("./core/assessment/controller");
+const theoryController = require("./core/theory/controller");
+const adminTheoryController = require("../admin/theory/controller");
 const { ensureAssessmentId, ensureAttemptId } = require("./validators");
 
 async function listForUser(req, res, next) {
@@ -185,5 +185,7 @@ module.exports = {
   update,
   remove,
 };
+
+
 
 

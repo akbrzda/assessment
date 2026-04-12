@@ -1,8 +1,8 @@
-const express = require("express");
+﻿const express = require("express");
 const router = express.Router();
 const verifyJWT = require("../../../middleware/verifyJWT");
 const checkModuleAccess = require("../../../middleware/checkModuleAccess");
-const analyticsController = require("./analytics.controller");
+const analyticsController = require("./controller");
 
 router.use(verifyJWT);
 router.use(checkModuleAccess("analytics"));
@@ -20,3 +20,4 @@ router.get("/export/excel", analyticsController.exportToExcel);
 router.get("/export/pdf", analyticsController.exportToPDF);
 
 module.exports = router;
+

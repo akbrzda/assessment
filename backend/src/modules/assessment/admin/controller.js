@@ -1,9 +1,9 @@
-const assessmentsService = require("./service");
+﻿const assessmentsService = require("./service");
 const {
   parseAssessmentId,
   normalizeListFilters,
 } = require("./validators");
-const assessmentsWriteService = require("./assessments.write.service");
+const assessmentsWriteService = require("./write/service");
 
 async function getAssessments(req, res, next) {
   try {
@@ -92,3 +92,4 @@ module.exports = {
   getUserAssessmentProgress,
   exportAssessmentToExcel,
 };
+
