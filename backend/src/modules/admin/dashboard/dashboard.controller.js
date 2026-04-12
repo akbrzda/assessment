@@ -1,10 +1,8 @@
-const dashboardService = require("./dashboard.service");
-const { sendLegacyResult } = require("../shared/legacy-handler-adapter");
+const handlers = require("./dashboard.handlers");
 
 async function getMetrics(req, res, next) {
   try {
-    const result = await dashboardService.getMetrics(req);
-    return sendLegacyResult(res, result);
+    return await handlers.getMetrics(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -12,8 +10,7 @@ async function getMetrics(req, res, next) {
 
 async function getActivityTrends(req, res, next) {
   try {
-    const result = await dashboardService.getActivityTrends(req);
-    return sendLegacyResult(res, result);
+    return await handlers.getActivityTrends(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -21,8 +18,7 @@ async function getActivityTrends(req, res, next) {
 
 async function getBranchKPI(req, res, next) {
   try {
-    const result = await dashboardService.getBranchKPI(req);
-    return sendLegacyResult(res, result);
+    return await handlers.getBranchKPI(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -30,8 +26,7 @@ async function getBranchKPI(req, res, next) {
 
 async function getLatestAssessmentActivities(req, res, next) {
   try {
-    const result = await dashboardService.getLatestAssessmentActivities(req);
-    return sendLegacyResult(res, result);
+    return await handlers.getLatestAssessmentActivities(req, res, next);
   } catch (error) {
     next(error);
   }

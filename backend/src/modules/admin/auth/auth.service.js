@@ -1,16 +1,15 @@
 const handlers = require("./auth.handlers.js");
-const { runLegacyHandler } = require("../shared/legacy-handler-adapter");
 
-async function login(req) {
-  return runLegacyHandler(handlers.login, req);
+async function login(req, res, next) {
+  return handlers.login(req, res, next);
 }
 
-async function refresh(req) {
-  return runLegacyHandler(handlers.refresh, req);
+async function refresh(req, res, next) {
+  return handlers.refresh(req, res, next);
 }
 
-async function logout(req) {
-  return runLegacyHandler(handlers.logout, req);
+async function logout(req, res, next) {
+  return handlers.logout(req, res, next);
 }
 
 module.exports = {

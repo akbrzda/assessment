@@ -1,8 +1,10 @@
 const gamificationService = require("./service");
+const { ensureCurrentUser } = require("./validators");
 
 async function getOverview(req, res, next) {
   try {
-    const overview = await gamificationService.getOverview(req.currentUser);
+    const currentUser = ensureCurrentUser(req.currentUser);
+    const overview = await gamificationService.getOverview(currentUser);
     res.json({ overview });
   } catch (error) {
     if (error.status) {
@@ -14,7 +16,8 @@ async function getOverview(req, res, next) {
 
 async function getBadges(req, res, next) {
   try {
-    const badges = await gamificationService.getBadges(req.currentUser);
+    const currentUser = ensureCurrentUser(req.currentUser);
+    const badges = await gamificationService.getBadges(currentUser);
     res.json({ badges });
   } catch (error) {
     if (error.status) {

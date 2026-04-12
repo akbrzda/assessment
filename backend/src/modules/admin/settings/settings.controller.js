@@ -1,10 +1,8 @@
-const settingsService = require("./settings.service");
-const { sendLegacyResult } = require("../shared/legacy-handler-adapter");
+﻿const settingsService = require("./settings.service");
 
 async function getSettings(req, res, next) {
   try {
-    const result = await settingsService.getSettings(req);
-    return sendLegacyResult(res, result);
+    return await settingsService.getSettings(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -12,8 +10,7 @@ async function getSettings(req, res, next) {
 
 async function getSettingByKey(req, res, next) {
   try {
-    const result = await settingsService.getSettingByKey(req);
-    return sendLegacyResult(res, result);
+    return await settingsService.getSettingByKey(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -21,8 +18,7 @@ async function getSettingByKey(req, res, next) {
 
 async function createSetting(req, res, next) {
   try {
-    const result = await settingsService.createSetting(req);
-    return sendLegacyResult(res, result);
+    return await settingsService.createSetting(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -30,8 +26,7 @@ async function createSetting(req, res, next) {
 
 async function updateSetting(req, res, next) {
   try {
-    const result = await settingsService.updateSetting(req);
-    return sendLegacyResult(res, result);
+    return await settingsService.updateSetting(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -39,8 +34,7 @@ async function updateSetting(req, res, next) {
 
 async function deleteSetting(req, res, next) {
   try {
-    const result = await settingsService.deleteSetting(req);
-    return sendLegacyResult(res, result);
+    return await settingsService.deleteSetting(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -53,3 +47,5 @@ module.exports = {
   updateSetting,
   deleteSetting,
 };
+
+

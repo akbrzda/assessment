@@ -1,4 +1,8 @@
 import { API_BASE_URL as ENV_API_BASE_URL } from "@/env";
+import {
+  getTelegramInitDataOverride,
+  getTelegramStartParam,
+} from "./telegramRuntimeState";
 
 let webAppInstance = null;
 const themeListeners = new Set();
@@ -54,9 +58,9 @@ export function onViewportChanged(handler) {
 }
 
 export function getInitData() {
-  // Приоритет отдаём данным, которые обновил telegramStore (учитывает start_param приглашения)
-  if (typeof window !== "undefined" && window.__telegramInitDataOverride) {
-    return window.__telegramInitDataOverride;
+  const initDataOverride = getTelegramInitDataOverride();
+  if (initDataOverride) {
+    return initDataOverride;
   }
 
   const webApp = resolveWebApp();
@@ -64,8 +68,9 @@ export function getInitData() {
 }
 
 export function getStartParam() {
-  if (typeof window !== "undefined" && window.__telegramStartParam) {
-    return window.__telegramStartParam;
+  const startParamFromState = getTelegramStartParam();
+  if (startParamFromState) {
+    return startParamFromState;
   }
 
   const webApp = resolveWebApp();

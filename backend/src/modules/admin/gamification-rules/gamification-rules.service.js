@@ -1,28 +1,27 @@
 const handlers = require("./gamification-rules.handlers.js");
-const { runLegacyHandler } = require("../shared/legacy-handler-adapter");
 
-async function list(req) {
-  return runLegacyHandler(handlers.list, req);
+async function list(req, res, next) {
+  return handlers.list(req, res, next);
 }
 
-async function getById(req) {
-  return runLegacyHandler(handlers.getById, req);
+async function getById(req, res, next) {
+  return handlers.getById(req, res, next);
 }
 
-async function create(req) {
-  return runLegacyHandler(handlers.create, req);
+async function create(req, res, next) {
+  return handlers.create(req, res, next);
 }
 
-async function update(req) {
-  return runLegacyHandler(handlers.update, req);
+async function update(req, res, next) {
+  return handlers.update(req, res, next);
 }
 
-async function remove(req) {
-  return runLegacyHandler(handlers.remove, req);
+async function remove(req, res, next) {
+  return handlers.remove(req, res, next);
 }
 
-async function dryRun(req) {
-  return runLegacyHandler(handlers.dryRun, req);
+async function dryRun(req, res, next) {
+  return handlers.dryRun(req, res, next);
 }
 
 module.exports = {

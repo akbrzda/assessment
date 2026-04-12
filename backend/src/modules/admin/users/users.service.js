@@ -1,40 +1,39 @@
 const handlers = require("./users.handlers.js");
-const { runLegacyHandler } = require("../shared/legacy-handler-adapter");
 
-async function listUsers(req) {
-  return runLegacyHandler(handlers.listUsers, req);
+async function listUsers(req, res, next) {
+  return handlers.listUsers(req, res, next);
 }
 
-async function exportUsersToExcel(req) {
-  return runLegacyHandler(handlers.exportUsersToExcel, req);
+async function exportUsersToExcel(req, res, next) {
+  return handlers.exportUsersToExcel(req, res, next);
 }
 
-async function getUserDetailedStats(req) {
-  return runLegacyHandler(handlers.getUserDetailedStats, req);
+async function getUserDetailedStats(req, res, next) {
+  return handlers.getUserDetailedStats(req, res, next);
 }
 
-async function getUserById(req) {
-  return runLegacyHandler(handlers.getUserById, req);
+async function getUserById(req, res, next) {
+  return handlers.getUserById(req, res, next);
 }
 
-async function createUser(req) {
-  return runLegacyHandler(handlers.createUser, req);
+async function createUser(req, res, next) {
+  return handlers.createUser(req, res, next);
 }
 
-async function updateUser(req) {
-  return runLegacyHandler(handlers.updateUser, req);
+async function updateUser(req, res, next) {
+  return handlers.updateUser(req, res, next);
 }
 
-async function deleteUser(req) {
-  return runLegacyHandler(handlers.deleteUser, req);
+async function deleteUser(req, res, next) {
+  return handlers.deleteUser(req, res, next);
 }
 
-async function resetPassword(req) {
-  return runLegacyHandler(handlers.resetPassword, req);
+async function resetPassword(req, res, next) {
+  return handlers.resetPassword(req, res, next);
 }
 
-async function resetAssessmentProgress(req) {
-  return runLegacyHandler(handlers.resetAssessmentProgress, req);
+async function resetAssessmentProgress(req, res, next) {
+  return handlers.resetAssessmentProgress(req, res, next);
 }
 
 module.exports = {

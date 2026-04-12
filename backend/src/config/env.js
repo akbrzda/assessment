@@ -15,10 +15,15 @@ for (const filename of envFiles) {
 
 const requiredVars = ["PORT", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "BOT_TOKEN", "JWT_SECRET", "JWT_REFRESH_SECRET"];
 
-for (const key of requiredVars) {
-  if (!process.env[key]) {
-    console.warn(`[env] Variable ${key} is not set. Check your environment configuration.`);
-  }
+const missingVars = requiredVars.filter((key) => !process.env[key]);
+
+if (missingVars.length) {
+  console.warn(`[env] Missing variables: ${missingVars.join(", ")}. Check your environment configuration.`);
+}
+
+const missingSecurityVars = ["JWT_SECRET", "JWT_REFRESH_SECRET"].filter((key) => !process.env[key]);
+if (missingSecurityVars.length) {
+  throw new Error(`[env] Security variables are required: ${missingSecurityVars.join(", ")}`);
 }
 
 function parseList(value) {
@@ -61,8 +66,8 @@ module.exports = {
     password: process.env.DB_PASSWORD,
   },
   botToken: process.env.BOT_TOKEN,
-  jwtSecret: process.env.JWT_SECRET || "your_secret_key_here",
-  jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || "your_refresh_secret_key_here",
+  jwtSecret: process.env.JWT_SECRET,
+  jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
   inviteExpirationDays: Number(process.env.INVITE_EXPIRATION_DAYS || 7),
   allowedOrigins: parseList(process.env.ALLOWED_ORIGINS),
   superAdminIds: parseList(process.env.SUPERADMIN_IDS),

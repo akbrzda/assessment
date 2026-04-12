@@ -1,10 +1,8 @@
-const questionBankService = require("./question-bank.service");
-const { sendLegacyResult } = require("../shared/legacy-handler-adapter");
+﻿const questionBankService = require("./question-bank.service");
 
 async function getCategories(req, res, next) {
   try {
-    const result = await questionBankService.getCategories(req);
-    return sendLegacyResult(res, result);
+    return await questionBankService.getCategories(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -12,8 +10,7 @@ async function getCategories(req, res, next) {
 
 async function createCategory(req, res, next) {
   try {
-    const result = await questionBankService.createCategory(req);
-    return sendLegacyResult(res, result);
+    return await questionBankService.createCategory(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -21,8 +18,7 @@ async function createCategory(req, res, next) {
 
 async function updateCategory(req, res, next) {
   try {
-    const result = await questionBankService.updateCategory(req);
-    return sendLegacyResult(res, result);
+    return await questionBankService.updateCategory(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -30,8 +26,7 @@ async function updateCategory(req, res, next) {
 
 async function deleteCategory(req, res, next) {
   try {
-    const result = await questionBankService.deleteCategory(req);
-    return sendLegacyResult(res, result);
+    return await questionBankService.deleteCategory(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -39,8 +34,7 @@ async function deleteCategory(req, res, next) {
 
 async function getQuestions(req, res, next) {
   try {
-    const result = await questionBankService.getQuestions(req);
-    return sendLegacyResult(res, result);
+    return await questionBankService.getQuestions(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -48,8 +42,7 @@ async function getQuestions(req, res, next) {
 
 async function getQuestionById(req, res, next) {
   try {
-    const result = await questionBankService.getQuestionById(req);
-    return sendLegacyResult(res, result);
+    return await questionBankService.getQuestionById(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -57,8 +50,7 @@ async function getQuestionById(req, res, next) {
 
 async function createQuestion(req, res, next) {
   try {
-    const result = await questionBankService.createQuestion(req);
-    return sendLegacyResult(res, result);
+    return await questionBankService.createQuestion(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -66,8 +58,7 @@ async function createQuestion(req, res, next) {
 
 async function updateQuestion(req, res, next) {
   try {
-    const result = await questionBankService.updateQuestion(req);
-    return sendLegacyResult(res, result);
+    return await questionBankService.updateQuestion(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -75,8 +66,7 @@ async function updateQuestion(req, res, next) {
 
 async function deleteQuestion(req, res, next) {
   try {
-    const result = await questionBankService.deleteQuestion(req);
-    return sendLegacyResult(res, result);
+    return await questionBankService.deleteQuestion(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -93,3 +83,5 @@ module.exports = {
   updateQuestion,
   deleteQuestion,
 };
+
+

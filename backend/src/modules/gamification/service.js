@@ -1,16 +1,6 @@
-const gamificationRepository = require("./repository");
-
-function assertCurrentUser(currentUser) {
-  if (!currentUser) {
-    const error = new Error("Требуется авторизация");
-    error.status = 401;
-    throw error;
-  }
-}
+﻿const gamificationRepository = require("./repository");
 
 async function getOverview(currentUser) {
-  assertCurrentUser(currentUser);
-
   const overview = await gamificationRepository.getUserOverview(currentUser.id);
   if (!overview) {
     const error = new Error("Пользователь не найден");

@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const config = require("../config/env");
 
 /**
  * Middleware для проверки JWT токена
@@ -13,7 +14,7 @@ module.exports = (req, res, next) => {
   const token = authHeader.substring(7);
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your_secret_key_here");
+    const decoded = jwt.verify(token, config.jwtSecret);
     req.user = decoded; // { id, role }
     next();
   } catch (error) {

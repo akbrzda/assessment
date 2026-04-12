@@ -1,20 +1,19 @@
 const handlers = require("./dashboard.handlers.js");
-const { runLegacyHandler } = require("../shared/legacy-handler-adapter");
 
-async function getMetrics(req) {
-  return runLegacyHandler(handlers.getMetrics, req);
+async function getMetrics(req, res, next) {
+  return handlers.getMetrics(req, res, next);
 }
 
-async function getActivityTrends(req) {
-  return runLegacyHandler(handlers.getActivityTrends, req);
+async function getActivityTrends(req, res, next) {
+  return handlers.getActivityTrends(req, res, next);
 }
 
-async function getBranchKPI(req) {
-  return runLegacyHandler(handlers.getBranchKPI, req);
+async function getBranchKPI(req, res, next) {
+  return handlers.getBranchKPI(req, res, next);
 }
 
-async function getLatestAssessmentActivities(req) {
-  return runLegacyHandler(handlers.getLatestAssessmentActivities, req);
+async function getLatestAssessmentActivities(req, res, next) {
+  return handlers.getLatestAssessmentActivities(req, res, next);
 }
 
 module.exports = {

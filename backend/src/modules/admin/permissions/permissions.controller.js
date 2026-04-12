@@ -1,10 +1,8 @@
-const permissionsService = require("./permissions.service");
-const { sendLegacyResult } = require("../shared/legacy-handler-adapter");
+﻿const permissionsService = require("./permissions.service");
 
 async function getSystemModules(req, res, next) {
   try {
-    const result = await permissionsService.getSystemModules(req);
-    return sendLegacyResult(res, result);
+    return await permissionsService.getSystemModules(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -12,8 +10,7 @@ async function getSystemModules(req, res, next) {
 
 async function getUserPermissions(req, res, next) {
   try {
-    const result = await permissionsService.getUserPermissions(req);
-    return sendLegacyResult(res, result);
+    return await permissionsService.getUserPermissions(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -21,8 +18,7 @@ async function getUserPermissions(req, res, next) {
 
 async function updateUserPermissions(req, res, next) {
   try {
-    const result = await permissionsService.updateUserPermissions(req);
-    return sendLegacyResult(res, result);
+    return await permissionsService.updateUserPermissions(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -30,8 +26,7 @@ async function updateUserPermissions(req, res, next) {
 
 async function checkUserAccess(req, res, next) {
   try {
-    const result = await permissionsService.checkUserAccess(req);
-    return sendLegacyResult(res, result);
+    return await permissionsService.checkUserAccess(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -43,3 +38,5 @@ module.exports = {
   updateUserPermissions,
   checkUserAccess,
 };
+
+

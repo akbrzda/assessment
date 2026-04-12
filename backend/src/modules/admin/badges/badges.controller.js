@@ -1,10 +1,8 @@
-const badgesService = require("./badges.service");
-const { sendLegacyResult } = require("../shared/legacy-handler-adapter");
+﻿const badgesService = require("./badges.service");
 
 async function getBadges(req, res, next) {
   try {
-    const result = await badgesService.getBadges(req);
-    return sendLegacyResult(res, result);
+    return await badgesService.getBadges(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -12,8 +10,7 @@ async function getBadges(req, res, next) {
 
 async function getBadgeById(req, res, next) {
   try {
-    const result = await badgesService.getBadgeById(req);
-    return sendLegacyResult(res, result);
+    return await badgesService.getBadgeById(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -21,8 +18,7 @@ async function getBadgeById(req, res, next) {
 
 async function createBadge(req, res, next) {
   try {
-    const result = await badgesService.createBadge(req);
-    return sendLegacyResult(res, result);
+    return await badgesService.createBadge(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -30,8 +26,7 @@ async function createBadge(req, res, next) {
 
 async function updateBadge(req, res, next) {
   try {
-    const result = await badgesService.updateBadge(req);
-    return sendLegacyResult(res, result);
+    return await badgesService.updateBadge(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -39,8 +34,7 @@ async function updateBadge(req, res, next) {
 
 async function uploadBadgeIcon(req, res, next) {
   try {
-    const result = await badgesService.uploadBadgeIcon(req);
-    return sendLegacyResult(res, result);
+    return await badgesService.uploadBadgeIcon(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -48,8 +42,7 @@ async function uploadBadgeIcon(req, res, next) {
 
 async function deleteBadge(req, res, next) {
   try {
-    const result = await badgesService.deleteBadge(req);
-    return sendLegacyResult(res, result);
+    return await badgesService.deleteBadge(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -57,8 +50,7 @@ async function deleteBadge(req, res, next) {
 
 async function reorderBadges(req, res, next) {
   try {
-    const result = await badgesService.reorderBadges(req);
-    return sendLegacyResult(res, result);
+    return await badgesService.reorderBadges(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -73,3 +65,5 @@ module.exports = {
   deleteBadge,
   reorderBadges,
 };
+
+

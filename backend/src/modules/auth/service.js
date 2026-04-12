@@ -9,24 +9,24 @@ function buildError(message, status) {
   return error;
 }
 
-function resolveInviteCode(req, fallbackInviteCode = null) {
+function resolveInviteCode(context, fallbackInviteCode = null) {
   if (fallbackInviteCode) {
     return normalizeInviteCode(fallbackInviteCode);
   }
 
-  const inviteCodeHeader = req.headers["x-invite-code"];
-  const inviteParam = req.telegramInitData?.start_param || req.telegramInitData?.startapp || req.telegramInitData?.start_param_hash;
+  const inviteCodeHeader = context.inviteCodeHeader;
+  const inviteParam = context.startParam || context.startApp || context.startParamHash;
   const inviteCodeFromParam = normalizeInviteCode(inviteParam);
 
   return inviteCodeHeader || inviteCodeFromParam || null;
 }
 
-async function getStatus(req) {
-  const telegramUser = req.telegramInitData?.user;
-  const inviteCode = resolveInviteCode(req);
+async function getStatus(context) {
+  const telegramUser = context.telegramUser;
+  const inviteCode = resolveInviteCode(context);
 
-  if (req.currentUser) {
-    const user = await authRepository.getDashboardData(req.currentUser.id);
+  if (context.currentUser) {
+    const user = await authRepository.getDashboardData(context.currentUser.id);
     return {
       registered: true,
       user,
@@ -60,12 +60,12 @@ async function getStatus(req) {
   };
 }
 
-async function register(req, payload) {
-  if (req.currentUser) {
+async function register(context, payload) {
+  if (context.currentUser) {
     throw buildError("User already registered", 400);
   }
 
-  const telegramUser = req.telegramInitData?.user;
+  const telegramUser = context.telegramUser;
   if (!telegramUser) {
     throw buildError("Missing Telegram user data", 400);
   }
@@ -84,7 +84,7 @@ async function register(req, payload) {
   let invitation = null;
   let managerPosition = null;
 
-  const inviteCode = resolveInviteCode(req, payload.inviteCode);
+  const inviteCode = resolveInviteCode(context, payload.inviteCode);
   if (inviteCode) {
     invitation = await authRepository.findActiveInvitationByCode(inviteCode);
     if (!invitation) {

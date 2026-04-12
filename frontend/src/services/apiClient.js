@@ -1,4 +1,5 @@
 import { getInitData } from "./telegram";
+import { getTelegramInviteCode } from "./telegramRuntimeState";
 import { API_BASE_URL } from "@/env";
 
 const envBaseUrl = (API_BASE_URL || "").trim();
@@ -19,10 +20,9 @@ async function request(path, options = {}) {
   }
 
   // Добавляем код приглашения через отдельный заголовок
-  const inviteCode = typeof window !== "undefined" ? window.__telegramInviteCode : null;
+  const inviteCode = getTelegramInviteCode();
   if (inviteCode) {
     headers.set("x-invite-code", inviteCode);
-    console.log("📤 Отправляем код приглашения:", inviteCode);
   }
 
   const targetUrl = BASE_URL ? `${BASE_URL}${path}` : path;

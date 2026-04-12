@@ -1,20 +1,19 @@
-const handlers = require("./permissions.handlers.js");
-const { runLegacyHandler } = require("../shared/legacy-handler-adapter");
+﻿const handlers = require("./permissions.handlers.js");
 
-async function getSystemModules(req) {
-  return runLegacyHandler(handlers.getSystemModules, req);
+async function getSystemModules(req, res, next) {
+  return handlers.getSystemModules(req, res, next);
 }
 
-async function getUserPermissions(req) {
-  return runLegacyHandler(handlers.getUserPermissions, req);
+async function getUserPermissions(req, res, next) {
+  return handlers.getUserPermissions(req, res, next);
 }
 
-async function updateUserPermissions(req) {
-  return runLegacyHandler(handlers.updateUserPermissions, req);
+async function updateUserPermissions(req, res, next) {
+  return handlers.updateUserPermissions(req, res, next);
 }
 
-async function checkUserAccess(req) {
-  return runLegacyHandler(handlers.checkUserAccess, req);
+async function checkUserAccess(req, res, next) {
+  return handlers.checkUserAccess(req, res, next);
 }
 
 module.exports = {
@@ -23,3 +22,5 @@ module.exports = {
   updateUserPermissions,
   checkUserAccess,
 };
+
+

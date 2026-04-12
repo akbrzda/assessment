@@ -1,32 +1,31 @@
-const handlers = require("./badges.handlers.js");
-const { runLegacyHandler } = require("../shared/legacy-handler-adapter");
+﻿const handlers = require("./badges.handlers.js");
 
-async function getBadges(req) {
-  return runLegacyHandler(handlers.getBadges, req);
+async function getBadges(req, res, next) {
+  return handlers.getBadges(req, res, next);
 }
 
-async function getBadgeById(req) {
-  return runLegacyHandler(handlers.getBadgeById, req);
+async function getBadgeById(req, res, next) {
+  return handlers.getBadgeById(req, res, next);
 }
 
-async function createBadge(req) {
-  return runLegacyHandler(handlers.createBadge, req);
+async function createBadge(req, res, next) {
+  return handlers.createBadge(req, res, next);
 }
 
-async function updateBadge(req) {
-  return runLegacyHandler(handlers.updateBadge, req);
+async function updateBadge(req, res, next) {
+  return handlers.updateBadge(req, res, next);
 }
 
-async function uploadBadgeIcon(req) {
-  return runLegacyHandler(handlers.uploadBadgeIcon, req);
+async function uploadBadgeIcon(req, res, next) {
+  return handlers.uploadBadgeIcon(req, res, next);
 }
 
-async function deleteBadge(req) {
-  return runLegacyHandler(handlers.deleteBadge, req);
+async function deleteBadge(req, res, next) {
+  return handlers.deleteBadge(req, res, next);
 }
 
-async function reorderBadges(req) {
-  return runLegacyHandler(handlers.reorderBadges, req);
+async function reorderBadges(req, res, next) {
+  return handlers.reorderBadges(req, res, next);
 }
 
 module.exports = {
@@ -38,3 +37,5 @@ module.exports = {
   deleteBadge,
   reorderBadges,
 };
+
+

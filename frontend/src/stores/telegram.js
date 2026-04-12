@@ -1,5 +1,9 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
+import {
+  clearTelegramRuntimeState,
+  setTelegramRuntimeState,
+} from "../services/telegramRuntimeState";
 
 function extractInviteFromUrl() {
   if (typeof window === "undefined") {
@@ -42,8 +46,11 @@ export const useTelegramStore = defineStore("telegram", () => {
       console.error("Telegram WebApp API недоступен. Откройте мини-приложение внутри Telegram.");
       if (urlInvite) {
         const token = `invite_${urlInvite}`;
-        window.__telegramInitDataOverride = "";
-        window.__telegramStartParam = token;
+        setTelegramRuntimeState({
+          initDataOverride: "",
+          startParam: token,
+          inviteCode: urlInvite,
+        });
       }
       return;
     }
@@ -123,17 +130,24 @@ export const useTelegramStore = defineStore("telegram", () => {
 
       // ВАЖНО: НЕ изменяем initData, чтобы не сломать подпись!
       // Просто сохраняем токен для передачи отдельно
-      window.__telegramStartParam = token;
-      window.__telegramInviteCode = inviteCode;
+      setTelegramRuntimeState({
+        startParam: token,
+        inviteCode,
+      });
 
       console.log("✅ Токен приглашения сохранен:", token);
     } else {
       inviteToken.value = startParam || startApp || tgWebAppStartParam || null;
-      window.__telegramStartParam = startParam || startApp || tgWebAppStartParam || null;
+      setTelegramRuntimeState({
+        startParam: startParam || startApp || tgWebAppStartParam || null,
+        inviteCode: null,
+      });
     }
 
     // Сохраняем оригинальный initData БЕЗ изменений (используем currentInitData, который может быть восстановлен)
-    window.__telegramInitDataOverride = currentInitData;
+    setTelegramRuntimeState({
+      initDataOverride: currentInitData,
+    });
 
     webApp.ready();
     webApp.expand();
@@ -314,6 +328,7 @@ export const useTelegramStore = defineStore("telegram", () => {
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("tg_init_data");
       sessionStorage.removeItem("tg_init_data_unsafe");
+      clearTelegramRuntimeState();
       console.log("🗑️ Сохранённые initData очищены");
     }
   }

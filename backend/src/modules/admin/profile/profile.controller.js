@@ -1,10 +1,8 @@
-const profileService = require("./profile.service");
-const { sendLegacyResult } = require("../shared/legacy-handler-adapter");
+﻿const profileService = require("./profile.service");
 
 async function getProfile(req, res, next) {
   try {
-    const result = await profileService.getProfile(req);
-    return sendLegacyResult(res, result);
+    return await profileService.getProfile(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -12,8 +10,7 @@ async function getProfile(req, res, next) {
 
 async function updateProfile(req, res, next) {
   try {
-    const result = await profileService.updateProfile(req);
-    return sendLegacyResult(res, result);
+    return await profileService.updateProfile(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -23,3 +20,5 @@ module.exports = {
   getProfile,
   updateProfile,
 };
+
+

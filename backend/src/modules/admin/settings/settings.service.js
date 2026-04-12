@@ -1,24 +1,23 @@
-const handlers = require("./settings.handlers.js");
-const { runLegacyHandler } = require("../shared/legacy-handler-adapter");
+﻿const handlers = require("./settings.handlers.js");
 
-async function getSettings(req) {
-  return runLegacyHandler(handlers.getSettings, req);
+async function getSettings(req, res, next) {
+  return handlers.getSettings(req, res, next);
 }
 
-async function getSettingByKey(req) {
-  return runLegacyHandler(handlers.getSettingByKey, req);
+async function getSettingByKey(req, res, next) {
+  return handlers.getSettingByKey(req, res, next);
 }
 
-async function createSetting(req) {
-  return runLegacyHandler(handlers.createSetting, req);
+async function createSetting(req, res, next) {
+  return handlers.createSetting(req, res, next);
 }
 
-async function updateSetting(req) {
-  return runLegacyHandler(handlers.updateSetting, req);
+async function updateSetting(req, res, next) {
+  return handlers.updateSetting(req, res, next);
 }
 
-async function deleteSetting(req) {
-  return runLegacyHandler(handlers.deleteSetting, req);
+async function deleteSetting(req, res, next) {
+  return handlers.deleteSetting(req, res, next);
 }
 
 module.exports = {
@@ -28,3 +27,5 @@ module.exports = {
   updateSetting,
   deleteSetting,
 };
+
+

@@ -2,10 +2,10 @@
 const assert = require("node:assert/strict");
 
 const adminModule = require("../src/modules/admin");
-const assessmentsModule = require("../src/modules/admin/assessments");
+const assessmentsModule = require("../src/modules/assessment/admin");
 const usersRoutes = require("../src/modules/admin/users");
 const authRoutes = require("../src/modules/admin/auth");
-const analyticsRoutes = require("../src/modules/admin/analytics");
+const analyticsRoutes = require("../src/modules/analytics/admin/routes");
 
 function assertRouter(router, moduleName) {
   assert.ok(router, `${moduleName}: роутер не экспортирован`);

@@ -1,10 +1,8 @@
-const usersService = require("./users.service");
-const { sendLegacyResult } = require("../shared/legacy-handler-adapter");
+const handlers = require("./users.handlers");
 
 async function listUsers(req, res, next) {
   try {
-    const result = await usersService.listUsers(req);
-    return sendLegacyResult(res, result);
+    return await handlers.listUsers(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -12,8 +10,7 @@ async function listUsers(req, res, next) {
 
 async function exportUsersToExcel(req, res, next) {
   try {
-    const result = await usersService.exportUsersToExcel(req);
-    return sendLegacyResult(res, result);
+    return await handlers.exportUsersToExcel(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -21,8 +18,7 @@ async function exportUsersToExcel(req, res, next) {
 
 async function getUserDetailedStats(req, res, next) {
   try {
-    const result = await usersService.getUserDetailedStats(req);
-    return sendLegacyResult(res, result);
+    return await handlers.getUserDetailedStats(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -30,8 +26,7 @@ async function getUserDetailedStats(req, res, next) {
 
 async function getUserById(req, res, next) {
   try {
-    const result = await usersService.getUserById(req);
-    return sendLegacyResult(res, result);
+    return await handlers.getUserById(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -39,8 +34,7 @@ async function getUserById(req, res, next) {
 
 async function createUser(req, res, next) {
   try {
-    const result = await usersService.createUser(req);
-    return sendLegacyResult(res, result);
+    return await handlers.createUser(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -48,8 +42,7 @@ async function createUser(req, res, next) {
 
 async function updateUser(req, res, next) {
   try {
-    const result = await usersService.updateUser(req);
-    return sendLegacyResult(res, result);
+    return await handlers.updateUser(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -57,8 +50,7 @@ async function updateUser(req, res, next) {
 
 async function deleteUser(req, res, next) {
   try {
-    const result = await usersService.deleteUser(req);
-    return sendLegacyResult(res, result);
+    return await handlers.deleteUser(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -66,8 +58,7 @@ async function deleteUser(req, res, next) {
 
 async function resetPassword(req, res, next) {
   try {
-    const result = await usersService.resetPassword(req);
-    return sendLegacyResult(res, result);
+    return await handlers.resetPassword(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -75,8 +66,7 @@ async function resetPassword(req, res, next) {
 
 async function resetAssessmentProgress(req, res, next) {
   try {
-    const result = await usersService.resetAssessmentProgress(req);
-    return sendLegacyResult(res, result);
+    return await handlers.resetAssessmentProgress(req, res, next);
   } catch (error) {
     next(error);
   }

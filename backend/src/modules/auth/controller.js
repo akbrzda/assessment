@@ -14,9 +14,20 @@ function handleKnownError(error, res, next) {
   next(error);
 }
 
+function createAuthContext(req) {
+  return {
+    inviteCodeHeader: req.headers["x-invite-code"] || null,
+    startParam: req.telegramInitData?.start_param || null,
+    startApp: req.telegramInitData?.startapp || null,
+    startParamHash: req.telegramInitData?.start_param_hash || null,
+    telegramUser: req.telegramInitData?.user || null,
+    currentUser: req.currentUser || null,
+  };
+}
+
 async function getStatus(req, res, next) {
   try {
-    const payload = await authService.getStatus(req);
+    const payload = await authService.getStatus(createAuthContext(req));
     res.json(payload);
   } catch (error) {
     handleKnownError(error, res, next);
@@ -26,7 +37,7 @@ async function getStatus(req, res, next) {
 async function register(req, res, next) {
   try {
     const payload = validateRegistrationPayload(req.body);
-    const result = await authService.register(req, payload);
+    const result = await authService.register(createAuthContext(req), payload);
     res.status(201).json(result);
   } catch (error) {
     handleKnownError(error, res, next);

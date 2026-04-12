@@ -1,32 +1,31 @@
-const handlers = require("./levels.handlers.js");
-const { runLegacyHandler } = require("../shared/legacy-handler-adapter");
+﻿const handlers = require("./levels.handlers.js");
 
-async function getLevels(req) {
-  return runLegacyHandler(handlers.getLevels, req);
+async function getLevels(req, res, next) {
+  return handlers.getLevels(req, res, next);
 }
 
-async function getLevelsStats(req) {
-  return runLegacyHandler(handlers.getLevelsStats, req);
+async function getLevelsStats(req, res, next) {
+  return handlers.getLevelsStats(req, res, next);
 }
 
-async function getLevelByNumber(req) {
-  return runLegacyHandler(handlers.getLevelByNumber, req);
+async function getLevelByNumber(req, res, next) {
+  return handlers.getLevelByNumber(req, res, next);
 }
 
-async function createLevel(req) {
-  return runLegacyHandler(handlers.createLevel, req);
+async function createLevel(req, res, next) {
+  return handlers.createLevel(req, res, next);
 }
 
-async function updateLevel(req) {
-  return runLegacyHandler(handlers.updateLevel, req);
+async function updateLevel(req, res, next) {
+  return handlers.updateLevel(req, res, next);
 }
 
-async function deleteLevel(req) {
-  return runLegacyHandler(handlers.deleteLevel, req);
+async function deleteLevel(req, res, next) {
+  return handlers.deleteLevel(req, res, next);
 }
 
-async function recalculateLevels(req) {
-  return runLegacyHandler(handlers.recalculateLevels, req);
+async function recalculateLevels(req, res, next) {
+  return handlers.recalculateLevels(req, res, next);
 }
 
 module.exports = {
@@ -38,3 +37,5 @@ module.exports = {
   deleteLevel,
   recalculateLevels,
 };
+
+

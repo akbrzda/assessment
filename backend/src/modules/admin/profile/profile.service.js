@@ -1,15 +1,16 @@
-const handlers = require("./profile.handlers.js");
-const { runLegacyHandler } = require("../shared/legacy-handler-adapter");
+﻿const handlers = require("./profile.handlers.js");
 
-async function getProfile(req) {
-  return runLegacyHandler(handlers.getProfile, req);
+async function getProfile(req, res, next) {
+  return handlers.getProfile(req, res, next);
 }
 
-async function updateProfile(req) {
-  return runLegacyHandler(handlers.updateProfile, req);
+async function updateProfile(req, res, next) {
+  return handlers.updateProfile(req, res, next);
 }
 
 module.exports = {
   getProfile,
   updateProfile,
 };
+
+

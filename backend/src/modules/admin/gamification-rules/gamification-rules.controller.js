@@ -1,10 +1,8 @@
 const rulesService = require("./gamification-rules.service");
-const { sendLegacyResult } = require("../shared/legacy-handler-adapter");
 
 async function list(req, res, next) {
   try {
-    const result = await rulesService.list(req);
-    return sendLegacyResult(res, result);
+    return await rulesService.list(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -12,8 +10,7 @@ async function list(req, res, next) {
 
 async function getById(req, res, next) {
   try {
-    const result = await rulesService.getById(req);
-    return sendLegacyResult(res, result);
+    return await rulesService.getById(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -21,8 +18,7 @@ async function getById(req, res, next) {
 
 async function create(req, res, next) {
   try {
-    const result = await rulesService.create(req);
-    return sendLegacyResult(res, result);
+    return await rulesService.create(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -30,8 +26,7 @@ async function create(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const result = await rulesService.update(req);
-    return sendLegacyResult(res, result);
+    return await rulesService.update(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -39,8 +34,7 @@ async function update(req, res, next) {
 
 async function remove(req, res, next) {
   try {
-    const result = await rulesService.remove(req);
-    return sendLegacyResult(res, result);
+    return await rulesService.remove(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -48,8 +42,7 @@ async function remove(req, res, next) {
 
 async function dryRun(req, res, next) {
   try {
-    const result = await rulesService.dryRun(req);
-    return sendLegacyResult(res, result);
+    return await rulesService.dryRun(req, res, next);
   } catch (error) {
     next(error);
   }
