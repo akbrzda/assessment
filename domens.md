@@ -1,8 +1,8 @@
-# План рефакторинга по доменам (целевая архитектура)
+﻿# План рефакторинга по доменам
 
 ## Цель
 
-Привести проект к модульной архитектуре по образцу:
+Привести backend к модульной архитектуре в формате:
 
 ```text
 backend/src/
@@ -10,104 +10,129 @@ backend/src/
   middleware/
   modules/
     admin/
-      assessments/
-        assessments.controller.js
-        assessments.repository.js
-        assessments.service.js
-        assessments.validators.js
+      <domain>/
+        <domain>.controller.js
+        <domain>.service.js
+        <domain>.repository.js      # где есть работа с БД
+        <domain>.validators.js      # где есть валидация
         routes.js
         index.js
-      branches/
-        branches.controller.js
-        branches.repository.js
-        branches.service.js
-        branches.validators.js
-        routes.js
-        index.js
-      positions/
-        positions.controller.js
-        positions.repository.js
-        positions.service.js
-        positions.validators.js
-        routes.js
-        index.js
-      references/
-        references.controller.js
-        references.repository.js
-        references.service.js
-        routes.js
-        index.js
+      shared/
+        legacy-handler-adapter.js
       index.js
-    analytics/
+    <public-domain>/
       controller.js
-      repository.js
       service.js
+      repository.js
       validators.js
       routes.js
       index.js
 ```
 
-## Правила модульного слоя
+## Правила слоя
 
 - `routes.js`: только маршруты, middleware и вызов контроллера
-- `*.controller.js`: только HTTP-вход/выход, без SQL и бизнес-правил
-- `*.service.js`: бизнес-правила и orchestration
-- `*.repository.js`: только доступ к данным
-- `*.validators.js`: валидация/нормализация входа
+- `*.controller.js`: HTTP-вход/выход
+- `*.service.js`: бизнес-логика и orchestration
+- `*.repository.js`: доступ к данным
+- `*.validators.js`: валидация и нормализация
 - `index.js`: единая точка входа модуля
+
+## Охват backend (все модули)
+
+### Уже перенесено в `modules/*`
+
+- [x] `admin/auth`
+- [x] `admin/dashboard`
+- [x] `admin/users`
+- [x] `admin/references`
+- [x] `admin/positions`
+- [x] `admin/branches`
+- [x] `admin/assessments`
+- [x] `admin/question-bank`
+- [x] `admin/analytics`
+- [x] `admin/settings`
+- [x] `admin/gamification-rules`
+- [x] `admin/invitations`
+- [x] `admin/profile`
+- [x] `admin/permissions`
+- [x] `admin/courses`
+- [x] `admin/badges`
+- [x] `admin/levels`
+- [x] `admin/legacy`
+- [x] `analytics`
+
+### Еще не перенесено (backend)
+
+- [ ] `auth` (публичный/miniapp контур)
+- [ ] `invitations` (публичный/miniapp контур)
+- [ ] `assessments` (пользовательский контур)
+- [ ] `cloud-storage`
+- [ ] `gamification`
+- [ ] `leaderboard`
+- [ ] `courses` (пользовательский контур, унификация с admin)
 
 ## Текущий прогресс
 
-### Завершено
+### Выполнено
 
-- [x] Перенос `admin/references` в целевую структуру
-- [x] Перенос `admin/positions` в целевую структуру
-- [x] Перенос `admin/branches` в целевую структуру
-- [x] Перенос `analytics` в модуль
-- [x] Перенос `admin/assessments` read-контура (`GET /admin/assessments`, `GET /admin/assessments/:id`)
-- [x] Переключение адаптеров роутов на новую структуру модулей
+- [x] Все admin-маршруты перенесены в `backend/src/modules/admin/*`
+- [x] Удалены fallback-файлы из `backend/src/routes/*` для уже мигрированных admin-разделов
+- [x] `app.js` переключен на подключение модулей из `modules/*`
+- [x] `admin/assessments` переведен на модульный контур, включая write-часть
+- [x] Добавлен `shared/legacy-handler-adapter` для безопасной обертки legacy-контроллеров
+- [x] Для admin-разделов добавлены модульные `service + controller + routes`
+  - [x] `auth`
+  - [x] `dashboard`
+  - [x] `users`
+  - [x] `question-bank`
+  - [x] `settings`
+  - [x] `analytics`
+  - [x] `gamification-rules`
+  - [x] `invitations`
+  - [x] `permissions`
+  - [x] `courses`
+  - [x] `badges`
+  - [x] `levels`
+  - [x] `profile`
+  - [x] `legacy`
 
 ### В работе
 
-- [ ] `admin/assessments` write-контур:
-- [ ] create/update/delete
-- [ ] export/details/progress
-- [ ] перенос транзакций из контроллера в сервис
+- [x] `admin/assessments`: декомпозиция `assessments.write.service` на отдельные use-case сервисы и repository-операции
+- [x] `admin/assessments`: вынести `adminTheoryController` из `routes` в модульный слой `service/controller`
+- [x] `admin/*`: поэтапно убрать зависимости от `backend/src/controllers/*` внутри `*.service.js` (полная независимость модулей)
 
-## Дополнительные задачи
+## Следующие итерации
 
-### Архитектурные
+### Итерация A — Закрытие admin до конца
 
-- [ ] Добавить `index.js`-агрегаторы для всех backend-модулей
-- [ ] Убрать прямые подключения legacy `controllers/*` после миграции домена
-- [ ] Ввести единый нейминг доменных файлов для всех новых модулей
-- [ ] Разделить крупные use-case в `admin/assessments` на отдельные сервисы (read/write/export)
+- [x] Убрать прямые импорты legacy-контроллеров из `admin/*/service.js` через перенос логики в модульные сервисы
+- [x] Выделить repository-слой там, где в сервисах остаются SQL/модельные вызовы
+- [x] Привести нейминг файлов к единому виду во всех admin-доменах
+- [x] Добавить smoke-тесты на ключевые admin-endpoint'ы
 
-### Качество и стандарты
+### Итерация B — Публичные backend-домены
 
-- [ ] Убрать `console.*` из backend runtime-кода, перевести на единый logger
-- [ ] Ввести единый формат доменных ошибок (`code`, `httpStatus`, `message`, `details`)
-- [ ] Добавить lint-правило на запрет SQL в `routes`/`controllers`
-- [ ] Добавить lint-правило на запрет файлов > 350 строк для новых модулей
+- [ ] Перенести `auth` в `modules/auth`
+- [ ] Перенести `invitations` в `modules/invitations`
+- [ ] Перенести пользовательский `assessments` в `modules/assessments`
+- [ ] Перенести `leaderboard`, `gamification`, `cloud-storage`
+- [ ] Унифицировать `courses` (admin + user) по единому доменному контракту
 
-### Тестирование
+### Итерация C — Качество и стандарты
 
-- [ ] Добавить smoke-интеграцию на `admin references/positions/branches`
-- [ ] Добавить интеграционные тесты на read-контур `admin/assessments`
-- [ ] Добавить интеграционные тесты на `analytics` (`summary`, `branches`, `employees`, `export`)
-- [ ] Добавить регресс-тесты на обратную совместимость API-контрактов
+- [ ] Убрать `console.*` из runtime-кода и перейти на единый logger
+- [ ] Ввести единый формат ошибок (`code`, `httpStatus`, `message`, `details`)
+- [ ] Зафиксировать lint-ограничения: без SQL в `routes/controllers` и без новых крупных файлов
+- [ ] Добавить интеграционные тесты для migrated-доменов
 
-### Frontend и bot (следующие этапы)
+## Критерии готовности backend-этапа
 
-- [ ] Перевести `admin-frontend` на `modules/<domain>/{api,stores,views,components}`
-- [ ] Разбить router `admin-frontend` на `routes/*` + `guards/*`
-- [ ] Перевести `frontend` на модульный API-слой и тонкие `views`
-- [ ] Разбить `bot/src/index.js` на `modules`, `handlers`, `service`, `validators`
+- [ ] Все backend-домены лежат в `modules/*` и имеют `index.js`
+- [ ] В migrated-доменах нет fallback-подключений старых route-файлов
+- [ ] В migrated-доменах нет SQL в `routes/controllers`
+- [ ] Контракты API сохранены (URL и формат ответов)
+- [ ] Есть минимальное smoke/integration покрытие на критичные домены
 
-## Критерии готовности этапа backend
 
-- [ ] Все новые backend-домены лежат в `modules/*` и имеют `index.js`
-- [ ] В migrated-доменах нет SQL в `routes` и `controllers`
-- [ ] Все migrated-роуты сохраняют текущие URL и формат ответа
-- [ ] В migrated-доменах нет `console.*` в runtime
-- [ ] Есть минимум smoke/integration покрытие на migrated-домены
