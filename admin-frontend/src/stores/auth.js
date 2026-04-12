@@ -2,14 +2,24 @@ import { defineStore } from "pinia";
 import authApi from "../api/auth";
 import websocketService from "../services/websocket";
 import apiClient from "../utils/axios";
+import {
+  clearSession,
+  getAccessToken,
+  getUser,
+  setAccessToken,
+  setUser,
+} from "../services/session/tokenStorage";
+import { onAccessTokenRefreshed, refreshAccessToken } from "../services/session/refreshCoordinator";
+
+const MANAGER_DEFAULT_MODULES = ["assessments", "analytics", "users", "reports", "questions"];
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
-    user: JSON.parse(localStorage.getItem("user")) || null,
-    accessToken: localStorage.getItem("accessToken") || null,
+    user: getUser(),
+    accessToken: getAccessToken(),
     tokenRefreshTimer: null,
-    isRefreshing: false,
-    userPermissions: null, // Индивидуальные права пользователя
+    sessionSyncUnsubscribe: null,
+    userPermissions: null,
     permissionsLoaded: false,
   }),
 
@@ -19,37 +29,27 @@ export const useAuthStore = defineStore("auth", {
     isManager: (state) => state.user?.role === "manager",
     token: (state) => state.accessToken,
 
-    /**
-     * Проверяет доступ к модулю на основе роли и индивидуальных прав
-     */
     hasModuleAccess: (state) => (moduleCode) => {
-      // Superadmin имеет доступ ко всем модулям
       if (state.user?.role === "superadmin") {
         return true;
       }
 
-      // Если права не загружены, используем дефолтные права роли
       if (!state.permissionsLoaded || !state.userPermissions) {
-        // Дефолтные права для manager
         if (state.user?.role === "manager") {
-          const managerModules = ["assessments", "analytics", "users", "reports", "questions"];
-          return managerModules.includes(moduleCode);
+          return MANAGER_DEFAULT_MODULES.includes(moduleCode);
         }
+
         return false;
       }
 
-      // Ищем право для модуля
-      const permission = state.userPermissions.find((p) => p.moduleCode === moduleCode);
+      const permission = state.userPermissions.find((item) => item.moduleCode === moduleCode);
 
-      // Если есть кастомное право, используем его
       if (permission && permission.isCustom) {
         return permission.hasAccess;
       }
 
-      // Если индивидуального права нет или оно не кастомное, используем дефолтное право роли
       if (state.user?.role === "manager") {
-        const managerModules = ["assessments", "analytics", "users", "reports", "questions"];
-        return managerModules.includes(moduleCode);
+        return MANAGER_DEFAULT_MODULES.includes(moduleCode);
       }
 
       return false;
@@ -57,6 +57,29 @@ export const useAuthStore = defineStore("auth", {
   },
 
   actions: {
+    initSessionSync() {
+      if (this.sessionSyncUnsubscribe) {
+        return;
+      }
+
+      this.sessionSyncUnsubscribe = onAccessTokenRefreshed((newAccessToken) => {
+        this.accessToken = newAccessToken;
+
+        if (websocketService.isConnected) {
+          websocketService.reconnectWithNewToken(newAccessToken);
+        }
+      });
+    },
+
+    stopSessionSync() {
+      if (!this.sessionSyncUnsubscribe) {
+        return;
+      }
+
+      this.sessionSyncUnsubscribe();
+      this.sessionSyncUnsubscribe = null;
+    },
+
     async login(credentials) {
       try {
         const { data } = await authApi.login(credentials);
@@ -64,21 +87,16 @@ export const useAuthStore = defineStore("auth", {
         this.user = data.user;
         this.accessToken = data.accessToken;
 
-        localStorage.setItem("user", JSON.stringify(data.user));
-        localStorage.setItem("accessToken", data.accessToken);
+        setUser(data.user);
+        setAccessToken(data.accessToken);
 
-        // Подключаем WebSocket после успешного логина
         websocketService.connect();
-
-        // Запускаем автообновление токена
         this.startTokenRefresh();
-
-        // Загружаем права пользователя
         await this.loadUserPermissions();
 
         return true;
       } catch (error) {
-        console.error("Login failed:", error);
+        console.error("������ �����:", error);
         return false;
       }
     },
@@ -94,83 +112,60 @@ export const useAuthStore = defineStore("auth", {
         this.userPermissions = data.permissions || [];
         this.permissionsLoaded = true;
       } catch (error) {
-        console.error("Не удалось загрузить права пользователя:", error);
+        console.error("�� ������� ��������� ����� ������������:", error);
         this.permissionsLoaded = false;
       }
     },
 
     startTokenRefresh() {
-      // Очищаем предыдущий таймер если есть
       if (this.tokenRefreshTimer) {
         clearInterval(this.tokenRefreshTimer);
       }
 
-      // Обновляем токен каждые 25 минут (токен живёт 30 минут)
-      // Запас в 5 минут даёт достаточно времени для обработки запроса
       this.tokenRefreshTimer = setInterval(async () => {
-        // Предотвращаем параллельные обновления
-        if (this.isRefreshing) {
-          console.log("Обновление токена уже выполняется, пропускаем");
-          return;
-        }
-
-        this.isRefreshing = true;
         try {
-          const { data } = await authApi.refresh();
-          this.setTokenAndReconnectWS(data.accessToken);
-          console.log("✅ Токен автоматически обновлён");
+          await refreshAccessToken();
         } catch (error) {
-          console.error("❌ Не удалось обновить токен:", error);
-          // Останавливаем таймер, axios interceptor сам сделает redirect на login
+          console.error("�� ������� ������������� �������� �����:", error);
           clearInterval(this.tokenRefreshTimer);
           this.tokenRefreshTimer = null;
-        } finally {
-          this.isRefreshing = false;
         }
-      }, 25 * 60 * 1000); // 25 минут
+      }, 25 * 60 * 1000);
     },
 
     setToken(newAccessToken) {
       this.accessToken = newAccessToken;
-      localStorage.setItem("accessToken", newAccessToken);
+      setAccessToken(newAccessToken);
     },
 
     setTokenAndReconnectWS(newAccessToken) {
-      this.accessToken = newAccessToken;
-      localStorage.setItem("accessToken", newAccessToken);
-
-      // Переподключаем WebSocket с новым токеном
-      if (websocketService.isConnected) {
-        websocketService.disconnect();
-        websocketService.connect();
-      }
+      this.setToken(newAccessToken);
+      websocketService.reconnectWithNewToken(newAccessToken);
     },
 
     updateUser(userData) {
       this.user = { ...this.user, ...userData };
-      localStorage.setItem("user", JSON.stringify(this.user));
+      setUser(this.user);
     },
 
     async logout() {
       try {
         await authApi.logout();
       } catch (error) {
-        console.error("Logout error:", error);
+        console.error("������ ������:", error);
       } finally {
-        // Останавливаем автообновление токена
         if (this.tokenRefreshTimer) {
           clearInterval(this.tokenRefreshTimer);
           this.tokenRefreshTimer = null;
         }
 
-        // Отключаем WebSocket перед выходом
         websocketService.disconnect();
 
         this.user = null;
         this.accessToken = null;
         this.userPermissions = null;
         this.permissionsLoaded = false;
-        localStorage.clear();
+        clearSession();
       }
     },
   },

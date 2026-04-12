@@ -12,8 +12,9 @@ const pinia = createPinia();
 app.use(pinia);
 app.use(router);
 
-// Подключаем WebSocket и запускаем автообновление если пользователь уже авторизован
 const authStore = useAuthStore();
+authStore.initSessionSync();
+
 if (authStore.isAuthenticated) {
   authStore.startTokenRefresh();
   websocketService.connect();

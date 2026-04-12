@@ -1,6 +1,7 @@
 import { io } from "socket.io-client";
-import { useAuthStore } from "@/stores/auth";
 import { API_BASE_URL } from "@/env";
+import { useAuthStore } from "@/stores/auth";
+import { refreshAccessToken } from "@/services/session/refreshCoordinator";
 
 class WebSocketService {
   constructor() {
@@ -18,23 +19,21 @@ class WebSocketService {
     const token = authStore.token;
 
     if (!token) {
-      console.warn("WebSocket: не удалось подключиться - отсутствует токен");
+      console.warn("WebSocket: �� ������� ������������, ����������� �����");
       return;
     }
 
     if (this.socket?.connected) {
-      console.log("WebSocket: уже подключен");
+      console.log("WebSocket: ��� ���������");
       return;
     }
 
-    // Проверяем, не истек ли токен перед подключением
     if (this.isTokenExpired(token)) {
-      console.log("WebSocket: токен истек, сначала обновляем его");
+      console.log("WebSocket: ����� �����, ��������� ����������");
       this.handleAuthError();
       return;
     }
 
-    // Определяем URL для WebSocket из конфигурации или используем дефолтный
     const apiUrl = API_BASE_URL ? API_BASE_URL.replace("/api", "") : "http://localhost:3001";
 
     this.socket = io(apiUrl, {
@@ -52,109 +51,100 @@ class WebSocketService {
   isTokenExpired(token) {
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
-      const expirationTime = payload.exp * 1000; // JWT exp в секундах
+      const expirationTime = payload.exp * 1000;
       const currentTime = Date.now();
-      // Проверяем с запасом в 30 секунд
       return expirationTime <= currentTime + 30000;
     } catch (error) {
-      console.error("WebSocket: ошибка при проверке токена:", error);
-      return false; // Если не можем проверить, пытаемся подключиться
+      console.error("WebSocket: ������ ��� �������� ������:", error);
+      return false;
     }
   }
 
   setupEventHandlers() {
-    if (!this.socket) return;
+    if (!this.socket) {
+      return;
+    }
 
     this.socket.on("connect", () => {
       this.isConnected = true;
       this.reconnectAttempts = 0;
       this.isAuthErrorHandling = false;
       this.isReconnecting = false;
-      console.log("WebSocket подключен:", this.socket.id);
+      console.log("WebSocket ���������:", this.socket.id);
       this.emit("status:changed", { connected: true });
     });
 
     this.socket.on("disconnect", (reason) => {
       this.isConnected = false;
-      console.log("WebSocket отключен:", reason);
+      console.log("WebSocket ��������:", reason);
       this.emit("status:changed", { connected: false });
     });
 
     this.socket.on("connect_error", (error) => {
-      console.error("WebSocket ошибка подключения:", error.message);
+      console.error("WebSocket ������ �����������:", error.message);
 
-      // Если ошибка аутентификации (истекший или невалидный токен) и мы еще не обрабатываем ее
-      if ((error.message.includes("Authentication error") || error.message.includes("token expired")) && !this.isAuthErrorHandling) {
-        console.log("WebSocket: ошибка аутентификации, требуется обновление токена");
+      const isAuthError = error.message.includes("Authentication error") || error.message.includes("token expired");
+      if (isAuthError && !this.isAuthErrorHandling) {
         this.isAuthErrorHandling = true;
-        this.reconnectAttempts = 0; // Сбрасываем счетчик при попытке обновить токен
+        this.reconnectAttempts = 0;
         this.handleAuthError();
         return;
       }
 
-      // Увеличиваем счетчик только для не-аутентификационных ошибок
-      this.reconnectAttempts++;
-
+      this.reconnectAttempts += 1;
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        console.error("WebSocket: превышено максимальное количество попыток переподключения");
+        console.error("WebSocket: ��������� ���������� ������� ���������������");
         this.disconnect();
       }
     });
 
     this.socket.on("pong", (data) => {
-      console.debug("WebSocket pong получен:", data);
+      console.debug("WebSocket pong:", data);
     });
 
-    // Обработка логов
     this.socket.on("log:new", (log) => {
-      console.log("Новый лог:", log);
       this.emit("log:new", log);
     });
 
-    // Обработка обновлений дашборда
     this.socket.on("dashboard:update", (data) => {
-      console.log("Обновление дашборда:", data);
       this.emit("dashboard:update", data);
     });
 
-    // Обработка обновлений аттестаций
     this.socket.on("assessment:update", (data) => {
-      console.log("Обновление аттестации:", data);
       this.emit("assessment:update", data);
     });
   }
 
   disconnect() {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-      this.isConnected = false;
-      this.reconnectAttempts = 0;
-      this.isAuthErrorHandling = false;
-      this.isReconnecting = false;
-      this.eventHandlers.clear();
-      console.log("WebSocket отключен вручную");
+    if (!this.socket) {
+      return;
     }
+
+    this.socket.disconnect();
+    this.socket = null;
+    this.isConnected = false;
+    this.reconnectAttempts = 0;
+    this.isAuthErrorHandling = false;
+    this.isReconnecting = false;
+    this.eventHandlers.clear();
+    console.log("WebSocket �������� �������");
   }
 
   reconnectWithNewToken(newToken) {
     if (!newToken) {
-      console.warn("WebSocket: попытка переподключения без токена");
+      console.warn("WebSocket: ������� ��������������� ��� ������");
       return;
     }
 
-    // Защита от множественных одновременных переподключений
     if (this.isReconnecting) {
-      console.log("WebSocket: переподключение уже выполняется, пропускаем");
+      console.log("WebSocket: ��������������� ��� �����������");
       return;
     }
 
-    console.log("WebSocket: переподключение с новым токеном");
     this.isReconnecting = true;
     this.disconnect();
     this.reconnectAttempts = 0;
 
-    // Небольшая задержка перед переподключением
     setTimeout(() => {
       this.isReconnecting = false;
       this.connect();
@@ -162,74 +152,65 @@ class WebSocketService {
   }
 
   async handleAuthError() {
-    console.log("WebSocket: попытка обновить токен после ошибки аутентификации");
-
     try {
       const authStore = useAuthStore();
+      const newAccessToken = await refreshAccessToken();
 
-      // Импортируем authApi динамически чтобы избежать циклических зависимостей
-      const { default: authApi } = await import("@/api/auth");
-      const { data } = await authApi.refresh();
-
-      // Обновляем токен в store БЕЗ переподключения
-      authStore.setToken(data.accessToken);
-
-      // Переподключаемся с новым токеном явно
+      authStore.setToken(newAccessToken);
       this.isAuthErrorHandling = false;
-      this.reconnectWithNewToken(data.accessToken);
+      this.reconnectWithNewToken(newAccessToken);
     } catch (error) {
-      console.error("WebSocket: не удалось обновить токен:", error);
+      console.error("WebSocket: �� ������� �������� �����:", error);
       this.isAuthErrorHandling = false;
       this.disconnect();
     }
   }
 
-  // Подписка на события
   on(event, handler) {
     if (!this.eventHandlers.has(event)) {
       this.eventHandlers.set(event, []);
     }
-    this.eventHandlers.get(event).push(handler);
 
-    // Возвращаем функцию для отписки
+    this.eventHandlers.get(event).push(handler);
     return () => this.off(event, handler);
   }
 
-  // Отписка от события
   off(event, handler) {
     const handlers = this.eventHandlers.get(event);
-    if (handlers) {
-      const index = handlers.indexOf(handler);
-      if (index !== -1) {
-        handlers.splice(index, 1);
-      }
+    if (!handlers) {
+      return;
+    }
+
+    const index = handlers.indexOf(handler);
+    if (index !== -1) {
+      handlers.splice(index, 1);
     }
   }
 
-  // Внутренний emit для уведомления подписчиков
   emit(event, data) {
     const handlers = this.eventHandlers.get(event);
-    if (handlers) {
-      handlers.forEach((handler) => {
-        try {
-          handler(data);
-        } catch (error) {
-          console.error(`Ошибка в обработчике события ${event}:`, error);
-        }
-      });
+    if (!handlers) {
+      return;
     }
+
+    handlers.forEach((handler) => {
+      try {
+        handler(data);
+      } catch (error) {
+        console.error(`������ � ����������� ������� ${event}:`, error);
+      }
+    });
   }
 
-  // Отправка события на сервер
   send(event, data) {
     if (this.socket && this.isConnected) {
       this.socket.emit(event, data);
-    } else {
-      console.warn(`WebSocket: не удалось отправить ${event} - нет подключения`);
+      return;
     }
+
+    console.warn(`WebSocket: �� ������� ��������� ${event}, ��� �����������`);
   }
 
-  // Проверка соединения
   ping() {
     if (this.socket && this.isConnected) {
       this.socket.emit("ping");
@@ -244,7 +225,6 @@ class WebSocketService {
   }
 }
 
-// Singleton экземпляр
 const websocketService = new WebSocketService();
 
 export default websocketService;
