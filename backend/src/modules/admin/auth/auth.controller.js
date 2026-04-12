@@ -1,10 +1,8 @@
-const authService = require("./auth.service");
-const { sendLegacyResult } = require("../shared/legacy-handler-adapter");
+const handlers = require("./auth.handlers");
 
 async function login(req, res, next) {
   try {
-    const result = await authService.login(req);
-    return sendLegacyResult(res, result);
+    return await handlers.login(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -12,8 +10,7 @@ async function login(req, res, next) {
 
 async function refresh(req, res, next) {
   try {
-    const result = await authService.refresh(req);
-    return sendLegacyResult(res, result);
+    return await handlers.refresh(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -21,8 +18,7 @@ async function refresh(req, res, next) {
 
 async function logout(req, res, next) {
   try {
-    const result = await authService.logout(req);
-    return sendLegacyResult(res, result);
+    return await handlers.logout(req, res, next);
   } catch (error) {
     next(error);
   }
