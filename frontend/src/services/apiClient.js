@@ -128,6 +128,33 @@ export const apiClient = {
       body: JSON.stringify(payload),
     });
   },
+  listCourses() {
+    return request("/courses");
+  },
+  getCourseById(id) {
+    return request(`/courses/${id}`);
+  },
+  startCourse(id) {
+    return request(`/courses/${id}/start`, {
+      method: "POST",
+    });
+  },
+  getCourseProgress(id) {
+    return request(`/courses/${id}/progress`);
+  },
+  completeCourseModuleAttempt(moduleId, attemptId) {
+    return request(`/courses/modules/${moduleId}/attempts/${attemptId}/complete`, {
+      method: "POST",
+    });
+  },
+  getCourseFinalAssessmentAccess(courseId) {
+    return request(`/courses/${courseId}/final-assessment/access`);
+  },
+  completeCourseFinalAssessmentAttempt(courseId, attemptId) {
+    return request(`/courses/${courseId}/final-assessment/attempts/${attemptId}/complete`, {
+      method: "POST",
+    });
+  },
   getLeaderboardUsers(params = {}) {
     const searchParams = new URLSearchParams();
     if (params.branchId && Number.isFinite(Number(params.branchId))) {

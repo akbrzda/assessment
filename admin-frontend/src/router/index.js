@@ -74,6 +74,24 @@ const routes = [
         meta: { roles: ["superadmin", "manager"], module: "assessments", title: "Теория аттестации" },
       },
       {
+        path: "courses",
+        name: "Courses",
+        component: () => import("../views/CoursesView.vue"),
+        meta: { roles: ["superadmin", "manager"], module: "courses", title: "Курсы" },
+      },
+      {
+        path: "courses/create",
+        name: "CreateCourse",
+        component: () => import("../views/CourseEditorView.vue"),
+        meta: { roles: ["superadmin", "manager"], module: "courses", title: "Создать курс" },
+      },
+      {
+        path: "courses/:id/edit",
+        name: "EditCourse",
+        component: () => import("../views/CourseEditorView.vue"),
+        meta: { roles: ["superadmin", "manager"], module: "courses", title: "Редактировать курс" },
+      },
+      {
         path: "questions",
         name: "Questions",
         component: () => import("../views/QuestionsView.vue"),

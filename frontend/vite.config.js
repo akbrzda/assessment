@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       host: true,
+      allowedHosts: ["app.theorica.ru", "app.dev.akbrzda.ru"],
     },
     resolve: {
       alias: {

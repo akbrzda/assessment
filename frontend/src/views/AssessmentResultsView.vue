@@ -68,6 +68,10 @@
           Пройти снова ({{ remainingAttempts }} {{ pluralizeAttempts(remainingAttempts) }})
         </button>
 
+        <router-link v-if="relatedCourseId" :to="`/courses/${relatedCourseId}`" class="btn btn-primary btn-full mb-12">
+          Вернуться к курсу
+        </router-link>
+
         <router-link to="/assessments" class="btn btn-primary btn-full mb-12"> Вернуться к аттестациям </router-link>
 
         <router-link to="/dashboard" class="btn btn-secondary btn-full"> На главную </router-link>
@@ -83,6 +87,8 @@ import { Check, CheckCircle, X, XCircle } from "lucide-vue-next";
 import { useTelegramStore } from "../stores/telegram";
 import { useUserStore } from "../stores/user";
 import { apiClient } from "../services/apiClient";
+
+const COURSE_COMPLETION_STORAGE_KEY = "courseCompletionContext";
 
 export default {
   name: "AssessmentResultsView",
@@ -102,6 +108,7 @@ export default {
     const result = ref({});
     const isLoading = ref(false);
     const summaryItem = ref(null);
+    const relatedCourseId = ref(null);
 
     const canRetake = computed(() => {
       if (!assessment.value || !result.value) {
@@ -150,6 +157,71 @@ export default {
       router.push(`/assessment/${route.params.id}`);
     }
 
+    function readCompletionContext(assessmentId) {
+      try {
+        const raw = window.sessionStorage.getItem(COURSE_COMPLETION_STORAGE_KEY);
+        if (!raw) {
+          return null;
+        }
+
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") {
+          return null;
+        }
+
+        const createdAt = Number(parsed.createdAt || 0);
+        if (createdAt > 0 && Date.now() - createdAt > 24 * 60 * 60 * 1000) {
+          window.sessionStorage.removeItem(COURSE_COMPLETION_STORAGE_KEY);
+          return null;
+        }
+
+        if (parsed.type === "module" && Number(parsed.assessmentId) === assessmentId) {
+          return parsed;
+        }
+
+        if (parsed.type === "final" && Number(parsed.finalAssessmentId) === assessmentId) {
+          return parsed;
+        }
+
+        return null;
+      } catch (error) {
+        console.warn("Не удалось прочитать контекст прохождения курса", error);
+        return null;
+      }
+    }
+
+    function clearCompletionContext() {
+      try {
+        window.sessionStorage.removeItem(COURSE_COMPLETION_STORAGE_KEY);
+      } catch (error) {
+        console.warn("Не удалось очистить контекст прохождения курса", error);
+      }
+    }
+
+    async function completeCourseStepIfNeeded(assessmentId, attemptId) {
+      const context = readCompletionContext(assessmentId);
+      if (!context || !Number.isFinite(attemptId) || attemptId <= 0) {
+        return;
+      }
+
+      try {
+        if (context.type === "module") {
+          await apiClient.completeCourseModuleAttempt(Number(context.moduleId), attemptId);
+          relatedCourseId.value = Number(context.courseId);
+          clearCompletionContext();
+          return;
+        }
+
+        if (context.type === "final") {
+          await apiClient.completeCourseFinalAssessmentAttempt(Number(context.courseId), attemptId);
+          relatedCourseId.value = Number(context.courseId);
+          clearCompletionContext();
+        }
+      } catch (error) {
+        console.warn("Не удалось синхронизировать прогресс курса", error);
+      }
+    }
+
     async function loadResults() {
       const id = Number(route.params.id);
       if (!Number.isFinite(id)) {
@@ -184,6 +256,8 @@ export default {
           router.replace("/assessments");
           return;
         }
+
+        await completeCourseStepIfNeeded(id, attemptId);
 
         const statusMap = { active: "open", pending: "pending", closed: "closed" };
         const mappedStatus = summaryItem.value ? statusMap[summaryItem.value.status] || summaryItem.value.status : "closed";
@@ -267,6 +341,7 @@ export default {
       result,
       canRetake,
       remainingAttempts,
+      relatedCourseId,
       pluralizeAttempts,
       retakeAssessment,
       isLoading,

@@ -75,6 +75,7 @@ const menuItems = computed(() => {
     { path: "/dashboard", label: "Дашборд", icon: "LayoutDashboard" },
     { path: "/users", label: "Пользователи", icon: "Users", module: "users" },
     { path: "/assessments", label: "Аттестации", icon: "ClipboardList", module: "assessments" },
+    { path: "/courses", label: "Курсы", icon: "BookOpenCheck", module: "courses" },
     { path: "/questions", label: "Банк вопросов", icon: "FileQuestion", module: "questions" },
     { path: "/reports", label: "Отчёты", icon: "BarChart3", module: "analytics" },
   ];

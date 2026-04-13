@@ -27,6 +27,7 @@ export function useBackButton() {
     profile: "/dashboard",
     leaderboard: "/dashboard",
     assessments: "/dashboard",
+    "course-details": "/assessments",
     "assessment-results": "/assessments",
 
     // Админские страницы

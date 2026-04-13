@@ -1,101 +1,161 @@
 <template>
   <div class="page-container">
     <div class="container">
-      <!-- Page Header -->
       <div class="page-header mb-16">
-        <h1 class="title-large">Аттестации</h1>
+        <h1 class="title-large">Обучение</h1>
       </div>
 
-      <!-- Filter Tabs -->
-      <div class="filter-tabs mb-12">
-        <button
-          v-for="filter in filters"
-          :key="filter.key"
-          class="filter-tab"
-          :class="{ active: activeFilter === filter.key }"
-          @click="setFilter(filter.key)"
-        >
-          {{ filter.label }}
-        </button>
+      <div class="mode-switch mb-12">
+        <button class="mode-tab" :class="{ active: activeMode === 'materials' }" @click="setMode('materials')">Материалы</button>
+        <button class="mode-tab" :class="{ active: activeMode === 'courses' }" @click="setMode('courses')">Курсы</button>
       </div>
 
-      <!-- Assessments List -->
-      <div v-if="filteredAssessments.length" class="assessments-list">
-        <div v-for="assessment in filteredAssessments" :key="assessment.id" class="card assessment-card" @click="handleAssessmentClick(assessment)">
-          <div class="assessment-header">
-            <div>
-              <h3 class="title-small mb-8">{{ assessment.title }}</h3>
-              <p v-if="assessment.requiresTheory" class="theory-hint" :class="{ done: assessment.theoryCompleted }">
-                {{ assessment.theoryCompleted ? "Теория пройдена" : "Нужно пройти теорию" }}
-              </p>
-            </div>
-            <span class="badge" :class="getStatusClass(assessment.status)">
-              {{ getStatusText(assessment.status) }}
-            </span>
-          </div>
+      <template v-if="activeMode === 'materials'">
+        <div class="filter-tabs mb-12">
+          <button
+            v-for="filter in filters"
+            :key="filter.key"
+            class="filter-tab"
+            :class="{ active: activeFilter === filter.key }"
+            @click="setFilter(filter.key)"
+          >
+            {{ filter.label }}
+          </button>
+        </div>
 
-          <div class="assessment-info mb-12">
-            <div class="info-item">
-              <span class="label">Срок:</span>
-              <span class="value">{{ formatDateRange(assessment.startDate, assessment.endDate) }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Порог:</span>
-              <span class="value">{{ assessment.threshold }}%</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Попытки:</span>
-              <span class="value">{{ assessment.attemptsUsed || 0 }} из {{ assessment.maxAttempts }}</span>
-            </div>
-          </div>
+        <div v-if="isLoading" class="loading-state card">
+          <p class="body-small text-secondary">Загрузка материалов...</p>
+        </div>
 
-          <div v-if="assessment.bestResult" class="best-result mb-12">
-            <div class="info-item">
-              <span class="label">Лучший результат:</span>
-              <span class="value" :class="assessment.bestResult.passed ? 'success' : 'error'"> {{ assessment.bestResult.score }}% </span>
+        <div v-else-if="filteredAssessments.length" class="assessments-list">
+          <div v-for="assessment in filteredAssessments" :key="assessment.id" class="card assessment-card" @click="handleAssessmentClick(assessment)">
+            <div class="assessment-header">
+              <div>
+                <h3 class="title-small mb-8">{{ assessment.title }}</h3>
+                <p v-if="assessment.requiresTheory" class="theory-hint" :class="{ done: assessment.theoryCompleted }">
+                  {{ assessment.theoryCompleted ? "Теория пройдена" : "Нужно пройти теорию" }}
+                </p>
+              </div>
+              <span class="badge" :class="getStatusClass(assessment.status)">
+                {{ getStatusText(assessment.status) }}
+              </span>
             </div>
-          </div>
 
-          <div class="assessment-actions">
-            <button
-              v-if="
-                assessment.status === 'open' &&
-                assessment.attemptsUsed < assessment.maxAttempts &&
-                (!assessment.bestResult || assessment.bestResult.score < 100)
-              "
-              class="btn btn-primary btn-full"
-              @click.stop="startAssessment(assessment)"
-            >
-              {{ getStartButtonText(assessment) }}
-            </button>
+            <div class="assessment-info mb-12">
+              <div class="info-item">
+                <span class="label">Срок:</span>
+                <span class="value">{{ formatDateRange(assessment.startDate, assessment.endDate) }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Порог:</span>
+                <span class="value">{{ assessment.threshold }}%</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Попытки:</span>
+                <span class="value">{{ assessment.attemptsUsed || 0 }} из {{ assessment.maxAttempts }}</span>
+              </div>
+            </div>
 
-            <button
-              v-else-if="
-                assessment.status === 'completed' ||
-                assessment.attemptsUsed >= assessment.maxAttempts ||
-                (assessment.bestResult && assessment.bestResult.score === 100)
-              "
-              class="btn btn-secondary btn-full"
-              @click.stop="viewResults(assessment.id)"
-            >
-              Посмотреть результаты
-            </button>
+            <div v-if="assessment.bestResult" class="best-result mb-12">
+              <div class="info-item">
+                <span class="label">Лучший результат:</span>
+                <span class="value" :class="assessment.bestResult.passed ? 'success' : 'error'"> {{ assessment.bestResult.score }}% </span>
+              </div>
+            </div>
 
-            <button v-else class="btn btn-primary btn-full" disabled>
-              {{ getActionButtonText(assessment.status) }}
-            </button>
+            <div class="assessment-actions">
+              <button
+                v-if="
+                  assessment.status === 'open' &&
+                  assessment.attemptsUsed < assessment.maxAttempts &&
+                  (!assessment.bestResult || assessment.bestResult.score < 100)
+                "
+                class="btn btn-primary btn-full"
+                @click.stop="startAssessment(assessment)"
+              >
+                {{ getStartButtonText(assessment) }}
+              </button>
+
+              <button
+                v-else-if="
+                  assessment.status === 'completed' ||
+                  assessment.attemptsUsed >= assessment.maxAttempts ||
+                  (assessment.bestResult && assessment.bestResult.score === 100)
+                "
+                class="btn btn-secondary btn-full"
+                @click.stop="viewResults(assessment.id)"
+              >
+                Посмотреть результаты
+              </button>
+
+              <button v-else class="btn btn-primary btn-full" disabled>
+                {{ getActionButtonText(assessment.status) }}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Empty State -->
-      <div v-else class="empty-state">
-        <div class="empty-icon">
-          <FileText />
+        <div v-else class="empty-state">
+          <div class="empty-icon">
+            <FileText />
+          </div>
+          <h3 class="title-small mb-8">{{ getEmptyStateTitle() }}</h3>
+          <p class="body-small text-secondary">{{ getEmptyStateDescription() }}</p>
         </div>
-        <h3 class="title-small mb-8">{{ getEmptyStateTitle() }}</h3>
-        <p class="body-small text-secondary">{{ getEmptyStateDescription() }}</p>
-      </div>
+      </template>
+
+      <template v-else>
+        <div v-if="isCoursesLoading" class="loading-state card">
+          <p class="body-small text-secondary">Загрузка курсов...</p>
+        </div>
+
+        <div v-else-if="courses.length" class="assessments-list">
+          <div v-for="course in courses" :key="course.id" class="card assessment-card course-card" @click="openCourse(course.id)">
+            <div class="assessment-header">
+              <div>
+                <h3 class="title-small mb-8">{{ course.title }}</h3>
+                <p class="course-description">{{ course.description || "Описание курса пока не добавлено" }}</p>
+              </div>
+              <span class="badge" :class="getCourseStatusClass(course.progress.status)">
+                {{ getCourseStatusText(course.progress.status) }}
+              </span>
+            </div>
+
+            <div class="assessment-info mb-12">
+              <div class="info-item">
+                <span class="label">Модулей:</span>
+                <span class="value">{{ course.modulesCount }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Обязательных:</span>
+                <span class="value">{{ course.requiredModulesCount }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Прогресс:</span>
+                <span class="value">{{ Math.round(course.progress.progressPercent || 0) }}%</span>
+              </div>
+            </div>
+
+            <div class="progress-bar mb-12">
+              <div class="progress-fill" :style="{ width: `${Math.min(Math.max(course.progress.progressPercent || 0, 0), 100)}%` }"></div>
+            </div>
+
+            <div class="assessment-actions">
+              <button class="btn btn-primary btn-full" @click.stop="openCourse(course.id)">
+                {{ getCourseActionText(course.progress.status) }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="empty-state">
+          <div class="empty-icon">
+            <BookOpen />
+          </div>
+          <h3 class="title-small mb-8">Курсы пока недоступны</h3>
+          <p class="body-small text-secondary">Когда курсы будут назначены, они появятся здесь.</p>
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -103,7 +163,7 @@
 <script>
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { FileText } from "lucide-vue-next";
+import { BookOpen, FileText } from "lucide-vue-next";
 import { useTelegramStore } from "../stores/telegram";
 import { useUserStore } from "../stores/user";
 import { apiClient } from "../services/apiClient";
@@ -111,6 +171,7 @@ import { apiClient } from "../services/apiClient";
 export default {
   name: "AssessmentsView",
   components: {
+    BookOpen,
     FileText,
   },
   setup() {
@@ -119,8 +180,11 @@ export default {
     const userStore = useUserStore();
 
     const assessments = ref([]);
+    const courses = ref([]);
     const activeFilter = ref("all");
+    const activeMode = ref("materials");
     const isLoading = ref(false);
+    const isCoursesLoading = ref(false);
 
     const filters = [
       { key: "all", label: "Все" },
@@ -145,6 +209,11 @@ export default {
         }
       });
     });
+
+    function setMode(mode) {
+      activeMode.value = mode;
+      telegramStore.hapticFeedback("selection");
+    }
 
     function setFilter(filter) {
       activeFilter.value = filter;
@@ -181,6 +250,39 @@ export default {
       }
     }
 
+    function getCourseStatusClass(status) {
+      switch (status) {
+        case "completed":
+          return "badge-success";
+        case "in_progress":
+          return "badge-primary";
+        default:
+          return "badge-neutral";
+      }
+    }
+
+    function getCourseStatusText(status) {
+      switch (status) {
+        case "completed":
+          return "Завершен";
+        case "in_progress":
+          return "В процессе";
+        default:
+          return "Не начат";
+      }
+    }
+
+    function getCourseActionText(status) {
+      switch (status) {
+        case "completed":
+          return "Открыть курс";
+        case "in_progress":
+          return "Продолжить";
+        default:
+          return "Начать курс";
+      }
+    }
+
     function getActionButtonText(status) {
       switch (status) {
         case "pending":
@@ -212,7 +314,7 @@ export default {
         case "completed":
           return "Пройденные аттестации появятся здесь";
         case "closed":
-          return "Завершённые аттестации появятся здесь";
+          return "Завершенные аттестации появятся здесь";
         default:
           return "Аттестации появятся здесь";
       }
@@ -232,15 +334,19 @@ export default {
       return `${start} - ${end}`;
     }
 
-    function handleAssessmentClick(assessment) {
+    function handleAssessmentClick() {
       telegramStore.hapticFeedback("impact", "light");
+    }
+
+    function openCourse(id) {
+      telegramStore.hapticFeedback("impact", "light");
+      router.push(`/courses/${id}`);
     }
 
     function startAssessment(assessment) {
       if (!assessment) {
         return;
       }
-      // Если требуется теория, всегда открываем страницу с теорией
       if (assessment.requiresTheory) {
         openTheory(assessment.id);
         return;
@@ -261,13 +367,9 @@ export default {
 
     function getStartButtonText(assessment) {
       if (!assessment) return "Начать";
-
-      // Если теория требуется, но не пройдена
       if (assessment.requiresTheory && !assessment.theoryCompleted) {
         return "Пройти теорию";
       }
-
-      // Если есть попытки или теория пройдена
       return assessment.attemptsUsed > 0 ? "Пройти ещё раз" : "Начать";
     }
 
@@ -290,13 +392,9 @@ export default {
       };
       let status = statusMap[item.status] || "pending";
 
-      // Статус "completed" только если нет возможности пройти снова
-      // (все попытки использованы ИЛИ результат 100%)
       if (bestScore != null || item.lastAttemptStatus === "completed") {
         const hasAttemptsLeft = attemptsUsed < maxAttempts;
         const isPerfectScore = bestScore === 100;
-
-        // Если аттестация открыта (active) и есть попытки и результат не 100%, оставляем статус open
         if (item.status === "active" && hasAttemptsLeft && !isPerfectScore) {
           status = "open";
         } else {
@@ -316,7 +414,6 @@ export default {
         attemptsUsed,
         requiresTheory,
         theoryCompleted,
-        theoryVersion: item.theory?.versionNumber || null,
         bestResult:
           bestScore != null
             ? {
@@ -324,6 +421,26 @@ export default {
                 passed: threshold ? bestScore >= threshold : true,
               }
             : null,
+      };
+    }
+
+    function normalizeCourse(item) {
+      if (!item) {
+        return null;
+      }
+
+      return {
+        id: Number(item.id),
+        title: item.title || "Курс",
+        description: item.description || "",
+        modulesCount: Number(item.modulesCount || 0),
+        requiredModulesCount: Number(item.requiredModulesCount || 0),
+        progress: {
+          status: item.progress?.status || "not_started",
+          progressPercent: Number(item.progress?.progressPercent || 0),
+          completedModulesCount: Number(item.progress?.completedModulesCount || 0),
+          totalModulesCount: Number(item.progress?.totalModulesCount || 0),
+        },
       };
     }
 
@@ -344,19 +461,40 @@ export default {
       }
     }
 
+    async function loadCourses() {
+      isCoursesLoading.value = true;
+      try {
+        const { courses: response } = await apiClient.listCourses();
+        courses.value = (response || []).map((item) => normalizeCourse(item)).filter(Boolean);
+      } catch (error) {
+        console.error("Не удалось загрузить список курсов", error);
+        courses.value = [];
+      } finally {
+        isCoursesLoading.value = false;
+      }
+    }
+
     onMounted(() => {
       loadAssessments();
+      loadCourses();
     });
 
     return {
+      activeMode,
       assessments,
+      courses,
       activeFilter,
       filters,
       isLoading,
+      isCoursesLoading,
       filteredAssessments,
+      setMode,
       setFilter,
       getStatusClass,
       getStatusText,
+      getCourseStatusClass,
+      getCourseStatusText,
+      getCourseActionText,
       getActionButtonText,
       getStartButtonText,
       getEmptyStateTitle,
@@ -366,6 +504,7 @@ export default {
       startAssessment,
       viewResults,
       openTheory,
+      openCourse,
     };
   },
 };
@@ -374,6 +513,31 @@ export default {
 <style scoped>
 .page-header {
   padding-top: 20px;
+}
+
+.mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 4px;
+  background-color: var(--bg-secondary);
+  border-radius: 10px;
+}
+
+.mode-tab {
+  border: none;
+  background: none;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mode-tab.active {
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  box-shadow: 0 1px 3px var(--card-shadow);
 }
 
 .filter-tabs {
@@ -401,6 +565,10 @@ export default {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   box-shadow: 0 1px 3px var(--card-shadow);
+}
+
+.loading-state {
+  text-align: center;
 }
 
 .assessments-list {
@@ -432,6 +600,12 @@ export default {
 
 .theory-hint.done {
   color: var(--success);
+}
+
+.course-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
 }
 
 .assessment-info {
