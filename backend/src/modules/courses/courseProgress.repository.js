@@ -3,6 +3,8 @@
  * Все функции принимают управляемый connection — транзакции на уровне сервиса.
  */
 
+const { pool } = require("../../config/database");
+
 // ─── Поиск с контекстом ─────────────────────────────────────────────────────
 
 async function findSectionWithCourse(sectionId, options = {}) {
@@ -277,6 +279,170 @@ async function completeCourseProgress({ courseId, userId, totalSections, connect
   );
 }
 
+// ─── Административные запросы прогресса ─────────────────────────────────────
+
+async function getAdminUsersProgress(courseId) {
+  const [rows] = await pool.execute(
+    `SELECT cup.user_id, cup.status, cup.progress_percent,
+            cup.started_at, cup.completed_at, cup.last_activity_at,
+            cup.completed_modules_count, cup.total_modules_count,
+            u.first_name, u.last_name, u.login,
+            p.name AS position_title, b.name AS branch_title
+       FROM course_user_progress cup
+       JOIN users u ON u.id = cup.user_id
+       LEFT JOIN positions p ON p.id = u.position_id
+       LEFT JOIN branches b ON b.id = u.branch_id
+      WHERE cup.course_id = ?
+      ORDER BY cup.last_activity_at DESC`,
+    [courseId],
+  );
+  return rows.map((r) => ({
+    userId: Number(r.user_id),
+    name: [r.first_name, r.last_name].filter(Boolean).join(" ") || r.login || `User #${r.user_id}`,
+    login: r.login || null,
+    positionTitle: r.position_title || null,
+    branchTitle: r.branch_title || null,
+    status: r.status,
+    progressPercent: Number(r.progress_percent || 0),
+    startedAt: r.started_at ? new Date(r.started_at).toISOString() : null,
+    completedAt: r.completed_at ? new Date(r.completed_at).toISOString() : null,
+    lastActivityAt: r.last_activity_at ? new Date(r.last_activity_at).toISOString() : null,
+    completedSections: Number(r.completed_modules_count || 0),
+    totalSections: Number(r.total_modules_count || 0),
+  }));
+}
+
+async function getAdminUserDetailedProgress(courseId, userId) {
+  const [[overallRow]] = await pool.execute(
+    `SELECT cup.status, cup.progress_percent, cup.started_at, cup.completed_at
+       FROM course_user_progress cup
+      WHERE cup.course_id = ? AND cup.user_id = ? LIMIT 1`,
+    [courseId, userId],
+  );
+  if (!overallRow) return null;
+
+  const [sectionRows] = await pool.execute(
+    `SELECT cs.id AS section_id, cs.title AS section_title, cs.order_index,
+            cs.is_required, cs.assessment_id AS section_assessment_id,
+            csup.status AS section_status, csup.best_score_percent AS section_score,
+            csup.attempt_count AS section_attempts, csup.completed_at AS section_completed_at
+       FROM course_sections cs
+       LEFT JOIN course_section_user_progress csup ON csup.section_id = cs.id AND csup.user_id = ?
+      WHERE cs.course_id = ?
+      ORDER BY cs.order_index ASC`,
+    [userId, courseId],
+  );
+
+  const [topicRows] = await pool.execute(
+    `SELECT ct.id AS topic_id, ct.section_id, ct.title AS topic_title, ct.order_index,
+            ct.has_material, ct.assessment_id AS topic_assessment_id,
+            ctup.status AS topic_status, ctup.material_viewed,
+            ctup.best_score_percent AS topic_score, ctup.attempt_count AS topic_attempts,
+            ctup.completed_at AS topic_completed_at
+       FROM course_topics ct
+       LEFT JOIN course_topic_user_progress ctup ON ctup.topic_id = ct.id AND ctup.user_id = ?
+      WHERE ct.course_id = ?
+      ORDER BY ct.section_id ASC, ct.order_index ASC`,
+    [userId, courseId],
+  );
+
+  const topicsBySection = {};
+  for (const t of topicRows) {
+    const sid = Number(t.section_id);
+    if (!topicsBySection[sid]) topicsBySection[sid] = [];
+    topicsBySection[sid].push({
+      topicId: Number(t.topic_id),
+      title: t.topic_title,
+      orderIndex: Number(t.order_index),
+      hasMaterial: Boolean(t.has_material),
+      hasAssessment: Boolean(t.topic_assessment_id),
+      status: t.topic_status || "not_started",
+      materialViewed: Boolean(t.material_viewed),
+      scorePercent: t.topic_score !== null ? Number(t.topic_score) : null,
+      attemptCount: Number(t.topic_attempts || 0),
+      completedAt: t.topic_completed_at ? new Date(t.topic_completed_at).toISOString() : null,
+    });
+  }
+
+  const sections = sectionRows.map((s) => ({
+    sectionId: Number(s.section_id),
+    title: s.section_title,
+    orderIndex: Number(s.order_index),
+    isRequired: Boolean(s.is_required),
+    hasAssessment: Boolean(s.section_assessment_id),
+    status: s.section_status || "not_started",
+    scorePercent: s.section_score !== null ? Number(s.section_score) : null,
+    attemptCount: Number(s.section_attempts || 0),
+    completedAt: s.section_completed_at ? new Date(s.section_completed_at).toISOString() : null,
+    topics: topicsBySection[Number(s.section_id)] || [],
+  }));
+
+  return {
+    status: overallRow.status,
+    progressPercent: Number(overallRow.progress_percent || 0),
+    startedAt: overallRow.started_at ? new Date(overallRow.started_at).toISOString() : null,
+    completedAt: overallRow.completed_at ? new Date(overallRow.completed_at).toISOString() : null,
+    sections,
+  };
+}
+
+async function resetUserProgressForCourse(courseId, userId, connection) {
+  await connection.execute("DELETE FROM course_topic_user_progress WHERE course_id = ? AND user_id = ?", [courseId, userId]);
+  await connection.execute("DELETE FROM course_section_user_progress WHERE course_id = ? AND user_id = ?", [courseId, userId]);
+  await connection.execute("DELETE FROM course_user_progress WHERE course_id = ? AND user_id = ?", [courseId, userId]);
+  await connection.execute("DELETE FROM course_user_snapshots WHERE course_id = ? AND user_id = ?", [courseId, userId]);
+}
+
+// ─── Аналитика воронки ───────────────────────────────────────────────────────
+
+async function getCourseFunnelStats() {
+  const [rows] = await pool.execute(
+    `SELECT c.id AS course_id, c.title AS course_title, c.status AS course_status,
+            COUNT(cup.user_id) AS enrolled_count,
+            SUM(CASE WHEN cup.started_at IS NOT NULL THEN 1 ELSE 0 END) AS started_count,
+            SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) AS completed_count,
+            AVG(cup.progress_percent) AS avg_progress
+       FROM courses c
+       LEFT JOIN course_user_progress cup ON cup.course_id = c.id
+      WHERE c.status = 'published'
+      GROUP BY c.id, c.title, c.status
+      ORDER BY enrolled_count DESC, c.title ASC`,
+  );
+  return rows.map((r) => ({
+    courseId: Number(r.course_id),
+    courseTitle: r.course_title,
+    enrolledCount: Number(r.enrolled_count || 0),
+    startedCount: Number(r.started_count || 0),
+    completedCount: Number(r.completed_count || 0),
+    avgProgress: r.avg_progress !== null ? Number(Number(r.avg_progress).toFixed(1)) : 0,
+  }));
+}
+
+async function getSectionFailureStats(courseId) {
+  const [rows] = await pool.execute(
+    `SELECT cs.id AS section_id, cs.title AS section_title, cs.order_index,
+            COUNT(csup.user_id) AS total_attempts,
+            SUM(CASE WHEN csup.status = 'failed' THEN 1 ELSE 0 END) AS failed_count,
+            SUM(CASE WHEN csup.status = 'passed' THEN 1 ELSE 0 END) AS passed_count,
+            AVG(csup.score_percent) AS avg_score
+       FROM course_sections cs
+       LEFT JOIN course_section_user_progress csup ON csup.section_id = cs.id
+      WHERE cs.course_id = ?
+      GROUP BY cs.id, cs.title, cs.order_index
+      ORDER BY cs.order_index ASC`,
+    [courseId],
+  );
+  return rows.map((r) => ({
+    sectionId: Number(r.section_id),
+    sectionTitle: r.section_title,
+    orderIndex: Number(r.order_index),
+    totalAttempts: Number(r.total_attempts || 0),
+    failedCount: Number(r.failed_count || 0),
+    passedCount: Number(r.passed_count || 0),
+    avgScore: r.avg_score !== null ? Number(Number(r.avg_score).toFixed(1)) : null,
+  }));
+}
+
 module.exports = {
   findSectionWithCourse,
   findTopicWithSection,
@@ -293,4 +459,9 @@ module.exports = {
   getCourseProgressAggregate,
   syncCourseProgress,
   completeCourseProgress,
+  getAdminUsersProgress,
+  getAdminUserDetailedProgress,
+  resetUserProgressForCourse,
+  getCourseFunnelStats,
+  getSectionFailureStats,
 };

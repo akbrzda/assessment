@@ -151,3 +151,33 @@ export const removeCourseAssignment = async (courseId, userId) => {
     return response.data;
   }, /get:\/admin\/courses/i);
 };
+
+// ─── Прогресс пользователей ──────────────────────────────────────────────────
+
+export const getCourseUsers = async (courseId) => {
+  const response = await axios.get(`/admin/courses/${courseId}/users`);
+  return response.data;
+};
+
+export const getCourseUserProgress = async (courseId, userId) => {
+  const response = await axios.get(`/admin/courses/${courseId}/users/${userId}/progress`);
+  return response.data;
+};
+
+export const resetCourseUserProgress = async (courseId, userId) => {
+  return mutateWithInvalidation(async () => {
+    await axios.delete(`/admin/courses/${courseId}/users/${userId}/progress`);
+  }, /get:\/admin\/courses/i);
+};
+
+// ─── Аналитика курсов ────────────────────────────────────────────────────────
+
+export const getCourseAnalyticsFunnel = async () => {
+  const response = await axios.get("/admin/courses/analytics/funnel");
+  return response.data;
+};
+
+export const getCourseSectionFailures = async (courseId) => {
+  const response = await axios.get(`/admin/courses/${courseId}/analytics/sections`);
+  return response.data;
+};

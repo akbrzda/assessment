@@ -1,6 +1,8 @@
 ﻿const coursesService = require("./service");
 const contentService = require("./contentService");
 const assignmentsRepo = require("../courseAssignments.repository");
+const progressRepo = require("../courseProgress.repository");
+const { pool } = require("../../../config/database");
 const {
   createCourseSchema,
   updateCourseSchema,
@@ -253,6 +255,78 @@ async function removeAssignment(req, res, next) {
   }
 }
 
+// ─── Прогресс пользователей ───────────────────────────────────────────────────
+
+async function getCourseUsers(req, res, next) {
+  try {
+    const courseId = parseId(req.params.id);
+    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
+    const users = await progressRepo.getAdminUsersProgress(courseId);
+    res.json({ users });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getCourseUserProgress(req, res, next) {
+  try {
+    const courseId = parseId(req.params.id);
+    const userId = parseId(req.params.userId);
+    if (!courseId || !userId) return res.status(400).json({ error: "Некорректные параметры" });
+    const progress = await progressRepo.getAdminUserDetailedProgress(courseId, userId);
+    if (!progress) return res.status(404).json({ error: "Прогресс пользователя не найден" });
+    res.json({ progress });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function resetCourseUserProgress(req, res, next) {
+  try {
+    const courseId = parseId(req.params.id);
+    const userId = parseId(req.params.userId);
+    if (!courseId || !userId) return res.status(400).json({ error: "Некорректные параметры" });
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      await progressRepo.resetUserProgressForCourse(courseId, userId, connection);
+      await connection.commit();
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ─── Аналитика ────────────────────────────────────────────────────────────────
+
+async function getAnalyticsFunnel(req, res, next) {
+  try {
+    const courses = await progressRepo.getCourseFunnelStats();
+    res.json({ courses });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getSectionFailures(req, res, next) {
+  try {
+    const courseId = parseId(req.params.id);
+    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
+    const sections = await progressRepo.getSectionFailureStats(courseId);
+    res.json({ sections });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   listCourses,
   getCourse,
@@ -272,4 +346,9 @@ module.exports = {
   getAssignments,
   addAssignment,
   removeAssignment,
+  getCourseUsers,
+  getCourseUserProgress,
+  resetCourseUserProgress,
+  getAnalyticsFunnel,
+  getSectionFailures,
 };

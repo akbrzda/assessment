@@ -1,5 +1,6 @@
 ﻿const courseProgressService = require("../../../services/courseProgressService");
 const coursesRepository = require("./repository");
+const eventsRepo = require("../courseEvents.repository");
 
 async function listCourses(userId, positionId, branchId) {
   return coursesRepository.listPublishedCoursesForUser(userId, positionId, branchId);
@@ -113,6 +114,10 @@ async function getFinalAssessmentAccess(courseId, userId) {
     courseId,
     userId,
   });
+
+  if (finalAccess.allowed) {
+    eventsRepo.insertCourseEvent({ courseId, userId, eventType: "course.final_assessment_opened" });
+  }
 
   return {
     finalAssessment: {

@@ -6,17 +6,8 @@
 
     <Card class="filters-card">
       <div class="filters-grid">
-        <Input
-          v-model="filters.search"
-          placeholder="Поиск по названию или описанию"
-          @keyup.enter="loadCourses"
-        />
-        <Select
-          v-model="filters.status"
-          :options="statusFilterOptions"
-          placeholder="Все статусы"
-          @update:modelValue="loadCourses"
-        />
+        <Input v-model="filters.search" placeholder="Поиск по названию или описанию" @keyup.enter="loadCourses" />
+        <Select v-model="filters.status" :options="statusFilterOptions" placeholder="Все статусы" @update:modelValue="loadCourses" />
         <Button variant="secondary" icon="search" @click="loadCourses">Найти</Button>
         <Button variant="secondary" icon="refresh-ccw" @click="resetFilters">Сбросить</Button>
       </div>
@@ -59,31 +50,13 @@
                 <td class="actions-cell">
                   <div class="actions-buttons">
                     <Button size="sm" variant="secondary" icon="pencil" @click="goToEdit(course.id)">Изменить</Button>
-                    <Button
-                      v-if="course.status === 'draft'"
-                      size="sm"
-                      variant="success"
-                      icon="send"
-                      @click="handlePublish(course)"
-                    >
+                    <Button v-if="course.status === 'draft'" size="sm" variant="success" icon="send" @click="handlePublish(course)">
                       Опубликовать
                     </Button>
-                    <Button
-                      v-if="course.status === 'published'"
-                      size="sm"
-                      variant="secondary"
-                      icon="archive"
-                      @click="handleArchive(course)"
-                    >
+                    <Button v-if="course.status === 'published'" size="sm" variant="secondary" icon="archive" @click="handleArchive(course)">
                       В архив
                     </Button>
-                    <Button
-                      v-if="course.status !== 'published'"
-                      size="sm"
-                      variant="danger"
-                      icon="trash"
-                      @click="handleDelete(course)"
-                    >
+                    <Button v-if="course.status !== 'published'" size="sm" variant="danger" icon="trash" @click="handleDelete(course)">
                       Удалить
                     </Button>
                   </div>
@@ -106,46 +79,67 @@
             </div>
 
             <div class="course-card-grid">
-              <div class="course-card-row"><span>Модулей:</span><strong>{{ course.modulesCount }}</strong></div>
-              <div class="course-card-row"><span>Версия:</span><strong>{{ course.version }}</strong></div>
-              <div class="course-card-row"><span>Обновлен:</span><strong>{{ formatDate(course.updatedAt) }}</strong></div>
+              <div class="course-card-row">
+                <span>Модулей:</span><strong>{{ course.modulesCount }}</strong>
+              </div>
+              <div class="course-card-row">
+                <span>Версия:</span><strong>{{ course.version }}</strong>
+              </div>
+              <div class="course-card-row">
+                <span>Обновлен:</span><strong>{{ formatDate(course.updatedAt) }}</strong>
+              </div>
             </div>
 
             <div class="course-card-actions">
               <Button size="sm" variant="secondary" icon="pencil" @click="goToEdit(course.id)" fullWidth>Изменить</Button>
-              <Button
-                v-if="course.status === 'draft'"
-                size="sm"
-                variant="success"
-                icon="send"
-                @click="handlePublish(course)"
-                fullWidth
-              >
+              <Button v-if="course.status === 'draft'" size="sm" variant="success" icon="send" @click="handlePublish(course)" fullWidth>
                 Опубликовать
               </Button>
-              <Button
-                v-if="course.status === 'published'"
-                size="sm"
-                variant="secondary"
-                icon="archive"
-                @click="handleArchive(course)"
-                fullWidth
-              >
+              <Button v-if="course.status === 'published'" size="sm" variant="secondary" icon="archive" @click="handleArchive(course)" fullWidth>
                 В архив
               </Button>
-              <Button
-                v-if="course.status !== 'published'"
-                size="sm"
-                variant="danger"
-                icon="trash"
-                @click="handleDelete(course)"
-                fullWidth
-              >
+              <Button v-if="course.status !== 'published'" size="sm" variant="danger" icon="trash" @click="handleDelete(course)" fullWidth>
                 Удалить
               </Button>
             </div>
           </div>
         </div>
+      </div>
+    </Card>
+
+    <!-- Аналитика: воронка курсов -->
+    <Card v-if="funnel.length > 0" class="funnel-card">
+      <div class="funnel-header">
+        <h2>Воронка по курсам</h2>
+        <p>Зачисленные, начавшие и завершившие по каждому опубликованному курсу.</p>
+      </div>
+      <div class="table-wrapper">
+        <table class="courses-table">
+          <thead>
+            <tr>
+              <th>Курс</th>
+              <th>Зачислено</th>
+              <th>Начали</th>
+              <th>Завершили</th>
+              <th>Ср. прогресс</th>
+              <th>Конверсия</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in funnel" :key="row.courseId">
+              <td>
+                <span class="course-title">{{ row.courseTitle }}</span>
+              </td>
+              <td>{{ row.enrolledCount }}</td>
+              <td>{{ row.startedCount }}</td>
+              <td>{{ row.completedCount }}</td>
+              <td>{{ row.avgProgress }}%</td>
+              <td>
+                <span class="funnel-conv"> {{ row.enrolledCount > 0 ? Math.round((row.completedCount / row.enrolledCount) * 100) : 0 }}% </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </Card>
   </div>
@@ -155,7 +149,7 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { Badge, Button, Card, Input, Preloader, Select } from "../components/ui";
-import { archiveCourse, deleteCourse, getCourses, publishCourse } from "../api/courses";
+import { archiveCourse, deleteCourse, getCourses, publishCourse, getCourseAnalyticsFunnel } from "../api/courses";
 import { useToast } from "../composables/useToast";
 
 const router = useRouter();
@@ -163,6 +157,7 @@ const { showToast } = useToast();
 
 const loading = ref(false);
 const courses = ref([]);
+const funnel = ref([]);
 const filters = ref({
   search: "",
   status: "",
@@ -290,7 +285,15 @@ const handleDelete = async (course) => {
   }
 };
 
-onMounted(loadCourses);
+onMounted(async () => {
+  await loadCourses();
+  try {
+    const response = await getCourseAnalyticsFunnel();
+    funnel.value = response.courses || [];
+  } catch {
+    // Воронка — не критичная функция, ошибку не показываем
+  }
+});
 </script>
 
 <style scoped>
@@ -441,5 +444,27 @@ onMounted(loadCourses);
     grid-template-columns: 1fr;
   }
 }
-</style>
 
+.funnel-card {
+  margin-top: 24px;
+}
+
+.funnel-header {
+  margin-bottom: 16px;
+}
+
+.funnel-header h2 {
+  margin: 0 0 4px;
+}
+
+.funnel-header p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.funnel-conv {
+  font-weight: 600;
+  color: var(--primary, #6366f1);
+}
+</style>

@@ -281,6 +281,87 @@
           </table>
         </div>
       </Card>
+
+      <!-- Блок участников с прогрессом -->
+      <Card v-if="isEditMode && course" class="participants-card">
+        <div class="participants-header">
+          <h2>Участники</h2>
+          <p>Пользователи, которые начали прохождение курса.</p>
+          <Button size="sm" variant="ghost" icon="refresh-ccw" :loading="loadingParticipants" @click="loadParticipants">Обновить</Button>
+        </div>
+
+        <div v-if="loadingParticipants" class="participants-loading">Загрузка...</div>
+        <div v-else-if="participants.length === 0" class="targets-empty">Участников ещё нет.</div>
+        <table v-else class="assignments-table">
+          <thead>
+            <tr>
+              <th>Пользователь</th>
+              <th>Должность</th>
+              <th>Филиал</th>
+              <th>Статус</th>
+              <th>Прогресс</th>
+              <th>Начат</th>
+              <th>Завершён</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in participants" :key="p.userId">
+              <td>{{ p.name }}</td>
+              <td>{{ p.positionTitle || "—" }}</td>
+              <td>{{ p.branchTitle || "—" }}</td>
+              <td>
+                <span :class="['participant-status', `status-${p.status}`]">{{ getProgressStatusLabel(p.status) }}</span>
+              </td>
+              <td>{{ p.progressPercent }}%</td>
+              <td>{{ formatAssignedAt(p.startedAt) }}</td>
+              <td>{{ formatAssignedAt(p.completedAt) }}</td>
+              <td class="participants-actions">
+                <Button size="sm" variant="ghost" icon="eye" :loading="viewingProgressUserId === p.userId" @click="openUserProgress(p.userId)" />
+                <Button
+                  size="sm"
+                  variant="danger"
+                  icon="rotate-ccw"
+                  :loading="resettingProgressUserId === p.userId"
+                  @click="handleResetProgress(p.userId, p.name)"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Детальный прогресс одного пользователя -->
+        <div v-if="selectedUserProgress" class="user-progress-detail">
+          <div class="user-progress-header">
+            <h3>Прогресс: {{ selectedUserName }}</h3>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="x"
+              @click="
+                selectedUserProgress = null;
+                selectedUserName = '';
+              "
+              >Закрыть</Button
+            >
+          </div>
+          <div v-for="section in selectedUserProgress.sections" :key="section.sectionId" class="progress-section">
+            <div class="progress-section-header">
+              <span class="progress-section-title">{{ section.orderIndex }}. {{ section.title }}</span>
+              <span v-if="!section.isRequired" class="section-badge-optional">необязательный</span>
+              <span :class="['participant-status', `status-${section.status}`]">{{ getProgressStatusLabel(section.status) }}</span>
+              <span v-if="section.scorePercent !== null" class="progress-score">{{ section.scorePercent }}%</span>
+            </div>
+            <div v-for="topic in section.topics" :key="topic.topicId" class="progress-topic">
+              <span class="progress-topic-title">{{ topic.orderIndex }}. {{ topic.title }}</span>
+              <span v-if="topic.hasMaterial" class="topic-badge" :class="{ 'badge-done': topic.materialViewed }">материал</span>
+              <span v-if="topic.hasAssessment" class="topic-badge" :class="{ 'badge-done': topic.status === 'completed' }">тест</span>
+              <span :class="['participant-status', `status-${topic.status}`]">{{ getProgressStatusLabel(topic.status) }}</span>
+              <span v-if="topic.scorePercent !== null" class="progress-score">{{ topic.scorePercent }}%</span>
+            </div>
+          </div>
+        </div>
+      </Card>
     </template>
   </div>
 </template>
@@ -306,6 +387,9 @@ import {
   getCourseAssignments,
   addCourseAssignment,
   removeCourseAssignment,
+  getCourseUsers,
+  getCourseUserProgress,
+  resetCourseUserProgress,
 } from "../api/courses";
 import { getAssessments } from "../api/assessments";
 import { getPositions } from "../api/positions";
@@ -361,6 +445,13 @@ const assignments = ref([]);
 const newAssignmentUserId = ref("");
 const addingAssignment = ref(false);
 const removingAssignmentUserId = ref(null);
+
+const participants = ref([]);
+const loadingParticipants = ref(false);
+const resettingProgressUserId = ref(null);
+const viewingProgressUserId = ref(null);
+const selectedUserProgress = ref(null);
+const selectedUserName = ref("");
 
 const isEditMode = computed(() => {
   return Number.isInteger(Number(route.params.id)) && Number(route.params.id) > 0;
@@ -823,10 +914,69 @@ const formatAssignedAt = (iso) => {
   return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 };
 
+const getProgressStatusLabel = (status) => {
+  const labels = {
+    not_started: "Не начат",
+    in_progress: "В процессе",
+    completed: "Завершён",
+    failed: "Провален",
+    passed: "Сдан",
+  };
+  return labels[status] || status;
+};
+
+const loadParticipants = async () => {
+  if (!isEditMode.value) return;
+  loadingParticipants.value = true;
+  try {
+    const response = await getCourseUsers(courseId.value);
+    participants.value = response.users || [];
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось загрузить участников"), "error");
+  } finally {
+    loadingParticipants.value = false;
+  }
+};
+
+const openUserProgress = async (userId) => {
+  const participant = participants.value.find((p) => p.userId === userId);
+  viewingProgressUserId.value = userId;
+  try {
+    const response = await getCourseUserProgress(courseId.value, userId);
+    selectedUserProgress.value = response.progress;
+    selectedUserName.value = participant?.name || `User #${userId}`;
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось загрузить прогресс"), "error");
+  } finally {
+    viewingProgressUserId.value = null;
+  }
+};
+
+const handleResetProgress = async (userId, name) => {
+  if (!window.confirm(`Сбросить прогресс пользователя "${name}" по этому курсу?\n\nИстория попыток аттестаций сохранится.`)) return;
+  resettingProgressUserId.value = userId;
+  try {
+    await resetCourseUserProgress(courseId.value, userId);
+    showToast("Прогресс сброшен", "success");
+    if (selectedUserProgress.value && selectedUserName.value === name) {
+      selectedUserProgress.value = null;
+      selectedUserName.value = "";
+    }
+    await loadParticipants();
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось сбросить прогресс"), "error");
+  } finally {
+    resettingProgressUserId.value = null;
+  }
+};
+
 onMounted(async () => {
   loading.value = true;
   await Promise.all([loadAssessments(), loadPositions(), loadBranches(), loadCourse()]);
   loading.value = false;
+  if (isEditMode.value) {
+    await loadParticipants();
+  }
 });
 </script>
 
@@ -1252,6 +1402,146 @@ onMounted(async () => {
 .switch-label input {
   width: 16px;
   height: 16px;
+}
+
+/* ─── Участники ─────────────────────────────────────────────────────────── */
+
+.participants-card {
+  margin-bottom: 20px;
+}
+
+.participants-header {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.participants-header h2 {
+  margin: 0 0 4px;
+  flex: 0 0 100%;
+}
+
+.participants-header p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  flex: 1;
+}
+
+.participants-loading {
+  color: var(--text-secondary);
+  font-size: 14px;
+  padding: 12px 0;
+}
+
+.participants-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.participant-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-not_started {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+.status-in_progress {
+  background: #fef9c3;
+  color: #854d0e;
+}
+.status-completed {
+  background: #dcfce7;
+  color: #166534;
+}
+.status-passed {
+  background: #dcfce7;
+  color: #166534;
+}
+.status-failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.user-progress-detail {
+  margin-top: 24px;
+  border-top: 1px solid var(--divider);
+  padding-top: 16px;
+}
+
+.user-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.user-progress-header h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.progress-section {
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.progress-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  flex-wrap: wrap;
+}
+
+.progress-section-title {
+  font-weight: 600;
+  font-size: 14px;
+  flex: 1;
+}
+
+.progress-score {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.progress-topic {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--divider);
+  flex-wrap: wrap;
+}
+
+.progress-topic-title {
+  font-size: 13px;
+  flex: 1;
+  min-width: 140px;
+}
+
+.topic-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.badge-done {
+  background: #dcfce7;
+  color: #166534;
 }
 
 @media (max-width: 1024px) {

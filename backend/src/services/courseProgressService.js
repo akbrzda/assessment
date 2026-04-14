@@ -1,6 +1,7 @@
 const { pool } = require("../config/database");
 const coursesRepo = require("../modules/courses/courses.repository");
 const progressRepo = require("../modules/courses/courseProgress.repository");
+const eventsRepo = require("../modules/courses/courseEvents.repository");
 
 async function startCourse({ courseId, userId }) {
   const connection = await pool.getConnection();
@@ -45,6 +46,7 @@ async function startCourse({ courseId, userId }) {
     await progressRepo.insertCourseSnapshot(courseId, userId, course.version, JSON.stringify(snapshot), connection);
 
     await connection.commit();
+    eventsRepo.insertCourseEvent({ courseId, userId, eventType: "course.started" });
     return { course, sections };
   } catch (error) {
     await connection.rollback();
@@ -81,6 +83,9 @@ async function handleTopicMaterialViewed({ topicId, userId }) {
     }
 
     await connection.commit();
+    if (completedStatus === "completed") {
+      eventsRepo.insertCourseEvent({ courseId: topic.courseId, userId, eventType: "course.topic_completed", payload: { topicId } });
+    }
     return { topicId, materialViewed: true, topicCompleted: completedStatus === "completed" };
   } catch (error) {
     await connection.rollback();
@@ -119,6 +124,14 @@ async function handleTopicAttemptCompletion({ topicId, userId, attemptId }) {
     await progressRepo.syncCourseProgress({ courseId: result.courseId, userId, aggregate, connection });
 
     await connection.commit();
+    if (status === "completed") {
+      eventsRepo.insertCourseEvent({
+        courseId: result.courseId,
+        userId,
+        eventType: "course.topic_completed",
+        payload: { topicId: result.topicId, passed: result.passed, scorePercent: result.scorePercent },
+      });
+    }
     return { result, aggregate };
   } catch (error) {
     await connection.rollback();
@@ -156,6 +169,12 @@ async function handleSectionAttemptCompletion({ sectionId, userId, attemptId }) 
     await progressRepo.syncCourseProgress({ courseId: result.courseId, userId, aggregate, connection });
 
     await connection.commit();
+    eventsRepo.insertCourseEvent({
+      courseId: result.courseId,
+      userId,
+      eventType: "course.section_completed",
+      payload: { sectionId: result.sectionId, passed: result.passed, scorePercent: result.scorePercent },
+    });
     return { result, aggregate };
   } catch (error) {
     await connection.rollback();
@@ -201,6 +220,9 @@ async function handleFinalAttemptCompletion({ courseId, userId, attemptId }) {
     }
 
     await connection.commit();
+    if (finalAttempt.passed) {
+      eventsRepo.insertCourseEvent({ courseId, userId, eventType: "course.completed" });
+    }
     return { finalAttempt, passedCourse: finalAttempt.passed };
   } catch (error) {
     await connection.rollback();

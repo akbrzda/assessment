@@ -33,4 +33,13 @@ router.get("/:id/assignments", controller.getAssignments);
 router.post("/:id/assignments", controller.addAssignment);
 router.delete("/:id/assignments/:userId", controller.removeAssignment);
 
+// Прогресс пользователей
+router.get("/:id/users", controller.getCourseUsers);
+router.get("/:id/users/:userId/progress", controller.getCourseUserProgress);
+router.delete("/:id/users/:userId/progress", controller.resetCourseUserProgress);
+
+// Аналитика
+router.get("/analytics/funnel", controller.getAnalyticsFunnel);
+router.get("/:id/analytics/sections", controller.getSectionFailures);
+
 module.exports = router;
