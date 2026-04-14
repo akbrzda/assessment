@@ -6,24 +6,8 @@
         <Badge :variant="getStatusVariant(course.status)" rounded>
           {{ getStatusLabel(course.status) }}
         </Badge>
-        <Button
-          v-if="course.status === 'draft'"
-          variant="success"
-          icon="send"
-          :loading="publishing"
-          @click="handlePublish"
-        >
-          Опубликовать
-        </Button>
-        <Button
-          v-if="course.status === 'published'"
-          variant="secondary"
-          icon="archive"
-          :loading="archiving"
-          @click="handleArchive"
-        >
-          В архив
-        </Button>
+        <Button v-if="course.status === 'draft'" variant="success" icon="send" :loading="publishing" @click="handlePublish"> Опубликовать </Button>
+        <Button v-if="course.status === 'published'" variant="secondary" icon="archive" :loading="archiving" @click="handleArchive"> В архив </Button>
       </div>
     </div>
 
@@ -32,19 +16,8 @@
     <template v-else>
       <Card class="editor-card">
         <div class="editor-grid">
-          <Input
-            v-model="form.title"
-            label="Название курса"
-            placeholder="Например: Стандарты обслуживания"
-            :error="errors.title"
-            required
-          />
-          <Select
-            v-model="form.finalAssessmentId"
-            label="Итоговая аттестация"
-            :options="assessmentOptions"
-            placeholder="Выберите аттестацию"
-          />
+          <Input v-model="form.title" label="Название курса" placeholder="Например: Стандарты обслуживания" :error="errors.title" required />
+          <Select v-model="form.finalAssessmentId" label="Итоговая аттестация" :options="assessmentOptions" placeholder="Выберите аттестацию" />
           <Textarea
             v-model="form.description"
             class="grid-span-full"
@@ -61,10 +34,10 @@
         </div>
       </Card>
 
-      <Card v-if="isEditMode && course" class="modules-card">
-        <div class="modules-header">
-          <h2>Модули курса</h2>
-          <p>Укажите порядок модулей и привяжите аттестации.</p>
+      <Card v-if="isEditMode && course" class="sections-card">
+        <div class="sections-header">
+          <h2>Разделы курса</h2>
+          <p>Каждый раздел содержит темы и обязательный тест для его завершения.</p>
         </div>
 
         <div v-if="publicationErrors.length > 0" class="publication-errors">
@@ -76,103 +49,236 @@
           </ul>
         </div>
 
-        <div v-if="course.modules.length === 0" class="empty-modules">
-          <p>Модули еще не добавлены.</p>
+        <div v-if="!course.sections || course.sections.length === 0" class="empty-sections">
+          <p>Разделы ещё не добавлены.</p>
         </div>
 
-        <div v-else class="modules-list">
-          <div v-for="moduleItem in course.modules" :key="moduleItem.id" class="module-item">
-            <div class="module-item-grid">
-              <Input
-                v-model="moduleDrafts[moduleItem.id].title"
-                label="Название"
-                :error="moduleErrors[moduleItem.id]?.title"
-                required
-              />
-              <Input
-                v-model="moduleDrafts[moduleItem.id].orderIndex"
-                type="number"
-                min="1"
-                label="Порядок"
-              />
-              <Select
-                v-model="moduleDrafts[moduleItem.id].assessmentId"
-                label="Аттестация модуля"
-                :options="assessmentOptions"
-                placeholder="Выберите аттестацию"
-              />
-              <Input
-                v-model="moduleDrafts[moduleItem.id].estimatedMinutes"
-                type="number"
-                min="1"
-                max="1440"
-                label="Оценка времени (мин.)"
-              />
-              <div class="module-required-field">
-                <label class="switch-label">
-                  <input v-model="moduleDrafts[moduleItem.id].isRequired" type="checkbox" />
-                  <span>Обязательный модуль</span>
-                </label>
+        <div class="sections-list">
+          <div v-for="section in course.sections" :key="section.id" class="section-item">
+            <!-- Строка раздела -->
+            <div class="section-row">
+              <span class="section-order">{{ section.orderIndex }}</span>
+              <div class="section-info">
+                <span class="section-name">{{ section.title }}</span>
+                <span v-if="!section.isRequired" class="section-badge-optional">необязательный</span>
+                <span v-if="!section.assessmentId" class="section-badge-error">нет теста</span>
+                <span v-else class="section-badge-ok">тест привязан</span>
               </div>
-              <Textarea
-                v-model="moduleDrafts[moduleItem.id].description"
-                class="grid-span-full"
-                label="Описание"
-                :rows="2"
-              />
-              <Textarea
-                v-model="moduleDrafts[moduleItem.id].content"
-                class="grid-span-full"
-                label="Контент"
-                :rows="3"
-              />
+              <div class="section-actions">
+                <Button size="sm" variant="ghost" :icon="sectionEditingId === section.id ? 'x' : 'pencil'" @click="toggleSectionEdit(section.id)">
+                  {{ sectionEditingId === section.id ? "Закрыть" : "Редактировать" }}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon="trash"
+                  :loading="deletingSectionId === section.id"
+                  @click="removeSection(section.id, section.title)"
+                >
+                  Удалить
+                </Button>
+              </div>
             </div>
 
-            <div class="module-item-actions">
-              <Button
-                size="sm"
-                variant="secondary"
-                icon="save"
-                :loading="updatingModuleId === moduleItem.id"
-                @click="saveModule(moduleItem.id)"
-              >
-                Сохранить модуль
-              </Button>
-              <Button
-                size="sm"
-                variant="danger"
-                icon="trash"
-                :loading="deletingModuleId === moduleItem.id"
-                @click="removeModule(moduleItem.id, moduleItem.title)"
-              >
-                Удалить
-              </Button>
+            <!-- Форма редактирования раздела -->
+            <div v-if="sectionEditingId === section.id" class="section-edit-form">
+              <div class="section-edit-grid">
+                <Input v-model="sectionDrafts[section.id].title" label="Название раздела" :error="sectionErrors[section.id]?.title" required />
+                <Input v-model="sectionDrafts[section.id].orderIndex" type="number" min="1" label="Порядок" />
+                <Select
+                  v-model="sectionDrafts[section.id].assessmentId"
+                  label="Тест раздела"
+                  :options="assessmentOptions"
+                  placeholder="Выберите тест"
+                />
+                <Input v-model="sectionDrafts[section.id].estimatedMinutes" type="number" min="1" max="1440" label="Время (мин.)" />
+                <div class="field-checkbox">
+                  <label class="switch-label">
+                    <input v-model="sectionDrafts[section.id].isRequired" type="checkbox" />
+                    <span>Обязательный раздел</span>
+                  </label>
+                </div>
+                <Textarea v-model="sectionDrafts[section.id].description" class="grid-span-full" label="Описание" :rows="2" />
+              </div>
+              <div class="section-edit-actions">
+                <Button size="sm" icon="save" :loading="updatingSectionId === section.id" @click="saveSection(section.id)">Сохранить раздел</Button>
+              </div>
+            </div>
+
+            <!-- Темы раздела -->
+            <div class="topics-container">
+              <div v-if="!section.topics || section.topics.length === 0" class="empty-topics">Тем нет.</div>
+              <div v-else class="topics-list">
+                <div v-for="topic in section.topics" :key="topic.id" class="topic-item">
+                  <div class="topic-row">
+                    <span class="topic-order">{{ topic.orderIndex }}</span>
+                    <div class="topic-info">
+                      <span class="topic-name">{{ topic.title }}</span>
+                      <span v-if="topic.hasMaterial" class="topic-badge">материал</span>
+                      <span v-if="topic.assessmentId" class="topic-badge">тест</span>
+                    </div>
+                    <div class="topic-actions">
+                      <Button size="sm" variant="ghost" :icon="topicEditingId === topic.id ? 'x' : 'pencil'" @click="toggleTopicEdit(topic.id)" />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon="trash"
+                        :loading="deletingTopicId === topic.id"
+                        @click="removeTopic(topic.id, topic.title)"
+                      />
+                    </div>
+                  </div>
+                  <!-- Форма редактирования темы -->
+                  <div v-if="topicEditingId === topic.id" class="topic-edit-form">
+                    <div class="topic-edit-grid">
+                      <Input v-model="topicDrafts[topic.id].title" label="Название темы" :error="topicErrors[topic.id]?.title" required />
+                      <Input v-model="topicDrafts[topic.id].orderIndex" type="number" min="1" label="Порядок" />
+                      <Select v-model="topicDrafts[topic.id].assessmentId" label="Тест темы" :options="assessmentOptions" placeholder="Без теста" />
+                      <div class="field-checkbox">
+                        <label class="switch-label">
+                          <input v-model="topicDrafts[topic.id].hasMaterial" type="checkbox" />
+                          <span>Есть материал</span>
+                        </label>
+                      </div>
+                      <Textarea
+                        v-if="topicDrafts[topic.id].hasMaterial"
+                        v-model="topicDrafts[topic.id].content"
+                        class="grid-span-full"
+                        label="Контент темы"
+                        :rows="5"
+                      />
+                    </div>
+                    <div class="topic-edit-actions">
+                      <Button size="sm" icon="save" :loading="updatingTopicId === topic.id" @click="saveTopic(topic.id)">Сохранить тему</Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Добавить тему -->
+              <div v-if="newTopics[section.id]" class="new-topic">
+                <h4>Новая тема</h4>
+                <div class="topic-edit-grid">
+                  <Input v-model="newTopics[section.id].title" label="Название темы" :error="newTopicErrors[section.id]?.title" required />
+                  <Input v-model="newTopics[section.id].orderIndex" type="number" min="1" label="Порядок" />
+                  <Select v-model="newTopics[section.id].assessmentId" label="Тест темы" :options="assessmentOptions" placeholder="Без теста" />
+                  <div class="field-checkbox">
+                    <label class="switch-label">
+                      <input v-model="newTopics[section.id].hasMaterial" type="checkbox" />
+                      <span>Есть материал</span>
+                    </label>
+                  </div>
+                  <Textarea
+                    v-if="newTopics[section.id].hasMaterial"
+                    v-model="newTopics[section.id].content"
+                    class="grid-span-full"
+                    label="Контент темы"
+                    :rows="4"
+                  />
+                </div>
+                <div class="new-topic-actions">
+                  <Button size="sm" icon="plus" :loading="creatingTopicSectionId === section.id" @click="addTopic(section.id)">Добавить тему</Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="new-module">
-          <h3>Новый модуль</h3>
-          <div class="module-item-grid">
-            <Input v-model="newModule.title" label="Название" :error="newModuleErrors.title" required />
-            <Input v-model="newModule.orderIndex" type="number" min="1" label="Порядок" />
-            <Select
-              v-model="newModule.assessmentId"
-              label="Аттестация модуля"
-              :options="assessmentOptions"
-              placeholder="Выберите аттестацию"
-            />
-            <Input v-model="newModule.estimatedMinutes" type="number" min="1" max="1440" label="Оценка времени (мин.)" />
-            <Textarea v-model="newModule.description" class="grid-span-full" label="Описание" :rows="2" />
-            <Textarea v-model="newModule.content" class="grid-span-full" label="Контент" :rows="3" />
+        <!-- Добавить раздел -->
+        <div class="new-section">
+          <h3>Новый раздел</h3>
+          <div class="section-edit-grid">
+            <Input v-model="newSection.title" label="Название раздела" :error="newSectionErrors.title" required />
+            <Input v-model="newSection.orderIndex" type="number" min="1" label="Порядок" />
+            <Select v-model="newSection.assessmentId" label="Тест раздела" :options="assessmentOptions" placeholder="Выберите тест" />
+            <Input v-model="newSection.estimatedMinutes" type="number" min="1" max="1440" label="Время (мин.)" />
+            <div class="field-checkbox">
+              <label class="switch-label">
+                <input v-model="newSection.isRequired" type="checkbox" />
+                <span>Обязательный раздел</span>
+              </label>
+            </div>
           </div>
-          <div class="new-module-actions">
-            <label class="switch-label">
-              <input v-model="newModule.isRequired" type="checkbox" />
-              <span>Обязательный модуль</span>
-            </label>
-            <Button icon="plus" :loading="creatingModule" @click="addModule">Добавить модуль</Button>
+          <div class="new-section-actions">
+            <Button icon="plus" :loading="creatingSection" @click="addSection">Добавить раздел</Button>
           </div>
+        </div>
+      </Card>
+
+      <!-- Блок назначения курса -->
+      <Card v-if="isEditMode && course" class="assignments-card">
+        <div class="assignments-header">
+          <h2>Назначение курса</h2>
+          <p>Если ни одна должность и ни один филиал не выбраны — курс виден всем.</p>
+        </div>
+
+        <div class="targets-grid">
+          <div class="targets-group">
+            <h3>Целевые должности</h3>
+            <div v-if="positionOptions.length === 0" class="targets-empty">Загрузка...</div>
+            <div v-else class="checkbox-list">
+              <label v-for="pos in positionOptions" :key="pos.id" class="checkbox-item">
+                <input type="checkbox" :value="pos.id" v-model="selectedPositionIds" />
+                <span>{{ pos.name }}</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="targets-group">
+            <h3>Целевые филиалы</h3>
+            <div v-if="branchOptions.length === 0" class="targets-empty">Загрузка...</div>
+            <div v-else class="checkbox-list">
+              <label v-for="branch in branchOptions" :key="branch.id" class="checkbox-item">
+                <input type="checkbox" :value="branch.id" v-model="selectedBranchIds" />
+                <span>{{ branch.name }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="targets-actions">
+          <Button :loading="savingTargets" icon="save" @click="saveTargets">Сохранить назначения</Button>
+        </div>
+
+        <div class="manual-assignments">
+          <h3>Ручные назначения</h3>
+
+          <div class="add-assignment">
+            <Input v-model="newAssignmentUserId" label="ID пользователя" type="number" min="1" placeholder="Введите ID" />
+            <Button :loading="addingAssignment" icon="plus" @click="handleAddAssignment">Добавить</Button>
+          </div>
+
+          <div v-if="assignments.length === 0" class="targets-empty">Ручных назначений нет.</div>
+          <table v-else class="assignments-table">
+            <thead>
+              <tr>
+                <th>Пользователь</th>
+                <th>Должность</th>
+                <th>Филиал</th>
+                <th>Кем назначен</th>
+                <th>Когда</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in assignments" :key="a.userId">
+                <td>{{ a.name }}</td>
+                <td>{{ a.positionTitle || "—" }}</td>
+                <td>{{ a.branchTitle || "—" }}</td>
+                <td>{{ a.assignedBy || "—" }}</td>
+                <td>{{ formatAssignedAt(a.assignedAt) }}</td>
+                <td>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    icon="trash"
+                    :loading="removingAssignmentUserId === a.userId"
+                    @click="handleRemoveAssignment(a.userId)"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </Card>
     </template>
@@ -186,14 +292,24 @@ import { Badge, Button, Card, Input, Preloader, Select, Textarea } from "../comp
 import {
   archiveCourse,
   createCourse,
-  createCourseModule,
-  deleteCourseModule,
+  createCourseSection,
+  updateCourseSection,
+  deleteCourseSection,
+  createCourseTopic,
+  updateCourseTopic,
+  deleteCourseTopic,
   getCourseById,
   publishCourse,
   updateCourse,
-  updateCourseModule,
+  getCourseTargets,
+  updateCourseTargets,
+  getCourseAssignments,
+  addCourseAssignment,
+  removeCourseAssignment,
 } from "../api/courses";
 import { getAssessments } from "../api/assessments";
+import { getPositions } from "../api/positions";
+import { getBranches } from "../api/branches";
 import { useToast } from "../composables/useToast";
 
 const route = useRoute();
@@ -202,11 +318,26 @@ const { showToast } = useToast();
 
 const loading = ref(false);
 const saving = ref(false);
-const creatingModule = ref(false);
-const updatingModuleId = ref(null);
-const deletingModuleId = ref(null);
 const publishing = ref(false);
 const archiving = ref(false);
+
+const sectionDrafts = ref({});
+const sectionErrors = ref({});
+const sectionEditingId = ref(null);
+const updatingSectionId = ref(null);
+const deletingSectionId = ref(null);
+const creatingSection = ref(false);
+const newSection = ref({ title: "", orderIndex: "", assessmentId: "", isRequired: true, estimatedMinutes: "", description: "" });
+const newSectionErrors = ref({ title: "" });
+
+const topicDrafts = ref({});
+const topicErrors = ref({});
+const topicEditingId = ref(null);
+const updatingTopicId = ref(null);
+const deletingTopicId = ref(null);
+const newTopics = ref({});
+const newTopicErrors = ref({});
+const creatingTopicSectionId = ref(null);
 
 const form = ref({
   title: "",
@@ -219,20 +350,17 @@ const errors = ref({
 });
 
 const course = ref(null);
-const moduleDrafts = ref({});
-const moduleErrors = ref({});
-const newModuleErrors = ref({ title: "" });
 const assessmentOptions = ref([]);
 
-const newModule = ref({
-  title: "",
-  description: "",
-  content: "",
-  orderIndex: "",
-  assessmentId: "",
-  isRequired: true,
-  estimatedMinutes: "",
-});
+const positionOptions = ref([]);
+const branchOptions = ref([]);
+const selectedPositionIds = ref([]);
+const selectedBranchIds = ref([]);
+const savingTargets = ref(false);
+const assignments = ref([]);
+const newAssignmentUserId = ref("");
+const addingAssignment = ref(false);
+const removingAssignmentUserId = ref(null);
 
 const isEditMode = computed(() => {
   return Number.isInteger(Number(route.params.id)) && Number(route.params.id) > 0;
@@ -275,34 +403,35 @@ const sanitizeOptionalNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const resetNewModule = () => {
-  newModule.value = {
-    title: "",
-    description: "",
-    content: "",
-    orderIndex: "",
-    assessmentId: "",
-    isRequired: true,
-    estimatedMinutes: "",
-  };
-  newModuleErrors.value = { title: "" };
-};
-
-const syncModuleDrafts = (modules = []) => {
+const syncSectionDrafts = (sections = []) => {
   const nextDrafts = {};
-  for (const moduleItem of modules) {
-    nextDrafts[moduleItem.id] = {
-      title: moduleItem.title || "",
-      description: moduleItem.description || "",
-      content: moduleItem.content || "",
-      orderIndex: String(moduleItem.orderIndex || ""),
-      assessmentId: moduleItem.assessmentId ? String(moduleItem.assessmentId) : "",
-      isRequired: Boolean(moduleItem.isRequired),
-      estimatedMinutes: moduleItem.estimatedMinutes ? String(moduleItem.estimatedMinutes) : "",
+  const nextTopicDrafts = {};
+  const nextNewTopics = {};
+  for (const section of sections) {
+    nextDrafts[section.id] = {
+      title: section.title || "",
+      description: section.description || "",
+      orderIndex: String(section.orderIndex || ""),
+      assessmentId: section.assessmentId ? String(section.assessmentId) : "",
+      isRequired: Boolean(section.isRequired),
+      estimatedMinutes: section.estimatedMinutes ? String(section.estimatedMinutes) : "",
     };
+    for (const topic of section.topics || []) {
+      nextTopicDrafts[topic.id] = {
+        title: topic.title || "",
+        orderIndex: String(topic.orderIndex || ""),
+        hasMaterial: Boolean(topic.hasMaterial),
+        content: topic.content || "",
+        assessmentId: topic.assessmentId ? String(topic.assessmentId) : "",
+      };
+    }
+    nextNewTopics[section.id] = newTopics.value[section.id] || { title: "", orderIndex: "", hasMaterial: false, content: "", assessmentId: "" };
   }
-  moduleDrafts.value = nextDrafts;
-  moduleErrors.value = {};
+  sectionDrafts.value = nextDrafts;
+  sectionErrors.value = {};
+  topicDrafts.value = nextTopicDrafts;
+  topicErrors.value = {};
+  newTopics.value = nextNewTopics;
 };
 
 const loadAssessments = async () => {
@@ -319,6 +448,24 @@ const loadAssessments = async () => {
     assessmentOptions.value = [{ value: "", label: "Не выбрано" }, ...options];
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось загрузить список аттестаций"), "error");
+  }
+};
+
+const loadPositions = async () => {
+  try {
+    const data = await getPositions();
+    positionOptions.value = data.positions || [];
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось загрузить должности"), "error");
+  }
+};
+
+const loadBranches = async () => {
+  try {
+    const data = await getBranches();
+    branchOptions.value = data.branches || [];
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось загрузить филиалы"), "error");
   }
 };
 
@@ -343,10 +490,17 @@ const loadCourse = async () => {
 
   loading.value = true;
   try {
-    const response = await getCourseById(courseId.value);
-    course.value = response.course;
-    applyCourseToForm(response.course);
-    syncModuleDrafts(response.course.modules || []);
+    const [courseResponse, targetsResponse, assignmentsResponse] = await Promise.all([
+      getCourseById(courseId.value),
+      getCourseTargets(courseId.value),
+      getCourseAssignments(courseId.value),
+    ]);
+    course.value = courseResponse.course;
+    applyCourseToForm(courseResponse.course);
+    syncSectionDrafts(courseResponse.course.sections || []);
+    selectedPositionIds.value = (targetsResponse.positions || []).map((p) => p.id);
+    selectedBranchIds.value = (targetsResponse.branches || []).map((b) => b.id);
+    assignments.value = assignmentsResponse.assignments || [];
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось загрузить курс"), "error");
     router.push("/courses");
@@ -405,106 +559,165 @@ const saveCourse = async () => {
   }
 };
 
-const validateModuleDraft = (draft, targetErrors) => {
-  targetErrors.title = "";
-
-  const title = String(draft.title || "").trim();
-  if (!title) {
-    targetErrors.title = "Укажите название модуля";
-    return false;
-  }
-  if (title.length < 2) {
-    targetErrors.title = "Название модуля должно содержать минимум 2 символа";
-    return false;
-  }
-
-  return true;
+const toggleSectionEdit = (sectionId) => {
+  sectionEditingId.value = sectionEditingId.value === sectionId ? null : sectionId;
 };
 
-const addModule = async () => {
-  const localErrors = { title: "" };
-  if (!validateModuleDraft(newModule.value, localErrors)) {
-    newModuleErrors.value = localErrors;
+const toggleTopicEdit = (topicId) => {
+  topicEditingId.value = topicEditingId.value === topicId ? null : topicId;
+};
+
+const resetNewSection = () => {
+  newSection.value = { title: "", orderIndex: "", assessmentId: "", isRequired: true, estimatedMinutes: "", description: "" };
+  newSectionErrors.value = { title: "" };
+};
+
+const addSection = async () => {
+  if (!newSection.value.title.trim()) {
+    newSectionErrors.value = { title: "Укажите название раздела" };
     return;
   }
-
-  creatingModule.value = true;
+  creatingSection.value = true;
   try {
     const payload = {
-      title: newModule.value.title.trim(),
-      description: (newModule.value.description || "").trim(),
-      content: (newModule.value.content || "").trim(),
-      orderIndex: sanitizeOptionalNumber(newModule.value.orderIndex),
-      assessmentId: sanitizeOptionalNumber(newModule.value.assessmentId),
-      isRequired: Boolean(newModule.value.isRequired),
-      estimatedMinutes: sanitizeOptionalNumber(newModule.value.estimatedMinutes),
+      title: newSection.value.title.trim(),
+      description: (newSection.value.description || "").trim(),
+      orderIndex: sanitizeOptionalNumber(newSection.value.orderIndex),
+      assessmentId: sanitizeOptionalNumber(newSection.value.assessmentId),
+      isRequired: Boolean(newSection.value.isRequired),
+      estimatedMinutes: sanitizeOptionalNumber(newSection.value.estimatedMinutes),
     };
-
-    const response = await createCourseModule(courseId.value, payload);
+    const response = await createCourseSection(courseId.value, payload);
     course.value = response.course;
-    syncModuleDrafts(response.course.modules || []);
-    resetNewModule();
-    showToast("Модуль добавлен", "success");
+    syncSectionDrafts(response.course.sections || []);
+    resetNewSection();
+    showToast("Раздел добавлен", "success");
   } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось добавить модуль"), "error");
+    showToast(getErrorMessage(error, "Не удалось добавить раздел"), "error");
   } finally {
-    creatingModule.value = false;
+    creatingSection.value = false;
   }
 };
 
-const saveModule = async (moduleId) => {
-  const draft = moduleDrafts.value[moduleId];
-  if (!draft) {
+const saveSection = async (sectionId) => {
+  const draft = sectionDrafts.value[sectionId];
+  if (!draft) return;
+  if (!draft.title.trim()) {
+    sectionErrors.value = { ...sectionErrors.value, [sectionId]: { title: "Укажите название" } };
     return;
   }
-
-  const localErrors = { title: "" };
-  if (!validateModuleDraft(draft, localErrors)) {
-    moduleErrors.value = {
-      ...moduleErrors.value,
-      [moduleId]: localErrors,
-    };
-    return;
-  }
-
-  updatingModuleId.value = moduleId;
+  updatingSectionId.value = sectionId;
   try {
     const payload = {
       title: draft.title.trim(),
       description: (draft.description || "").trim(),
-      content: (draft.content || "").trim(),
       orderIndex: sanitizeOptionalNumber(draft.orderIndex),
       assessmentId: sanitizeOptionalNumber(draft.assessmentId),
       isRequired: Boolean(draft.isRequired),
       estimatedMinutes: sanitizeOptionalNumber(draft.estimatedMinutes),
     };
-
-    const response = await updateCourseModule(moduleId, payload);
+    const response = await updateCourseSection(sectionId, payload);
     course.value = response.course;
-    syncModuleDrafts(response.course.modules || []);
-    showToast("Модуль обновлен", "success");
+    syncSectionDrafts(response.course.sections || []);
+    sectionEditingId.value = null;
+    showToast("Раздел обновлён", "success");
   } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось обновить модуль"), "error");
+    showToast(getErrorMessage(error, "Не удалось обновить раздел"), "error");
   } finally {
-    updatingModuleId.value = null;
+    updatingSectionId.value = null;
   }
 };
 
-const removeModule = async (moduleId, title) => {
-  if (!window.confirm(`Удалить модуль "${title}"?`)) {
+const removeSection = async (sectionId, title) => {
+  if (!window.confirm(`Удалить раздел "${title}" и все его темы?`)) return;
+  deletingSectionId.value = sectionId;
+  try {
+    const response = await deleteCourseSection(sectionId);
+    course.value = response.course;
+    syncSectionDrafts(response.course.sections || []);
+    if (sectionEditingId.value === sectionId) sectionEditingId.value = null;
+    showToast("Раздел удалён", "success");
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось удалить раздел"), "error");
+  } finally {
+    deletingSectionId.value = null;
+  }
+};
+
+const addTopic = async (sectionId) => {
+  const draft = newTopics.value[sectionId];
+  if (!draft) return;
+  if (!draft.title.trim()) {
+    newTopicErrors.value = { ...newTopicErrors.value, [sectionId]: { title: "Укажите название темы" } };
     return;
   }
-
-  deletingModuleId.value = moduleId;
+  if (!draft.hasMaterial && !sanitizeOptionalNumber(draft.assessmentId)) {
+    showToast("Тема должна содержать материал или тест", "error");
+    return;
+  }
+  creatingTopicSectionId.value = sectionId;
   try {
-    const response = await deleteCourseModule(moduleId);
+    const payload = {
+      title: draft.title.trim(),
+      orderIndex: sanitizeOptionalNumber(draft.orderIndex),
+      hasMaterial: Boolean(draft.hasMaterial),
+      content: draft.hasMaterial ? (draft.content || "").trim() || null : null,
+      assessmentId: sanitizeOptionalNumber(draft.assessmentId),
+    };
+    const response = await createCourseTopic(sectionId, payload);
     course.value = response.course;
-    syncModuleDrafts(response.course.modules || []);
-    showToast("Модуль удален", "success");
+    syncSectionDrafts(response.course.sections || []);
+    newTopics.value[sectionId] = { title: "", orderIndex: "", hasMaterial: false, content: "", assessmentId: "" };
+    newTopicErrors.value = { ...newTopicErrors.value, [sectionId]: null };
+    showToast("Тема добавлена", "success");
   } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось удалить модуль"), "error");
+    showToast(getErrorMessage(error, "Не удалось добавить тему"), "error");
   } finally {
-    deletingModuleId.value = null;
+    creatingTopicSectionId.value = null;
+  }
+};
+
+const saveTopic = async (topicId) => {
+  const draft = topicDrafts.value[topicId];
+  if (!draft) return;
+  if (!draft.title.trim()) {
+    topicErrors.value = { ...topicErrors.value, [topicId]: { title: "Укажите название" } };
+    return;
+  }
+  updatingTopicId.value = topicId;
+  try {
+    const payload = {
+      title: draft.title.trim(),
+      orderIndex: sanitizeOptionalNumber(draft.orderIndex),
+      hasMaterial: Boolean(draft.hasMaterial),
+      content: draft.hasMaterial ? (draft.content || "").trim() || null : null,
+      assessmentId: sanitizeOptionalNumber(draft.assessmentId),
+    };
+    const response = await updateCourseTopic(topicId, payload);
+    course.value = response.course;
+    syncSectionDrafts(response.course.sections || []);
+    topicEditingId.value = null;
+    showToast("Тема обновлена", "success");
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось обновить тему"), "error");
+  } finally {
+    updatingTopicId.value = null;
+  }
+};
+
+const removeTopic = async (topicId, title) => {
+  if (!window.confirm(`Удалить тему "${title}"?`)) return;
+  deletingTopicId.value = topicId;
+  try {
+    const response = await deleteCourseTopic(topicId);
+    course.value = response.course;
+    syncSectionDrafts(response.course.sections || []);
+    if (topicEditingId.value === topicId) topicEditingId.value = null;
+    showToast("Тема удалена", "success");
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось удалить тему"), "error");
+  } finally {
+    deletingTopicId.value = null;
   }
 };
 
@@ -553,9 +766,66 @@ const goBack = () => {
   router.push("/courses");
 };
 
+const saveTargets = async () => {
+  savingTargets.value = true;
+  try {
+    await updateCourseTargets(courseId.value, {
+      positionIds: selectedPositionIds.value,
+      branchIds: selectedBranchIds.value,
+    });
+    showToast("Назначения сохранены", "success");
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось сохранить назначения"), "error");
+  } finally {
+    savingTargets.value = false;
+  }
+};
+
+const handleAddAssignment = async () => {
+  const userId = parseInt(newAssignmentUserId.value, 10);
+  if (!userId || userId <= 0) {
+    showToast("Укажите корректный ID пользователя", "error");
+    return;
+  }
+
+  addingAssignment.value = true;
+  try {
+    const response = await addCourseAssignment(courseId.value, userId);
+    assignments.value = response.assignments || [];
+    newAssignmentUserId.value = "";
+    showToast("Пользователь добавлен", "success");
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось добавить пользователя"), "error");
+  } finally {
+    addingAssignment.value = false;
+  }
+};
+
+const handleRemoveAssignment = async (userId) => {
+  if (!window.confirm("Убрать назначение?")) {
+    return;
+  }
+
+  removingAssignmentUserId.value = userId;
+  try {
+    const response = await removeCourseAssignment(courseId.value, userId);
+    assignments.value = response.assignments || [];
+    showToast("Назначение удалено", "success");
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось удалить назначение"), "error");
+  } finally {
+    removingAssignmentUserId.value = null;
+  }
+};
+
+const formatAssignedAt = (iso) => {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
+};
+
 onMounted(async () => {
   loading.value = true;
-  await Promise.all([loadAssessments(), loadCourse()]);
+  await Promise.all([loadAssessments(), loadPositions(), loadBranches(), loadCourse()]);
   loading.value = false;
 });
 </script>
@@ -580,7 +850,7 @@ onMounted(async () => {
 }
 
 .editor-card,
-.modules-card {
+.sections-card {
   margin-bottom: 20px;
 }
 
@@ -598,19 +868,6 @@ onMounted(async () => {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
-}
-
-.modules-header {
-  margin-bottom: 12px;
-}
-
-.modules-header h2 {
-  margin: 0 0 4px;
-}
-
-.modules-header p {
-  margin: 0;
-  color: var(--text-secondary);
 }
 
 .publication-errors {
@@ -632,7 +889,20 @@ onMounted(async () => {
   color: var(--text-secondary);
 }
 
-.empty-modules {
+.sections-header {
+  margin-bottom: 12px;
+}
+
+.sections-header h2 {
+  margin: 0 0 4px;
+}
+
+.sections-header p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.empty-sections {
   border: 1px dashed var(--divider);
   border-radius: 12px;
   padding: 18px;
@@ -640,54 +910,225 @@ onMounted(async () => {
   margin-bottom: 16px;
 }
 
-.modules-list {
+.sections-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
-.module-item {
+.section-item {
   border: 1px solid var(--divider);
   border-radius: 12px;
-  padding: 12px;
+  overflow: hidden;
+}
+
+.section-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
   background: var(--bg-secondary);
 }
 
-.module-item-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+.section-order {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primary, #6366f1);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.module-item-actions {
-  margin-top: 10px;
+.section-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.section-name {
+  font-weight: 600;
+}
+
+.section-badge-optional {
+  font-size: 12px;
+  color: var(--text-secondary);
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.section-badge-error {
+  font-size: 12px;
+  color: #ef4444;
+  border: 1px solid #ef444466;
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.section-badge-ok {
+  font-size: 12px;
+  color: #22c55e;
+  border: 1px solid #22c55e66;
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.section-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.section-edit-form {
+  padding: 12px 14px;
+  border-top: 1px solid var(--divider);
+}
+
+.section-edit-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.section-edit-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
 }
 
-.module-required-field {
+.topics-container {
+  padding: 12px 14px;
+  border-top: 1px solid var(--divider);
+}
+
+.empty-topics {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.topics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.topic-item {
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.topic-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+}
+
+.topic-order {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: var(--divider);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.topic-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.topic-name {
+  font-size: 14px;
+}
+
+.topic-badge {
+  font-size: 11px;
+  color: var(--text-secondary);
+  border: 1px solid var(--divider);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.topic-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.topic-edit-form {
+  padding: 10px 12px;
+  border-top: 1px solid var(--divider);
+}
+
+.topic-edit-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.topic-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.field-checkbox {
   display: flex;
   align-items: center;
   min-height: 44px;
 }
 
-.new-module {
-  margin-top: 16px;
-  padding-top: 16px;
+.new-topic {
+  padding-top: 12px;
+  border-top: 1px solid var(--divider);
+  margin-top: 8px;
+}
+
+.new-topic h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.new-topic-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.new-section {
+  padding-top: 20px;
+  margin-top: 4px;
   border-top: 1px solid var(--divider);
 }
 
-.new-module h3 {
+.new-section h3 {
   margin: 0 0 10px;
 }
 
-.new-module-actions {
-  margin-top: 10px;
+.new-section-actions {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 10px;
 }
 
 .switch-label {
@@ -698,6 +1139,116 @@ onMounted(async () => {
   color: var(--text-secondary);
 }
 
+.assignments-card {
+  margin-bottom: 20px;
+}
+
+.assignments-header {
+  margin-bottom: 16px;
+}
+
+.assignments-header h2 {
+  margin: 0 0 4px;
+}
+
+.assignments-header p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.targets-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+.targets-group h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.targets-empty {
+  color: var(--text-secondary);
+  font-size: 14px;
+  padding: 8px 0;
+}
+
+.checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.checkbox-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.targets-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.manual-assignments h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.add-assignment {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.add-assignment .input-wrapper {
+  width: 180px;
+}
+
+.assignments-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.assignments-table th,
+.assignments-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--divider);
+}
+
+.assignments-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .switch-label input {
   width: 16px;
   height: 16px;
@@ -705,13 +1256,9 @@ onMounted(async () => {
 
 @media (max-width: 1024px) {
   .editor-grid,
-  .module-item-grid {
+  .section-edit-grid,
+  .topic-edit-grid {
     grid-template-columns: 1fr;
-  }
-
-  .new-module-actions {
-    flex-direction: column;
-    align-items: stretch;
   }
 
   .page-header {
@@ -724,4 +1271,3 @@ onMounted(async () => {
   }
 }
 </style>
-

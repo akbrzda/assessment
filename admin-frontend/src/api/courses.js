@@ -71,3 +71,83 @@ export const deleteCourseModule = async (moduleId) => {
   }, /get:\/admin\/courses/i);
 };
 
+// ─── Разделы ─────────────────────────────────────────────────────────────────
+
+export const createCourseSection = async (courseId, payload) => {
+  return mutateWithInvalidation(async () => {
+    const response = await axios.post(`/admin/courses/${courseId}/sections`, payload);
+    return response.data;
+  }, /get:\/admin\/courses/i);
+};
+
+export const updateCourseSection = async (sectionId, payload) => {
+  return mutateWithInvalidation(async () => {
+    const response = await axios.patch(`/admin/courses/sections/${sectionId}`, payload);
+    return response.data;
+  }, /get:\/admin\/courses/i);
+};
+
+export const deleteCourseSection = async (sectionId) => {
+  return mutateWithInvalidation(async () => {
+    const response = await axios.delete(`/admin/courses/sections/${sectionId}`);
+    return response.data;
+  }, /get:\/admin\/courses/i);
+};
+
+// ─── Темы ─────────────────────────────────────────────────────────────────────
+
+export const createCourseTopic = async (sectionId, payload) => {
+  return mutateWithInvalidation(async () => {
+    const response = await axios.post(`/admin/courses/sections/${sectionId}/topics`, payload);
+    return response.data;
+  }, /get:\/admin\/courses/i);
+};
+
+export const updateCourseTopic = async (topicId, payload) => {
+  return mutateWithInvalidation(async () => {
+    const response = await axios.patch(`/admin/courses/topics/${topicId}`, payload);
+    return response.data;
+  }, /get:\/admin\/courses/i);
+};
+
+export const deleteCourseTopic = async (topicId) => {
+  return mutateWithInvalidation(async () => {
+    const response = await axios.delete(`/admin/courses/topics/${topicId}`);
+    return response.data;
+  }, /get:\/admin\/courses/i);
+};
+
+// ─── Назначения: должности и филиалы ────────────────────────────────────────
+
+export const getCourseTargets = async (courseId) => {
+  const response = await axios.get(`/admin/courses/${courseId}/targets`, { cacheMaxAge: 10000 });
+  return response.data;
+};
+
+export const updateCourseTargets = async (courseId, payload) => {
+  return mutateWithInvalidation(async () => {
+    const response = await axios.put(`/admin/courses/${courseId}/targets`, payload);
+    return response.data;
+  }, /get:\/admin\/courses/i);
+};
+
+// ─── Назначения: ручное назначение пользователей ────────────────────────────
+
+export const getCourseAssignments = async (courseId) => {
+  const response = await axios.get(`/admin/courses/${courseId}/assignments`, { cacheMaxAge: 10000 });
+  return response.data;
+};
+
+export const addCourseAssignment = async (courseId, userId) => {
+  return mutateWithInvalidation(async () => {
+    const response = await axios.post(`/admin/courses/${courseId}/assignments`, { userId });
+    return response.data;
+  }, /get:\/admin\/courses/i);
+};
+
+export const removeCourseAssignment = async (courseId, userId) => {
+  return mutateWithInvalidation(async () => {
+    const response = await axios.delete(`/admin/courses/${courseId}/assignments/${userId}`);
+    return response.data;
+  }, /get:\/admin\/courses/i);
+};

@@ -3,11 +3,7 @@ node_modules/
 .DS_Store
 .vscode
 dist/
-docs/
-AGENTS.md
-copilot-instructions.md
 # Environment files
 .env
 .env.local
 .env.*.local
-TASKS.md

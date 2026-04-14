@@ -147,6 +147,21 @@ export const apiClient = {
       method: "POST",
     });
   },
+  viewCourseTopicMaterial(topicId) {
+    return request(`/courses/topics/${topicId}/view-material`, {
+      method: "POST",
+    });
+  },
+  completeCourseTopicAttempt(topicId, attemptId) {
+    return request(`/courses/topics/${topicId}/attempts/${attemptId}/complete`, {
+      method: "POST",
+    });
+  },
+  completeCourseSectionAttempt(sectionId, attemptId) {
+    return request(`/courses/sections/${sectionId}/attempts/${attemptId}/complete`, {
+      method: "POST",
+    });
+  },
   getCourseFinalAssessmentAccess(courseId) {
     return request(`/courses/${courseId}/final-assessment/access`);
   },

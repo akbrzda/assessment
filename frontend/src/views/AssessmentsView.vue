@@ -123,12 +123,12 @@
 
             <div class="assessment-info mb-12">
               <div class="info-item">
-                <span class="label">Модулей:</span>
-                <span class="value">{{ course.modulesCount }}</span>
+                <span class="label">Разделов:</span>
+                <span class="value">{{ course.sectionsCount }}</span>
               </div>
               <div class="info-item">
                 <span class="label">Обязательных:</span>
-                <span class="value">{{ course.requiredModulesCount }}</span>
+                <span class="value">{{ course.requiredSectionsCount }}</span>
               </div>
               <div class="info-item">
                 <span class="label">Прогресс:</span>
@@ -433,13 +433,13 @@ export default {
         id: Number(item.id),
         title: item.title || "Курс",
         description: item.description || "",
-        modulesCount: Number(item.modulesCount || 0),
-        requiredModulesCount: Number(item.requiredModulesCount || 0),
+        sectionsCount: Number(item.sectionsCount || 0),
+        requiredSectionsCount: Number(item.requiredSectionsCount || 0),
         progress: {
           status: item.progress?.status || "not_started",
           progressPercent: Number(item.progress?.progressPercent || 0),
-          completedModulesCount: Number(item.progress?.completedModulesCount || 0),
-          totalModulesCount: Number(item.progress?.totalModulesCount || 0),
+          completedSectionsCount: Number(item.progress?.completedSectionsCount || 0),
+          totalSectionsCount: Number(item.progress?.totalSectionsCount || 0),
         },
       };
     }

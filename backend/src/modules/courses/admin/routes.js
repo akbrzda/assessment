@@ -24,4 +24,13 @@ router.post("/sections/:sectionId/topics", controller.createTopic);
 router.patch("/topics/:topicId", controller.updateTopic);
 router.delete("/topics/:topicId", controller.deleteTopic);
 
+// Назначения: целевые должности и филиалы
+router.get("/:id/targets", controller.getTargets);
+router.put("/:id/targets", controller.updateTargets);
+
+// Назначения: ручные назначения пользователей
+router.get("/:id/assignments", controller.getAssignments);
+router.post("/:id/assignments", controller.addAssignment);
+router.delete("/:id/assignments/:userId", controller.removeAssignment);
+
 module.exports = router;

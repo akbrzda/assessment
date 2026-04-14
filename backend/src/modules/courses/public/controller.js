@@ -3,6 +3,9 @@ const {
   assertCourseId,
   assertFinalAttemptParams,
   assertModuleAttemptParams,
+  assertTopicId,
+  assertTopicAttemptParams,
+  assertSectionAttemptParams,
 } = require("./validators");
 
 function handleControllerError(error, res, next) {
@@ -16,7 +19,8 @@ function handleControllerError(error, res, next) {
 
 async function listCourses(req, res, next) {
   try {
-    const courses = await coursesService.listCourses(req.currentUser.id);
+    const { id, positionId, branchId } = req.currentUser;
+    const courses = await coursesService.listCourses(id, positionId, branchId);
     res.json({ courses });
   } catch (error) {
     handleControllerError(error, res, next);
@@ -75,6 +79,42 @@ async function completeModuleAttempt(req, res, next) {
   }
 }
 
+async function viewTopicMaterial(req, res, next) {
+  try {
+    const topicId = assertTopicId(req.params.topicId);
+    const payload = await coursesService.viewTopicMaterial({ topicId, userId: req.currentUser.id });
+    res.json(payload);
+  } catch (error) {
+    handleControllerError(error, res, next);
+  }
+}
+
+async function completeTopicAttempt(req, res, next) {
+  try {
+    const params = assertTopicAttemptParams({
+      topicId: req.params.topicId,
+      attemptId: req.params.attemptId,
+    });
+    const payload = await coursesService.completeTopicAttempt({ ...params, userId: req.currentUser.id });
+    res.json(payload);
+  } catch (error) {
+    handleControllerError(error, res, next);
+  }
+}
+
+async function completeSectionAttempt(req, res, next) {
+  try {
+    const params = assertSectionAttemptParams({
+      sectionId: req.params.sectionId,
+      attemptId: req.params.attemptId,
+    });
+    const payload = await coursesService.completeSectionAttempt({ ...params, userId: req.currentUser.id });
+    res.json(payload);
+  } catch (error) {
+    handleControllerError(error, res, next);
+  }
+}
+
 async function getFinalAssessmentAccess(req, res, next) {
   try {
     const courseId = assertCourseId(req.params.courseId);
@@ -108,6 +148,9 @@ module.exports = {
   getCourse,
   startCourse,
   getCourseProgress,
+  viewTopicMaterial,
+  completeTopicAttempt,
+  completeSectionAttempt,
   completeModuleAttempt,
   getFinalAssessmentAccess,
   completeFinalAttempt,

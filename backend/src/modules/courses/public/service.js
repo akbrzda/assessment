@@ -1,8 +1,8 @@
 ﻿const courseProgressService = require("../../../services/courseProgressService");
 const coursesRepository = require("./repository");
 
-async function listCourses(userId) {
-  return coursesRepository.listPublishedCoursesForUser(userId);
+async function listCourses(userId, positionId, branchId) {
+  return coursesRepository.listPublishedCoursesForUser(userId, positionId, branchId);
 }
 
 async function getCourse(courseId, userId) {
@@ -64,6 +64,50 @@ async function completeModuleAttempt({ moduleId, attemptId, userId }) {
   };
 }
 
+async function viewTopicMaterial({ topicId, userId }) {
+  return courseProgressService.handleTopicMaterialViewed({ topicId, userId });
+}
+
+async function completeTopicAttempt({ topicId, attemptId, userId }) {
+  const result = await courseProgressService.handleTopicAttemptCompletion({ topicId, userId, attemptId });
+  return {
+    topic: {
+      id: result.result.topicId,
+      assessmentId: result.result.assessmentId,
+      attemptId: result.result.attemptId,
+      attemptNumber: result.result.attemptNumber,
+      scorePercent: result.result.scorePercent,
+      passScorePercent: result.result.passScorePercent,
+      passed: result.result.passed,
+    },
+    progress: {
+      progressPercent: result.aggregate.progressPercent,
+      passedRequiredSections: result.aggregate.passedRequiredSections,
+      totalRequiredSections: result.aggregate.totalRequiredSections,
+    },
+  };
+}
+
+async function completeSectionAttempt({ sectionId, attemptId, userId }) {
+  const result = await courseProgressService.handleSectionAttemptCompletion({ sectionId, userId, attemptId });
+  return {
+    section: {
+      id: result.result.sectionId,
+      assessmentId: result.result.assessmentId,
+      attemptId: result.result.attemptId,
+      attemptNumber: result.result.attemptNumber,
+      scorePercent: result.result.scorePercent,
+      passScorePercent: result.result.passScorePercent,
+      passed: result.result.passed,
+    },
+    progress: {
+      progressPercent: result.aggregate.progressPercent,
+      passedRequiredSections: result.aggregate.passedRequiredSections,
+      totalRequiredSections: result.aggregate.totalRequiredSections,
+    },
+  };
+}
+
 async function getFinalAssessmentAccess(courseId, userId) {
   const finalAccess = await coursesRepository.canAccessFinalAssessment({
     courseId,
@@ -108,6 +152,9 @@ module.exports = {
   getCourse,
   startCourse,
   getCourseProgress,
+  viewTopicMaterial,
+  completeTopicAttempt,
+  completeSectionAttempt,
   completeModuleAttempt,
   getFinalAssessmentAccess,
   completeFinalAttempt,

@@ -212,6 +212,20 @@ export default {
           return;
         }
 
+        if (context.type === "section") {
+          await apiClient.completeCourseSectionAttempt(Number(context.sectionId), attemptId);
+          relatedCourseId.value = Number(context.courseId);
+          clearCompletionContext();
+          return;
+        }
+
+        if (context.type === "topic") {
+          await apiClient.completeCourseTopicAttempt(Number(context.topicId), attemptId);
+          relatedCourseId.value = Number(context.courseId);
+          clearCompletionContext();
+          return;
+        }
+
         if (context.type === "final") {
           await apiClient.completeCourseFinalAssessmentAttempt(Number(context.courseId), attemptId);
           relatedCourseId.value = Number(context.courseId);

@@ -1,5 +1,6 @@
 ﻿const coursesService = require("./service");
 const contentService = require("./contentService");
+const assignmentsRepo = require("../courseAssignments.repository");
 const {
   createCourseSchema,
   updateCourseSchema,
@@ -182,6 +183,76 @@ async function deleteTopic(req, res, next) {
   }
 }
 
+// ─── Назначения ──────────────────────────────────────────────────────────────
+
+async function getTargets(req, res, next) {
+  try {
+    const courseId = parseId(req.params.id);
+    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
+    const targets = await assignmentsRepo.getTargets(courseId);
+    res.json(targets);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function updateTargets(req, res, next) {
+  try {
+    const courseId = parseId(req.params.id);
+    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
+
+    const positionIds = (req.body.positionIds || []).map(Number).filter((n) => n > 0);
+    const branchIds = (req.body.branchIds || []).map(Number).filter((n) => n > 0);
+
+    await assignmentsRepo.replaceTargets(courseId, { positionIds, branchIds });
+    const targets = await assignmentsRepo.getTargets(courseId);
+    res.json(targets);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getAssignments(req, res, next) {
+  try {
+    const courseId = parseId(req.params.id);
+    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
+    const assignments = await assignmentsRepo.getAssignments(courseId);
+    res.json({ assignments });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function addAssignment(req, res, next) {
+  try {
+    const courseId = parseId(req.params.id);
+    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
+
+    const userId = Number(req.body.userId);
+    if (!userId || userId <= 0) return res.status(400).json({ error: "Некорректный идентификатор пользователя" });
+
+    await assignmentsRepo.addAssignment(courseId, userId, req.user.id);
+    const assignments = await assignmentsRepo.getAssignments(courseId);
+    res.status(201).json({ assignments });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function removeAssignment(req, res, next) {
+  try {
+    const courseId = parseId(req.params.id);
+    const userId = parseId(req.params.userId);
+    if (!courseId || !userId) return res.status(400).json({ error: "Некорректные параметры" });
+
+    await assignmentsRepo.removeAssignment(courseId, userId);
+    const assignments = await assignmentsRepo.getAssignments(courseId);
+    res.json({ assignments });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   listCourses,
   getCourse,
@@ -196,4 +267,9 @@ module.exports = {
   createTopic,
   updateTopic,
   deleteTopic,
+  getTargets,
+  updateTargets,
+  getAssignments,
+  addAssignment,
+  removeAssignment,
 };

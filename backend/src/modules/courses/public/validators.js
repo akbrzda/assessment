@@ -14,6 +14,47 @@ function assertCourseId(rawCourseId) {
   throw error;
 }
 
+function assertTopicId(rawTopicId) {
+  const topicId = parsePositiveId(rawTopicId);
+  if (topicId) {
+    return topicId;
+  }
+
+  const error = new Error("Некорректный идентификатор темы");
+  error.status = 400;
+  throw error;
+}
+
+function assertTopicAttemptParams({ topicId, attemptId }) {
+  const normalizedTopicId = parsePositiveId(topicId);
+  const normalizedAttemptId = parsePositiveId(attemptId);
+  if (normalizedTopicId && normalizedAttemptId) {
+    return {
+      topicId: normalizedTopicId,
+      attemptId: normalizedAttemptId,
+    };
+  }
+
+  const error = new Error("Некорректные параметры попытки темы");
+  error.status = 400;
+  throw error;
+}
+
+function assertSectionAttemptParams({ sectionId, attemptId }) {
+  const normalizedSectionId = parsePositiveId(sectionId);
+  const normalizedAttemptId = parsePositiveId(attemptId);
+  if (normalizedSectionId && normalizedAttemptId) {
+    return {
+      sectionId: normalizedSectionId,
+      attemptId: normalizedAttemptId,
+    };
+  }
+
+  const error = new Error("Некорректные параметры попытки раздела");
+  error.status = 400;
+  throw error;
+}
+
 function assertModuleAttemptParams({ moduleId, attemptId }) {
   const normalizedModuleId = parsePositiveId(moduleId);
   const normalizedAttemptId = parsePositiveId(attemptId);
@@ -46,6 +87,9 @@ function assertFinalAttemptParams({ courseId, attemptId }) {
 
 module.exports = {
   assertCourseId,
+  assertTopicId,
+  assertTopicAttemptParams,
+  assertSectionAttemptParams,
   assertModuleAttemptParams,
   assertFinalAttemptParams,
 };

@@ -1,8 +1,16 @@
 const { pool } = require("../../config/database");
 const { toIsoUtc, mapCourseRow, mapSectionRow, mapTopicRow } = require("./courses.mappers");
 const { canAccessFinalAssessment } = require("./courses.repository");
+const { listAssignedCourseIds } = require("./courseAssignments.repository");
 
-async function listPublishedCoursesForUser(userId) {
+async function listPublishedCoursesForUser(userId, userPositionId, userBranchId) {
+  // Получаем множество ID курсов, доступных этому пользователю
+  const allowedIds = await listAssignedCourseIds(userId, userPositionId, userBranchId);
+  if (allowedIds.size === 0) {
+    return [];
+  }
+
+  const idList = [...allowedIds].join(",");
   const [rows] = await pool.execute(
     `SELECT c.id, c.title, c.description, c.status, c.version, c.final_assessment_id,
             c.created_by, c.updated_by, c.published_at, c.archived_at, c.created_at, c.updated_at,
@@ -14,7 +22,7 @@ async function listPublishedCoursesForUser(userId) {
             (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id AND cs.is_required = 1) AS required_sections_count
        FROM courses c
        LEFT JOIN course_user_progress cup ON cup.course_id = c.id AND cup.user_id = ?
-      WHERE c.status = 'published'
+      WHERE c.status = 'published' AND c.id IN (${idList})
       ORDER BY c.published_at DESC, c.id DESC`,
     [userId],
   );
@@ -148,7 +156,8 @@ async function getCourseForUser(courseId, userId) {
       return { ...topic, progress: { ...topic.progress, locked: isLocked || (!!prevTopic && prevTopic.progress.status !== "completed") } };
     });
 
-    const allTopicsCompleted = topics.length > 0 && topics.every((t) => t.progress.status === "completed");
+    // Если в разделе нет тем — считаем «все темы выполнены» (раздел открыт только для теста)
+    const allTopicsCompleted = topics.length === 0 || topics.every((t) => t.progress.status === "completed");
     return {
       ...section,
       progress: {

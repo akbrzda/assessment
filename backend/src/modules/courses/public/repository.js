@@ -1,8 +1,8 @@
 ﻿const coursesRepo = require("../courses.repository");
 const userViewRepo = require("../userCourseView.repository");
 
-async function listPublishedCoursesForUser(userId) {
-  return userViewRepo.listPublishedCoursesForUser(userId);
+async function listPublishedCoursesForUser(userId, positionId, branchId) {
+  return userViewRepo.listPublishedCoursesForUser(userId, positionId, branchId);
 }
 
 async function getCourseForUser(courseId, userId) {
