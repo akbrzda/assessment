@@ -17,11 +17,11 @@ async function bootstrap() {
       logger.info(`Server listening on port ${config.port}`);
     });
   } catch (error) {
-    logger.error("Failed to start server", { 
+    logger.error("Failed to start server", {
       message: error.message,
       code: error.code,
       stack: error.stack,
-      errno: error.errno
+      errno: error.errno,
     });
     console.error("❌ Startup Error:", error);
     process.exit(1);
