@@ -87,7 +87,11 @@ async function getCourseSnapshot(courseId, userId) {
   return { courseVersion: Number(row.course_version || 0), snapshot, createdAt: toIsoUtc(row.created_at) };
 }
 
-async function getCourseForUser(courseId, userId) {
+async function getCourseForUser(courseId, userId, { positionId = null, branchId = null } = {}) {
+  // Проверка назначения курса пользователю
+  const allowedIds = await listAssignedCourseIds(userId, positionId, branchId);
+  if (!allowedIds.has(Number(courseId))) return null;
+
   const [courseRows] = await pool.execute(
     `SELECT c.id, c.title, c.description, c.status, c.version, c.final_assessment_id,
             c.created_by, c.updated_by, c.published_at, c.archived_at, c.created_at, c.updated_at,

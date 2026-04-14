@@ -5,8 +5,8 @@ async function listPublishedCoursesForUser(userId, positionId, branchId) {
   return userViewRepo.listPublishedCoursesForUser(userId, positionId, branchId);
 }
 
-async function getCourseForUser(courseId, userId) {
-  return userViewRepo.getCourseForUser(courseId, userId);
+async function getCourseForUser(courseId, userId, userContext = {}) {
+  return userViewRepo.getCourseForUser(courseId, userId, userContext);
 }
 
 async function findCourseById(courseId) {

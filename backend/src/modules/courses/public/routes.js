@@ -2,13 +2,12 @@
 const verifyInitData = require("../../../middleware/verifyInitData");
 const resolveUser = require("../../../middleware/resolveUser");
 const requireRole = require("../../../middleware/requireRole");
-const requireCoursesFeature = require("../../../middleware/requireCoursesFeature");
 const requireCourseFinalAssessmentAccess = require("../../../middleware/requireCourseFinalAssessmentAccess");
 const coursesController = require("./controller");
 
 const router = express.Router();
 
-router.use(verifyInitData, resolveUser, requireRole(["employee", "manager", "superadmin"]), requireCoursesFeature);
+router.use(verifyInitData, resolveUser, requireRole(["employee", "manager", "superadmin"]));
 
 router.post("/topics/:topicId/view-material", coursesController.viewTopicMaterial);
 router.post("/topics/:topicId/attempts/:attemptId/complete", coursesController.completeTopicAttempt);

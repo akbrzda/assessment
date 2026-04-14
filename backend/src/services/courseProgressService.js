@@ -73,6 +73,17 @@ async function handleTopicMaterialViewed({ topicId, userId }) {
       throw error;
     }
 
+    // Проверка последовательности: предыдущая тема должна быть завершена
+    const prevCompleted = await progressRepo.isPreviousTopicCompleted(
+      { sectionId: topic.sectionId, orderIndex: topic.orderIndex, userId },
+      { connection },
+    );
+    if (!prevCompleted) {
+      const error = new Error("Необходимо завершить предыдущую тему перед изучением этой");
+      error.status = 409;
+      throw error;
+    }
+
     // Без теста — просмотр материала завершает тему
     const completedStatus = !topic.assessmentId ? "completed" : "in_progress";
     await progressRepo.markTopicMaterial({ topicId, sectionId: topic.sectionId, courseId: topic.courseId, userId, completedStatus, connection });
@@ -105,6 +116,20 @@ async function handleTopicAttemptCompletion({ topicId, userId, attemptId }) {
       const error = new Error("Результат попытки для темы не найден");
       error.status = 404;
       throw error;
+    }
+
+    // Проверка последовательности: предыдущая тема должна быть завершена
+    const topicInfo = await progressRepo.findTopicWithSection(topicId, { connection });
+    if (topicInfo) {
+      const prevCompleted = await progressRepo.isPreviousTopicCompleted(
+        { sectionId: topicInfo.sectionId, orderIndex: topicInfo.orderIndex, userId },
+        { connection },
+      );
+      if (!prevCompleted) {
+        const error = new Error("Необходимо завершить предыдущую тему перед сдачей теста этой темы");
+        error.status = 409;
+        throw error;
+      }
     }
 
     const status = result.passed ? "completed" : "failed";
@@ -150,6 +175,14 @@ async function handleSectionAttemptCompletion({ sectionId, userId, attemptId }) 
     if (!result) {
       const error = new Error("Результат попытки для раздела не найден");
       error.status = 404;
+      throw error;
+    }
+
+    // Проверка: все темы раздела должны быть завершены перед сдачей теста раздела
+    const topicsCheck = await progressRepo.areAllTopicsCompletedBySection({ sectionId: result.sectionId, userId }, { connection });
+    if (!topicsCheck.allCompleted) {
+      const error = new Error(`Для сдачи теста раздела необходимо завершить все темы (завершено ${topicsCheck.completed} из ${topicsCheck.total})`);
+      error.status = 409;
       throw error;
     }
 

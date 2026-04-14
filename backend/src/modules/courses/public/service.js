@@ -1,18 +1,26 @@
 ﻿const courseProgressService = require("../../../services/courseProgressService");
 const coursesRepository = require("./repository");
 const eventsRepo = require("../courseEvents.repository");
+const { listAssignedCourseIds } = require("../courseAssignments.repository");
 
 async function listCourses(userId, positionId, branchId) {
   return coursesRepository.listPublishedCoursesForUser(userId, positionId, branchId);
 }
 
-async function getCourse(courseId, userId) {
-  return coursesRepository.getCourseForUser(courseId, userId);
+async function getCourse(courseId, userId, userContext = {}) {
+  return coursesRepository.getCourseForUser(courseId, userId, userContext);
 }
 
-async function startCourse(courseId, userId) {
+async function startCourse(courseId, userId, { positionId = null, branchId = null } = {}) {
+  // Проверка доступа: курс должен быть назначен пользователю
+  const allowedIds = await listAssignedCourseIds(userId, positionId, branchId);
+  if (!allowedIds.has(Number(courseId))) {
+    const error = new Error("Курс недоступен");
+    error.status = 403;
+    throw error;
+  }
   await courseProgressService.startCourse({ courseId, userId });
-  return coursesRepository.getCourseForUser(courseId, userId);
+  return coursesRepository.getCourseForUser(courseId, userId, { positionId, branchId });
 }
 
 async function getCourseProgress(courseId, userId) {

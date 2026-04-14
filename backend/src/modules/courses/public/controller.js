@@ -30,7 +30,8 @@ async function listCourses(req, res, next) {
 async function getCourse(req, res, next) {
   try {
     const courseId = assertCourseId(req.params.id);
-    const course = await coursesService.getCourse(courseId, req.currentUser.id);
+    const { id, positionId, branchId } = req.currentUser;
+    const course = await coursesService.getCourse(courseId, id, { positionId, branchId });
     if (!course) {
       return res.status(404).json({ error: "Курс не найден или недоступен" });
     }
@@ -44,7 +45,8 @@ async function getCourse(req, res, next) {
 async function startCourse(req, res, next) {
   try {
     const courseId = assertCourseId(req.params.id);
-    const course = await coursesService.startCourse(courseId, req.currentUser.id);
+    const { id, positionId, branchId } = req.currentUser;
+    const course = await coursesService.startCourse(courseId, id, { positionId, branchId });
     res.status(201).json({ course });
   } catch (error) {
     handleControllerError(error, res, next);

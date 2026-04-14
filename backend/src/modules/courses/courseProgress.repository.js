@@ -33,7 +33,7 @@ async function findTopicWithSection(topicId, options = {}) {
   const executor = options.connection;
   const lock = options.forUpdate ? " FOR UPDATE" : "";
   const [rows] = await executor.execute(
-    `SELECT ct.id, ct.section_id, ct.course_id, ct.assessment_id, ct.has_material,
+    `SELECT ct.id, ct.section_id, ct.course_id, ct.assessment_id, ct.has_material, ct.order_index,
             cs.assessment_id AS section_assessment_id, c.status AS course_status
        FROM course_topics ct
        JOIN course_sections cs ON cs.id = ct.section_id
@@ -49,9 +49,47 @@ async function findTopicWithSection(topicId, options = {}) {
     courseId: Number(row.course_id),
     assessmentId: row.assessment_id ? Number(row.assessment_id) : null,
     hasMaterial: Boolean(row.has_material),
+    orderIndex: Number(row.order_index || 0),
     sectionAssessmentId: row.section_assessment_id ? Number(row.section_assessment_id) : null,
     courseStatus: row.course_status,
   };
+}
+
+/**
+ * Проверяет, завершена ли предыдущая тема в разделе.
+ * Если предыдущей темы нет — возвращает true (доступ разрешён).
+ */
+async function isPreviousTopicCompleted({ sectionId, orderIndex, userId }, options = {}) {
+  const executor = options.connection || pool;
+  const [rows] = await executor.execute(
+    `SELECT ctup.status
+       FROM course_topics ct
+       LEFT JOIN course_topic_user_progress ctup ON ctup.topic_id = ct.id AND ctup.user_id = ?
+      WHERE ct.section_id = ? AND ct.order_index < ?
+      ORDER BY ct.order_index DESC
+      LIMIT 1`,
+    [userId, sectionId, orderIndex],
+  );
+  if (!rows.length) return true;
+  return (rows[0].status || "not_started") === "completed";
+}
+
+/**
+ * Проверяет, завершены ли все темы раздела пользователем.
+ */
+async function areAllTopicsCompletedBySection({ sectionId, userId }, options = {}) {
+  const executor = options.connection || pool;
+  const [[row]] = await executor.execute(
+    `SELECT COUNT(*) AS total,
+            COUNT(CASE WHEN ctup.status = 'completed' THEN 1 END) AS completed
+       FROM course_topics ct
+       LEFT JOIN course_topic_user_progress ctup ON ctup.topic_id = ct.id AND ctup.user_id = ?
+      WHERE ct.section_id = ?`,
+    [userId, sectionId],
+  );
+  const total = Number(row?.total || 0);
+  const completed = Number(row?.completed || 0);
+  return { total, completed, allCompleted: total === 0 || total === completed };
 }
 
 // ─── Результаты попыток ──────────────────────────────────────────────────────
@@ -446,6 +484,8 @@ async function getSectionFailureStats(courseId) {
 module.exports = {
   findSectionWithCourse,
   findTopicWithSection,
+  isPreviousTopicCompleted,
+  areAllTopicsCompletedBySection,
   getSectionAttemptResult,
   getTopicAttemptResult,
   getFinalAttemptResult,
