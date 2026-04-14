@@ -33,33 +33,33 @@ async function getCourseProgress(courseId, userId) {
       available: finalAccess.allowed,
       reason: finalAccess.allowed ? null : finalAccess.reason,
       finalAssessmentId: finalAccess.finalAssessmentId || course.finalAssessmentId,
-      passedRequiredModules: finalAccess.passedRequiredModules || 0,
-      totalRequiredModules: finalAccess.totalRequiredModules || progress.totalModulesCount || 0,
+      passedRequiredSections: finalAccess.passedRequiredSections || 0,
+      totalRequiredSections: finalAccess.totalRequiredSections || 0,
     },
   };
 }
 
 async function completeModuleAttempt({ moduleId, attemptId, userId }) {
-  const result = await courseProgressService.handleModuleAttemptCompletion({
-    moduleId,
+  const result = await courseProgressService.handleSectionAttemptCompletion({
+    sectionId: moduleId,
     userId,
     attemptId,
   });
 
   return {
     module: {
-      id: result.moduleAttemptResult.moduleId,
-      assessmentId: result.moduleAttemptResult.assessmentId,
-      attemptId: result.moduleAttemptResult.attemptId,
-      attemptNumber: result.moduleAttemptResult.attemptNumber,
-      scorePercent: result.moduleAttemptResult.scorePercent,
-      passScorePercent: result.moduleAttemptResult.passScorePercent,
-      passed: result.moduleAttemptResult.passed,
+      id: result.result.sectionId,
+      assessmentId: result.result.assessmentId,
+      attemptId: result.result.attemptId,
+      attemptNumber: result.result.attemptNumber,
+      scorePercent: result.result.scorePercent,
+      passScorePercent: result.result.passScorePercent,
+      passed: result.result.passed,
     },
     progress: {
       progressPercent: result.aggregate.progressPercent,
-      passedRequiredModules: result.aggregate.passedRequiredModules,
-      totalRequiredModules: result.aggregate.totalRequiredModules,
+      passedRequiredSections: result.aggregate.passedRequiredSections,
+      totalRequiredSections: result.aggregate.totalRequiredSections,
     },
   };
 }
@@ -75,8 +75,8 @@ async function getFinalAssessmentAccess(courseId, userId) {
       available: finalAccess.allowed,
       finalAssessmentId: finalAccess.finalAssessmentId || null,
       reason: finalAccess.allowed ? null : finalAccess.reason,
-      passedRequiredModules: finalAccess.passedRequiredModules || 0,
-      totalRequiredModules: finalAccess.totalRequiredModules || 0,
+      passedRequiredSections: finalAccess.passedRequiredSections || 0,
+      totalRequiredSections: finalAccess.totalRequiredSections || 0,
     },
   };
 }
@@ -112,4 +112,3 @@ module.exports = {
   getFinalAssessmentAccess,
   completeFinalAttempt,
 };
-

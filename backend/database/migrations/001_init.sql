@@ -346,6 +346,7 @@ CREATE TABLE IF NOT EXISTS assessment_theory_completions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Добавляем внешний ключ к текущей версии теории в assessments
+ALTER TABLE assessments DROP FOREIGN KEY IF EXISTS fk_current_theory_version;
 ALTER TABLE assessments
   ADD CONSTRAINT fk_current_theory_version
     FOREIGN KEY (current_theory_version_id) REFERENCES assessment_theory_versions(id)
@@ -574,7 +575,10 @@ INSERT INTO system_settings (setting_key, setting_value, description) VALUES
   ('SUPERADMIN_IDS', '5089263300', 'Telegram ID суперадминов через запятую'),
   ('GAMIFICATION_ENABLED', 'true', 'Включить систему геймификации'),
   ('BOT_USERNAME', 'learningpf_bot', 'Username Telegram бота (без @) для генерации ссылок-приглашений'),
-  ('GAMIFICATION_RULES_ENABLED', 'true', 'Включить движок гибких правил геймификации')
+  ('GAMIFICATION_RULES_ENABLED', 'true', 'Включить движок гибких правил геймификации'),
+  ('COURSES_ENABLED', 'true', 'Включить модуль курсов для пользователей'),
+  ('COURSES_ENABLED_BRANCH_IDS', '', 'Список ID филиалов через запятую (пусто = все)'),
+  ('COURSES_ENABLED_POSITION_IDS', '', 'Список ID должностей через запятую (пусто = все)')
 ON DUPLICATE KEY UPDATE
   setting_value = VALUES(setting_value),
   description = VALUES(description);
@@ -621,7 +625,7 @@ ON DUPLICATE KEY UPDATE
 -- Дата создания: 2025-12-26
 
 ALTER TABLE users 
-ADD COLUMN timezone VARCHAR(64) DEFAULT 'UTC' AFTER password;
+ADD COLUMN IF NOT EXISTS timezone VARCHAR(64) DEFAULT 'UTC' AFTER password;
 
 -- Добавление индекса для ускорения поиска
-CREATE INDEX idx_timezone ON users(timezone);
+CREATE INDEX IF NOT EXISTS idx_timezone ON users(timezone);

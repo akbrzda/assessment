@@ -21,7 +21,7 @@
           </div>
           <div class="summary-row mb-16">
             <span class="body-small text-secondary">Пройдено модулей</span>
-            <span class="body-small">{{ course.progress.completedModulesCount || 0 }} / {{ course.progress.totalModulesCount || 0 }}</span>
+            <span class="body-small">{{ course.progress.completedSectionsCount || 0 }} / {{ course.progress.totalSectionsCount || 0 }}</span>
           </div>
 
           <button v-if="course.progress.status === 'not_started'" class="btn btn-primary btn-full" :disabled="isStarting" @click="startCourseFlow">
@@ -33,37 +33,41 @@
         <div id="modules-list" class="card mb-12">
           <h3 class="title-small mb-12">Модули курса</h3>
 
-          <div v-if="!course.modules.length" class="empty-state">
+          <div v-if="!course.sections.length" class="empty-state">
             <p class="body-small text-secondary">В курсе пока нет модулей.</p>
           </div>
 
           <div v-else class="modules-list">
-            <div v-for="(moduleItem, index) in course.modules" :key="moduleItem.id" class="module-card">
+            <div v-for="(sectionItem, index) in course.sections" :key="sectionItem.id" class="module-card">
               <div class="module-head">
                 <div class="module-order">Шаг {{ index + 1 }}</div>
-                <span class="badge" :class="getModuleStatusClass(moduleItem.progress.status)">
-                  {{ getModuleStatusText(moduleItem.progress.status) }}
+                <span class="badge" :class="getModuleStatusClass(sectionItem.progress.status)">
+                  {{ getModuleStatusText(sectionItem.progress.status) }}
                 </span>
               </div>
 
-              <h4 class="title-small mb-8">{{ moduleItem.title }}</h4>
-              <p v-if="moduleItem.description" class="body-small text-secondary mb-12">{{ moduleItem.description }}</p>
+              <h4 class="title-small mb-8">{{ sectionItem.title }}</h4>
+              <p v-if="sectionItem.description" class="body-small text-secondary mb-12">{{ sectionItem.description }}</p>
 
               <div class="module-meta mb-12">
                 <div class="info-item">
                   <span class="label">Оценка времени:</span>
-                  <span class="value">{{ moduleItem.estimatedMinutes ? `${moduleItem.estimatedMinutes} мин` : "—" }}</span>
+                  <span class="value">{{ sectionItem.estimatedMinutes ? `${sectionItem.estimatedMinutes} мин` : "—" }}</span>
                 </div>
                 <div class="info-item">
                   <span class="label">Попыток:</span>
-                  <span class="value">{{ moduleItem.progress.attemptCount || 0 }}</span>
+                  <span class="value">{{ sectionItem.progress.attemptCount || 0 }}</span>
                 </div>
               </div>
 
               <p v-if="isModuleLocked(index)" class="body-small lock-text mb-8">Сначала завершите предыдущие обязательные модули</p>
 
-              <button class="btn btn-primary btn-full" :disabled="isModuleLocked(index) || !moduleItem.assessmentId" @click="openModuleAssessment(moduleItem)">
-                {{ getModuleActionText(moduleItem, index) }}
+              <button
+                class="btn btn-primary btn-full"
+                :disabled="isModuleLocked(index) || !sectionItem.assessmentId"
+                @click="openModuleAssessment(sectionItem)"
+              >
+                {{ getModuleActionText(sectionItem, index) }}
               </button>
             </div>
           </div>
@@ -72,15 +76,19 @@
         <div class="card">
           <h3 class="title-small mb-12">Итоговая аттестация</h3>
           <p class="body-small text-secondary mb-12">
-            Доступ откроется после прохождения обязательных модулей: {{ course.finalAssessment.passedRequiredModules || 0 }} /
-            {{ course.finalAssessment.totalRequiredModules || 0 }}
+            Доступ откроется после прохождения обязательных модулей: {{ course.finalAssessment.passedRequiredSections || 0 }} /
+            {{ course.finalAssessment.totalRequiredSections || 0 }}
           </p>
 
           <p v-if="!course.finalAssessment.available" class="body-small lock-text mb-12">
             {{ getFinalReasonText(course.finalAssessment.reason) }}
           </p>
 
-          <button class="btn btn-primary btn-full" :disabled="!course.finalAssessment.available || !course.finalAssessment.id" @click="openFinalAssessment">
+          <button
+            class="btn btn-primary btn-full"
+            :disabled="!course.finalAssessment.available || !course.finalAssessment.id"
+            @click="openFinalAssessment"
+          >
             {{ getFinalActionText() }}
           </button>
         </div>
@@ -159,11 +167,11 @@ export default {
     }
 
     function isModuleLocked(index) {
-      if (!course.value?.modules?.length) {
+      if (!course.value?.sections?.length) {
         return true;
       }
 
-      return course.value.modules.slice(0, index).some((moduleItem) => moduleItem.isRequired && moduleItem.progress?.status !== "completed");
+      return course.value.sections.slice(0, index).some((sectionItem) => sectionItem.isRequired && sectionItem.progress?.status !== "completed");
     }
 
     function getModuleActionText(moduleItem, index) {

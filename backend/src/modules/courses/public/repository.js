@@ -1,23 +1,24 @@
-﻿const courseModel = require("../../../models/courseModel");
+﻿const coursesRepo = require("../courses.repository");
+const userViewRepo = require("../userCourseView.repository");
 
 async function listPublishedCoursesForUser(userId) {
-  return courseModel.listPublishedCoursesForUser(userId);
+  return userViewRepo.listPublishedCoursesForUser(userId);
 }
 
 async function getCourseForUser(courseId, userId) {
-  return courseModel.getCourseForUser(courseId, userId);
+  return userViewRepo.getCourseForUser(courseId, userId);
 }
 
 async function findCourseById(courseId) {
-  return courseModel.findById(courseId);
+  return coursesRepo.findById(courseId);
 }
 
 async function getCourseProgressForUser(courseId, userId) {
-  return courseModel.getCourseProgressForUser(courseId, userId);
+  return userViewRepo.getCourseProgressForUser(courseId, userId);
 }
 
 async function canAccessFinalAssessment(params) {
-  return courseModel.canAccessFinalAssessment(params);
+  return coursesRepo.canAccessFinalAssessment(params);
 }
 
 module.exports = {
@@ -27,4 +28,3 @@ module.exports = {
   getCourseProgressForUser,
   canAccessFinalAssessment,
 };
-

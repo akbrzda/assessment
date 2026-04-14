@@ -94,6 +94,16 @@ jobs:
             cd /var/www/backend.theorica.ru
             npm ci --production
 
+      - name: Run database migrations
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /var/www/backend.theorica.ru
+            npm run migrate
+
       - name: Restart application with PM2
         uses: appleboy/ssh-action@v1.0.0
         with:

@@ -38,17 +38,31 @@ function mapCourseRow(row) {
   };
 }
 
-function mapModuleRow(row) {
+function mapSectionRow(row) {
   return {
     id: Number(row.id),
     courseId: Number(row.course_id),
     title: row.title,
     description: row.description || "",
-    content: row.content || "",
     orderIndex: Number(row.order_index),
     assessmentId: row.assessment_id ? Number(row.assessment_id) : null,
     isRequired: Boolean(row.is_required),
     estimatedMinutes: row.estimated_minutes ? Number(row.estimated_minutes) : null,
+    createdAt: toIsoUtc(row.created_at),
+    updatedAt: toIsoUtc(row.updated_at),
+  };
+}
+
+function mapTopicRow(row) {
+  return {
+    id: Number(row.id),
+    sectionId: Number(row.section_id),
+    courseId: Number(row.course_id),
+    title: row.title,
+    orderIndex: Number(row.order_index),
+    hasMaterial: Boolean(row.has_material),
+    content: row.content || null,
+    assessmentId: row.assessment_id ? Number(row.assessment_id) : null,
     createdAt: toIsoUtc(row.created_at),
     updatedAt: toIsoUtc(row.updated_at),
   };
@@ -69,20 +83,50 @@ async function findById(courseId, options = {}) {
   return mapCourseRow(rows[0]);
 }
 
-async function listModulesByCourseId(courseId, options = {}) {
+async function listSectionsByCourseId(courseId, options = {}) {
   const { connection } = options;
   const executor = connection || pool;
   const lockClause = options.forUpdate ? " FOR UPDATE" : "";
 
   const [rows] = await executor.execute(
-    `SELECT id, course_id, title, description, content, order_index, assessment_id, is_required, estimated_minutes, created_at, updated_at
-       FROM course_modules
+    `SELECT id, course_id, title, description, order_index, assessment_id, is_required, estimated_minutes, created_at, updated_at
+       FROM course_sections
       WHERE course_id = ?
       ORDER BY order_index ASC${lockClause}`,
     [courseId],
   );
 
-  return rows.map(mapModuleRow);
+  return rows.map(mapSectionRow);
+}
+
+async function listTopicsBySectionId(sectionId, options = {}) {
+  const { connection } = options;
+  const executor = connection || pool;
+
+  const [rows] = await executor.execute(
+    `SELECT id, section_id, course_id, title, order_index, has_material, content, assessment_id, created_at, updated_at
+       FROM course_topics
+      WHERE section_id = ?
+      ORDER BY order_index ASC`,
+    [sectionId],
+  );
+
+  return rows.map(mapTopicRow);
+}
+
+async function listTopicsByCourseId(courseId, options = {}) {
+  const { connection } = options;
+  const executor = connection || pool;
+
+  const [rows] = await executor.execute(
+    `SELECT id, section_id, course_id, title, order_index, has_material, content, assessment_id, created_at, updated_at
+       FROM course_topics
+      WHERE course_id = ?
+      ORDER BY section_id ASC, order_index ASC`,
+    [courseId],
+  );
+
+  return rows.map(mapTopicRow);
 }
 
 async function validatePublicationIntegrity(courseId, options = {}) {
@@ -95,34 +139,47 @@ async function validatePublicationIntegrity(courseId, options = {}) {
       valid: false,
       errors: ["Курс не найден"],
       course: null,
-      modules: [],
+      sections: [],
     };
   }
 
-  const modules = await listModulesByCourseId(courseId, { connection });
+  const sections = await listSectionsByCourseId(courseId, { connection });
   const errors = [];
 
-  if (!course.finalAssessmentId) {
-    errors.push("Для публикации курса необходимо указать итоговую аттестацию");
-  } else {
+  // Итоговая аттестация опциональна — проверяем только если указана
+  if (course.finalAssessmentId) {
     const [finalAssessmentRows] = await executor.execute("SELECT id FROM assessments WHERE id = ? LIMIT 1", [course.finalAssessmentId]);
     if (!finalAssessmentRows.length) {
-      errors.push("Итоговая аттестация курса не найдена");
+      errors.push("Указанная итоговая аттестация курса не найдена");
     }
   }
 
-  if (!modules.length) {
-    errors.push("Для публикации курса необходим минимум один модуль");
+  if (!sections.length) {
+    errors.push("Для публикации курса необходим минимум один раздел");
   }
 
-  for (const moduleItem of modules) {
-    if (!moduleItem.assessmentId) {
-      errors.push(`Для модуля "${moduleItem.title}" не назначена аттестация`);
+  for (const section of sections) {
+    if (!section.assessmentId) {
+      errors.push(`Раздел "${section.title}": не назначен тест раздела`);
       continue;
     }
-    const [assessmentRows] = await executor.execute("SELECT id FROM assessments WHERE id = ? LIMIT 1", [moduleItem.assessmentId]);
+
+    const [assessmentRows] = await executor.execute("SELECT id FROM assessments WHERE id = ? LIMIT 1", [section.assessmentId]);
     if (!assessmentRows.length) {
-      errors.push(`Аттестация модуля "${moduleItem.title}" не найдена`);
+      errors.push(`Раздел "${section.title}": тест раздела не найден`);
+      continue;
+    }
+
+    const topics = await listTopicsBySectionId(section.id, { connection });
+    if (!topics.length) {
+      errors.push(`Раздел "${section.title}": должна быть хотя бы одна тема`);
+      continue;
+    }
+
+    for (const topic of topics) {
+      if (!topic.hasMaterial && !topic.assessmentId) {
+        errors.push(`Раздел "${section.title}", тема "${topic.title}": должна содержать материал или тест`);
+      }
     }
   }
 
@@ -130,7 +187,7 @@ async function validatePublicationIntegrity(courseId, options = {}) {
     valid: errors.length === 0,
     errors,
     course,
-    modules,
+    sections,
   };
 }
 
@@ -185,7 +242,7 @@ async function archiveCourse(courseId, userId) {
   return result.affectedRows > 0;
 }
 
-function buildCourseSnapshot(course, modules) {
+function buildCourseSnapshot(course, sections, topicsBySectionId) {
   return {
     course: {
       id: course.id,
@@ -194,15 +251,21 @@ function buildCourseSnapshot(course, modules) {
       version: course.version,
       finalAssessmentId: course.finalAssessmentId,
     },
-    modules: modules.map((moduleItem) => ({
-      id: moduleItem.id,
-      title: moduleItem.title,
-      description: moduleItem.description,
-      content: moduleItem.content,
-      orderIndex: moduleItem.orderIndex,
-      assessmentId: moduleItem.assessmentId,
-      isRequired: moduleItem.isRequired,
-      estimatedMinutes: moduleItem.estimatedMinutes,
+    sections: sections.map((section) => ({
+      id: section.id,
+      title: section.title,
+      description: section.description,
+      orderIndex: section.orderIndex,
+      assessmentId: section.assessmentId,
+      isRequired: section.isRequired,
+      estimatedMinutes: section.estimatedMinutes,
+      topics: (topicsBySectionId[section.id] || []).map((topic) => ({
+        id: topic.id,
+        title: topic.title,
+        orderIndex: topic.orderIndex,
+        hasMaterial: topic.hasMaterial,
+        assessmentId: topic.assessmentId,
+      })),
     })),
   };
 }
@@ -231,15 +294,15 @@ async function listPublishedCoursesForUser(userId) {
        cup.last_activity_at AS user_last_activity_at,
        (
          SELECT COUNT(*)
-         FROM course_modules cm
-         WHERE cm.course_id = c.id
-       ) AS modules_count,
+         FROM course_sections cs
+         WHERE cs.course_id = c.id
+       ) AS sections_count,
        (
          SELECT COUNT(*)
-         FROM course_modules cm
-         WHERE cm.course_id = c.id
-           AND cm.is_required = 1
-       ) AS required_modules_count
+         FROM course_sections cs
+         WHERE cs.course_id = c.id
+           AND cs.is_required = 1
+       ) AS required_sections_count
      FROM courses c
      LEFT JOIN course_user_progress cup
        ON cup.course_id = c.id
@@ -253,13 +316,13 @@ async function listPublishedCoursesForUser(userId) {
     const course = mapCourseRow(row);
     return {
       ...course,
-      modulesCount: Number(row.modules_count || 0),
-      requiredModulesCount: Number(row.required_modules_count || 0),
+      sectionsCount: Number(row.sections_count || 0),
+      requiredSectionsCount: Number(row.required_sections_count || 0),
       progress: {
         status: row.user_status || "not_started",
         progressPercent: row.progress_percent != null ? Number(row.progress_percent) : 0,
-        completedModulesCount: row.completed_modules_count != null ? Number(row.completed_modules_count) : 0,
-        totalModulesCount: row.total_modules_count != null ? Number(row.total_modules_count) : Number(row.required_modules_count || 0),
+        completedSectionsCount: row.completed_modules_count != null ? Number(row.completed_modules_count) : 0,
+        totalSectionsCount: row.total_modules_count != null ? Number(row.total_modules_count) : Number(row.required_sections_count || 0),
         startedAt: toIsoUtc(row.user_started_at),
         completedAt: toIsoUtc(row.user_completed_at),
         lastActivityAt: toIsoUtc(row.user_last_activity_at),
@@ -335,45 +398,128 @@ async function getCourseForUser(courseId, userId) {
   const row = courseRows[0];
   const course = mapCourseRow(row);
 
-  const [moduleRows] = await pool.execute(
+  // Загружаем разделы с прогрессом
+  const [sectionRows] = await pool.execute(
     `SELECT
-       cm.id,
-       cm.course_id,
-       cm.title,
-       cm.description,
-       cm.content,
-       cm.order_index,
-       cm.assessment_id,
-       cm.is_required,
-       cm.estimated_minutes,
-       cm.created_at,
-       cm.updated_at,
-       cmup.status AS user_module_status,
-       cmup.best_score_percent,
-       cmup.attempt_count,
-       cmup.last_attempt_id,
-       cmup.started_at AS user_started_at,
-       cmup.completed_at AS user_completed_at
-     FROM course_modules cm
-     LEFT JOIN course_module_user_progress cmup
-       ON cmup.module_id = cm.id
-      AND cmup.user_id = ?
-     WHERE cm.course_id = ?
-     ORDER BY cm.order_index ASC`,
+       cs.id,
+       cs.course_id,
+       cs.title,
+       cs.description,
+       cs.order_index,
+       cs.assessment_id,
+       cs.is_required,
+       cs.estimated_minutes,
+       cs.created_at,
+       cs.updated_at,
+       csup.status AS user_section_status,
+       csup.best_score_percent AS section_best_score,
+       csup.attempt_count AS section_attempt_count,
+       csup.last_attempt_id AS section_last_attempt_id,
+       csup.started_at AS section_started_at,
+       csup.completed_at AS section_completed_at
+     FROM course_sections cs
+     LEFT JOIN course_section_user_progress csup
+       ON csup.section_id = cs.id
+      AND csup.user_id = ?
+     WHERE cs.course_id = ?
+     ORDER BY cs.order_index ASC`,
     [userId, courseId],
   );
 
-  const modules = moduleRows.map((moduleRow) => ({
-    ...mapModuleRow(moduleRow),
-    progress: {
-      status: moduleRow.user_module_status || "not_started",
-      bestScorePercent: moduleRow.best_score_percent != null ? Number(moduleRow.best_score_percent) : null,
-      attemptCount: moduleRow.attempt_count != null ? Number(moduleRow.attempt_count) : 0,
-      lastAttemptId: moduleRow.last_attempt_id != null ? Number(moduleRow.last_attempt_id) : null,
-      startedAt: toIsoUtc(moduleRow.user_started_at),
-      completedAt: toIsoUtc(moduleRow.user_completed_at),
-    },
-  }));
+  // Загружаем все темы курса с прогрессом одним запросом
+  const [topicRows] = await pool.execute(
+    `SELECT
+       ct.id,
+       ct.section_id,
+       ct.course_id,
+       ct.title,
+       ct.order_index,
+       ct.has_material,
+       ct.content,
+       ct.assessment_id,
+       ct.created_at,
+       ct.updated_at,
+       ctup.status AS user_topic_status,
+       ctup.material_viewed,
+       ctup.best_score_percent AS topic_best_score,
+       ctup.attempt_count AS topic_attempt_count,
+       ctup.last_attempt_id AS topic_last_attempt_id,
+       ctup.completed_at AS topic_completed_at
+     FROM course_topics ct
+     LEFT JOIN course_topic_user_progress ctup
+       ON ctup.topic_id = ct.id
+      AND ctup.user_id = ?
+     WHERE ct.course_id = ?
+     ORDER BY ct.section_id ASC, ct.order_index ASC`,
+    [userId, courseId],
+  );
+
+  // Группируем темы по section_id
+  const topicsBySectionId = {};
+  for (const topicRow of topicRows) {
+    const sId = Number(topicRow.section_id);
+    if (!topicsBySectionId[sId]) {
+      topicsBySectionId[sId] = [];
+    }
+    topicsBySectionId[sId].push({
+      ...mapTopicRow(topicRow),
+      progress: {
+        status: topicRow.user_topic_status || "not_started",
+        materialViewed: Boolean(topicRow.material_viewed),
+        bestScorePercent: topicRow.topic_best_score != null ? Number(topicRow.topic_best_score) : null,
+        attemptCount: topicRow.topic_attempt_count != null ? Number(topicRow.topic_attempt_count) : 0,
+        lastAttemptId: topicRow.topic_last_attempt_id != null ? Number(topicRow.topic_last_attempt_id) : null,
+        completedAt: toIsoUtc(topicRow.topic_completed_at),
+      },
+    });
+  }
+
+  // Вычисляем статусы блокировки разделов и тем
+  const sections = sectionRows.map((sectionRow, sectionIndex) => {
+    const section = mapSectionRow(sectionRow);
+    const sectionProgress = {
+      status: sectionRow.user_section_status || "not_started",
+      bestScorePercent: sectionRow.section_best_score != null ? Number(sectionRow.section_best_score) : null,
+      attemptCount: sectionRow.section_attempt_count != null ? Number(sectionRow.section_attempt_count) : 0,
+      lastAttemptId: sectionRow.section_last_attempt_id != null ? Number(sectionRow.section_last_attempt_id) : null,
+      startedAt: toIsoUtc(sectionRow.section_started_at),
+      completedAt: toIsoUtc(sectionRow.section_completed_at),
+    };
+
+    // Раздел заблокирован, если предыдущий ОБЯЗАТЕЛЬНЫЙ раздел не пройден
+    const prevRequiredSections = sectionRows.slice(0, sectionIndex).filter((s) => Boolean(s.is_required));
+    const isLocked = prevRequiredSections.some((s) => (s.user_section_status || "not_started") !== "passed");
+
+    const topics = (topicsBySectionId[section.id] || []).map((topic, topicIndex) => {
+      // Тема заблокирована, если раздел заблокирован или предыдущая тема не завершена
+      const prevTopic = topicsBySectionId[section.id]?.[topicIndex - 1];
+      const isTopicLocked = isLocked || (prevTopic && prevTopic.progress.status !== "completed");
+
+      return {
+        ...topic,
+        progress: {
+          ...topic.progress,
+          locked: isTopicLocked,
+        },
+      };
+    });
+
+    // Все темы раздела завершены?
+    const allTopicsCompleted = topics.length > 0 && topics.every((t) => t.progress.status === "completed");
+    // Тест раздела доступен?
+    const sectionTestAvailable = !isLocked && allTopicsCompleted && !!section.assessmentId;
+
+    return {
+      ...section,
+      progress: {
+        ...sectionProgress,
+        locked: isLocked,
+        allTopicsCompleted,
+        sectionTestAvailable,
+      },
+      topics,
+    };
+  });
 
   const finalAccess = await canAccessFinalAssessment({ courseId, userId });
   const snapshot = await getCourseSnapshot(courseId, userId);
@@ -383,19 +529,19 @@ async function getCourseForUser(courseId, userId) {
     progress: {
       status: row.user_status || "not_started",
       progressPercent: row.progress_percent != null ? Number(row.progress_percent) : 0,
-      completedModulesCount: row.completed_modules_count != null ? Number(row.completed_modules_count) : 0,
-      totalModulesCount: row.total_modules_count != null ? Number(row.total_modules_count) : modules.filter((item) => item.isRequired).length,
+      completedSectionsCount: row.completed_modules_count != null ? Number(row.completed_modules_count) : 0,
+      totalSectionsCount: row.total_modules_count != null ? Number(row.total_modules_count) : sections.filter((s) => s.isRequired).length,
       startedAt: toIsoUtc(row.user_started_at),
       completedAt: toIsoUtc(row.user_completed_at),
       lastActivityAt: toIsoUtc(row.user_last_activity_at),
     },
-    modules,
+    sections,
     finalAssessment: {
       id: course.finalAssessmentId,
       available: finalAccess.allowed,
       reason: finalAccess.allowed ? null : finalAccess.reason,
-      passedRequiredModules: finalAccess.passedRequiredModules || 0,
-      totalRequiredModules: finalAccess.totalRequiredModules || modules.filter((item) => item.isRequired).length,
+      passedRequiredSections: finalAccess.passedRequiredSections || 0,
+      totalRequiredSections: finalAccess.totalRequiredSections || sections.filter((s) => s.isRequired).length,
     },
     snapshot,
   };
@@ -421,8 +567,8 @@ async function getCourseProgressForUser(courseId, userId) {
     return {
       status: "not_started",
       progressPercent: 0,
-      completedModulesCount: 0,
-      totalModulesCount: 0,
+      completedSectionsCount: 0,
+      totalSectionsCount: 0,
       startedAt: null,
       completedAt: null,
       lastActivityAt: null,
@@ -433,8 +579,8 @@ async function getCourseProgressForUser(courseId, userId) {
   return {
     status: row.status,
     progressPercent: row.progress_percent != null ? Number(row.progress_percent) : 0,
-    completedModulesCount: row.completed_modules_count != null ? Number(row.completed_modules_count) : 0,
-    totalModulesCount: row.total_modules_count != null ? Number(row.total_modules_count) : 0,
+    completedSectionsCount: row.completed_modules_count != null ? Number(row.completed_modules_count) : 0,
+    totalSectionsCount: row.total_modules_count != null ? Number(row.total_modules_count) : 0,
     startedAt: toIsoUtc(row.started_at),
     completedAt: toIsoUtc(row.completed_at),
     lastActivityAt: toIsoUtc(row.last_activity_at),
@@ -474,9 +620,9 @@ async function listCoursesForAdmin({ status, search } = {}) {
        c.updated_at,
        (
          SELECT COUNT(*)
-         FROM course_modules cm
-         WHERE cm.course_id = c.id
-       ) AS modules_count
+         FROM course_sections cs
+         WHERE cs.course_id = c.id
+       ) AS sections_count
      FROM courses c
      ${whereClause}
      ORDER BY c.updated_at DESC, c.id DESC`,
@@ -485,7 +631,7 @@ async function listCoursesForAdmin({ status, search } = {}) {
 
   return rows.map((row) => ({
     ...mapCourseRow(row),
-    modulesCount: Number(row.modules_count || 0),
+    sectionsCount: Number(row.sections_count || 0),
   }));
 }
 
@@ -495,12 +641,21 @@ async function getCourseByIdForAdmin(courseId) {
     return null;
   }
 
-  const modules = await listModulesByCourseId(courseId);
+  const sections = await listSectionsByCourseId(courseId);
+
+  // Загружаем темы для каждого раздела
+  const sectionsWithTopics = await Promise.all(
+    sections.map(async (section) => {
+      const topics = await listTopicsBySectionId(section.id);
+      return { ...section, topics };
+    }),
+  );
+
   const integrity = await validatePublicationIntegrity(courseId);
 
   return {
     ...course,
-    modules,
+    sections: sectionsWithTopics,
     publication: {
       valid: integrity.valid,
       errors: integrity.errors,
@@ -579,7 +734,7 @@ async function deleteCourse(courseId) {
   }
 }
 
-async function createCourseModule(courseId, { title, description, content, orderIndex, assessmentId, isRequired, estimatedMinutes }, userId) {
+async function createCourseSection(courseId, { title, description, orderIndex, assessmentId, isRequired, estimatedMinutes }, userId) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -593,12 +748,15 @@ async function createCourseModule(courseId, { title, description, content, order
 
     let targetOrderIndex = orderIndex;
     if (targetOrderIndex === undefined || targetOrderIndex === null) {
-      const [[orderRow]] = await connection.execute("SELECT COALESCE(MAX(order_index), 0) AS max_order FROM course_modules WHERE course_id = ?", [courseId]);
+      const [[orderRow]] = await connection.execute("SELECT COALESCE(MAX(order_index), 0) AS max_order FROM course_sections WHERE course_id = ?", [
+        courseId,
+      ]);
       targetOrderIndex = Number(orderRow.max_order || 0) + 1;
     }
 
+    // Сдвигаем существующие разделы при вставке в конкретную позицию
     await connection.execute(
-      `UPDATE course_modules
+      `UPDATE course_sections
           SET order_index = order_index + 1
         WHERE course_id = ?
           AND order_index >= ?`,
@@ -606,44 +764,25 @@ async function createCourseModule(courseId, { title, description, content, order
     );
 
     const [result] = await connection.execute(
-      `INSERT INTO course_modules
-        (course_id, title, description, content, order_index, assessment_id, is_required, estimated_minutes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
-      [
-        courseId,
-        title,
-        description || "",
-        content || "",
-        targetOrderIndex,
-        assessmentId || null,
-        isRequired ? 1 : 0,
-        estimatedMinutes || null,
-      ],
+      `INSERT INTO course_sections
+        (course_id, title, description, order_index, assessment_id, is_required, estimated_minutes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
+      [courseId, title, description || "", targetOrderIndex, assessmentId || null, isRequired ? 1 : 0, estimatedMinutes || null],
     );
 
     if (courseRows[0].status === "published") {
-      await connection.execute(
-        `UPDATE courses
-            SET version = version + 1,
-                updated_by = ?,
-                updated_at = UTC_TIMESTAMP()
-          WHERE id = ?`,
-        [userId || null, courseId],
-      );
+      await connection.execute(`UPDATE courses SET version = version + 1, updated_by = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?`, [
+        userId || null,
+        courseId,
+      ]);
     } else {
-      await connection.execute(
-        `UPDATE courses
-            SET updated_by = ?,
-                updated_at = UTC_TIMESTAMP()
-          WHERE id = ?`,
-        [userId || null, courseId],
-      );
+      await connection.execute(`UPDATE courses SET updated_by = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?`, [userId || null, courseId]);
     }
 
     await connection.commit();
 
-    const modules = await listModulesByCourseId(courseId);
-    return modules.find((item) => item.id === result.insertId) || null;
+    const sections = await listSectionsByCourseId(courseId);
+    return sections.find((s) => s.id === result.insertId) || null;
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -652,26 +791,22 @@ async function createCourseModule(courseId, { title, description, content, order
   }
 }
 
-async function updateCourseModule(moduleId, payload, userId) {
+async function updateCourseSection(sectionId, payload, userId) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
-    const [moduleRows] = await connection.execute(
-      `SELECT id, course_id, order_index
-         FROM course_modules
-        WHERE id = ?
-        LIMIT 1 FOR UPDATE`,
-      [moduleId],
-    );
-    if (!moduleRows.length) {
-      const error = new Error("Модуль не найден");
+    const [sectionRows] = await connection.execute("SELECT id, course_id, order_index FROM course_sections WHERE id = ? LIMIT 1 FOR UPDATE", [
+      sectionId,
+    ]);
+    if (!sectionRows.length) {
+      const error = new Error("Раздел не найден");
       error.status = 404;
       throw error;
     }
-    const moduleRow = moduleRows[0];
+    const sectionRow = sectionRows[0];
 
-    const [courseRows] = await connection.execute("SELECT id, status FROM courses WHERE id = ? FOR UPDATE", [moduleRow.course_id]);
+    const [courseRows] = await connection.execute("SELECT id, status FROM courses WHERE id = ? FOR UPDATE", [sectionRow.course_id]);
     if (!courseRows.length) {
       const error = new Error("Курс не найден");
       error.status = 404;
@@ -680,6 +815,7 @@ async function updateCourseModule(moduleId, payload, userId) {
 
     const fields = [];
     const params = [];
+
     if (payload.title !== undefined) {
       fields.push("title = ?");
       params.push(payload.title);
@@ -687,10 +823,6 @@ async function updateCourseModule(moduleId, payload, userId) {
     if (payload.description !== undefined) {
       fields.push("description = ?");
       params.push(payload.description || "");
-    }
-    if (payload.content !== undefined) {
-      fields.push("content = ?");
-      params.push(payload.content || "");
     }
     if (payload.assessmentId !== undefined) {
       fields.push("assessment_id = ?");
@@ -705,27 +837,19 @@ async function updateCourseModule(moduleId, payload, userId) {
       params.push(payload.estimatedMinutes || null);
     }
 
-    if (payload.orderIndex !== undefined && payload.orderIndex !== null && Number(payload.orderIndex) !== Number(moduleRow.order_index)) {
+    if (payload.orderIndex !== undefined && payload.orderIndex !== null && Number(payload.orderIndex) !== Number(sectionRow.order_index)) {
       const targetOrder = Number(payload.orderIndex);
-      const currentOrder = Number(moduleRow.order_index);
+      const currentOrder = Number(sectionRow.order_index);
 
       if (targetOrder > currentOrder) {
         await connection.execute(
-          `UPDATE course_modules
-              SET order_index = order_index - 1
-            WHERE course_id = ?
-              AND order_index > ?
-              AND order_index <= ?`,
-          [moduleRow.course_id, currentOrder, targetOrder],
+          "UPDATE course_sections SET order_index = order_index - 1 WHERE course_id = ? AND order_index > ? AND order_index <= ?",
+          [sectionRow.course_id, currentOrder, targetOrder],
         );
       } else {
         await connection.execute(
-          `UPDATE course_modules
-              SET order_index = order_index + 1
-            WHERE course_id = ?
-              AND order_index >= ?
-              AND order_index < ?`,
-          [moduleRow.course_id, targetOrder, currentOrder],
+          "UPDATE course_sections SET order_index = order_index + 1 WHERE course_id = ? AND order_index >= ? AND order_index < ?",
+          [sectionRow.course_id, targetOrder, currentOrder],
         );
       }
       fields.push("order_index = ?");
@@ -734,32 +858,25 @@ async function updateCourseModule(moduleId, payload, userId) {
 
     if (fields.length > 0) {
       fields.push("updated_at = UTC_TIMESTAMP()");
-      params.push(moduleId);
-      await connection.execute(`UPDATE course_modules SET ${fields.join(", ")} WHERE id = ?`, params);
+      params.push(sectionId);
+      await connection.execute(`UPDATE course_sections SET ${fields.join(", ")} WHERE id = ?`, params);
     }
 
     if (courseRows[0].status === "published") {
-      await connection.execute(
-        `UPDATE courses
-            SET version = version + 1,
-                updated_by = ?,
-                updated_at = UTC_TIMESTAMP()
-          WHERE id = ?`,
-        [userId || null, moduleRow.course_id],
-      );
+      await connection.execute("UPDATE courses SET version = version + 1, updated_by = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?", [
+        userId || null,
+        sectionRow.course_id,
+      ]);
     } else {
-      await connection.execute(
-        `UPDATE courses
-            SET updated_by = ?,
-                updated_at = UTC_TIMESTAMP()
-          WHERE id = ?`,
-        [userId || null, moduleRow.course_id],
-      );
+      await connection.execute("UPDATE courses SET updated_by = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?", [
+        userId || null,
+        sectionRow.course_id,
+      ]);
     }
 
     await connection.commit();
-    const modules = await listModulesByCourseId(moduleRow.course_id);
-    return modules.find((item) => item.id === Number(moduleId)) || null;
+    const sections = await listSectionsByCourseId(sectionRow.course_id);
+    return sections.find((s) => s.id === Number(sectionId)) || null;
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -768,58 +885,44 @@ async function updateCourseModule(moduleId, payload, userId) {
   }
 }
 
-async function deleteCourseModule(moduleId, userId) {
+async function deleteCourseSection(sectionId, userId) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
-    const [moduleRows] = await connection.execute(
-      `SELECT id, course_id, order_index
-         FROM course_modules
-        WHERE id = ?
-        LIMIT 1 FOR UPDATE`,
-      [moduleId],
-    );
-    if (!moduleRows.length) {
-      const error = new Error("Модуль не найден");
+    const [sectionRows] = await connection.execute("SELECT id, course_id, order_index FROM course_sections WHERE id = ? LIMIT 1 FOR UPDATE", [
+      sectionId,
+    ]);
+    if (!sectionRows.length) {
+      const error = new Error("Раздел не найден");
       error.status = 404;
       throw error;
     }
 
-    const moduleRow = moduleRows[0];
+    const sectionRow = sectionRows[0];
 
-    await connection.execute("DELETE FROM course_modules WHERE id = ?", [moduleId]);
+    await connection.execute("DELETE FROM course_sections WHERE id = ?", [sectionId]);
 
-    await connection.execute(
-      `UPDATE course_modules
-          SET order_index = order_index - 1
-        WHERE course_id = ?
-          AND order_index > ?`,
-      [moduleRow.course_id, moduleRow.order_index],
-    );
+    await connection.execute("UPDATE course_sections SET order_index = order_index - 1 WHERE course_id = ? AND order_index > ?", [
+      sectionRow.course_id,
+      sectionRow.order_index,
+    ]);
 
-    const [courseRows] = await connection.execute("SELECT status FROM courses WHERE id = ? FOR UPDATE", [moduleRow.course_id]);
+    const [courseRows] = await connection.execute("SELECT status FROM courses WHERE id = ? FOR UPDATE", [sectionRow.course_id]);
     if (courseRows.length && courseRows[0].status === "published") {
-      await connection.execute(
-        `UPDATE courses
-            SET version = version + 1,
-                updated_by = ?,
-                updated_at = UTC_TIMESTAMP()
-          WHERE id = ?`,
-        [userId || null, moduleRow.course_id],
-      );
+      await connection.execute("UPDATE courses SET version = version + 1, updated_by = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?", [
+        userId || null,
+        sectionRow.course_id,
+      ]);
     } else {
-      await connection.execute(
-        `UPDATE courses
-            SET updated_by = ?,
-                updated_at = UTC_TIMESTAMP()
-          WHERE id = ?`,
-        [userId || null, moduleRow.course_id],
-      );
+      await connection.execute("UPDATE courses SET updated_by = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?", [
+        userId || null,
+        sectionRow.course_id,
+      ]);
     }
 
     await connection.commit();
-    return { courseId: Number(moduleRow.course_id) };
+    return { courseId: Number(sectionRow.course_id) };
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -828,7 +931,177 @@ async function deleteCourseModule(moduleId, userId) {
   }
 }
 
-async function upsertCourseProgressOnStart({ courseId, userId, totalModulesCount, connection }) {
+async function createCourseTopic(sectionId, { title, orderIndex, hasMaterial, content, assessmentId }, userId) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [sectionRows] = await connection.execute("SELECT id, course_id FROM course_sections WHERE id = ? FOR UPDATE", [sectionId]);
+    if (!sectionRows.length) {
+      const error = new Error("Раздел не найден");
+      error.status = 404;
+      throw error;
+    }
+    const { course_id: courseId } = sectionRows[0];
+
+    if (!hasMaterial && !assessmentId) {
+      const error = new Error("Тема должна содержать материал или тест");
+      error.status = 422;
+      throw error;
+    }
+
+    let targetOrderIndex = orderIndex;
+    if (targetOrderIndex === undefined || targetOrderIndex === null) {
+      const [[orderRow]] = await connection.execute("SELECT COALESCE(MAX(order_index), 0) AS max_order FROM course_topics WHERE section_id = ?", [
+        sectionId,
+      ]);
+      targetOrderIndex = Number(orderRow.max_order || 0) + 1;
+    }
+
+    await connection.execute("UPDATE course_topics SET order_index = order_index + 1 WHERE section_id = ? AND order_index >= ?", [
+      sectionId,
+      targetOrderIndex,
+    ]);
+
+    const [result] = await connection.execute(
+      `INSERT INTO course_topics
+        (section_id, course_id, title, order_index, has_material, content, assessment_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
+      [sectionId, courseId, title, targetOrderIndex, hasMaterial ? 1 : 0, content || null, assessmentId || null],
+    );
+
+    await connection.execute("UPDATE courses SET updated_by = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?", [userId || null, courseId]);
+
+    await connection.commit();
+
+    const topics = await listTopicsBySectionId(sectionId);
+    return topics.find((t) => t.id === result.insertId) || null;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function updateCourseTopic(topicId, payload, userId) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [topicRows] = await connection.execute(
+      "SELECT id, section_id, course_id, order_index, has_material, assessment_id FROM course_topics WHERE id = ? LIMIT 1 FOR UPDATE",
+      [topicId],
+    );
+    if (!topicRows.length) {
+      const error = new Error("Тема не найдена");
+      error.status = 404;
+      throw error;
+    }
+    const topicRow = topicRows[0];
+
+    const resolvedHasMaterial = payload.hasMaterial !== undefined ? payload.hasMaterial : Boolean(topicRow.has_material);
+    const resolvedAssessmentId = payload.assessmentId !== undefined ? payload.assessmentId || null : topicRow.assessment_id;
+
+    if (!resolvedHasMaterial && !resolvedAssessmentId) {
+      const error = new Error("Тема должна содержать материал или тест");
+      error.status = 422;
+      throw error;
+    }
+
+    const fields = [];
+    const params = [];
+
+    if (payload.title !== undefined) {
+      fields.push("title = ?");
+      params.push(payload.title);
+    }
+    if (payload.hasMaterial !== undefined) {
+      fields.push("has_material = ?");
+      params.push(payload.hasMaterial ? 1 : 0);
+    }
+    if (payload.content !== undefined) {
+      fields.push("content = ?");
+      params.push(payload.content || null);
+    }
+    if (payload.assessmentId !== undefined) {
+      fields.push("assessment_id = ?");
+      params.push(payload.assessmentId || null);
+    }
+
+    if (payload.orderIndex !== undefined && Number(payload.orderIndex) !== Number(topicRow.order_index)) {
+      const targetOrder = Number(payload.orderIndex);
+      const currentOrder = Number(topicRow.order_index);
+
+      if (targetOrder > currentOrder) {
+        await connection.execute(
+          "UPDATE course_topics SET order_index = order_index - 1 WHERE section_id = ? AND order_index > ? AND order_index <= ?",
+          [topicRow.section_id, currentOrder, targetOrder],
+        );
+      } else {
+        await connection.execute(
+          "UPDATE course_topics SET order_index = order_index + 1 WHERE section_id = ? AND order_index >= ? AND order_index < ?",
+          [topicRow.section_id, targetOrder, currentOrder],
+        );
+      }
+      fields.push("order_index = ?");
+      params.push(targetOrder);
+    }
+
+    if (fields.length > 0) {
+      fields.push("updated_at = UTC_TIMESTAMP()");
+      params.push(topicId);
+      await connection.execute(`UPDATE course_topics SET ${fields.join(", ")} WHERE id = ?`, params);
+    }
+
+    await connection.execute("UPDATE courses SET updated_by = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?", [userId || null, topicRow.course_id]);
+
+    await connection.commit();
+    const topics = await listTopicsBySectionId(topicRow.section_id);
+    return topics.find((t) => t.id === Number(topicId)) || null;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function deleteCourseTopic(topicId, userId) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [topicRows] = await connection.execute("SELECT id, section_id, course_id, order_index FROM course_topics WHERE id = ? LIMIT 1 FOR UPDATE", [
+      topicId,
+    ]);
+    if (!topicRows.length) {
+      const error = new Error("Тема не найдена");
+      error.status = 404;
+      throw error;
+    }
+    const topicRow = topicRows[0];
+
+    await connection.execute("DELETE FROM course_topics WHERE id = ?", [topicId]);
+
+    await connection.execute("UPDATE course_topics SET order_index = order_index - 1 WHERE section_id = ? AND order_index > ?", [
+      topicRow.section_id,
+      topicRow.order_index,
+    ]);
+
+    await connection.execute("UPDATE courses SET updated_by = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?", [userId || null, topicRow.course_id]);
+
+    await connection.commit();
+    return { courseId: Number(topicRow.course_id), sectionId: Number(topicRow.section_id) };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function upsertCourseProgressOnStart({ courseId, userId, totalRequiredSectionsCount, connection }) {
   await connection.execute(
     `INSERT INTO course_user_progress
       (course_id, user_id, status, progress_percent, completed_modules_count, total_modules_count, started_at, last_activity_at, created_at, updated_at)
@@ -839,24 +1112,38 @@ async function upsertCourseProgressOnStart({ courseId, userId, totalModulesCount
        started_at = IF(started_at IS NULL, UTC_TIMESTAMP(), started_at),
        last_activity_at = UTC_TIMESTAMP(),
        updated_at = UTC_TIMESTAMP()`,
-    [courseId, userId, totalModulesCount],
+    [courseId, userId, totalRequiredSectionsCount],
   );
 }
 
-async function ensureModuleProgressOnStart({ courseId, userId, modules, connection }) {
-  for (const moduleItem of modules) {
+async function ensureSectionAndTopicProgressOnStart({ courseId, userId, sections, topicsBySectionId, connection }) {
+  for (const section of sections) {
     await connection.execute(
-      `INSERT INTO course_module_user_progress
-        (course_id, module_id, user_id, status, attempt_count, created_at, updated_at)
+      `INSERT INTO course_section_user_progress
+        (course_id, section_id, user_id, status, attempt_count, created_at, updated_at)
        VALUES (?, ?, ?, 'not_started', 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())
        ON DUPLICATE KEY UPDATE updated_at = UTC_TIMESTAMP()`,
-      [courseId, moduleItem.id, userId],
+      [courseId, section.id, userId],
     );
+
+    for (const topic of topicsBySectionId[section.id] || []) {
+      await connection.execute(
+        `INSERT INTO course_topic_user_progress
+          (topic_id, section_id, course_id, user_id, status, material_viewed, attempt_count, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'not_started', 0, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+         ON DUPLICATE KEY UPDATE updated_at = UTC_TIMESTAMP()`,
+        [topic.id, section.id, courseId, userId],
+      );
+    }
   }
 }
 
-async function ensureCourseSnapshotOnStart({ courseId, userId, course, modules, connection }) {
-  const snapshot = buildCourseSnapshot(course, modules);
+async function ensureCourseSnapshotOnStart({ courseId, userId, course, sections, topicsBySectionId, connection }) {
+  const topicsMap = {};
+  for (const [sId, topics] of Object.entries(topicsBySectionId)) {
+    topicsMap[sId] = topics;
+  }
+  const snapshot = buildCourseSnapshot(course, sections, topicsMap);
 
   await connection.execute(
     `INSERT INTO course_user_snapshots
@@ -885,41 +1172,29 @@ async function startCourseProgress(courseId, userId) {
       throw error;
     }
 
-    const modules = await listModulesByCourseId(courseId, { connection });
-    if (!modules.length) {
-      const error = new Error("В курсе нет модулей для прохождения");
+    const sections = await listSectionsByCourseId(courseId, { connection });
+    if (!sections.length) {
+      const error = new Error("В курсе нет разделов для прохождения");
       error.status = 409;
       throw error;
     }
 
-    await upsertCourseProgressOnStart({
-      courseId,
-      userId,
-      totalModulesCount: modules.length,
-      connection,
-    });
+    const topicsBySectionId = {};
+    for (const section of sections) {
+      topicsBySectionId[section.id] = await listTopicsBySectionId(section.id, { connection });
+    }
 
-    await ensureModuleProgressOnStart({
-      courseId,
-      userId,
-      modules,
-      connection,
-    });
+    const totalRequiredSectionsCount = sections.filter((s) => s.isRequired).length;
 
-    await ensureCourseSnapshotOnStart({
-      courseId,
-      userId,
-      course,
-      modules,
-      connection,
-    });
+    await upsertCourseProgressOnStart({ courseId, userId, totalRequiredSectionsCount, connection });
+
+    await ensureSectionAndTopicProgressOnStart({ courseId, userId, sections, topicsBySectionId, connection });
+
+    await ensureCourseSnapshotOnStart({ courseId, userId, course, sections, topicsBySectionId, connection });
 
     await connection.commit();
 
-    return {
-      course,
-      modules,
-    };
+    return { course, sections };
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -928,28 +1203,27 @@ async function startCourseProgress(courseId, userId) {
   }
 }
 
-async function getModuleWithCourse(moduleId, options = {}) {
+async function getSectionWithCourse(sectionId, options = {}) {
   const { connection } = options;
   const executor = connection || pool;
   const lockClause = options.forUpdate ? " FOR UPDATE" : "";
 
   const [rows] = await executor.execute(
     `SELECT
-       cm.id,
-       cm.course_id,
-       cm.title,
-       cm.description,
-       cm.content,
-       cm.order_index,
-       cm.assessment_id,
-       cm.is_required,
-       cm.estimated_minutes,
+       cs.id,
+       cs.course_id,
+       cs.title,
+       cs.description,
+       cs.order_index,
+       cs.assessment_id,
+       cs.is_required,
+       cs.estimated_minutes,
        c.status AS course_status,
        c.final_assessment_id
-     FROM course_modules cm
-     JOIN courses c ON c.id = cm.course_id
-     WHERE cm.id = ?${lockClause}`,
-    [moduleId],
+     FROM course_sections cs
+     JOIN courses c ON c.id = cs.course_id
+     WHERE cs.id = ?${lockClause}`,
+    [sectionId],
   );
 
   if (!rows.length) {
@@ -957,13 +1231,11 @@ async function getModuleWithCourse(moduleId, options = {}) {
   }
 
   const row = rows[0];
-
   return {
     id: Number(row.id),
     courseId: Number(row.course_id),
     title: row.title,
     description: row.description || "",
-    content: row.content || "",
     orderIndex: Number(row.order_index),
     assessmentId: row.assessment_id ? Number(row.assessment_id) : null,
     isRequired: Boolean(row.is_required),
@@ -973,25 +1245,66 @@ async function getModuleWithCourse(moduleId, options = {}) {
   };
 }
 
-async function getModuleAttemptResult({ moduleId, userId, attemptId, connection }) {
+async function getTopicWithSection(topicId, options = {}) {
+  const { connection } = options;
+  const executor = connection || pool;
+  const lockClause = options.forUpdate ? " FOR UPDATE" : "";
+
+  const [rows] = await executor.execute(
+    `SELECT
+       ct.id,
+       ct.section_id,
+       ct.course_id,
+       ct.title,
+       ct.order_index,
+       ct.has_material,
+       ct.assessment_id,
+       cs.assessment_id AS section_assessment_id,
+       c.status AS course_status
+     FROM course_topics ct
+     JOIN course_sections cs ON cs.id = ct.section_id
+     JOIN courses c ON c.id = ct.course_id
+     WHERE ct.id = ?${lockClause}`,
+    [topicId],
+  );
+
+  if (!rows.length) {
+    return null;
+  }
+
+  const row = rows[0];
+  return {
+    id: Number(row.id),
+    sectionId: Number(row.section_id),
+    courseId: Number(row.course_id),
+    title: row.title,
+    orderIndex: Number(row.order_index),
+    hasMaterial: Boolean(row.has_material),
+    assessmentId: row.assessment_id ? Number(row.assessment_id) : null,
+    sectionAssessmentId: row.section_assessment_id ? Number(row.section_assessment_id) : null,
+    courseStatus: row.course_status,
+  };
+}
+
+async function getSectionAttemptResult({ sectionId, userId, attemptId, connection }) {
   const [rows] = await connection.execute(
     `SELECT
-       cm.id AS module_id,
-       cm.course_id,
-       cm.assessment_id,
+       cs.id AS section_id,
+       cs.course_id,
+       cs.assessment_id,
        aa.id AS attempt_id,
        aa.attempt_number,
        aa.score_percent,
        a.pass_score_percent
-     FROM course_modules cm
-     JOIN assessment_attempts aa ON aa.assessment_id = cm.assessment_id
+     FROM course_sections cs
+     JOIN assessment_attempts aa ON aa.assessment_id = cs.assessment_id
      JOIN assessments a ON a.id = aa.assessment_id
-     WHERE cm.id = ?
+     WHERE cs.id = ?
        AND aa.id = ?
        AND aa.user_id = ?
        AND aa.status = 'completed'
      LIMIT 1`,
-    [moduleId, attemptId, userId],
+    [sectionId, attemptId, userId],
   );
 
   if (!rows.length) {
@@ -1003,7 +1316,50 @@ async function getModuleAttemptResult({ moduleId, userId, attemptId, connection 
   const passScorePercent = row.pass_score_percent != null ? Number(row.pass_score_percent) : 0;
 
   return {
-    moduleId: Number(row.module_id),
+    sectionId: Number(row.section_id),
+    courseId: Number(row.course_id),
+    assessmentId: Number(row.assessment_id),
+    attemptId: Number(row.attempt_id),
+    attemptNumber: Number(row.attempt_number || 0),
+    scorePercent,
+    passScorePercent,
+    passed: scorePercent >= passScorePercent,
+  };
+}
+
+async function getTopicAttemptResult({ topicId, userId, attemptId, connection }) {
+  const [rows] = await connection.execute(
+    `SELECT
+       ct.id AS topic_id,
+       ct.section_id,
+       ct.course_id,
+       ct.assessment_id,
+       aa.id AS attempt_id,
+       aa.attempt_number,
+       aa.score_percent,
+       a.pass_score_percent
+     FROM course_topics ct
+     JOIN assessment_attempts aa ON aa.assessment_id = ct.assessment_id
+     JOIN assessments a ON a.id = aa.assessment_id
+     WHERE ct.id = ?
+       AND aa.id = ?
+       AND aa.user_id = ?
+       AND aa.status = 'completed'
+     LIMIT 1`,
+    [topicId, attemptId, userId],
+  );
+
+  if (!rows.length) {
+    return null;
+  }
+
+  const row = rows[0];
+  const scorePercent = row.score_percent != null ? Number(row.score_percent) : 0;
+  const passScorePercent = row.pass_score_percent != null ? Number(row.pass_score_percent) : 0;
+
+  return {
+    topicId: Number(row.topic_id),
+    sectionId: Number(row.section_id),
     courseId: Number(row.course_id),
     assessmentId: Number(row.assessment_id),
     attemptId: Number(row.attempt_id),
@@ -1053,11 +1409,11 @@ async function getFinalAttemptResult({ courseId, userId, attemptId, connection }
   };
 }
 
-async function upsertModuleProgressFromAttempt({ moduleAttemptResult, userId, connection }) {
-  const status = moduleAttemptResult.passed ? "passed" : "failed";
+async function upsertSectionProgressFromAttempt({ sectionAttemptResult, userId, connection }) {
+  const status = sectionAttemptResult.passed ? "passed" : "failed";
   await connection.execute(
-    `INSERT INTO course_module_user_progress
-      (course_id, module_id, user_id, status, last_attempt_id, best_score_percent, attempt_count, started_at, completed_at, created_at, updated_at)
+    `INSERT INTO course_section_user_progress
+      (course_id, section_id, user_id, status, last_attempt_id, best_score_percent, attempt_count, started_at, completed_at, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), IF(? = 'passed', UTC_TIMESTAMP(), NULL), UTC_TIMESTAMP(), UTC_TIMESTAMP())
      ON DUPLICATE KEY UPDATE
        status = VALUES(status),
@@ -1068,13 +1424,41 @@ async function upsertModuleProgressFromAttempt({ moduleAttemptResult, userId, co
        completed_at = IF(VALUES(status) = 'passed', UTC_TIMESTAMP(), completed_at),
        updated_at = UTC_TIMESTAMP()`,
     [
-      moduleAttemptResult.courseId,
-      moduleAttemptResult.moduleId,
+      sectionAttemptResult.courseId,
+      sectionAttemptResult.sectionId,
       userId,
       status,
-      moduleAttemptResult.attemptId,
-      moduleAttemptResult.scorePercent,
-      moduleAttemptResult.attemptNumber,
+      sectionAttemptResult.attemptId,
+      sectionAttemptResult.scorePercent,
+      sectionAttemptResult.attemptNumber,
+      status,
+    ],
+  );
+}
+
+async function upsertTopicProgressFromAttempt({ topicAttemptResult, userId, connection }) {
+  // Тема с тестом завершена только если тест пройден
+  const status = topicAttemptResult.passed ? "completed" : "failed";
+  await connection.execute(
+    `INSERT INTO course_topic_user_progress
+      (topic_id, section_id, course_id, user_id, status, last_attempt_id, best_score_percent, attempt_count, completed_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, IF(? = 'completed', UTC_TIMESTAMP(), NULL), UTC_TIMESTAMP(), UTC_TIMESTAMP())
+     ON DUPLICATE KEY UPDATE
+       status = VALUES(status),
+       last_attempt_id = VALUES(last_attempt_id),
+       best_score_percent = GREATEST(IFNULL(best_score_percent, 0), VALUES(best_score_percent)),
+       attempt_count = GREATEST(IFNULL(attempt_count, 0), VALUES(attempt_count)),
+       completed_at = IF(VALUES(status) = 'completed', UTC_TIMESTAMP(), completed_at),
+       updated_at = UTC_TIMESTAMP()`,
+    [
+      topicAttemptResult.topicId,
+      topicAttemptResult.sectionId,
+      topicAttemptResult.courseId,
+      userId,
+      status,
+      topicAttemptResult.attemptId,
+      topicAttemptResult.scorePercent,
+      topicAttemptResult.attemptNumber,
       status,
     ],
   );
@@ -1083,30 +1467,30 @@ async function upsertModuleProgressFromAttempt({ moduleAttemptResult, userId, co
 async function getUserCourseAggregate({ courseId, userId, connection }) {
   const [[aggregate]] = await connection.execute(
     `SELECT
-       COUNT(CASE WHEN cm.is_required = 1 THEN 1 END) AS total_required_modules,
-       COUNT(CASE WHEN cmup.status = 'passed' AND cm.is_required = 1 THEN 1 END) AS passed_required_modules
-     FROM course_modules cm
-     LEFT JOIN course_module_user_progress cmup
-       ON cmup.module_id = cm.id
-      AND cmup.user_id = ?
-     WHERE cm.course_id = ?`,
+       COUNT(CASE WHEN cs.is_required = 1 THEN 1 END) AS total_required_sections,
+       COUNT(CASE WHEN csup.status = 'passed' AND cs.is_required = 1 THEN 1 END) AS passed_required_sections
+     FROM course_sections cs
+     LEFT JOIN course_section_user_progress csup
+       ON csup.section_id = cs.id
+      AND csup.user_id = ?
+     WHERE cs.course_id = ?`,
     [userId, courseId],
   );
 
-  const totalRequiredModules = Number(aggregate?.total_required_modules || 0);
-  const passedRequiredModules = Number(aggregate?.passed_required_modules || 0);
-  const progressPercent = totalRequiredModules > 0 ? Number(((passedRequiredModules / totalRequiredModules) * 100).toFixed(2)) : 0;
+  const totalRequiredSections = Number(aggregate?.total_required_sections || 0);
+  const passedRequiredSections = Number(aggregate?.passed_required_sections || 0);
+  const progressPercent = totalRequiredSections > 0 ? Number(((passedRequiredSections / totalRequiredSections) * 100).toFixed(2)) : 0;
 
   return {
-    totalRequiredModules,
-    passedRequiredModules,
+    totalRequiredSections,
+    passedRequiredSections,
     progressPercent,
   };
 }
 
-async function syncCourseProgressFromModules({ courseId, userId, connection }) {
+async function syncCourseProgressFromSections({ courseId, userId, connection }) {
   const aggregate = await getUserCourseAggregate({ courseId, userId, connection });
-  const status = aggregate.passedRequiredModules > 0 ? "in_progress" : "not_started";
+  const status = aggregate.passedRequiredSections > 0 ? "in_progress" : "not_started";
 
   await connection.execute(
     `INSERT INTO course_user_progress
@@ -1120,41 +1504,105 @@ async function syncCourseProgressFromModules({ courseId, userId, connection }) {
        started_at = IF(started_at IS NULL AND VALUES(status) <> 'not_started', UTC_TIMESTAMP(), started_at),
        last_activity_at = UTC_TIMESTAMP(),
        updated_at = UTC_TIMESTAMP()`,
-    [
-      courseId,
-      userId,
-      status,
-      aggregate.progressPercent,
-      aggregate.passedRequiredModules,
-      aggregate.totalRequiredModules,
-      status,
-    ],
+    [courseId, userId, status, aggregate.progressPercent, aggregate.passedRequiredSections, aggregate.totalRequiredSections, status],
   );
 
   return aggregate;
 }
 
-async function markModuleAttemptCompleted({ moduleId, userId, attemptId }) {
+async function markTopicMaterialViewed({ topicId, userId }) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
-    const moduleAttemptResult = await getModuleAttemptResult({ moduleId, userId, attemptId, connection });
-    if (!moduleAttemptResult) {
-      const error = new Error("Результат попытки для модуля не найден");
+    const topic = await getTopicWithSection(topicId, { connection, forUpdate: true });
+    if (!topic) {
+      const error = new Error("Тема не найдена");
       error.status = 404;
       throw error;
     }
 
-    await upsertModuleProgressFromAttempt({ moduleAttemptResult, userId, connection });
-    const aggregate = await syncCourseProgressFromModules({ courseId: moduleAttemptResult.courseId, userId, connection });
+    if (!topic.hasMaterial) {
+      const error = new Error("У данной темы нет теоретического материала");
+      error.status = 422;
+      throw error;
+    }
+
+    // Если у темы нет теста — просмотр материала завершает тему
+    const completedStatus = !topic.assessmentId ? "completed" : "in_progress";
+
+    await connection.execute(
+      `INSERT INTO course_topic_user_progress
+        (topic_id, section_id, course_id, user_id, material_viewed, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 1, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+       ON DUPLICATE KEY UPDATE
+         material_viewed = 1,
+         status = IF(status IN ('completed','failed'), status, VALUES(status)),
+         completed_at = IF(VALUES(status) = 'completed' AND completed_at IS NULL, UTC_TIMESTAMP(), completed_at),
+         updated_at = UTC_TIMESTAMP()`,
+      [topicId, topic.sectionId, topic.courseId, userId, completedStatus],
+    );
+
+    // Если тема завершена — синхронизируем прогресс курса
+    if (completedStatus === "completed") {
+      await syncCourseProgressFromSections({ courseId: topic.courseId, userId, connection });
+    }
 
     await connection.commit();
 
-    return {
-      moduleAttemptResult,
-      aggregate,
-    };
+    return { topicId, materialViewed: true, topicCompleted: completedStatus === "completed" };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function markTopicAttemptCompleted({ topicId, userId, attemptId }) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const topicAttemptResult = await getTopicAttemptResult({ topicId, userId, attemptId, connection });
+    if (!topicAttemptResult) {
+      const error = new Error("Результат попытки для темы не найден");
+      error.status = 404;
+      throw error;
+    }
+
+    await upsertTopicProgressFromAttempt({ topicAttemptResult, userId, connection });
+    const aggregate = await syncCourseProgressFromSections({ courseId: topicAttemptResult.courseId, userId, connection });
+
+    await connection.commit();
+
+    return { topicAttemptResult, aggregate };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function markSectionAttemptCompleted({ sectionId, userId, attemptId }) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const sectionAttemptResult = await getSectionAttemptResult({ sectionId, userId, attemptId, connection });
+    if (!sectionAttemptResult) {
+      const error = new Error("Результат попытки для раздела не найден");
+      error.status = 404;
+      throw error;
+    }
+
+    await upsertSectionProgressFromAttempt({ sectionAttemptResult, userId, connection });
+    const aggregate = await syncCourseProgressFromSections({ courseId: sectionAttemptResult.courseId, userId, connection });
+
+    await connection.commit();
+
+    return { sectionAttemptResult, aggregate };
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -1182,37 +1630,37 @@ async function canAccessFinalAssessment({ courseId, userId }, options = {}) {
 
   const [[aggregate]] = await executor.execute(
     `SELECT
-       COUNT(CASE WHEN cm.is_required = 1 THEN 1 END) AS total_required_modules,
-       COUNT(CASE WHEN cmup.status = 'passed' AND cm.is_required = 1 THEN 1 END) AS passed_required_modules
-     FROM course_modules cm
-     LEFT JOIN course_module_user_progress cmup
-       ON cmup.module_id = cm.id
-      AND cmup.user_id = ?
-     WHERE cm.course_id = ?`,
+       COUNT(CASE WHEN cs.is_required = 1 THEN 1 END) AS total_required_sections,
+       COUNT(CASE WHEN csup.status = 'passed' AND cs.is_required = 1 THEN 1 END) AS passed_required_sections
+     FROM course_sections cs
+     LEFT JOIN course_section_user_progress csup
+       ON csup.section_id = cs.id
+      AND csup.user_id = ?
+     WHERE cs.course_id = ?`,
     [userId, courseId],
   );
 
-  const totalRequiredModules = Number(aggregate?.total_required_modules || 0);
-  const passedRequiredModules = Number(aggregate?.passed_required_modules || 0);
+  const totalRequiredSections = Number(aggregate?.total_required_sections || 0);
+  const passedRequiredSections = Number(aggregate?.passed_required_sections || 0);
 
-  if (totalRequiredModules === 0) {
-    return { allowed: false, reason: "В курсе отсутствуют обязательные модули" };
+  if (totalRequiredSections === 0) {
+    return { allowed: false, reason: "В курсе отсутствуют обязательные разделы" };
   }
 
-  if (passedRequiredModules < totalRequiredModules) {
+  if (passedRequiredSections < totalRequiredSections) {
     return {
       allowed: false,
-      reason: "Итоговая аттестация будет доступна после прохождения всех модулей",
-      totalRequiredModules,
-      passedRequiredModules,
+      reason: "Итоговая аттестация будет доступна после прохождения всех обязательных разделов",
+      totalRequiredSections,
+      passedRequiredSections,
     };
   }
 
   return {
     allowed: true,
     finalAssessmentId: Number(courseRows[0].final_assessment_id),
-    totalRequiredModules,
-    passedRequiredModules,
+    totalRequiredSections,
+    passedRequiredSections,
   };
 }
 
@@ -1235,7 +1683,7 @@ async function markFinalAttemptCompleted({ courseId, userId, attemptId }) {
       throw error;
     }
 
-    const aggregate = await syncCourseProgressFromModules({ courseId, userId, connection });
+    const aggregate = await syncCourseProgressFromSections({ courseId, userId, connection });
 
     if (finalAttempt.passed) {
       await connection.execute(
@@ -1248,7 +1696,7 @@ async function markFinalAttemptCompleted({ courseId, userId, attemptId }) {
                 last_activity_at = UTC_TIMESTAMP(),
                 updated_at = UTC_TIMESTAMP()
           WHERE course_id = ? AND user_id = ?`,
-        [aggregate.totalRequiredModules, aggregate.totalRequiredModules, courseId, userId],
+        [aggregate.totalRequiredSections, aggregate.totalRequiredSections, courseId, userId],
       );
     } else {
       await connection.execute(
@@ -1280,22 +1728,30 @@ module.exports = {
   listPublishedCoursesForUser,
   getCourseForUser,
   getCourseProgressForUser,
+  listSectionsByCourseId,
+  listTopicsBySectionId,
+  listTopicsByCourseId,
   listCoursesForAdmin,
   getCourseByIdForAdmin,
   createCourse,
   updateCourse,
   deleteCourse,
-  createCourseModule,
-  updateCourseModule,
-  deleteCourseModule,
-  listModulesByCourseId,
+  createCourseSection,
+  updateCourseSection,
+  deleteCourseSection,
+  createCourseTopic,
+  updateCourseTopic,
+  deleteCourseTopic,
   validatePublicationIntegrity,
   publishCourse,
   archiveCourse,
   startCourseProgress,
-  getModuleWithCourse,
-  markModuleAttemptCompleted,
+  getSectionWithCourse,
+  getTopicWithSection,
+  markTopicMaterialViewed,
+  markTopicAttemptCompleted,
+  markSectionAttemptCompleted,
   canAccessFinalAssessment,
   markFinalAttemptCompleted,
-  syncCourseProgressFromModules,
+  syncCourseProgressFromSections,
 };
