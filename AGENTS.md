@@ -15,9 +15,9 @@
 Before starting any task:
 
 1. Read available documentation:
-   - `README.md`
    - `docs/`
    - `TASKS.md`
+   - `docs/engineering`
 
 2. Understand project structure and conventions
 3. Reuse existing patterns instead of inventing new ones
