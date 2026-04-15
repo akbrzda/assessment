@@ -27,7 +27,7 @@
               <tr>
                 <th>Название</th>
                 <th>Статус</th>
-                <th>Модулей</th>
+                <th>Тем курса</th>
                 <th>Версия</th>
                 <th>Обновлен</th>
                 <th class="actions-col">Действия</th>
@@ -44,7 +44,7 @@
                     {{ getStatusLabel(course.status) }}
                   </Badge>
                 </td>
-                <td>{{ course.modulesCount }}</td>
+                <td>{{ course.sectionsCount }}</td>
                 <td>{{ course.version }}</td>
                 <td>{{ formatDate(course.updatedAt) }}</td>
                 <td class="actions-cell">
@@ -54,7 +54,7 @@
                       Опубликовать
                     </Button>
                     <Button v-if="course.status === 'published'" size="sm" variant="secondary" icon="archive" @click="handleArchive(course)">
-                      В архив
+                      Закрыть
                     </Button>
                     <Button v-if="course.status !== 'published'" size="sm" variant="danger" icon="trash" @click="handleDelete(course)">
                       Удалить
@@ -80,7 +80,7 @@
 
             <div class="course-card-grid">
               <div class="course-card-row">
-                <span>Модулей:</span><strong>{{ course.modulesCount }}</strong>
+                <span>Тем курса:</span><strong>{{ course.sectionsCount }}</strong>
               </div>
               <div class="course-card-row">
                 <span>Версия:</span><strong>{{ course.version }}</strong>
@@ -96,7 +96,7 @@
                 Опубликовать
               </Button>
               <Button v-if="course.status === 'published'" size="sm" variant="secondary" icon="archive" @click="handleArchive(course)" fullWidth>
-                В архив
+                Закрыть
               </Button>
               <Button v-if="course.status !== 'published'" size="sm" variant="danger" icon="trash" @click="handleDelete(course)" fullWidth>
                 Удалить
@@ -166,14 +166,14 @@ const filters = ref({
 const statusFilterOptions = [
   { value: "draft", label: "Черновик" },
   { value: "published", label: "Опубликован" },
-  { value: "archived", label: "Архив" },
+  { value: "archived", label: "Закрыт" },
 ];
 
 const getStatusLabel = (status) => {
   const labels = {
     draft: "Черновик",
     published: "Опубликован",
-    archived: "Архив",
+    archived: "Закрыт",
   };
   return labels[status] || status;
 };
@@ -258,16 +258,16 @@ const handlePublish = async (course) => {
 };
 
 const handleArchive = async (course) => {
-  if (!window.confirm(`Перевести курс "${course.title}" в архив?`)) {
+  if (!window.confirm(`Закрыть курс "${course.title}" для новых пользователей?`)) {
     return;
   }
 
   try {
     await archiveCourse(course.id);
-    showToast("Курс архивирован", "success");
+    showToast("Курс закрыт", "success");
     await loadCourses();
   } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось архивировать курс"), "error");
+    showToast(getErrorMessage(error, "Не удалось закрыть курс"), "error");
   }
 };
 

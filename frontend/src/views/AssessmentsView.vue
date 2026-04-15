@@ -123,7 +123,7 @@
 
             <div class="assessment-info mb-12">
               <div class="info-item">
-                <span class="label">Разделов:</span>
+                <span class="label">Тем курса:</span>
                 <span class="value">{{ course.sectionsCount }}</span>
               </div>
               <div class="info-item">
@@ -182,7 +182,7 @@ export default {
     const assessments = ref([]);
     const courses = ref([]);
     const activeFilter = ref("all");
-    const activeMode = ref("materials");
+    const activeMode = ref("courses");
     const isLoading = ref(false);
     const isCoursesLoading = ref(false);
 
@@ -265,6 +265,9 @@ export default {
       switch (status) {
         case "completed":
           return "Завершен";
+        case "closed":
+        case "archived":
+          return "Закрыт";
         case "in_progress":
           return "В процессе";
         default:

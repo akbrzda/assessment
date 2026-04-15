@@ -7,17 +7,57 @@
           {{ getStatusLabel(course.status) }}
         </Badge>
         <Button v-if="course.status === 'draft'" variant="success" icon="send" :loading="publishing" @click="handlePublish"> Опубликовать </Button>
-        <Button v-if="course.status === 'published'" variant="secondary" icon="archive" :loading="archiving" @click="handleArchive"> В архив </Button>
+        <Button v-if="course.status === 'published'" variant="secondary" icon="archive" :loading="archiving" @click="handleArchive">
+          Закрыть курс
+        </Button>
       </div>
     </div>
 
     <Preloader v-if="loading" />
 
     <template v-else>
-      <Card class="editor-card">
+      <Card class="wizard-card">
+        <div class="wizard-header">
+          <div>
+            <h2>Мастер настройки курса</h2>
+            <p>
+              {{
+                isEditMode
+                  ? "Проверьте шаги курса и подготовьте его к публикации."
+                  : "Сначала сохраните основу курса, затем добавьте темы и итоговую аттестацию."
+              }}
+            </p>
+          </div>
+          <Badge variant="primary" rounded>Шаг {{ currentStep }} из {{ wizardSteps.length }}</Badge>
+        </div>
+
+        <div class="wizard-steps">
+          <div
+            v-for="step in wizardSteps"
+            :key="step.id"
+            class="wizard-step"
+            :class="{ active: currentStep === step.id, completed: currentStep > step.id }"
+          >
+            <div class="step-number">{{ step.id }}</div>
+            <div class="step-label">{{ step.title }}</div>
+          </div>
+        </div>
+      </Card>
+
+      <Card v-if="currentStep === 1" class="editor-card">
+        <div class="step-card-header">
+          <h2>Шаг 1. Основная информация</h2>
+          <p>Заполните общие данные курса и сохраните основу перед наполнением.</p>
+        </div>
+
         <div class="editor-grid">
           <Input v-model="form.title" label="Название курса" placeholder="Например: Стандарты обслуживания" :error="errors.title" required />
-          <Select v-model="form.finalAssessmentId" label="Итоговая аттестация" :options="assessmentOptions" placeholder="Выберите аттестацию" />
+          <div class="status-summary">
+            <span class="status-summary-label">Статус публикации</span>
+            <Badge :variant="course ? getStatusVariant(course.status) : 'warning'" rounded>
+              {{ course ? getStatusLabel(course.status) : "Черновик" }}
+            </Badge>
+          </div>
           <Textarea
             v-model="form.description"
             class="grid-span-full"
@@ -26,31 +66,25 @@
             :rows="4"
           />
         </div>
-
-        <div class="editor-actions">
-          <Button :loading="saving" icon="save" @click="saveCourse">
-            {{ isEditMode ? "Сохранить изменения" : "Создать курс" }}
-          </Button>
-        </div>
       </Card>
 
-      <Card v-if="isEditMode && course" class="sections-card">
-        <div class="sections-header">
-          <h2>Разделы курса</h2>
-          <p>Каждый раздел содержит темы и обязательный тест для его завершения.</p>
+      <Card v-if="currentStep === 2 && isEditMode && course" class="sections-card">
+        <div class="step-card-header">
+          <h2>Шаг 2. Темы курса и подтемы</h2>
+          <p>Каждая тема курса содержит подтемы и при необходимости завершается своим тестом.</p>
         </div>
 
-        <div v-if="publicationErrors.length > 0" class="publication-errors">
+        <div v-if="publicationErrorsForDisplay.length > 0" class="publication-errors">
           <h3>Что нужно исправить перед публикацией</h3>
           <ul>
-            <li v-for="(errorText, index) in publicationErrors" :key="`${index}-${errorText}`">
+            <li v-for="(errorText, index) in publicationErrorsForDisplay" :key="`${index}-${errorText}`">
               {{ errorText }}
             </li>
           </ul>
         </div>
 
         <div v-if="!course.sections || course.sections.length === 0" class="empty-sections">
-          <p>Разделы ещё не добавлены.</p>
+          <p>Темы курса ещё не добавлены.</p>
         </div>
 
         <div class="sections-list">
@@ -60,7 +94,7 @@
               <span class="section-order">{{ section.orderIndex }}</span>
               <div class="section-info">
                 <span class="section-name">{{ section.title }}</span>
-                <span v-if="!section.isRequired" class="section-badge-optional">необязательный</span>
+                <span v-if="!section.isRequired" class="section-badge-optional">необязательная</span>
                 <span v-if="!section.assessmentId" class="section-badge-error">нет теста</span>
                 <span v-else class="section-badge-ok">тест привязан</span>
               </div>
@@ -83,11 +117,11 @@
             <!-- Форма редактирования раздела -->
             <div v-if="sectionEditingId === section.id" class="section-edit-form">
               <div class="section-edit-grid">
-                <Input v-model="sectionDrafts[section.id].title" label="Название раздела" :error="sectionErrors[section.id]?.title" required />
+                <Input v-model="sectionDrafts[section.id].title" label="Название темы курса" :error="sectionErrors[section.id]?.title" required />
                 <Input v-model="sectionDrafts[section.id].orderIndex" type="number" min="1" label="Порядок" />
                 <Select
                   v-model="sectionDrafts[section.id].assessmentId"
-                  label="Тест раздела"
+                  label="Проверочный тест темы курса"
                   :options="assessmentOptions"
                   placeholder="Выберите тест"
                 />
@@ -95,19 +129,21 @@
                 <div class="field-checkbox">
                   <label class="switch-label">
                     <input v-model="sectionDrafts[section.id].isRequired" type="checkbox" />
-                    <span>Обязательный раздел</span>
+                    <span>Обязательная тема курса</span>
                   </label>
                 </div>
                 <Textarea v-model="sectionDrafts[section.id].description" class="grid-span-full" label="Описание" :rows="2" />
               </div>
               <div class="section-edit-actions">
-                <Button size="sm" icon="save" :loading="updatingSectionId === section.id" @click="saveSection(section.id)">Сохранить раздел</Button>
+                <Button size="sm" icon="save" :loading="updatingSectionId === section.id" @click="saveSection(section.id)"
+                  >Сохранить тему курса</Button
+                >
               </div>
             </div>
 
             <!-- Темы раздела -->
             <div class="topics-container">
-              <div v-if="!section.topics || section.topics.length === 0" class="empty-topics">Тем нет.</div>
+              <div v-if="!section.topics || section.topics.length === 0" class="empty-topics">Подтем пока нет.</div>
               <div v-else class="topics-list">
                 <div v-for="topic in section.topics" :key="topic.id" class="topic-item">
                   <div class="topic-row">
@@ -131,9 +167,14 @@
                   <!-- Форма редактирования темы -->
                   <div v-if="topicEditingId === topic.id" class="topic-edit-form">
                     <div class="topic-edit-grid">
-                      <Input v-model="topicDrafts[topic.id].title" label="Название темы" :error="topicErrors[topic.id]?.title" required />
+                      <Input v-model="topicDrafts[topic.id].title" label="Название подтемы" :error="topicErrors[topic.id]?.title" required />
                       <Input v-model="topicDrafts[topic.id].orderIndex" type="number" min="1" label="Порядок" />
-                      <Select v-model="topicDrafts[topic.id].assessmentId" label="Тест темы" :options="assessmentOptions" placeholder="Без теста" />
+                      <Select
+                        v-model="topicDrafts[topic.id].assessmentId"
+                        label="Тест подтемы"
+                        :options="assessmentOptions"
+                        placeholder="Без теста"
+                      />
                       <div class="field-checkbox">
                         <label class="switch-label">
                           <input v-model="topicDrafts[topic.id].hasMaterial" type="checkbox" />
@@ -144,12 +185,12 @@
                         v-if="topicDrafts[topic.id].hasMaterial"
                         v-model="topicDrafts[topic.id].content"
                         class="grid-span-full"
-                        label="Контент темы"
+                        label="Контент подтемы"
                         :rows="5"
                       />
                     </div>
                     <div class="topic-edit-actions">
-                      <Button size="sm" icon="save" :loading="updatingTopicId === topic.id" @click="saveTopic(topic.id)">Сохранить тему</Button>
+                      <Button size="sm" icon="save" :loading="updatingTopicId === topic.id" @click="saveTopic(topic.id)">Сохранить подтему</Button>
                     </div>
                   </div>
                 </div>
@@ -157,11 +198,11 @@
 
               <!-- Добавить тему -->
               <div v-if="newTopics[section.id]" class="new-topic">
-                <h4>Новая тема</h4>
+                <h4>Новая подтема</h4>
                 <div class="topic-edit-grid">
-                  <Input v-model="newTopics[section.id].title" label="Название темы" :error="newTopicErrors[section.id]?.title" required />
+                  <Input v-model="newTopics[section.id].title" label="Название подтемы" :error="newTopicErrors[section.id]?.title" required />
                   <Input v-model="newTopics[section.id].orderIndex" type="number" min="1" label="Порядок" />
-                  <Select v-model="newTopics[section.id].assessmentId" label="Тест темы" :options="assessmentOptions" placeholder="Без теста" />
+                  <Select v-model="newTopics[section.id].assessmentId" label="Тест подтемы" :options="assessmentOptions" placeholder="Без теста" />
                   <div class="field-checkbox">
                     <label class="switch-label">
                       <input v-model="newTopics[section.id].hasMaterial" type="checkbox" />
@@ -172,41 +213,127 @@
                     v-if="newTopics[section.id].hasMaterial"
                     v-model="newTopics[section.id].content"
                     class="grid-span-full"
-                    label="Контент темы"
+                    label="Контент подтемы"
                     :rows="4"
                   />
                 </div>
                 <div class="new-topic-actions">
-                  <Button size="sm" icon="plus" :loading="creatingTopicSectionId === section.id" @click="addTopic(section.id)">Добавить тему</Button>
+                  <Button size="sm" icon="plus" :loading="creatingTopicSectionId === section.id" @click="addTopic(section.id)"
+                    >Добавить подтему</Button
+                  >
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Добавить раздел -->
         <div class="new-section">
-          <h3>Новый раздел</h3>
+          <h3>Новая тема курса</h3>
           <div class="section-edit-grid">
-            <Input v-model="newSection.title" label="Название раздела" :error="newSectionErrors.title" required />
+            <Input v-model="newSection.title" label="Название темы курса" :error="newSectionErrors.title" required />
             <Input v-model="newSection.orderIndex" type="number" min="1" label="Порядок" />
-            <Select v-model="newSection.assessmentId" label="Тест раздела" :options="assessmentOptions" placeholder="Выберите тест" />
+            <Select v-model="newSection.assessmentId" label="Проверочный тест темы курса" :options="assessmentOptions" placeholder="Выберите тест" />
             <Input v-model="newSection.estimatedMinutes" type="number" min="1" max="1440" label="Время (мин.)" />
             <div class="field-checkbox">
               <label class="switch-label">
                 <input v-model="newSection.isRequired" type="checkbox" />
-                <span>Обязательный раздел</span>
+                <span>Обязательная тема курса</span>
               </label>
             </div>
           </div>
           <div class="new-section-actions">
-            <Button icon="plus" :loading="creatingSection" @click="addSection">Добавить раздел</Button>
+            <Button icon="plus" :loading="creatingSection" @click="addSection">Добавить тему курса</Button>
           </div>
         </div>
       </Card>
 
+      <Card v-if="currentStep === 3 && isEditMode && course" class="editor-card final-assessment-card">
+        <div class="step-card-header">
+          <h2>Шаг 3. Итоговая аттестация</h2>
+          <p>Назначьте обязательную итоговую аттестацию курса и сохраните настройки.</p>
+        </div>
+
+        <div class="editor-grid">
+          <Select v-model="form.finalAssessmentId" label="Итоговая аттестация курса" :options="assessmentOptions" placeholder="Выберите аттестацию" />
+          <div class="status-summary">
+            <span class="status-summary-label">Текущий выбор</span>
+            <strong>{{ selectedFinalAssessmentLabel }}</strong>
+            <p class="status-summary-text">На следующем этапе будет показан итоговый предпросмотр курса перед публикацией.</p>
+          </div>
+        </div>
+
+        <div v-if="!form.finalAssessmentId" class="publication-errors">
+          <h3>Что нужно исправить</h3>
+          <ul>
+            <li>Выберите итоговую аттестацию курса.</li>
+          </ul>
+        </div>
+      </Card>
+
+      <Card v-if="currentStep === 4 && isEditMode && course" class="preview-card">
+        <div class="step-card-header">
+          <h2>Шаг 4. Предпросмотр курса</h2>
+          <p>Проверьте структуру курса, итоговую аттестацию и готовность к публикации.</p>
+        </div>
+
+        <div class="preview-grid">
+          <div class="preview-item">
+            <span class="preview-label">Название</span>
+            <strong>{{ form.title || "—" }}</strong>
+          </div>
+          <div class="preview-item">
+            <span class="preview-label">Статус</span>
+            <strong>{{ getStatusLabel(course.status) }}</strong>
+          </div>
+          <div class="preview-item">
+            <span class="preview-label">Тем курса</span>
+            <strong>{{ previewStats.themesCount }}</strong>
+          </div>
+          <div class="preview-item">
+            <span class="preview-label">Подтем</span>
+            <strong>{{ previewStats.subtopicsCount }}</strong>
+          </div>
+          <div class="preview-item">
+            <span class="preview-label">Обязательных тем</span>
+            <strong>{{ previewStats.requiredThemesCount }}</strong>
+          </div>
+          <div class="preview-item">
+            <span class="preview-label">Итоговая аттестация</span>
+            <strong>{{ selectedFinalAssessmentLabel }}</strong>
+          </div>
+        </div>
+
+        <div v-if="publicationErrorsForDisplay.length > 0" class="publication-errors">
+          <h3>Что нужно исправить перед публикацией</h3>
+          <ul>
+            <li v-for="(errorText, index) in publicationErrorsForDisplay" :key="`preview-${index}-${errorText}`">
+              {{ errorText }}
+            </li>
+          </ul>
+        </div>
+      </Card>
+
+      <div class="wizard-navigation">
+        <Button v-if="currentStep > 1" variant="secondary" @click="goToPrevStep">Назад</Button>
+        <div class="spacer"></div>
+        <Button v-if="currentStep < wizardSteps.length" @click="goToNextStep" :disabled="!canProceed">Далее</Button>
+        <Button
+          v-else-if="course?.status === 'draft'"
+          variant="success"
+          icon="send"
+          :loading="publishing"
+          @click="handlePublish"
+          :disabled="publicationErrorsForDisplay.length > 0"
+        >
+          Опубликовать курс
+        </Button>
+        <Button v-else-if="course?.status === 'published'" variant="secondary" icon="archive" :loading="archiving" @click="handleArchive">
+          Закрыть курс
+        </Button>
+      </div>
+
       <!-- Блок назначения курса -->
-      <Card v-if="isEditMode && course" class="assignments-card">
+      <Card v-if="currentStep === 1 && isEditMode && course" class="assignments-card">
         <div class="assignments-header">
           <h2>Назначение курса</h2>
           <p>Если ни одна должность и ни один филиал не выбраны — курс виден всем.</p>
@@ -283,7 +410,7 @@
       </Card>
 
       <!-- Блок участников с прогрессом -->
-      <Card v-if="isEditMode && course" class="participants-card">
+      <Card v-if="currentStep === 4 && isEditMode && course" class="participants-card">
         <div class="participants-header">
           <h2>Участники</h2>
           <p>Пользователи, которые начали прохождение курса.</p>
@@ -348,7 +475,7 @@
           <div v-for="section in selectedUserProgress.sections" :key="section.sectionId" class="progress-section">
             <div class="progress-section-header">
               <span class="progress-section-title">{{ section.orderIndex }}. {{ section.title }}</span>
-              <span v-if="!section.isRequired" class="section-badge-optional">необязательный</span>
+              <span v-if="!section.isRequired" class="section-badge-optional">необязательная</span>
               <span :class="['participant-status', `status-${section.status}`]">{{ getProgressStatusLabel(section.status) }}</span>
               <span v-if="section.scorePercent !== null" class="progress-score">{{ section.scorePercent }}%</span>
             </div>
@@ -463,11 +590,43 @@ const publicationErrors = computed(() => {
   return course.value?.publication?.errors || [];
 });
 
+const currentStep = ref(1);
+const wizardSteps = [
+  { id: 1, title: "Основная информация" },
+  { id: 2, title: "Темы курса" },
+  { id: 3, title: "Итоговая аттестация" },
+  { id: 4, title: "Предпросмотр" },
+];
+const canProceed = computed(() => {
+  if (currentStep.value === 1) {
+    return Boolean(form.value.title?.trim());
+  }
+  if (currentStep.value === 3) {
+    return Boolean(form.value.finalAssessmentId);
+  }
+  return true;
+});
+
+const publicationErrorsForDisplay = computed(() => publicationErrors.value.map((item) => formatPublicationError(item)));
+const selectedFinalAssessmentLabel = computed(() => {
+  const currentValue = String(form.value.finalAssessmentId || "");
+  const option = assessmentOptions.value.find((item) => item.value === currentValue);
+  return option?.label || "Не выбрана";
+});
+const previewStats = computed(() => {
+  const themes = course.value?.sections || [];
+  return {
+    themesCount: themes.length,
+    requiredThemesCount: themes.filter((item) => item.isRequired).length,
+    subtopicsCount: themes.reduce((total, item) => total + (item.topics?.length || 0), 0),
+  };
+});
+
 const getStatusLabel = (status) => {
   const labels = {
     draft: "Черновик",
     published: "Опубликован",
-    archived: "Архив",
+    archived: "Закрыт",
   };
   return labels[status] || status;
 };
@@ -484,6 +643,17 @@ const getStatusVariant = (status) => {
 const getErrorMessage = (error, fallbackText) => {
   return error?.response?.data?.error || fallbackText;
 };
+
+function formatPublicationError(text) {
+  return String(text || "")
+    .replace("минимум один раздел", "минимум одна тема курса")
+    .replaceAll('Раздел "', 'Тема курса "')
+    .replaceAll('раздел "', 'тема курса "')
+    .replaceAll("не назначен тест раздела", "не назначен проверочный тест темы курса")
+    .replaceAll("тест раздела не найден", "проверочный тест темы курса не найден")
+    .replaceAll("должна быть хотя бы одна тема", "должна содержать хотя бы одну подтему")
+    .replaceAll(', тема "', ', подтема "');
+}
 
 const sanitizeOptionalNumber = (value) => {
   if (value === null || value === undefined || value === "") {
@@ -618,7 +788,7 @@ const validateCourse = () => {
 
 const saveCourse = async () => {
   if (!validateCourse()) {
-    return;
+    return false;
   }
 
   const payload = {
@@ -643,10 +813,47 @@ const saveCourse = async () => {
       await router.replace(`/courses/${response.course.id}/edit`);
       await loadCourse();
     }
+    return true;
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось сохранить курс"), "error");
+    return false;
   } finally {
     saving.value = false;
+  }
+};
+
+const goToStep = async (stepId) => {
+  if (stepId === currentStep.value) return;
+  if (stepId > 1 && !course.value && !isEditMode.value) {
+    showToast("Сначала сохраните основную информацию о курсе", "error");
+    return;
+  }
+  if (stepId > currentStep.value && (currentStep.value === 1 || currentStep.value === 3)) {
+    const saved = await saveCourse();
+    if (!saved) return;
+  }
+  currentStep.value = stepId;
+  if (currentStep.value === 4 && isEditMode.value) {
+    await loadParticipants();
+  }
+};
+
+const goToPrevStep = () => {
+  if (currentStep.value > 1) {
+    currentStep.value -= 1;
+  }
+};
+
+const goToNextStep = async () => {
+  if (currentStep.value === 1 || currentStep.value === 3) {
+    const saved = await saveCourse();
+    if (!saved) return;
+  }
+  if (currentStep.value < wizardSteps.length) {
+    currentStep.value += 1;
+  }
+  if (currentStep.value === 4 && isEditMode.value) {
+    await loadParticipants();
   }
 };
 
@@ -665,7 +872,7 @@ const resetNewSection = () => {
 
 const addSection = async () => {
   if (!newSection.value.title.trim()) {
-    newSectionErrors.value = { title: "Укажите название раздела" };
+    newSectionErrors.value = { title: "Укажите название темы курса" };
     return;
   }
   creatingSection.value = true;
@@ -682,9 +889,9 @@ const addSection = async () => {
     course.value = response.course;
     syncSectionDrafts(response.course.sections || []);
     resetNewSection();
-    showToast("Раздел добавлен", "success");
+    showToast("Тема курса добавлена", "success");
   } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось добавить раздел"), "error");
+    showToast(getErrorMessage(error, "Не удалось добавить тему курса"), "error");
   } finally {
     creatingSection.value = false;
   }
@@ -711,25 +918,25 @@ const saveSection = async (sectionId) => {
     course.value = response.course;
     syncSectionDrafts(response.course.sections || []);
     sectionEditingId.value = null;
-    showToast("Раздел обновлён", "success");
+    showToast("Тема курса обновлена", "success");
   } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось обновить раздел"), "error");
+    showToast(getErrorMessage(error, "Не удалось обновить тему курса"), "error");
   } finally {
     updatingSectionId.value = null;
   }
 };
 
 const removeSection = async (sectionId, title) => {
-  if (!window.confirm(`Удалить раздел "${title}" и все его темы?`)) return;
+  if (!window.confirm(`Удалить тему курса "${title}" и все её подтемы?`)) return;
   deletingSectionId.value = sectionId;
   try {
     const response = await deleteCourseSection(sectionId);
     course.value = response.course;
     syncSectionDrafts(response.course.sections || []);
     if (sectionEditingId.value === sectionId) sectionEditingId.value = null;
-    showToast("Раздел удалён", "success");
+    showToast("Тема курса удалена", "success");
   } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось удалить раздел"), "error");
+    showToast(getErrorMessage(error, "Не удалось удалить тему курса"), "error");
   } finally {
     deletingSectionId.value = null;
   }
@@ -739,11 +946,11 @@ const addTopic = async (sectionId) => {
   const draft = newTopics.value[sectionId];
   if (!draft) return;
   if (!draft.title.trim()) {
-    newTopicErrors.value = { ...newTopicErrors.value, [sectionId]: { title: "Укажите название темы" } };
+    newTopicErrors.value = { ...newTopicErrors.value, [sectionId]: { title: "Укажите название подтемы" } };
     return;
   }
   if (!draft.hasMaterial && !sanitizeOptionalNumber(draft.assessmentId)) {
-    showToast("Тема должна содержать материал или тест", "error");
+    showToast("Подтема должна содержать материал или тест", "error");
     return;
   }
   creatingTopicSectionId.value = sectionId;
@@ -760,9 +967,9 @@ const addTopic = async (sectionId) => {
     syncSectionDrafts(response.course.sections || []);
     newTopics.value[sectionId] = { title: "", orderIndex: "", hasMaterial: false, content: "", assessmentId: "" };
     newTopicErrors.value = { ...newTopicErrors.value, [sectionId]: null };
-    showToast("Тема добавлена", "success");
+    showToast("Подтема добавлена", "success");
   } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось добавить тему"), "error");
+    showToast(getErrorMessage(error, "Не удалось добавить подтему"), "error");
   } finally {
     creatingTopicSectionId.value = null;
   }
@@ -788,25 +995,25 @@ const saveTopic = async (topicId) => {
     course.value = response.course;
     syncSectionDrafts(response.course.sections || []);
     topicEditingId.value = null;
-    showToast("Тема обновлена", "success");
+    showToast("Подтема обновлена", "success");
   } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось обновить тему"), "error");
+    showToast(getErrorMessage(error, "Не удалось обновить подтему"), "error");
   } finally {
     updatingTopicId.value = null;
   }
 };
 
 const removeTopic = async (topicId, title) => {
-  if (!window.confirm(`Удалить тему "${title}"?`)) return;
+  if (!window.confirm(`Удалить подтему "${title}"?`)) return;
   deletingTopicId.value = topicId;
   try {
     const response = await deleteCourseTopic(topicId);
     course.value = response.course;
     syncSectionDrafts(response.course.sections || []);
     if (topicEditingId.value === topicId) topicEditingId.value = null;
-    showToast("Тема удалена", "success");
+    showToast("Подтема удалена", "success");
   } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось удалить тему"), "error");
+    showToast(getErrorMessage(error, "Не удалось удалить подтему"), "error");
   } finally {
     deletingTopicId.value = null;
   }
@@ -825,7 +1032,7 @@ const handlePublish = async () => {
   } catch (error) {
     const validationErrors = error?.response?.data?.validationErrors;
     if (Array.isArray(validationErrors) && validationErrors.length > 0) {
-      showToast(validationErrors.join("; "), "error", 7000);
+      showToast(validationErrors.map((item) => formatPublicationError(item)).join("; "), "error", 7000);
       await loadCourse();
       return;
     }
@@ -837,17 +1044,17 @@ const handlePublish = async () => {
 };
 
 const handleArchive = async () => {
-  if (!course.value || !window.confirm(`Перевести курс "${course.value.title}" в архив?`)) {
+  if (!course.value || !window.confirm(`Закрыть курс "${course.value.title}" для новых пользователей?`)) {
     return;
   }
 
   archiving.value = true;
   try {
     await archiveCourse(course.value.id);
-    showToast("Курс архивирован", "success");
+    showToast("Курс закрыт", "success");
     await loadCourse();
   } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось архивировать курс"), "error");
+    showToast(getErrorMessage(error, "Не удалось закрыть курс"), "error");
   } finally {
     archiving.value = false;
   }
@@ -918,8 +1125,8 @@ const getProgressStatusLabel = (status) => {
   const labels = {
     not_started: "Не начат",
     in_progress: "В процессе",
-    completed: "Завершён",
-    failed: "Провален",
+    completed: "Завершен",
+    failed: "Не пройден",
     passed: "Сдан",
   };
   return labels[status] || status;
@@ -944,7 +1151,7 @@ const openUserProgress = async (userId) => {
   try {
     const response = await getCourseUserProgress(courseId.value, userId);
     selectedUserProgress.value = response.progress;
-    selectedUserName.value = participant?.name || `User #${userId}`;
+    selectedUserName.value = participant?.name || `Пользователь #${userId}`;
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось загрузить прогресс"), "error");
   } finally {
@@ -999,15 +1206,156 @@ onMounted(async () => {
   gap: 8px;
 }
 
+.wizard-card,
 .editor-card,
-.sections-card {
+.sections-card,
+.final-assessment-card,
+.preview-card {
   margin-bottom: 20px;
 }
 
-.editor-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
+.wizard-header {
+  display: flex;
+  justify-content: space-between;
   gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.wizard-header h2,
+.step-card-header h2 {
+  margin: 0 0 4px;
+}
+
+.wizard-header p,
+.step-card-header p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.wizard-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  text-align: left;
+}
+
+.wizard-step.active {
+  border-color: var(--primary, #6366f1);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.wizard-step.completed {
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.step-number {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.step-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wizard-navigation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 20px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.wizard-step-index {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.wizard-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wizard-step-text small {
+  color: var(--text-secondary);
+}
+
+.step-card-header {
+  margin-bottom: 14px;
+}
+
+.status-summary {
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status-summary-label,
+.preview-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.status-summary-text {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.preview-item {
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wizard-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .grid-span-full {
