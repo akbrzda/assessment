@@ -1,6 +1,11 @@
-﻿const Joi = require("joi");
+const Joi = require("joi");
 const { pool } = require("../../../config/database");
-const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
+const { logAndSend } = require("../../../services/auditService");
+const {
+  hasDefaultModuleAccess,
+  getDefaultModulesForRole,
+  getDefaultModulesMap,
+} = require("../../../config/roleModules");
 
 const updatePermissionsSchema = Joi.object({
   modules: Joi.array()
@@ -13,87 +18,83 @@ const updatePermissionsSchema = Joi.object({
     .required(),
 });
 
-/**
- * РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РІСЃРµС… РјРѕРґСѓР»РµР№ СЃРёСЃС‚РµРјС‹
- */
+async function getRoleNameByUserId(connection, userId) {
+  const [roles] = await connection.query(
+    "SELECT r.name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ? LIMIT 1",
+    [userId]
+  );
+  return roles[0]?.name || null;
+}
+
 async function getSystemModules(req, res, next) {
   try {
     const [modules] = await pool.query(
-      `SELECT id, code, name, description, is_active 
-       FROM system_modules 
-       WHERE is_active = 1 
+      `SELECT id, code, name, description, is_active
+       FROM system_modules
+       WHERE is_active = 1
        ORDER BY name ASC`
     );
+
     res.json({ modules });
   } catch (error) {
     next(error);
   }
 }
 
-/**
- * РџРѕР»СѓС‡РёС‚СЊ РїСЂР°РІР° РґРѕСЃС‚СѓРїР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
- */
+async function getDefaultModules(req, res, next) {
+  try {
+    res.json({ defaultModules: getDefaultModulesMap() });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function getUserPermissions(req, res, next) {
   try {
     const userId = Number(req.params.userId);
     const currentUser = req.user;
 
-    // РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РјРѕР¶РµС‚ Р·Р°РіСЂСѓР¶Р°С‚СЊ С‚РѕР»СЊРєРѕ СЃРІРѕРё РїСЂР°РІР°, superadmin - Р»СЋР±С‹Рµ
     if (currentUser.role !== "superadmin" && currentUser.id !== userId) {
-      return res.status(403).json({ error: "Р”РѕСЃС‚СѓРї Р·Р°РїСЂРµС‰С‘РЅ" });
+      return res.status(403).json({ error: "Доступ запрещён" });
     }
 
-    // РџСЂРѕРІРµСЂСЏРµРј СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
     const [users] = await pool.query("SELECT id, role_id FROM users WHERE id = ?", [userId]);
     if (users.length === 0) {
-      return res.status(404).json({ error: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Пользователь не найден" });
     }
 
     const user = users[0];
 
-    // РџРѕР»СѓС‡Р°РµРј РІСЃРµ РјРѕРґСѓР»Рё
     const [modules] = await pool.query(
-      `SELECT id, code, name, description 
-       FROM system_modules 
-       WHERE is_active = 1 
+      `SELECT id, code, name, description
+       FROM system_modules
+       WHERE is_active = 1
        ORDER BY name ASC`
     );
 
-    // РџРѕР»СѓС‡Р°РµРј РїСЂР°РІР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
     const [permissions] = await pool.query(
-      `SELECT module_id, has_access, granted_by, granted_at 
-       FROM user_permissions 
+      `SELECT module_id, has_access, granted_by, granted_at
+       FROM user_permissions
        WHERE user_id = ?`,
       [userId]
     );
 
-    // Р¤РѕСЂРјРёСЂСѓРµРј РєР°СЂС‚Сѓ РїСЂР°РІ
     const permissionsMap = {};
-    permissions.forEach((p) => {
-      permissionsMap[p.module_id] = {
-        hasAccess: Boolean(p.has_access),
-        grantedBy: p.granted_by,
-        grantedAt: p.granted_at,
+    permissions.forEach((permission) => {
+      permissionsMap[permission.module_id] = {
+        hasAccess: Boolean(permission.has_access),
+        grantedBy: permission.granted_by,
+        grantedAt: permission.granted_at,
       };
     });
 
-    // РџРѕР»СѓС‡Р°РµРј СЂРѕР»СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РґР»СЏ РѕРїСЂРµРґРµР»РµРЅРёСЏ РїСЂР°РІ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
     const [roles] = await pool.query("SELECT name FROM roles WHERE id = ?", [user.role_id]);
-    const roleName = roles[0]?.name;
+    const roleName = roles[0]?.name || null;
+    const defaultModules = getDefaultModulesForRole(roleName);
 
-    // Р¤РѕСЂРјРёСЂСѓРµРј СЂРµР·СѓР»СЊС‚Р°С‚
     const result = modules.map((module) => {
       const userPermission = permissionsMap[module.id];
-
-      // РћРїСЂРµРґРµР»СЏРµРј РґРѕСЃС‚СѓРї РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ РЅР° РѕСЃРЅРѕРІРµ СЂРѕР»Рё
-      let defaultAccess = false;
-      if (roleName === "superadmin") {
-        defaultAccess = true; // РЎСѓРїРµСЂР°РґРјРёРЅ РёРјРµРµС‚ РґРѕСЃС‚СѓРї РєРѕ РІСЃРµРј РјРѕРґСѓР»СЏРј
-      } else if (roleName === "manager") {
-        // РњРµРЅРµРґР¶РµСЂ РёРјРµРµС‚ РґРѕСЃС‚СѓРї Рє РЅРµРєРѕС‚РѕСЂС‹Рј РјРѕРґСѓР»СЏРј РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
-        const managerModules = ["assessments", "analytics", "users", "questions"];
-        defaultAccess = managerModules.includes(module.code);
-      }
+      const defaultAccess = hasDefaultModuleAccess(roleName, module.code);
 
       return {
         moduleId: module.id,
@@ -101,21 +102,22 @@ async function getUserPermissions(req, res, next) {
         moduleName: module.name,
         moduleDescription: module.description,
         hasAccess: userPermission ? userPermission.hasAccess : defaultAccess,
-        isCustom: Boolean(userPermission), // Р•СЃС‚СЊ Р»Рё РєР°СЃС‚РѕРјРЅР°СЏ РЅР°СЃС‚СЂРѕР№РєР°
+        isCustom: Boolean(userPermission),
         grantedBy: userPermission?.grantedBy || null,
         grantedAt: userPermission?.grantedAt || null,
       };
     });
 
-    res.json({ permissions: result });
+    res.json({
+      permissions: result,
+      roleName,
+      defaultModules,
+    });
   } catch (error) {
     next(error);
   }
 }
 
-/**
- * РћР±РЅРѕРІРёС‚СЊ РїСЂР°РІР° РґРѕСЃС‚СѓРїР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
- */
 async function updateUserPermissions(req, res, next) {
   const connection = await pool.getConnection();
   try {
@@ -126,53 +128,36 @@ async function updateUserPermissions(req, res, next) {
       return res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
     }
 
-    // РџСЂРѕРІРµСЂСЏРµРј СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
     const [users] = await connection.query("SELECT id, first_name, last_name FROM users WHERE id = ?", [userId]);
     if (users.length === 0) {
-      return res.status(404).json({ error: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Пользователь не найден" });
     }
 
     await connection.beginTransaction();
 
-    // РЈРґР°Р»СЏРµРј СЃС‚Р°СЂС‹Рµ РїСЂР°РІР°
     await connection.query("DELETE FROM user_permissions WHERE user_id = ?", [userId]);
 
-    // Р”РѕР±Р°РІР»СЏРµРј РЅРѕРІС‹Рµ РїСЂР°РІР° (С‚РѕР»СЊРєРѕ РµСЃР»Рё РѕРЅРё РѕС‚Р»РёС‡Р°СЋС‚СЃСЏ РѕС‚ СѓРјРѕР»С‡Р°РЅРёСЏ)
     if (value.modules.length > 0) {
       const grantedBy = req.user?.id || null;
+      const userRole = await getRoleNameByUserId(connection, userId);
 
-      // РџРѕР»СѓС‡Р°РµРј СЂРѕР»СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РґР»СЏ РѕРїСЂРµРґРµР»РµРЅРёСЏ РґРµС„РѕР»С‚РЅС‹С… РїСЂР°РІ
-      const [userRoles] = await connection.query("SELECT r.name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?", [userId]);
-      const userRole = userRoles[0]?.name;
-
-      // РџРѕР»СѓС‡Р°РµРј РІСЃРµ РјРѕРґСѓР»Рё РґР»СЏ РѕРїСЂРµРґРµР»РµРЅРёСЏ РґРµС„РѕР»С‚РЅС‹С… РїСЂР°РІ
       const [allModules] = await connection.query("SELECT id, code FROM system_modules WHERE is_active = 1");
       const modulesMap = {};
-      allModules.forEach((m) => {
-        modulesMap[m.id] = m.code;
+      allModules.forEach((module) => {
+        modulesMap[module.id] = module.code;
       });
 
-      // Р¤РёР»СЊС‚СЂСѓРµРј С‚РѕР»СЊРєРѕ С‚Рµ РїСЂР°РІР°, РєРѕС‚РѕСЂС‹Рµ РѕС‚Р»РёС‡Р°СЋС‚СЃСЏ РѕС‚ РґРµС„РѕР»С‚РЅС‹С…
       const insertValues = value.modules
-        .filter((m) => {
-          const moduleCode = modulesMap[m.moduleId];
-          let defaultAccess = false;
-
-          if (userRole === "superadmin") {
-            defaultAccess = true;
-          } else if (userRole === "manager") {
-            const managerModules = ["assessments", "analytics", "users", "questions"];
-            defaultAccess = managerModules.includes(moduleCode);
-          }
-
-          // Р”РѕР±Р°РІР»СЏРµРј С‚РѕР»СЊРєРѕ РµСЃР»Рё РїСЂР°РІРѕ РѕС‚Р»РёС‡Р°РµС‚СЃСЏ РѕС‚ РґРµС„РѕР»С‚РЅРѕРіРѕ
-          return m.hasAccess !== defaultAccess;
+        .filter((moduleAccess) => {
+          const moduleCode = modulesMap[moduleAccess.moduleId];
+          const defaultAccess = hasDefaultModuleAccess(userRole, moduleCode);
+          return moduleAccess.hasAccess !== defaultAccess;
         })
-        .map((m) => [userId, m.moduleId, m.hasAccess ? 1 : 0, grantedBy]);
+        .map((moduleAccess) => [userId, moduleAccess.moduleId, moduleAccess.hasAccess ? 1 : 0, grantedBy]);
 
       if (insertValues.length > 0) {
         await connection.query(
-          `INSERT INTO user_permissions (user_id, module_id, has_access, granted_by) 
+          `INSERT INTO user_permissions (user_id, module_id, has_access, granted_by)
            VALUES ?`,
           [insertValues]
         );
@@ -181,7 +166,6 @@ async function updateUserPermissions(req, res, next) {
 
     await connection.commit();
 
-    // Р›РѕРіРёСЂСѓРµРј РґРµР№СЃС‚РІРёРµ
     await logAndSend({
       action: "update_user_permissions",
       entityType: "user",
@@ -195,7 +179,7 @@ async function updateUserPermissions(req, res, next) {
       },
     });
 
-    res.json({ message: "РџСЂР°РІР° РґРѕСЃС‚СѓРїР° СѓСЃРїРµС€РЅРѕ РѕР±РЅРѕРІР»РµРЅС‹" });
+    res.json({ message: "Права доступа успешно обновлены" });
   } catch (error) {
     await connection.rollback();
     next(error);
@@ -204,55 +188,50 @@ async function updateUserPermissions(req, res, next) {
   }
 }
 
-/**
- * РџСЂРѕРІРµСЂРёС‚СЊ РґРѕСЃС‚СѓРї РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Рє РјРѕРґСѓР»СЋ
- */
 async function checkUserAccess(req, res, next) {
   try {
     const userId = Number(req.params.userId);
     const { moduleCode } = req.query;
     const currentUser = req.user;
 
-    // РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РјРѕР¶РµС‚ РїСЂРѕРІРµСЂСЏС‚СЊ С‚РѕР»СЊРєРѕ СЃРІРѕР№ РґРѕСЃС‚СѓРї, superadmin - Р»СЋР±РѕР№
     if (currentUser.role !== "superadmin" && currentUser.id !== userId) {
-      return res.status(403).json({ error: "Р”РѕСЃС‚СѓРї Р·Р°РїСЂРµС‰С‘РЅ" });
+      return res.status(403).json({ error: "Доступ запрещён" });
     }
 
     if (!moduleCode) {
-      return res.status(400).json({ error: "РќРµ СѓРєР°Р·Р°РЅ РєРѕРґ РјРѕРґСѓР»СЏ" });
+      return res.status(400).json({ error: "Не указан код модуля" });
     }
 
-    // РџРѕР»СѓС‡Р°РµРј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЃ РµРіРѕ СЂРѕР»СЊСЋ
     const [users] = await pool.query(
-      `SELECT u.id, u.role_id, r.name as role_name 
-       FROM users u 
-       JOIN roles r ON u.role_id = r.id 
+      `SELECT u.id, r.name as role_name
+       FROM users u
+       JOIN roles r ON u.role_id = r.id
        WHERE u.id = ?`,
       [userId]
     );
 
     if (users.length === 0) {
-      return res.status(404).json({ error: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Пользователь не найден" });
     }
 
-    const user = users[0];
+    const roleName = users[0].role_name;
 
-    // РЎСѓРїРµСЂР°РґРјРёРЅ РёРјРµРµС‚ РґРѕСЃС‚СѓРї РєРѕ РІСЃРµРјСѓ
-    if (user.role_name === "superadmin") {
+    if (roleName === "superadmin") {
       return res.json({ hasAccess: true, reason: "superadmin" });
     }
 
-    // РџРѕР»СѓС‡Р°РµРј РјРѕРґСѓР»СЊ
     const [modules] = await pool.query("SELECT id FROM system_modules WHERE code = ? AND is_active = 1", [moduleCode]);
 
     if (modules.length === 0) {
-      return res.status(404).json({ error: "РњРѕРґСѓР»СЊ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Модуль не найден" });
     }
 
     const moduleId = modules[0].id;
 
-    // РџСЂРѕРІРµСЂСЏРµРј РєР°СЃС‚РѕРјРЅС‹Рµ РїСЂР°РІР°
-    const [permissions] = await pool.query("SELECT has_access FROM user_permissions WHERE user_id = ? AND module_id = ?", [userId, moduleId]);
+    const [permissions] = await pool.query(
+      "SELECT has_access FROM user_permissions WHERE user_id = ? AND module_id = ?",
+      [userId, moduleId]
+    );
 
     if (permissions.length > 0) {
       return res.json({
@@ -261,9 +240,7 @@ async function checkUserAccess(req, res, next) {
       });
     }
 
-    // РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ РґР»СЏ СЂРѕР»Рё
-    const managerModules = ["assessments", "analytics", "users", "questions"];
-    const defaultAccess = user.role_name === "manager" && managerModules.includes(moduleCode);
+    const defaultAccess = hasDefaultModuleAccess(roleName, moduleCode);
 
     res.json({
       hasAccess: defaultAccess,
@@ -276,8 +253,8 @@ async function checkUserAccess(req, res, next) {
 
 module.exports = {
   getSystemModules,
+  getDefaultModules,
   getUserPermissions,
   updateUserPermissions,
   checkUserAccess,
 };
-

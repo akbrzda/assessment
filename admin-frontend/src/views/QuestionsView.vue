@@ -16,11 +16,11 @@
     <!-- Фильтры -->
     <Card class="filters-card">
       <div class="filters-grid">
-        <Input v-model="filters.search" placeholder="Поиск по тексту вопроса..." @input="loadQuestions" />
+        <Input v-model="filters.search" placeholder="Поиск по тексту вопроса..." @input="applyFilters" />
 
-        <Select v-model="filters.category" :options="categoryOptions" placeholder="Все категории" @change="loadQuestions" />
+        <Select v-model="filters.category" :options="categoryOptions" placeholder="Все категории" @change="applyFilters" />
 
-        <Select v-model="filters.type" :options="typeOptions" placeholder="Все типы" @change="loadQuestions" />
+        <Select v-model="filters.type" :options="typeOptions" placeholder="Все типы" @change="applyFilters" />
 
         <Button variant="secondary" @click="resetFilters" fullWidth icon="refresh-ccw">Сбросить</Button>
       </div>
@@ -28,7 +28,7 @@
       <!-- Переключатель группировки -->
       <div class="grouping-toggle">
         <label class="toggle-checkbox">
-          <input type="checkbox" v-model="groupByAssessment" @change="loadQuestions" />
+          <input type="checkbox" v-model="groupByAssessment" @change="applyFilters" />
           <span>Группировать по аттестациям</span>
         </label>
       </div>
@@ -40,6 +40,7 @@
       <div v-if="questions.length === 0" class="empty-state">Вопросы не найдены</div>
 
       <div v-else class="table-wrapper hide-mobile">
+        <div class="list-meta">Показано {{ questions.length }} из {{ totalQuestions }}</div>
         <table class="questions-table">
           <thead>
             <tr>
@@ -123,6 +124,18 @@
           </div>
         </div>
       </div>
+
+      <div v-if="totalPages > 1" class="pagination">
+        <span class="pagination-info">Страница {{ pagination.page }} из {{ totalPages }}</span>
+        <div class="pagination-buttons">
+          <Button size="sm" variant="ghost" :disabled="pagination.page <= 1" @click="changePage(pagination.page - 1)">
+            Предыдущая
+          </Button>
+          <Button size="sm" variant="ghost" :disabled="pagination.page >= totalPages" @click="changePage(pagination.page + 1)">
+            Следующая
+          </Button>
+        </div>
+      </div>
     </Card>
 
     <!-- Модальное окно управления категориями -->
@@ -150,7 +163,12 @@ const router = useRouter();
 const loading = ref(false);
 const questions = ref([]);
 const categories = ref([]);
+const totalQuestions = ref(0);
 const groupByAssessment = ref(false);
+const pagination = ref({
+  page: 1,
+  limit: 20,
+});
 const filters = ref({
   search: "",
   category: "",
@@ -174,13 +192,19 @@ const typeOptions = [
   { value: "matching", label: "Сопоставление" },
 ];
 
+const totalPages = computed(() => Math.max(1, Math.ceil(totalQuestions.value / pagination.value.limit)));
+
 const getQuestionTypeLabel = (type) => {
   const option = typeOptions.find((opt) => opt.value === type);
   return option ? option.label : type;
 };
 
 const buildFiltersPayload = () => {
-  const payload = { ...filters.value };
+  const payload = {
+    ...filters.value,
+    page: pagination.value.page,
+    limit: pagination.value.limit,
+  };
   if (groupByAssessment.value) {
     payload.group_by = "assessment";
   }
@@ -192,6 +216,7 @@ const loadQuestions = async () => {
   try {
     const data = await getQuestions(buildFiltersPayload());
     questions.value = data.questions;
+    totalQuestions.value = Number(data.total || data.questions?.length || 0);
   } catch (error) {
     console.error("Load questions error:", error);
     showToast("Ошибка загрузки вопросов", "error");
@@ -215,6 +240,17 @@ const resetFilters = () => {
     category: "",
     type: "",
   };
+  pagination.value.page = 1;
+  loadQuestions();
+};
+
+const applyFilters = () => {
+  pagination.value.page = 1;
+  loadQuestions();
+};
+
+const changePage = (page) => {
+  pagination.value.page = page;
   loadQuestions();
 };
 
@@ -231,6 +267,7 @@ const goToDetails = (id) => {
 };
 
 const handleCategoryUpdate = () => {
+  pagination.value.page = 1;
   loadCategories();
   loadQuestions();
 };
@@ -495,6 +532,31 @@ onMounted(async () => {
   text-align: center;
   color: var(--text-secondary);
   font-size: 14px;
+}
+
+.list-meta {
+  padding: 12px 16px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid var(--divider);
+}
+
+.pagination-info {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.pagination-buttons {
+  display: flex;
+  gap: 8px;
 }
 
 /* Responsive design */

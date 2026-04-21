@@ -1,4 +1,5 @@
 const { pool } = require("../config/database");
+const { hasDefaultModuleAccess } = require("../config/roleModules");
 
 /**
  * Middleware для проверки доступа пользователя к модулю
@@ -40,8 +41,7 @@ const checkModuleAccess = (moduleCode) => {
       }
 
       // Проверяем права по умолчанию для роли
-      const defaultManagerModules = ["assessments", "analytics", "users", "questions"];
-      const hasDefaultAccess = userRole === "manager" && defaultManagerModules.includes(moduleCode);
+      const hasDefaultAccess = hasDefaultModuleAccess(userRole, moduleCode);
 
       if (hasDefaultAccess) {
         return next();

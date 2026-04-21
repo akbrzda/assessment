@@ -1,19 +1,16 @@
+const requireRole = require("./requireRole");
+
 /**
- * Middleware для проверки роли пользователя
- * @param {Array} allowedRoles - массив разрешённых ролей ['superadmin', 'manager']
+ * Middleware для проверки роли администратора.
+ * Использует общий requireRole с другим источником пользователя.
+ * @param {Array} allowedRoles
  */
-module.exports = (allowedRoles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: "Не авторизован" });
-    }
-
-    const { role } = req.user;
-
-    if (!allowedRoles.includes(role)) {
-      return res.status(403).json({ error: "Доступ запрещён" });
-    }
-
-    next();
-  };
-};
+module.exports = (allowedRoles) =>
+  requireRole(allowedRoles, {
+    userResolver: (req) => req.user,
+    roleField: "role",
+    unauthorizedStatus: 401,
+    forbiddenStatus: 403,
+    unauthorizedMessage: "Не авторизован",
+    forbiddenMessage: "Доступ запрещён",
+  });

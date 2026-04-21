@@ -60,7 +60,7 @@ function toUserResponse(user) {
 }
 
 function createAccessToken(user) {
-  return jwt.sign({ id: user.id, role: user.role_name }, config.jwtSecret, {
+  return jwt.sign({ id: user.id, role: user.role_name, branch_id: user.branch_id || null }, config.jwtSecret, {
     expiresIn: ACCESS_TOKEN_TTL,
   });
 }
@@ -130,7 +130,10 @@ async function refresh(payload, req, res) {
   await authRepository.updateRefreshToken(user.id, newRefreshToken);
   setRefreshCookie(res, newRefreshToken);
 
-  return { accessToken };
+  return {
+    accessToken,
+    user: toUserResponse(user),
+  };
 }
 
 async function logout(currentUser, res) {
@@ -149,4 +152,3 @@ module.exports = {
   refresh,
   logout,
 };
-

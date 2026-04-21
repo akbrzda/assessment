@@ -67,6 +67,90 @@ function mapAssessmentRow(row) {
   };
 }
 
+function mapQuestionRows(questionRows) {
+  const questionMap = new Map();
+  questionRows.forEach((row) => {
+    if (!questionMap.has(row.id)) {
+      questionMap.set(row.id, {
+        id: row.id,
+        order: row.order_index,
+        text: row.question_text,
+        questionType: row.question_type || "single",
+        options: [],
+      });
+    }
+
+    if (row.option_id) {
+      questionMap.get(row.id).options.push({
+        id: row.option_id,
+        order: row.option_order,
+        text: row.option_text,
+        matchText: row.match_text,
+      });
+    }
+  });
+
+  return Array.from(questionMap.values());
+}
+
+async function loadAssessmentQuestions(assessmentId) {
+  const [questionRows] = await pool.execute(
+    `SELECT
+       q.id,
+       q.order_index,
+       q.question_text,
+       q.question_type,
+       q.correct_text_answer,
+       o.id AS option_id,
+       o.order_index AS option_order,
+       o.option_text,
+       o.match_text,
+       o.is_correct
+     FROM assessment_questions q
+     LEFT JOIN assessment_question_options o ON o.question_id = q.id
+     WHERE q.assessment_id = ?
+     ORDER BY q.order_index ASC, o.order_index ASC`,
+    [assessmentId],
+  );
+
+  return mapQuestionRows(questionRows);
+}
+
+async function loadAttemptSnapshotQuestions(attemptId) {
+  const [snapshotRows] = await pool.execute(
+    `SELECT
+       q.id,
+       aq.order_index,
+       q.question_text,
+       q.question_type,
+       q.correct_text_answer,
+       o.id AS option_id,
+       o.order_index AS option_order,
+       o.option_text,
+       o.match_text,
+       o.is_correct
+     FROM assessment_attempt_questions aq
+     JOIN assessment_questions q ON q.id = aq.question_id
+     LEFT JOIN assessment_question_options o ON o.question_id = q.id
+     WHERE aq.attempt_id = ?
+     ORDER BY aq.order_index ASC, o.order_index ASC`,
+    [attemptId],
+  );
+
+  return mapQuestionRows(snapshotRows);
+}
+
+async function createAttemptQuestionsSnapshot(connection, { attemptId, assessmentId }) {
+  await connection.execute(
+    `INSERT INTO assessment_attempt_questions (attempt_id, question_id, order_index)
+     SELECT ?, q.id, q.order_index
+     FROM assessment_questions q
+     WHERE q.assessment_id = ?
+     ORDER BY q.order_index ASC`,
+    [attemptId, assessmentId],
+  );
+}
+
 async function createAssessment({ assessment, questions, branchIds, userIds, positionIds, userId }) {
   const connection = await pool.getConnection();
   let committed = false;
@@ -619,6 +703,14 @@ async function hasAttempts(assessmentId) {
   return Number(rows[0].total || 0) > 0;
 }
 
+async function hasInProgressAttempts(assessmentId) {
+  const [rows] = await pool.execute(
+    "SELECT COUNT(*) AS total FROM assessment_attempts WHERE assessment_id = ? AND status = 'in_progress'",
+    [assessmentId],
+  );
+  return Number(rows[0].total || 0) > 0;
+}
+
 async function listAssignableUsers({ roleName, branchId }) {
   const params = [];
   let whereClause = "";
@@ -823,7 +915,14 @@ async function assignUserToMatchingAssessments({ userId, branchId, positionId })
   }
 }
 
-async function listAssessmentsForUser(userId) {
+async function listAssessmentsForUser(userId, options = {}) {
+  const page = Number(options.page);
+  const limit = Number(options.limit);
+  const usePagination = Number.isInteger(page) && Number.isInteger(limit) && page > 0 && limit > 0;
+  const safeLimit = usePagination ? Math.min(limit, 100) : null;
+  const safeOffset = usePagination ? (page - 1) * safeLimit : null;
+
+  const baseParams = [userId, userId, userId, userId, userId, userId, userId, userId];
   const [rows] = await pool.execute(
     `SELECT DISTINCT
        a.id,
@@ -901,11 +1000,12 @@ async function listAssessmentsForUser(userId) {
      ) best_attempts ON best_attempts.assessment_id = a.id
      LEFT JOIN assessment_theory_versions tv ON tv.id = a.current_theory_version_id AND tv.status = 'published'
      LEFT JOIN assessment_theory_completions tc ON tc.assessment_id = a.id AND tc.user_id = ? AND tc.version_id = tv.id
-      ORDER BY a.open_at ASC`,
-    [userId, userId, userId, userId, userId, userId, userId, userId],
+      ORDER BY a.open_at ASC
+      ${usePagination ? "LIMIT ? OFFSET ?" : ""}`,
+    usePagination ? [...baseParams, safeLimit, safeOffset] : baseParams,
   );
 
-  return rows.map((row) => ({
+  const assessments = rows.map((row) => ({
     id: row.id,
     title: row.title,
     description: row.description,
@@ -949,6 +1049,58 @@ async function listAssessmentsForUser(userId) {
       return Math.max(limitSeconds - elapsedSeconds, 0);
     })(),
   }));
+
+  if (!usePagination) {
+    return {
+      items: assessments,
+      total: assessments.length,
+      page: null,
+      limit: null,
+    };
+  }
+
+  const [totalRows] = await pool.execute(
+    `SELECT COUNT(*) AS total
+       FROM (
+         SELECT DISTINCT a.id
+         FROM assessments a
+         JOIN (
+           SELECT aua.assessment_id
+           FROM assessment_user_assignments aua
+           WHERE aua.user_id = ?
+           UNION
+           SELECT aba.assessment_id
+           FROM assessment_branch_assignments aba
+           JOIN users u ON u.branch_id = aba.branch_id
+           WHERE u.id = ?
+             AND NOT EXISTS (
+               SELECT 1 FROM assessment_position_assignments apa WHERE apa.assessment_id = aba.assessment_id
+             )
+           UNION
+           SELECT apa.assessment_id
+           FROM assessment_position_assignments apa
+           JOIN users u ON u.position_id = apa.position_id
+           WHERE u.id = ?
+             AND NOT EXISTS (
+               SELECT 1 FROM assessment_branch_assignments aba WHERE aba.assessment_id = apa.assessment_id
+             )
+           UNION
+           SELECT aba.assessment_id
+           FROM assessment_branch_assignments aba
+           JOIN assessment_position_assignments apa ON apa.assessment_id = aba.assessment_id
+           JOIN users u ON u.branch_id = aba.branch_id AND u.position_id = apa.position_id
+           WHERE u.id = ?
+         ) assigned ON assigned.assessment_id = a.id
+       ) assignment_scope`,
+    [userId, userId, userId, userId],
+  );
+
+  return {
+    items: assessments,
+    total: Number(totalRows[0]?.total || 0),
+    page,
+    limit: safeLimit,
+  };
 }
 
 async function getAssessmentForUser(assessmentId, userId) {
@@ -1019,48 +1171,6 @@ async function getAssessmentForUser(assessmentId, userId) {
     status: rows[0].status,
   };
 
-  const [questionRows] = await pool.execute(
-    `SELECT
-       q.id,
-       q.order_index,
-       q.question_text,
-       q.question_type,
-       q.correct_text_answer,
-       o.id AS option_id,
-       o.order_index AS option_order,
-       o.option_text,
-       o.match_text,
-       o.is_correct
-     FROM assessment_questions q
-     LEFT JOIN assessment_question_options o ON o.question_id = q.id
-     WHERE q.assessment_id = ?
-     ORDER BY q.order_index ASC, o.order_index ASC`,
-    [assessmentId],
-  );
-
-  const questionMap = new Map();
-  questionRows.forEach((row) => {
-    if (!questionMap.has(row.id)) {
-      questionMap.set(row.id, {
-        id: row.id,
-        order: row.order_index,
-        text: row.question_text,
-        questionType: row.question_type || "single",
-        options: [],
-      });
-    }
-    if (row.option_id) {
-      questionMap.get(row.id).options.push({
-        id: row.option_id,
-        order: row.option_order,
-        text: row.option_text,
-        matchText: row.match_text,
-      });
-    }
-  });
-
-  const questionsArray = Array.from(questionMap.values());
-
   const [attemptRows] = await pool.execute(
     `SELECT id, attempt_number, status, started_at, completed_at, score_percent
        FROM assessment_attempts
@@ -1070,7 +1180,12 @@ async function getAssessmentForUser(assessmentId, userId) {
     [assessmentId, userId],
   );
 
-  base.questions = questionsArray;
+  if (attemptRows.length && attemptRows[0].status === "in_progress") {
+    const snapshotQuestions = await loadAttemptSnapshotQuestions(attemptRows[0].id);
+    base.questions = snapshotQuestions.length ? snapshotQuestions : await loadAssessmentQuestions(assessmentId);
+  } else {
+    base.questions = await loadAssessmentQuestions(assessmentId);
+  }
 
   if (attemptRows.length) {
     const attempt = attemptRows[0];
@@ -1165,32 +1280,6 @@ async function createAttempt(assessment, userId) {
     await connection.beginTransaction();
     logWithTime("createAttempt", `Начало создания попытки`, { assessmentId: assessment.id, userId });
 
-    const [existingAttemptRows] = await connection.execute(
-      `SELECT id, attempt_number, started_at
-         FROM assessment_attempts
-        WHERE assessment_id = ? AND user_id = ? AND status = 'in_progress'
-        LIMIT 1`,
-      [assessment.id, userId],
-    );
-
-    if (existingAttemptRows.length) {
-      const existing = existingAttemptRows[0];
-      logWithTime("createAttempt", "Найдена активная попытка, возвращаем её", {
-        attemptId: existing.id,
-        attemptNumber: existing.attempt_number,
-      });
-      await connection.commit();
-      return {
-        id: existing.id,
-        attemptNumber: Number(existing.attempt_number),
-        timeLimitMinutes: assessment.timeLimitMinutes != null ? Number(assessment.timeLimitMinutes) : null,
-        maxAttempts: assessment.maxAttempts != null ? Number(assessment.maxAttempts) : null,
-        createdBy: assessment.created_by,
-        title: assessment.title,
-        startedAt: toIsoUtc(existing.started_at),
-      };
-    }
-
     logWithTime("createAttempt", "Блокируем запись аттестации для проверки ограничений");
     const [assessmentRow] = await connection.execute(
       "SELECT id, title, open_at, close_at, max_attempts, time_limit_minutes, created_by FROM assessments WHERE id = ? FOR UPDATE",
@@ -1218,6 +1307,32 @@ async function createAttempt(assessment, userId) {
       throw error;
     }
 
+    const [existingAttemptRows] = await connection.execute(
+      `SELECT id, attempt_number, started_at
+         FROM assessment_attempts
+        WHERE assessment_id = ? AND user_id = ? AND status = 'in_progress'
+        FOR UPDATE`,
+      [assessment.id, userId],
+    );
+
+    if (existingAttemptRows.length) {
+      const existing = existingAttemptRows[0];
+      logWithTime("createAttempt", "Найдена активная попытка, возвращаем её", {
+        attemptId: existing.id,
+        attemptNumber: existing.attempt_number,
+      });
+      await connection.commit();
+      return {
+        id: existing.id,
+        attemptNumber: Number(existing.attempt_number),
+        timeLimitMinutes: row.time_limit_minutes != null ? Number(row.time_limit_minutes) : null,
+        maxAttempts: row.max_attempts != null ? Number(row.max_attempts) : null,
+        createdBy: row.created_by,
+        title: row.title,
+        startedAt: toIsoUtc(existing.started_at),
+      };
+    }
+
     const [attemptCountRows] = await connection.execute("SELECT COUNT(*) AS total FROM assessment_attempts WHERE assessment_id = ? AND user_id = ?", [
       assessment.id,
       userId,
@@ -1239,6 +1354,7 @@ async function createAttempt(assessment, userId) {
     );
 
     const attemptId = insertResult.insertId;
+    await createAttemptQuestionsSnapshot(connection, { attemptId, assessmentId: assessment.id });
 
     logWithTime("createAttempt", "Создана попытка без рандомизации", {
       attemptId,
@@ -1277,6 +1393,158 @@ const normalizeTextAnswer = (value) => {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 };
 
+function buildHttpError(message, status = 400) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
+function normalizeIdList(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return [];
+  }
+
+  return [...new Set(ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
+}
+
+async function loadQuestionForScoring(connection, { assessmentId, questionId }) {
+  const [questionRows] = await connection.execute(
+    "SELECT id, question_type, correct_text_answer FROM assessment_questions WHERE id = ? AND assessment_id = ?",
+    [questionId, assessmentId],
+  );
+
+  if (!questionRows.length) {
+    throw buildHttpError("Вопрос не найден", 404);
+  }
+
+  const question = questionRows[0];
+  let options = [];
+  if (question.question_type !== "text") {
+    const [optionRows] = await connection.execute("SELECT id, is_correct FROM assessment_question_options WHERE question_id = ?", [questionId]);
+    options = optionRows;
+  }
+
+  return {
+    id: Number(question.id),
+    questionType: question.question_type,
+    correctTextAnswer: question.correct_text_answer || "",
+    options: options.map((option) => ({
+      id: Number(option.id),
+      isCorrect: Boolean(option.is_correct),
+    })),
+  };
+}
+
+function scoreAnswer(question, payload) {
+  const { optionId, optionIds, textAnswer, matchPairs } = payload;
+
+  if (question.questionType === "single") {
+    const normalizedOptionId = Number(optionId);
+    if (!Number.isInteger(normalizedOptionId) || normalizedOptionId <= 0) {
+      throw buildHttpError("Не указан вариант ответа");
+    }
+
+    const option = question.options.find((item) => item.id === normalizedOptionId);
+    if (!option) {
+      throw buildHttpError("Ответ не найден", 404);
+    }
+
+    return {
+      resolvedOptionId: normalizedOptionId,
+      selectedOptionIdsJson: null,
+      resolvedTextAnswer: null,
+      isCorrect: option.isCorrect ? 1 : 0,
+    };
+  }
+
+  if (question.questionType === "multiple") {
+    const normalizedIds = normalizeIdList(optionIds);
+    if (!normalizedIds.length) {
+      throw buildHttpError("Не выбраны варианты ответа");
+    }
+
+    const validIds = new Set(question.options.map((option) => option.id));
+    if (!normalizedIds.every((id) => validIds.has(id))) {
+      throw buildHttpError("Выбран недопустимый вариант ответа");
+    }
+
+    const correctIds = question.options.filter((option) => option.isCorrect).map((option) => option.id);
+    const sortedSelected = normalizedIds.slice().sort((a, b) => a - b);
+    const sortedCorrect = correctIds.slice().sort((a, b) => a - b);
+    const isCorrect = sortedSelected.length === sortedCorrect.length && sortedSelected.every((id, idx) => id === sortedCorrect[idx]) ? 1 : 0;
+
+    return {
+      resolvedOptionId: null,
+      selectedOptionIdsJson: JSON.stringify(sortedSelected),
+      resolvedTextAnswer: null,
+      isCorrect,
+    };
+  }
+
+  if (question.questionType === "text") {
+    if (typeof textAnswer !== "string") {
+      throw buildHttpError("Ответ должен быть текстом");
+    }
+
+    const resolvedTextAnswer = textAnswer.trim();
+    const normalizedUser = normalizeTextAnswer(resolvedTextAnswer);
+    const normalizedCorrect = normalizeTextAnswer(question.correctTextAnswer);
+    const isCorrect = normalizedUser && normalizedCorrect && normalizedUser === normalizedCorrect ? 1 : 0;
+
+    return {
+      resolvedOptionId: null,
+      selectedOptionIdsJson: null,
+      resolvedTextAnswer,
+      isCorrect,
+    };
+  }
+
+  if (question.questionType === "matching") {
+    if (!Array.isArray(matchPairs) || matchPairs.length === 0) {
+      throw buildHttpError("Не указаны пары для сопоставления");
+    }
+
+    const validIds = new Set(question.options.map((option) => option.id));
+    const leftIds = new Set();
+    const rightIds = new Set();
+    const normalizedPairs = [];
+
+    for (const pair of matchPairs) {
+      const leftId = Number(pair.leftOptionId);
+      const rightId = Number(pair.rightOptionId);
+
+      if (!Number.isInteger(leftId) || leftId <= 0 || !Number.isInteger(rightId) || rightId <= 0) {
+        throw buildHttpError("Некорректные пары для сопоставления");
+      }
+      if (!validIds.has(leftId) || !validIds.has(rightId)) {
+        throw buildHttpError("Выбрана недопустимая пара");
+      }
+      if (leftIds.has(leftId) || rightIds.has(rightId)) {
+        throw buildHttpError("Пары должны быть уникальными");
+      }
+
+      leftIds.add(leftId);
+      rightIds.add(rightId);
+      normalizedPairs.push({ leftOptionId: leftId, rightOptionId: rightId });
+    }
+
+    if (leftIds.size !== question.options.length || rightIds.size !== question.options.length) {
+      throw buildHttpError("Не все пары выбраны");
+    }
+
+    normalizedPairs.sort((a, b) => a.leftOptionId - b.leftOptionId);
+
+    return {
+      resolvedOptionId: null,
+      selectedOptionIdsJson: JSON.stringify(normalizedPairs),
+      resolvedTextAnswer: null,
+      isCorrect: normalizedPairs.every((pair) => pair.leftOptionId === pair.rightOptionId) ? 1 : 0,
+    };
+  }
+
+  throw buildHttpError("Неподдерживаемый тип вопроса");
+}
+
 async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, textAnswer, matchPairs }) {
   const connection = await pool.getConnection();
   try {
@@ -1309,133 +1577,30 @@ async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, 
       throw error;
     }
 
-    const [questionRows] = await connection.execute(
-      "SELECT id, question_type, correct_text_answer FROM assessment_questions WHERE id = ? AND assessment_id = ?",
-      [questionId, attempt.assessment_id],
-    );
-    if (!questionRows.length) {
-      const error = new Error("Вопрос не найден");
-      error.status = 404;
-      throw error;
-    }
-
-    const question = questionRows[0];
-    let resolvedOptionId = null;
-    let selectedOptionIdsJson = null;
-    let resolvedTextAnswer = null;
-    let isCorrect = 0;
+    const question = await loadQuestionForScoring(connection, {
+      assessmentId: attempt.assessment_id,
+      questionId,
+    });
 
     logWithTime("saveAnswer", "Детали вопроса", {
-      questionType: question.question_type,
+      questionType: question.questionType,
       optionId,
       optionIds,
       textAnswer,
     });
 
-    if (question.question_type === "single") {
-      if (!optionId) {
-        const error = new Error("Не указан вариант ответа");
-        error.status = 400;
-        throw error;
-      }
-      const [optionRows] = await connection.execute("SELECT id, is_correct FROM assessment_question_options WHERE id = ? AND question_id = ?", [
-        optionId,
-        questionId,
-      ]);
-      if (!optionRows.length) {
-        const error = new Error("Ответ не найден");
-        error.status = 404;
-        throw error;
-      }
-      resolvedOptionId = optionRows[0].id;
-      isCorrect = optionRows[0].is_correct ? 1 : 0;
-    } else if (question.question_type === "multiple" || question.question_type === "matching") {
-      if (!Array.isArray(optionIds) || optionIds.length === 0) {
-        const error = new Error("Не выбраны варианты ответа");
-        error.status = 400;
-        throw error;
-      }
-      const normalizedIds = [...new Set(optionIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
-      if (!normalizedIds.length) {
-        const error = new Error("Некорректные варианты ответа");
-        error.status = 400;
-        throw error;
-      }
-      const [options] = await connection.execute("SELECT id, is_correct FROM assessment_question_options WHERE question_id = ?", [questionId]);
-      const validIds = new Set(options.map((opt) => opt.id));
-      if (!normalizedIds.every((id) => validIds.has(id))) {
-        const error = new Error("Выбран недопустимый вариант ответа");
-        error.status = 400;
-        throw error;
-      }
-      const correctIds = options.filter((opt) => opt.is_correct).map((opt) => opt.id);
-      const sortedSelected = normalizedIds.slice().sort((a, b) => a - b);
-      const sortedCorrect = correctIds.slice().sort((a, b) => a - b);
-      const equalLength = sortedSelected.length === sortedCorrect.length;
-      const match = equalLength && sortedSelected.every((id, idx) => id === sortedCorrect[idx]);
-      isCorrect = match ? 1 : 0;
-      selectedOptionIdsJson = JSON.stringify(sortedSelected);
-    } else if (question.question_type === "text") {
-      if (typeof textAnswer !== "string") {
-        const error = new Error("Ответ должен быть текстом");
-        error.status = 400;
-        throw error;
-      }
-      resolvedTextAnswer = textAnswer.trim();
-      const normalizedUser = normalizeTextAnswer(resolvedTextAnswer);
-      const normalizedCorrect = normalizeTextAnswer(question.correct_text_answer || "");
-      isCorrect = normalizedUser && normalizedCorrect && normalizedUser === normalizedCorrect ? 1 : 0;
-    } else if (question.question_type === "matching") {
-      if (!Array.isArray(matchPairs) || matchPairs.length === 0) {
-        const error = new Error("Не указаны пары для сопоставления");
-        error.status = 400;
-        throw error;
-      }
-      const [options] = await connection.execute("SELECT id FROM assessment_question_options WHERE question_id = ?", [questionId]);
-      const validIds = new Set(options.map((opt) => opt.id));
-      const leftIds = new Set();
-      const rightIds = new Set();
-      const normalizedPairs = [];
-
-      for (const pair of matchPairs) {
-        const leftId = Number(pair.leftOptionId);
-        const rightId = Number(pair.rightOptionId);
-        if (!Number.isInteger(leftId) || leftId <= 0 || !Number.isInteger(rightId) || rightId <= 0) {
-          const error = new Error("Некорректные пары для сопоставления");
-          error.status = 400;
-          throw error;
-        }
-        if (!validIds.has(leftId) || !validIds.has(rightId)) {
-          const error = new Error("Выбрана недопустимая пара");
-          error.status = 400;
-          throw error;
-        }
-        if (leftIds.has(leftId) || rightIds.has(rightId)) {
-          const error = new Error("Пары должны быть уникальными");
-          error.status = 400;
-          throw error;
-        }
-        leftIds.add(leftId);
-        rightIds.add(rightId);
-        normalizedPairs.push({ leftOptionId: leftId, rightOptionId: rightId });
-      }
-
-      if (leftIds.size !== options.length || rightIds.size !== options.length) {
-        const error = new Error("Не все пары выбраны");
-        error.status = 400;
-        throw error;
-      }
-
-      normalizedPairs.sort((a, b) => a.leftOptionId - b.leftOptionId);
-      selectedOptionIdsJson = JSON.stringify(normalizedPairs);
-      isCorrect = normalizedPairs.every((pair) => pair.leftOptionId === pair.rightOptionId) ? 1 : 0;
-    }
+    const { resolvedOptionId, selectedOptionIdsJson, resolvedTextAnswer, isCorrect } = scoreAnswer(question, {
+      optionId,
+      optionIds,
+      textAnswer,
+      matchPairs,
+    });
 
     logWithTime("saveAnswer", "Сохраняем ответ", {
       attemptId,
       questionId,
       isCorrect,
-      questionType: question.question_type,
+      questionType: question.questionType,
     });
 
     await connection.execute(
@@ -1485,120 +1650,17 @@ async function saveAnswersBatch({ attemptId, userId, answers }) {
 
     for (const payload of answers) {
       const { questionId, optionId, optionIds, textAnswer, matchPairs } = payload;
-      const [questionRows] = await connection.execute(
-        "SELECT id, question_type, correct_text_answer FROM assessment_questions WHERE id = ? AND assessment_id = ?",
-        [questionId, attempt.assessment_id],
-      );
-      if (!questionRows.length) {
-        const error = new Error("Вопрос не найден");
-        error.status = 404;
-        throw error;
-      }
+      const question = await loadQuestionForScoring(connection, {
+        assessmentId: attempt.assessment_id,
+        questionId,
+      });
 
-      const question = questionRows[0];
-      let resolvedOptionId = null;
-      let selectedOptionIdsJson = null;
-      let resolvedTextAnswer = null;
-      let isCorrect = 0;
-
-      if (question.question_type === "single") {
-        if (!optionId) {
-          const error = new Error("Не указан вариант ответа");
-          error.status = 400;
-          throw error;
-        }
-        const [optionRows] = await connection.execute("SELECT id, is_correct FROM assessment_question_options WHERE id = ? AND question_id = ?", [
-          optionId,
-          questionId,
-        ]);
-        if (!optionRows.length) {
-          const error = new Error("Ответ не найден");
-          error.status = 404;
-          throw error;
-        }
-        resolvedOptionId = optionRows[0].id;
-        isCorrect = optionRows[0].is_correct ? 1 : 0;
-      } else if (question.question_type === "multiple" || question.question_type === "matching") {
-        if (!Array.isArray(optionIds) || optionIds.length === 0) {
-          const error = new Error("Не выбраны варианты ответа");
-          error.status = 400;
-          throw error;
-        }
-        const normalizedIds = [...new Set(optionIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
-        if (!normalizedIds.length) {
-          const error = new Error("Некорректные варианты ответа");
-          error.status = 400;
-          throw error;
-        }
-        const [options] = await connection.execute("SELECT id, is_correct FROM assessment_question_options WHERE question_id = ?", [questionId]);
-        const validIds = new Set(options.map((opt) => opt.id));
-        if (!normalizedIds.every((id) => validIds.has(id))) {
-          const error = new Error("Выбран недопустимый вариант ответа");
-          error.status = 400;
-          throw error;
-        }
-        const correctIds = options.filter((opt) => opt.is_correct).map((opt) => opt.id);
-        const sortedSelected = normalizedIds.slice().sort((a, b) => a - b);
-        const sortedCorrect = correctIds.slice().sort((a, b) => a - b);
-        const equalLength = sortedSelected.length === sortedCorrect.length;
-        const match = equalLength && sortedSelected.every((id, idx) => id === sortedCorrect[idx]);
-        isCorrect = match ? 1 : 0;
-        selectedOptionIdsJson = JSON.stringify(sortedSelected);
-      } else if (question.question_type === "text") {
-        if (typeof textAnswer !== "string") {
-          const error = new Error("Ответ должен быть текстом");
-          error.status = 400;
-          throw error;
-        }
-        resolvedTextAnswer = textAnswer.trim();
-        const normalizedUser = normalizeTextAnswer(resolvedTextAnswer);
-        const normalizedCorrect = normalizeTextAnswer(question.correct_text_answer || "");
-        isCorrect = normalizedUser && normalizedCorrect && normalizedUser === normalizedCorrect ? 1 : 0;
-      } else if (question.question_type === "matching") {
-        if (!Array.isArray(matchPairs) || matchPairs.length === 0) {
-          const error = new Error("Не указаны пары для сопоставления");
-          error.status = 400;
-          throw error;
-        }
-        const [options] = await connection.execute("SELECT id FROM assessment_question_options WHERE question_id = ?", [questionId]);
-        const validIds = new Set(options.map((opt) => opt.id));
-        const leftIds = new Set();
-        const rightIds = new Set();
-        const normalizedPairs = [];
-
-        for (const pair of matchPairs) {
-          const leftId = Number(pair.leftOptionId);
-          const rightId = Number(pair.rightOptionId);
-          if (!Number.isInteger(leftId) || leftId <= 0 || !Number.isInteger(rightId) || rightId <= 0) {
-            const error = new Error("Некорректные пары для сопоставления");
-            error.status = 400;
-            throw error;
-          }
-          if (!validIds.has(leftId) || !validIds.has(rightId)) {
-            const error = new Error("Выбрана недопустимая пара");
-            error.status = 400;
-            throw error;
-          }
-          if (leftIds.has(leftId) || rightIds.has(rightId)) {
-            const error = new Error("Пары должны быть уникальными");
-            error.status = 400;
-            throw error;
-          }
-          leftIds.add(leftId);
-          rightIds.add(rightId);
-          normalizedPairs.push({ leftOptionId: leftId, rightOptionId: rightId });
-        }
-
-        if (leftIds.size !== options.length || rightIds.size !== options.length) {
-          const error = new Error("Не все пары выбраны");
-          error.status = 400;
-          throw error;
-        }
-
-        normalizedPairs.sort((a, b) => a.leftOptionId - b.leftOptionId);
-        selectedOptionIdsJson = JSON.stringify(normalizedPairs);
-        isCorrect = normalizedPairs.every((pair) => pair.leftOptionId === pair.rightOptionId) ? 1 : 0;
-      }
+      const { resolvedOptionId, selectedOptionIdsJson, resolvedTextAnswer, isCorrect } = scoreAnswer(question, {
+        optionId,
+        optionIds,
+        textAnswer,
+        matchPairs,
+      });
 
       await connection.execute(
         `INSERT INTO assessment_answers (attempt_id, question_id, option_id, selected_option_ids, text_answer, is_correct, answered_at, created_at)
@@ -1654,8 +1716,15 @@ async function completeAttempt(attemptId, userId) {
     }
     const assessment = assessmentRows[0];
 
-    const [[questionRow]] = await connection.execute("SELECT COUNT(*) AS total FROM assessment_questions WHERE assessment_id = ?", [assessment.id]);
-    const totalQuestions = Number(questionRow.total || 0);
+    const [[snapshotCountRow]] = await connection.execute(
+      "SELECT COUNT(*) AS total FROM assessment_attempt_questions WHERE attempt_id = ?",
+      [attemptId],
+    );
+    let totalQuestions = Number(snapshotCountRow.total || 0);
+    if (totalQuestions === 0) {
+      const [[questionRow]] = await connection.execute("SELECT COUNT(*) AS total FROM assessment_questions WHERE assessment_id = ?", [assessment.id]);
+      totalQuestions = Number(questionRow.total || 0);
+    }
 
     const [[correctRow]] = await connection.execute("SELECT COUNT(*) AS total FROM assessment_answers WHERE attempt_id = ? AND is_correct = 1", [
       attemptId,
@@ -1994,6 +2063,7 @@ module.exports = {
   listAssessmentsForManager,
   findAssessmentByIdForManager,
   hasAttempts,
+  hasInProgressAttempts,
   listAssignableUsers,
   listAssignablePositions,
   listAssignableBranches,
@@ -2010,4 +2080,8 @@ module.exports = {
   getOpenAssessments,
   getUsersWithIncompleteAttempts,
   cancelExpiredAttempts,
+  __test: {
+    scoreAnswer,
+    normalizeTextAnswer,
+  },
 };

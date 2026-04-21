@@ -537,21 +537,39 @@ exports.updateAssessment = async (req, res, next) => {
     const { title, description, openAt, closeAt, timeLimitMinutes, passScorePercent, maxAttempts, questions, branchIds, positionIds, userIds } =
       req.body;
 
-    const canEditParameters = true;
+    const [[inProgressStats]] = await connection.query(
+      "SELECT COUNT(*) AS total FROM assessment_attempts WHERE assessment_id = ? AND status = 'in_progress'",
+      [assessmentId]
+    );
+    const hasInProgressAttempts = Number(inProgressStats?.total || 0) > 0;
+    const canEditParameters = !hasInProgressAttempts;
 
     // РћР±РЅРѕРІРёС‚СЊ РѕСЃРЅРѕРІРЅСѓСЋ РёРЅС„РѕСЂРјР°С†РёСЋ (title, description, РґР°С‚С‹ РјРѕР¶РЅРѕ РІСЃРµРіРґР°)
     const updateFields = ["title = ?", "description = ?", "open_at = ?", "close_at = ?"];
     const updateValues = [title, description || "", openAt, closeAt];
 
-    updateFields.push("time_limit_minutes = ?", "pass_score_percent = ?", "max_attempts = ?");
-    updateValues.push(timeLimitMinutes, passScorePercent, maxAttempts);
+    if (canEditParameters) {
+      updateFields.push("time_limit_minutes = ?", "pass_score_percent = ?", "max_attempts = ?");
+      updateValues.push(timeLimitMinutes, passScorePercent, maxAttempts);
+    } else {
+      const hasParameterChanges =
+        Number(timeLimitMinutes) !== Number(assessment.time_limit_minutes) ||
+        Number(passScorePercent) !== Number(assessment.pass_score_percent) ||
+        Number(maxAttempts) !== Number(assessment.max_attempts);
+
+      if (hasParameterChanges) {
+        const error = new Error("Нельзя менять параметры аттестации при активных попытках");
+        error.status = 409;
+        throw error;
+      }
+    }
 
     updateValues.push(assessmentId);
 
     await connection.query(`UPDATE assessments SET ${updateFields.join(", ")} WHERE id = ?`, updateValues);
 
     // РћР±РЅРѕРІРёС‚СЊ РЅР°Р·РЅР°С‡РµРЅРёСЏ
-    if (branchIds !== undefined || positionIds !== undefined || userIds !== undefined) {
+    if (canEditParameters && (branchIds !== undefined || positionIds !== undefined || userIds !== undefined)) {
       // РџРѕР»СѓС‡РёС‚СЊ С‚РµРєСѓС‰СѓСЋ СЂРѕР»СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
       const currentUser = req.user;
 
@@ -633,6 +651,18 @@ exports.updateAssessment = async (req, res, next) => {
 
     // Р•СЃР»Рё РїРµСЂРµРґР°РЅС‹ РІРѕРїСЂРѕСЃС‹, РѕР±РЅРѕРІРёС‚СЊ РёС…
     if (questions && questions.length > 0) {
+      if (hasInProgressAttempts) {
+        const [[questionsStats]] = await connection.query("SELECT COUNT(*) AS total FROM assessment_questions WHERE assessment_id = ?", [
+          assessmentId,
+        ]);
+        const currentQuestionsCount = Number(questionsStats?.total || 0);
+        if (questions.length < currentQuestionsCount) {
+          const error = new Error("Нельзя удалять вопросы при активных попытках");
+          error.status = 409;
+          throw error;
+        }
+      }
+
       // РЈРґР°Р»РёС‚СЊ СЃС‚Р°СЂС‹Рµ РІРѕРїСЂРѕСЃС‹ Рё РёС… РІР°СЂРёР°РЅС‚С‹ (CASCADE СѓРґР°Р»РёС‚ РІР°СЂРёР°РЅС‚С‹)
       await connection.query("DELETE FROM assessment_questions WHERE assessment_id = ?", [assessmentId]);
 
@@ -1604,6 +1634,4 @@ exports.exportAssessmentToExcel = async (req, res, next) => {
     next(error);
   }
 };
-
-
 

@@ -237,6 +237,7 @@ import Select from "../components/ui/Select.vue";
 import { INVITE_EXPIRATION_DAYS, BOT_USERNAME } from "@/env";
 import { useToast } from "../composables/useToast";
 import { formatBranchLabel } from "../utils/branch";
+import { useAuthStore } from "../stores/auth";
 
 const loading = ref(false);
 const saving = ref(false);
@@ -272,6 +273,16 @@ const form = ref({
 
 const extendDays = ref(7);
 const { showToast } = useToast();
+const authStore = useAuthStore();
+
+const availableBranches = computed(() => {
+  if (authStore.user?.role !== "manager") {
+    return references.value.branches;
+  }
+
+  const managerBranchId = Number(authStore.user?.branchId || 0);
+  return references.value.branches.filter((branch) => Number(branch.id) === managerBranchId);
+});
 
 const stats = computed(() => {
   const counters = { total: 0, active: 0, used: 0, expired: 0 };
@@ -289,7 +300,7 @@ const statusOptions = computed(() => [
 ]);
 
 const branchOptions = computed(() => [
-  ...references.value.branches.map((b) => ({
+  ...availableBranches.value.map((b) => ({
     value: String(b.id),
     label: formatBranchLabel(b),
   })),
@@ -297,7 +308,7 @@ const branchOptions = computed(() => [
 
 const branchSelectOptions = computed(() => [
   { value: "", label: "Выберите филиал" },
-  ...references.value.branches.map((b) => ({
+  ...availableBranches.value.map((b) => ({
     value: b.id,
     label: formatBranchLabel(b),
   })),
@@ -376,11 +387,12 @@ const normalizeInvitation = (item) => {
 };
 
 const openCreateModal = () => {
+  const managerBranchId = Number(authStore.user?.branchId || 0);
   editingInvitation.value = null;
   form.value = {
     firstName: "",
     lastName: "",
-    branchId: "",
+    branchId: authStore.user?.role === "manager" ? managerBranchId || "" : "",
   };
   showFormModal.value = true;
 };

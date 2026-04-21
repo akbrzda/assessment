@@ -30,6 +30,7 @@
       </div>
 
       <div v-else>
+        <div class="list-meta">Показано {{ assessments.length }} из {{ totalAssessments }}</div>
         <!-- Desktop Table -->
         <div class="table-wrapper hide-mobile">
           <table class="assessments-table">
@@ -150,6 +151,14 @@
             </div>
           </div>
         </div>
+
+        <div v-if="totalPages > 1" class="pagination">
+          <span class="pagination-info">Страница {{ pagination.page }} из {{ totalPages }}</span>
+          <div class="pagination-buttons">
+            <Button size="sm" variant="ghost" :disabled="pagination.page === 1" @click="goToPrevPage">Предыдущая</Button>
+            <Button size="sm" variant="ghost" :disabled="pagination.page === totalPages" @click="goToNextPage">Следующая</Button>
+          </div>
+        </div>
       </div>
     </Card>
   </div>
@@ -174,12 +183,18 @@ const authStore = useAuthStore();
 
 const loading = ref(false);
 const assessments = ref([]);
+const totalAssessments = ref(0);
+const pagination = ref({
+  page: 1,
+  perPage: 20,
+});
 const filters = ref({
   search: "",
   status: "",
   branch: "",
 });
 const { showToast } = useToast();
+const totalPages = computed(() => Math.max(1, Math.ceil(totalAssessments.value / pagination.value.perPage)));
 
 const references = ref({
   branches: [],
@@ -211,8 +226,13 @@ const loadReferences = async () => {
 const loadAssessments = async () => {
   loading.value = true;
   try {
-    const data = await getAssessments(filters.value);
-    assessments.value = data.assessments;
+    const data = await getAssessments({
+      ...filters.value,
+      page: pagination.value.page,
+      limit: pagination.value.perPage,
+    });
+    assessments.value = data.assessments || [];
+    totalAssessments.value = Number(data.total || 0);
   } catch (error) {
     console.error("Load assessments error:", error);
     showToast("Ошибка загрузки аттестаций", "error");
@@ -227,6 +247,23 @@ const resetFilters = () => {
     status: "",
     branch: "",
   };
+  pagination.value.page = 1;
+  loadAssessments();
+};
+
+const goToPrevPage = () => {
+  if (pagination.value.page <= 1) {
+    return;
+  }
+  pagination.value.page -= 1;
+  loadAssessments();
+};
+
+const goToNextPage = () => {
+  if (pagination.value.page >= totalPages.value) {
+    return;
+  }
+  pagination.value.page += 1;
   loadAssessments();
 };
 
@@ -346,6 +383,31 @@ onMounted(() => {
 
 .assessments-card {
   overflow: visible;
+}
+
+.list-meta {
+  padding: 16px 16px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid var(--divider);
+}
+
+.pagination-info {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.pagination-buttons {
+  display: flex;
+  gap: 8px;
 }
 
 /* Table */

@@ -35,7 +35,7 @@ const routes = [
         path: "invitations",
         name: "Invitations",
         component: () => import("../views/InvitationsView.vue"),
-        meta: { roles: ["superadmin"], module: "invitations", title: "Приглашения" },
+        meta: { roles: ["superadmin", "manager"], module: "invitations", title: "Приглашения" },
       },
       {
         path: "assessments",
@@ -183,6 +183,13 @@ router.beforeEach(async (to, from, next) => {
   }
 
   // Если маршрут требует авторизации и пользователь не авторизован
+  if (requiresAuth && !authStore.isAuthenticated) {
+    const restored = await authStore.tryRestoreSession();
+    if (!restored) {
+      return next("/login");
+    }
+  }
+
   if (requiresAuth && !authStore.isAuthenticated) {
     return next("/login");
   }

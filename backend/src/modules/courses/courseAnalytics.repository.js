@@ -1,6 +1,43 @@
 const { pool } = require("../../config/database");
 
+let schemaValidationPromise = null;
+
+async function ensureCourseAnalyticsSchema() {
+  if (schemaValidationPromise) {
+    return schemaValidationPromise;
+  }
+
+  schemaValidationPromise = pool
+    .execute(
+      `SELECT table_name
+         FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+          AND table_name IN ('course_sections', 'course_section_user_progress')`,
+    )
+    .then(([rows]) => {
+      const existingTables = new Set(rows.map((row) => row.table_name));
+      const missingTables = [];
+      if (!existingTables.has("course_sections")) missingTables.push("course_sections");
+      if (!existingTables.has("course_section_user_progress")) missingTables.push("course_section_user_progress");
+
+      if (missingTables.length > 0) {
+        const error = new Error(
+          `Схема модуля курсов неактуальна. Отсутствуют таблицы: ${missingTables.join(", ")}. Примените миграции БД.`,
+        );
+        error.status = 500;
+        throw error;
+      }
+    })
+    .catch((error) => {
+      schemaValidationPromise = null;
+      throw error;
+    });
+
+  return schemaValidationPromise;
+}
+
 async function getCourseFunnelStats() {
+  await ensureCourseAnalyticsSchema();
   const [rows] = await pool.execute(
     `SELECT c.id AS course_id, c.title AS course_title,
             COALESCE(assigned.assigned_count, 0) AS assigned_count,
@@ -66,6 +103,7 @@ async function getCourseFunnelStats() {
 }
 
 async function getSectionFailureStats(courseId) {
+  await ensureCourseAnalyticsSchema();
   const [rows] = await pool.execute(
     `SELECT cs.id AS section_id, cs.title AS section_title, cs.order_index,
             COUNT(csup.user_id) AS total_attempts,
@@ -92,6 +130,7 @@ async function getSectionFailureStats(courseId) {
 }
 
 async function getCourseProgressReport(courseId) {
+  await ensureCourseAnalyticsSchema();
   const [rows] = await pool.execute(
     `SELECT cup.user_id, cup.status, cup.progress_percent, cup.started_at, cup.completed_at, cup.last_activity_at,
             cup.completed_modules_count, cup.total_modules_count,

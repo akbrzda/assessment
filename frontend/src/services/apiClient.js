@@ -82,8 +82,18 @@ export const apiClient = {
   getReferences() {
     return request("/auth/references");
   },
-  listUserAssessments() {
-    return request("/assessments/user");
+  listUserAssessments(params = {}) {
+    const searchParams = new URLSearchParams();
+    if (params.page && Number.isFinite(Number(params.page))) {
+      searchParams.set("page", String(params.page));
+    }
+    if (params.limit && Number.isFinite(Number(params.limit))) {
+      searchParams.set("limit", String(params.limit));
+    }
+
+    const query = searchParams.toString();
+    const path = query ? `/assessments/user?${query}` : "/assessments/user";
+    return request(path);
   },
   getUserAssessment(id) {
     return request(`/assessments/user/${id}`);

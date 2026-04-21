@@ -8,11 +8,6 @@ const routes = [
     redirect: "/dashboard",
   },
   {
-    path: "/registration",
-    name: "registration",
-    component: () => import("../views/RegistrationView.vue"),
-  },
-  {
     path: "/invitation",
     name: "invitation",
     component: () => import("../views/InvitationView.vue"),
@@ -64,6 +59,10 @@ const routes = [
     name: "profile",
     component: () => import("../views/ProfileView.vue"),
     meta: { requiresAuth: true },
+  },
+  {
+    path: "/:pathMatch(.*)*",
+    redirect: "/invitation",
   },
 ];
 

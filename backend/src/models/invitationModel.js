@@ -87,6 +87,26 @@ async function findByCreator(userId) {
   return rows;
 }
 
+async function findByBranch(branchId) {
+  const [rows] = await pool.execute(
+    `SELECT inv.id, inv.code, inv.first_name, inv.last_name,
+            inv.expires_at, inv.created_at, inv.used_at,
+            inv.used_by, inv.branch_id,
+            b.name AS branch_name,
+            r.name AS role_name,
+            CONCAT(used_user.first_name, ' ', used_user.last_name) AS used_by_name,
+            used_user.telegram_id AS used_by_telegram_id
+     FROM invitations inv
+     LEFT JOIN branches b ON b.id = inv.branch_id
+     LEFT JOIN roles r ON r.id = inv.role_id
+     LEFT JOIN users used_user ON used_user.id = inv.used_by
+     WHERE inv.branch_id = ?
+     ORDER BY inv.id ASC`,
+    [branchId]
+  );
+  return rows;
+}
+
 // Алиас для обратной совместимости
 const listInvitationsByCreator = findByCreator;
 
@@ -114,6 +134,7 @@ module.exports = {
   markUsed,
   findAll,
   findByCreator,
+  findByBranch,
   listInvitationsByCreator,
   updateExpiration,
   deleteInvitation,

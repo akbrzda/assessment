@@ -8,8 +8,14 @@ const assessmentsWriteService = require("./write/service");
 async function getAssessments(req, res, next) {
   try {
     const filters = normalizeListFilters(req.query, req.user);
-    const assessments = await assessmentsService.getAssessments(filters);
-    res.json({ assessments });
+    const result = await assessmentsService.getAssessments(filters);
+    res.setHeader("X-Total-Count", String(result.total));
+    res.json({
+      assessments: result.items,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    });
   } catch (error) {
     next(error);
   }
@@ -92,4 +98,3 @@ module.exports = {
   getUserAssessmentProgress,
   exportAssessmentToExcel,
 };
-

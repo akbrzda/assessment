@@ -1,6 +1,6 @@
 const { pool } = require("../../../config/database");
 
-async function listAssessments({ status, branch, search, userRole, userId }) {
+async function listAssessments({ status, branch, search, userRole, userId, page = 1, limit = 20 }) {
   const params = [];
   const conditions = [];
 
@@ -52,8 +52,9 @@ async function listAssessments({ status, branch, search, userRole, userId }) {
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const offset = (Math.max(page, 1) - 1) * Math.max(limit, 1);
 
-  const query = `
+  const dataQuery = `
     SELECT
       a.id,
       a.title,
@@ -90,10 +91,23 @@ async function listAssessments({ status, branch, search, userRole, userId }) {
     FROM assessments a
     ${whereClause}
     ORDER BY a.created_at DESC
+    LIMIT ? OFFSET ?
   `;
 
-  const [rows] = await pool.query(query, params);
-  return rows;
+  const [countRows] = await pool.query(
+    `SELECT COUNT(*) AS total
+     FROM assessments a
+     ${whereClause}`,
+    params,
+  );
+
+  const [rows] = await pool.query(dataQuery, [...params, limit, offset]);
+  return {
+    items: rows,
+    total: Number(countRows?.[0]?.total || 0),
+    page,
+    limit,
+  };
 }
 
 async function findAssessmentById(assessmentId) {

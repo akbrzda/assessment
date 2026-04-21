@@ -53,9 +53,6 @@
         <h3 class="title-small mb-8">Приглашение недоступно</h3>
         <p class="body-small text-secondary">Приглашение не найдено или истекло. Попросите администратора отправить новую ссылку.</p>
 
-        <div class="empty-actions">
-          <button class="btn btn-secondary" @click="goToRegistration">Зарегистрироваться самостоятельно</button>
-        </div>
       </div>
     </div>
   </div>
@@ -117,10 +114,6 @@ export default {
       }
     }
 
-    function goToRegistration() {
-      router.push("/registration");
-    }
-
     onMounted(async () => {
       // Страница отображает информацию о приглашении или сообщение об отсутствии
       // Логика перенаправления обрабатывается роутером
@@ -131,7 +124,6 @@ export default {
       isLoading,
       formattedExpiryDate,
       acceptInvitation,
-      goToRegistration,
     };
   },
 };

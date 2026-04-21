@@ -93,7 +93,7 @@ const baseSchema = Joi.object({
   closeAt: Joi.date().iso().required(),
   timeLimitMinutes: Joi.number().integer().min(1).max(240).required(),
   passScorePercent: Joi.number().integer().min(0).max(100).required(),
-  maxAttempts: Joi.number().integer().min(1).max(3).required(),
+  maxAttempts: Joi.number().integer().min(0).max(3).required(),
   branchIds: Joi.array().items(Joi.number().integer().positive()).unique().default([]),
   userIds: Joi.array().items(Joi.number().integer().positive()).unique().default([]),
   positionIds: Joi.array().items(Joi.number().integer().positive()).unique().default([]),
@@ -147,11 +147,24 @@ async function listManaged(req, res, next) {
 
 async function listForUser(req, res, next) {
   try {
-    // РћС‚РјРµРЅРёС‚СЊ РїСЂРѕСЃСЂРѕС‡РµРЅРЅС‹Рµ РїРѕРїС‹С‚РєРё РїРµСЂРµРґ РїРѕР»СѓС‡РµРЅРёРµРј СЃРїРёСЃРєР°
-    await assessmentModel.cancelExpiredAttempts();
+    const page = Number(req.query.page);
+    const limit = Number(req.query.limit);
 
-    const assessments = await assessmentModel.listAssessmentsForUser(req.currentUser.id);
-    res.json({ assessments });
+    const payload = await assessmentModel.listAssessmentsForUser(req.currentUser.id, {
+      page: Number.isInteger(page) && page > 0 ? page : undefined,
+      limit: Number.isInteger(limit) && limit > 0 ? limit : undefined,
+    });
+
+    if (payload.page && payload.limit) {
+      res.setHeader("X-Total-Count", String(payload.total));
+    }
+
+    res.json({
+      assessments: payload.items,
+      total: payload.total,
+      page: payload.page,
+      limit: payload.limit,
+    });
   } catch (error) {
     next(error);
   }
@@ -160,9 +173,6 @@ async function listForUser(req, res, next) {
 async function getForUser(req, res, next) {
   try {
     const assessmentId = Number(req.params.id);
-
-    // РћС‚РјРµРЅРёС‚СЊ РїСЂРѕСЃСЂРѕС‡РµРЅРЅС‹Рµ РїРѕРїС‹С‚РєРё РґР»СЏ РґР°РЅРЅРѕР№ Р°С‚С‚РµСЃС‚Р°С†РёРё
-    await assessmentModel.cancelExpiredAttempts(assessmentId);
 
     const assessment = await assessmentModel.getAssessmentForUser(assessmentId, req.currentUser.id);
     if (!assessment) {
@@ -345,9 +355,6 @@ async function getDetail(req, res, next) {
   try {
     const assessmentId = Number(req.params.id);
 
-    // РћС‚РјРµРЅРёС‚СЊ РїСЂРѕСЃСЂРѕС‡РµРЅРЅС‹Рµ РїРѕРїС‹С‚РєРё РїРµСЂРµРґ РїРѕР»СѓС‡РµРЅРёРµРј РґРµС‚Р°Р»РµР№
-    await assessmentModel.cancelExpiredAttempts(assessmentId);
-
     const assessment = await assessmentModel.findAssessmentByIdForManager(assessmentId, {
       userId: req.currentUser.id,
       roleName: req.currentUser.roleName,
@@ -365,9 +372,6 @@ async function getDetail(req, res, next) {
 async function startAttempt(req, res, next) {
   try {
     const assessmentId = Number(req.params.id);
-
-    // РћС‚РјРµРЅРёС‚СЊ РїСЂРѕСЃСЂРѕС‡РµРЅРЅС‹Рµ РїРѕРїС‹С‚РєРё РґР»СЏ РґР°РЅРЅРѕР№ Р°С‚С‚РµСЃС‚Р°С†РёРё
-    await assessmentModel.cancelExpiredAttempts(assessmentId);
 
     const assessment = await assessmentModel.getAssessmentForUser(assessmentId, req.currentUser.id);
     if (!assessment) {
@@ -597,9 +601,6 @@ async function update(req, res, next) {
   try {
     const assessmentId = Number(req.params.id);
 
-    // РћС‚РјРµРЅРёС‚СЊ РїСЂРѕСЃСЂРѕС‡РµРЅРЅС‹Рµ РїРѕРїС‹С‚РєРё РїРµСЂРµРґ РѕР±РЅРѕРІР»РµРЅРёРµРј
-    await assessmentModel.cancelExpiredAttempts(assessmentId);
-
     const existing = await assessmentModel.findAssessmentByIdForManager(assessmentId, {
       userId: req.currentUser.id,
       roleName: req.currentUser.roleName,
@@ -609,7 +610,8 @@ async function update(req, res, next) {
       return res.status(404).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°" });
     }
 
-    const canEditParameters = true;
+    const hasInProgressAttempts = await assessmentModel.hasInProgressAttempts(assessmentId);
+    const canEditParameters = !hasInProgressAttempts;
 
     const payload = {
       ...req.body,
@@ -622,6 +624,26 @@ async function update(req, res, next) {
     }
 
     const targets = await prepareTargets(value, req.currentUser);
+
+    if (hasInProgressAttempts) {
+      const hasParameterChanges =
+        Number(value.timeLimitMinutes) !== Number(existing.timeLimitMinutes) ||
+        Number(value.passScorePercent) !== Number(existing.passScorePercent) ||
+        Number(value.maxAttempts) !== Number(existing.maxAttempts);
+
+      if (hasParameterChanges) {
+        return res.status(409).json({
+          error: "Нельзя менять параметры аттестации при активных попытках",
+        });
+      }
+
+      const currentQuestionsCount = Array.isArray(existing.questions) ? existing.questions.length : 0;
+      if (Array.isArray(value.questions) && value.questions.length < currentQuestionsCount) {
+        return res.status(409).json({
+          error: "Нельзя удалять вопросы при активных попытках",
+        });
+      }
+    }
 
     // Р”Р°РЅРЅС‹Рµ РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ - РёСЃРїРѕР»СЊР·СѓРµРј СЃС‚Р°СЂС‹Рµ Р·РЅР°С‡РµРЅРёСЏ РїР°СЂР°РјРµС‚СЂРѕРІ РµСЃР»Рё СЃС‚Р°С‚СѓСЃ РЅРµ pending
     const assessmentData = {
@@ -676,9 +698,6 @@ async function remove(req, res, next) {
   try {
     const assessmentId = Number(req.params.id);
 
-    // РћС‚РјРµРЅРёС‚СЊ РїСЂРѕСЃСЂРѕС‡РµРЅРЅС‹Рµ РїРѕРїС‹С‚РєРё РїРµСЂРµРґ СѓРґР°Р»РµРЅРёРµРј
-    await assessmentModel.cancelExpiredAttempts(assessmentId);
-
     const existing = await assessmentModel.findAssessmentByIdForManager(assessmentId, {
       userId: req.currentUser.id,
       roleName: req.currentUser.roleName,
@@ -732,6 +751,3 @@ module.exports = {
   completeAttempt,
   getAttemptResultController,
 };
-
-
-

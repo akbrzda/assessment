@@ -54,3 +54,7 @@ module.exports = {
   allowedOrigins: parseList(process.env.ALLOWED_ORIGINS),
   superAdminIds: parseList(process.env.SUPERADMIN_IDS),
 };
+
+if (module.exports.nodeEnv === "production" && module.exports.allowedOrigins.length === 0) {
+  throw new Error("[env] В production переменная ALLOWED_ORIGINS обязательна и не может быть пустой");
+}

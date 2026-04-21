@@ -26,6 +26,11 @@ const adminPermissionsRoutes = require("./modules/admin/permissions");
 
 const app = express();
 
+const isProduction = config.nodeEnv === "production";
+if (isProduction && config.allowedOrigins.length === 0) {
+  throw new Error("ALLOWED_ORIGINS не задан: запуск в production остановлен");
+}
+
 const corsOptions = {
   origin: config.allowedOrigins.length ? config.allowedOrigins : true,
   credentials: true,
@@ -89,4 +94,3 @@ app.use("/api", apiRouter);
 app.use(errorHandler);
 
 module.exports = app;
-

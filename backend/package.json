@@ -7,9 +7,12 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "migrate": "node database/runMigrations.js",
+    "phase0:diagnostics": "node scripts/phase0-diagnostics.js",
+    "phase1:recalculate-matching": "node scripts/recalculate-matching-attempts.js",
     "test:smoke:admin": "node --test tests/admin-smoke.test.js",
+    "test:assessment": "node --test tests/assessment.score-answer.test.js",
     "test:courses": "node --test tests/courses/topics.completion.test.js tests/courses/sections.completion.test.js tests/courses/progress.calculation.test.js tests/courses/assignments.filter.test.js tests/courses/course.e2e.test.js tests/courses/analytics.repository.test.js",
-    "test": "node --test tests/admin-smoke.test.js tests/courses/topics.completion.test.js tests/courses/sections.completion.test.js tests/courses/progress.calculation.test.js tests/courses/assignments.filter.test.js tests/courses/course.e2e.test.js tests/courses/analytics.repository.test.js"
+    "test": "node --test tests/admin-smoke.test.js tests/assessment.score-answer.test.js tests/courses/topics.completion.test.js tests/courses/sections.completion.test.js tests/courses/progress.calculation.test.js tests/courses/assignments.filter.test.js tests/courses/course.e2e.test.js tests/courses/analytics.repository.test.js"
   },
   "keywords": [],
   "author": "",

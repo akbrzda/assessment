@@ -31,9 +31,41 @@ exports.getCategories = async (req, res, next) => {
 exports.getQuestions = async (req, res, next) => {
   try {
     const { category, search, type } = req.query;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
 
-    let query = `
-      SELECT 
+    let whereClause = "WHERE 1=1";
+    const params = [];
+
+    if (category) {
+      whereClause += " AND qb.category_id = ?";
+      params.push(category);
+    }
+
+    if (search) {
+      whereClause += " AND qb.question_text LIKE ?";
+      params.push(`%${search}%`);
+    }
+
+    if (type) {
+      whereClause += " AND qb.question_type = ?";
+      params.push(type);
+    }
+
+    const [countRows] = await pool.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM question_bank qb
+      ${whereClause}
+    `,
+      params
+    );
+    const total = Number(countRows[0]?.total || 0);
+
+    const [questions] = await pool.query(
+      `
+      SELECT
         qb.id,
         qb.question_text,
         qb.question_type,
@@ -46,29 +78,13 @@ exports.getQuestions = async (req, res, next) => {
       FROM question_bank qb
       LEFT JOIN question_categories qc ON qb.category_id = qc.id
       LEFT JOIN users u ON qb.created_by = u.id
-      WHERE 1=1
-    `;
-
-    const params = [];
-
-    if (category) {
-      query += " AND qb.category_id = ?";
-      params.push(category);
-    }
-
-    if (search) {
-      query += " AND qb.question_text LIKE ?";
-      params.push(`%${search}%`);
-    }
-
-    if (type) {
-      query += " AND qb.question_type = ?";
-      params.push(type);
-    }
-
-    query += " ORDER BY qb.created_at DESC";
-
-    const [questions] = await pool.query(query, params);
+      ${whereClause}
+      ORDER BY qb.created_at DESC
+      LIMIT ?
+      OFFSET ?
+    `,
+      [...params, limit, offset]
+    );
 
     // Р—Р°РіСЂСѓР¶Р°РµРј РѕРїС†РёРё РґР»СЏ РєР°Р¶РґРѕРіРѕ РІРѕРїСЂРѕСЃР°
     for (const question of questions) {
@@ -79,7 +95,8 @@ exports.getQuestions = async (req, res, next) => {
       question.options = options;
     }
 
-    res.json({ questions });
+    res.setHeader("X-Total-Count", String(total));
+    res.json({ questions, total, page, limit });
   } catch (error) {
     console.error("Get questions error:", error);
     next(error);
@@ -430,5 +447,4 @@ exports.deleteCategory = async (req, res, next) => {
     next(error);
   }
 };
-
 

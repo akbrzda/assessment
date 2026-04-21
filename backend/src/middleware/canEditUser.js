@@ -42,6 +42,20 @@ const canEditUser = async (req, res, next) => {
         });
       }
 
+      const managerBranchId = Number(currentUser.branch_id || currentUser.branchId || 0);
+      let resolvedManagerBranchId = managerBranchId;
+
+      if (!resolvedManagerBranchId) {
+        const [managerRows] = await pool.query("SELECT branch_id FROM users WHERE id = ? LIMIT 1", [currentUser.id]);
+        resolvedManagerBranchId = Number(managerRows?.[0]?.branch_id || 0);
+      }
+
+      if (!resolvedManagerBranchId || Number(target.branch_id) !== resolvedManagerBranchId) {
+        return res.status(403).json({
+          error: "Вы можете редактировать только сотрудников своего филиала",
+        });
+      }
+
       return next();
     }
 

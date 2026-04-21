@@ -56,6 +56,19 @@ function validateInitData(initDataString) {
     }
   }
 
+  const authDate = Number(payload.auth_date);
+  if (!Number.isInteger(authDate) || authDate <= 0) {
+    logger.warn("initData отклонен: отсутствует или некорректный auth_date");
+    return null;
+  }
+
+  const maxAgeSeconds = 5 * 60;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (nowSeconds - authDate > maxAgeSeconds) {
+    logger.warn("initData отклонен: auth_date старше 5 минут");
+    return null;
+  }
+
   return payload;
 }
 

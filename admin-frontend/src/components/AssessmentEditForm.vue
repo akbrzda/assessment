@@ -50,7 +50,7 @@
               required
             />
 
-            <Input v-model="formData.maxAttempts" type="number" label="Максимум попыток" :min="1" :max="3" :disabled="!canEditParameters" required />
+            <Input v-model="formData.maxAttempts" type="number" label="Максимум попыток" :min="0" :max="3" :disabled="!canEditParameters" required />
           </div>
         </section>
 

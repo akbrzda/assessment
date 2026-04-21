@@ -20,9 +20,13 @@ const updateSchema = Joi.object({
 async function listUsers(req, res, next) {
   try {
     const { branch, position, role, level, search } = req.query;
-    const currentUser = req.user; // { id, role }
+    const rawPage = Number(req.query?.page);
+    const rawLimit = Number(req.query?.limit);
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.trunc(rawPage) : 1;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.trunc(rawLimit), 100) : 20;
+    const offset = (page - 1) * limit;
 
-    let query = `
+    const selectClause = `
       SELECT 
         u.id, 
         u.telegram_id, 
@@ -42,8 +46,9 @@ async function listUsers(req, res, next) {
       LEFT JOIN branches b ON u.branch_id = b.id
       LEFT JOIN positions p ON u.position_id = p.id
       LEFT JOIN roles r ON u.role_id = r.id
-      WHERE 1=1
     `;
+
+    let whereClause = "WHERE 1=1";
 
     const params = [];
 
@@ -51,35 +56,54 @@ async function listUsers(req, res, next) {
     // РќРµ РґРѕР±Р°РІР»СЏРµРј С„РёР»СЊС‚СЂР°С†РёСЋ РїРѕ СЂРѕР»Рё РґР»СЏ manager
 
     if (branch) {
-      query += " AND u.branch_id = ?";
+      whereClause += " AND u.branch_id = ?";
       params.push(branch);
     }
 
     if (position) {
-      query += " AND u.position_id = ?";
+      whereClause += " AND u.position_id = ?";
       params.push(position);
     }
 
     if (role) {
-      query += " AND u.role_id = ?";
+      whereClause += " AND u.role_id = ?";
       params.push(role);
     }
 
     if (level) {
-      query += " AND u.level = ?";
+      whereClause += " AND u.level = ?";
       params.push(level);
     }
 
     if (search) {
-      query += " AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.login LIKE ?)";
+      whereClause += " AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.login LIKE ?)";
       const searchPattern = `%${search}%`;
       params.push(searchPattern, searchPattern, searchPattern);
     }
 
-    query += " ORDER BY u.id ASC";
+    const [[countRow]] = await pool.query(
+      `SELECT COUNT(*) AS total
+       FROM users u
+       ${whereClause}`,
+      params,
+    );
 
-    const [users] = await pool.query(query, params);
-    res.json({ users });
+    const [users] = await pool.query(
+      `${selectClause}
+       ${whereClause}
+       ORDER BY u.id ASC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset],
+    );
+
+    const total = Number(countRow?.total || 0);
+    res.setHeader("X-Total-Count", String(total));
+    res.json({
+      users,
+      total,
+      page,
+      limit,
+    });
   } catch (error) {
     next(error);
   }
@@ -760,4 +784,3 @@ async function getUserById(req, res, next) {
     next(error);
   }
 }
-

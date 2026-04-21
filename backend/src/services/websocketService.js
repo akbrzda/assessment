@@ -35,6 +35,11 @@ function authenticateSocket(socket, next) {
 
 // Инициализация WebSocket сервера
 function initWebSocket(server) {
+  const isProduction = config.nodeEnv === "production";
+  if (isProduction && (!config.allowedOrigins || config.allowedOrigins.length === 0)) {
+    throw new Error("ALLOWED_ORIGINS не задан: WebSocket не может быть запущен в production");
+  }
+
   const allowedOrigins =
     config.allowedOrigins && config.allowedOrigins.length > 0
       ? config.allowedOrigins

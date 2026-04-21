@@ -15,9 +15,20 @@ app.use(router);
 const authStore = useAuthStore();
 authStore.initSessionSync();
 
-if (authStore.isAuthenticated) {
-  authStore.startTokenRefresh();
-  websocketService.connect();
+async function bootstrap() {
+  await authStore.tryRestoreSession();
+
+  if (authStore.isAuthenticated) {
+    if (!authStore.tokenRefreshTimer) {
+      authStore.startTokenRefresh();
+    }
+
+    if (!websocketService.isConnected) {
+      websocketService.connect();
+    }
+  }
+
+  app.mount("#app");
 }
 
-app.mount("#app");
+bootstrap();

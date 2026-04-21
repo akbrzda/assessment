@@ -9,6 +9,16 @@ function buildError(message, status) {
   return error;
 }
 
+async function resolveActorBranchId(actor) {
+  const fromToken = Number(actor.branch_id || actor.branchId || 0);
+  if (fromToken > 0) {
+    return fromToken;
+  }
+
+  const fromDb = await invitationsRepository.findUserBranchId(actor.id);
+  return Number(fromDb || 0);
+}
+
 async function ensureUniqueCode() {
   for (let index = 0; index < 5; index += 1) {
     const code = generateInviteCode();
@@ -21,8 +31,28 @@ async function ensureUniqueCode() {
   throw buildError("Unable to generate unique invitation code", 500);
 }
 
-function ensureAccess(actor, invitation) {
-  if (actor.role !== "superadmin" && invitation.created_by !== actor.id) {
+async function ensureAccess(actor, invitation) {
+  if (actor.role === "superadmin") {
+    return;
+  }
+
+  if (actor.role !== "manager") {
+    throw buildError("Access denied", 403);
+  }
+
+  const actorBranchId = await resolveActorBranchId(actor);
+  if (!actorBranchId || Number(invitation.branch_id) !== actorBranchId) {
+    throw buildError("Access denied", 403);
+  }
+}
+
+async function ensureManagerBranchAccess(actor, branchId) {
+  if (actor.role !== "manager") {
+    return;
+  }
+
+  const actorBranchId = await resolveActorBranchId(actor);
+  if (!actorBranchId || Number(branchId) !== actorBranchId) {
     throw buildError("Access denied", 403);
   }
 }
@@ -39,13 +69,19 @@ async function listInvitations(actor) {
   }
 
   if (actor.role === "manager") {
-    return invitationsRepository.findByCreator(actor.id);
+    const actorBranchId = await resolveActorBranchId(actor);
+    if (!actorBranchId) {
+      throw buildError("Branch is required for manager", 403);
+    }
+    return invitationsRepository.findByBranch(actorBranchId);
   }
 
   throw buildError("Access denied", 403);
 }
 
 async function createInvitation(payload, actor, req) {
+  await ensureManagerBranchAccess(actor, payload.branchId);
+
   const managerRole = await invitationsRepository.findManagerRole();
   if (!managerRole) {
     throw buildError("Manager role not configured", 500);
@@ -84,8 +120,9 @@ async function updateInvitation(invitationId, payload, actor, req) {
     throw buildError("Invitation not found", 404);
   }
 
-  ensureAccess(actor, invitation);
+  await ensureAccess(actor, invitation);
   ensureUnused(invitation, "update");
+  await ensureManagerBranchAccess(actor, payload.branchId);
 
   await invitationsRepository.updateInvitation(invitationId, {
     firstName: payload.firstName,
@@ -112,7 +149,7 @@ async function extendInvitation(invitationId, days, actor, req) {
     throw buildError("Invitation not found", 404);
   }
 
-  ensureAccess(actor, invitation);
+  await ensureAccess(actor, invitation);
   ensureUnused(invitation, "extend");
 
   const expiresAt = new Date(invitation.expires_at);
@@ -138,7 +175,7 @@ async function deleteInvitation(invitationId, actor, req) {
     throw buildError("Invitation not found", 404);
   }
 
-  ensureAccess(actor, invitation);
+  await ensureAccess(actor, invitation);
   ensureUnused(invitation, "delete");
 
   await invitationsRepository.removeInvitation(invitationId);
@@ -160,4 +197,3 @@ module.exports = {
   extendInvitation,
   deleteInvitation,
 };
-

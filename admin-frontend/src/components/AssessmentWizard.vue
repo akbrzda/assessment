@@ -285,10 +285,10 @@
             v-model.number="formData.maxAttempts"
             type="number"
             label="Максимум попыток"
-            min="1"
+            min="0"
             required
             :error="errors.maxAttempts"
-            @blur="validateNumberField('maxAttempts', 1, null)"
+            @blur="validateNumberField('maxAttempts', 0, null)"
           />
         </div>
 
@@ -1004,7 +1004,7 @@ const submitAssessment = async () => {
   validateDateField("closeAt");
   validateNumberField("timeLimitMinutes", 1, null);
   validateNumberField("passScorePercent", 0, 100);
-  validateNumberField("maxAttempts", 1, null);
+  validateNumberField("maxAttempts", 0, null);
 
   if (Object.keys(errors.value).length > 0) {
     showToast("Пожалуйста, исправьте ошибки в форме", "warning");

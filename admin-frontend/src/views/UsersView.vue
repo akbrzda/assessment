@@ -43,6 +43,7 @@
       </div>
 
       <div v-else>
+        <div class="list-meta">Показано {{ users.length }} из {{ totalUsers }}</div>
         <!-- Desktop table -->
         <div class="table-wrapper hide-mobile">
           <table class="users-table">
@@ -141,6 +142,14 @@
               >
               <Button v-if="authStore.isSuperAdmin" size="sm" variant="danger" icon="trash" fullWidth @click="openDeleteModal(user)">Удалить</Button>
             </div>
+          </div>
+        </div>
+
+        <div v-if="totalPages > 1" class="pagination">
+          <span class="pagination-info">Страница {{ pagination.page }} из {{ totalPages }}</span>
+          <div class="pagination-buttons">
+            <Button size="sm" variant="ghost" :disabled="pagination.page === 1" @click="goToPrevPage">Предыдущая</Button>
+            <Button size="sm" variant="ghost" :disabled="pagination.page === totalPages" @click="goToNextPage">Следующая</Button>
           </div>
         </div>
       </div>
@@ -397,6 +406,11 @@ const authStore = useAuthStore();
 const loading = ref(false);
 const actionLoading = ref(false);
 const users = ref([]);
+const totalUsers = ref(0);
+const pagination = ref({
+  page: 1,
+  perPage: 20,
+});
 const references = ref({
   branches: [],
   positions: [],
@@ -456,11 +470,12 @@ const defaultForm = () => ({
 const formData = ref(defaultForm());
 
 const stats = computed(() => {
-  const total = users.value.length;
+  const total = totalUsers.value;
   const superadmin = users.value.filter((user) => user.role_name === "superadmin").length;
   const manager = users.value.filter((user) => user.role_name === "manager").length;
   return { total, superadmin, manager };
 });
+const totalPages = computed(() => Math.max(1, Math.ceil(totalUsers.value / pagination.value.perPage)));
 
 const branchOptions = computed(() => [
   ...references.value.branches.map((branch) => ({
@@ -538,8 +553,13 @@ const buildFilters = () => {
 const loadUsers = async () => {
   loading.value = true;
   try {
-    const data = await getUsers(buildFilters());
+    const data = await getUsers({
+      ...buildFilters(),
+      page: pagination.value.page,
+      limit: pagination.value.perPage,
+    });
     users.value = data.users || [];
+    totalUsers.value = Number(data.total || 0);
   } catch (error) {
     console.error("Ошибка загрузки пользователей", error);
     showToast("Не удалось загрузить пользователей", "error");
@@ -558,6 +578,7 @@ const handleSearch = () => {
 };
 
 const handleFilterChange = () => {
+  pagination.value.page = 1;
   loadUsers();
 };
 
@@ -567,16 +588,34 @@ const resetFilters = () => {
   filters.position = "";
   filters.role = "";
   filters.level = "";
+  pagination.value.page = 1;
   loadUsers();
 };
 
 const removeFilter = (key) => {
   filters[key] = "";
+  pagination.value.page = 1;
   if (key === "search") {
     handleSearch();
   } else {
     loadUsers();
   }
+};
+
+const goToPrevPage = () => {
+  if (pagination.value.page <= 1) {
+    return;
+  }
+  pagination.value.page -= 1;
+  loadUsers();
+};
+
+const goToNextPage = () => {
+  if (pagination.value.page >= totalPages.value) {
+    return;
+  }
+  pagination.value.page += 1;
+  loadUsers();
 };
 
 const openProfileModal = async (user) => {
@@ -1147,6 +1186,31 @@ onMounted(async () => {
 
 .users-card {
   overflow: visible;
+}
+
+.list-meta {
+  padding: 16px 16px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid var(--divider);
+}
+
+.pagination-info {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.pagination-buttons {
+  display: flex;
+  gap: 8px;
 }
 
 .table-wrapper {

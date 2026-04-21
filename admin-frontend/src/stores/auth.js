@@ -11,8 +11,6 @@ import {
 } from "../services/session/tokenStorage";
 import { onAccessTokenRefreshed, refreshAccessToken } from "../services/session/refreshCoordinator";
 
-const MANAGER_DEFAULT_MODULES = ["assessments", "analytics", "users", "reports", "questions"];
-
 export const useAuthStore = defineStore("auth", {
   state: () => ({
     user: getUser(),
@@ -21,6 +19,8 @@ export const useAuthStore = defineStore("auth", {
     sessionSyncUnsubscribe: null,
     userPermissions: null,
     permissionsLoaded: false,
+    defaultModulesByRole: {},
+    restorePromise: null,
   }),
 
   getters: {
@@ -34,25 +34,19 @@ export const useAuthStore = defineStore("auth", {
         return true;
       }
 
-      if (!state.permissionsLoaded || !state.userPermissions) {
-        if (state.user?.role === "manager") {
-          return MANAGER_DEFAULT_MODULES.includes(moduleCode);
-        }
+      const roleDefaults = state.defaultModulesByRole[state.user?.role] || [];
+      const hasRoleDefault = roleDefaults.includes("*") || roleDefaults.includes(moduleCode);
 
-        return false;
+      if (!state.permissionsLoaded || !state.userPermissions) {
+        return hasRoleDefault;
       }
 
       const permission = state.userPermissions.find((item) => item.moduleCode === moduleCode);
-
       if (permission && permission.isCustom) {
         return permission.hasAccess;
       }
 
-      if (state.user?.role === "manager") {
-        return MANAGER_DEFAULT_MODULES.includes(moduleCode);
-      }
-
-      return false;
+      return hasRoleDefault;
     },
   },
 
@@ -85,10 +79,8 @@ export const useAuthStore = defineStore("auth", {
         const { data } = await authApi.login(credentials);
 
         this.user = data.user;
-        this.accessToken = data.accessToken;
-
+        this.setToken(data.accessToken);
         setUser(data.user);
-        setAccessToken(data.accessToken);
 
         websocketService.connect();
         this.startTokenRefresh();
@@ -96,8 +88,20 @@ export const useAuthStore = defineStore("auth", {
 
         return true;
       } catch (error) {
-        console.error("Ошибка входа:", error);
+        console.error("РћС€РёР±РєР° РІС…РѕРґР°:", error);
         return false;
+      }
+    },
+
+    async loadDefaultModules() {
+      try {
+        const { data } = await apiClient.get("/admin/permissions/default-modules", {
+          cacheMaxAge: 300000,
+        });
+
+        this.defaultModulesByRole = data.defaultModules || {};
+      } catch (error) {
+        console.error("РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ default-РјРѕРґСѓР»Рё:", error);
       }
     },
 
@@ -111,10 +115,61 @@ export const useAuthStore = defineStore("auth", {
         const { data } = await apiClient.get(`/admin/permissions/users/${this.user.id}`);
         this.userPermissions = data.permissions || [];
         this.permissionsLoaded = true;
+
+        if (data.roleName && Array.isArray(data.defaultModules)) {
+          this.defaultModulesByRole = {
+            ...this.defaultModulesByRole,
+            [data.roleName]: data.defaultModules,
+          };
+        } else if (!Object.keys(this.defaultModulesByRole).length) {
+          await this.loadDefaultModules();
+        }
       } catch (error) {
-        console.error("Не удалось загрузить права пользователя:", error);
+        console.error("РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РїСЂР°РІР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ:", error);
         this.permissionsLoaded = false;
       }
+    },
+
+    async tryRestoreSession() {
+      if (this.isAuthenticated) {
+        return true;
+      }
+
+      if (this.restorePromise) {
+        return this.restorePromise;
+      }
+
+      this.restorePromise = (async () => {
+        try {
+          const { data } = await authApi.refresh();
+          if (!data?.accessToken) {
+            return false;
+          }
+
+          this.setToken(data.accessToken);
+
+          if (data.user) {
+            this.user = data.user;
+            setUser(data.user);
+          }
+
+          this.startTokenRefresh();
+          await this.loadUserPermissions();
+          websocketService.connect();
+          return true;
+        } catch {
+          this.user = null;
+          this.accessToken = null;
+          this.userPermissions = null;
+          this.permissionsLoaded = false;
+          clearSession();
+          return false;
+        } finally {
+          this.restorePromise = null;
+        }
+      })();
+
+      return this.restorePromise;
     },
 
     startTokenRefresh() {
@@ -126,7 +181,7 @@ export const useAuthStore = defineStore("auth", {
         try {
           await refreshAccessToken();
         } catch (error) {
-          console.error("Не удалось автоматически обновить токен:", error);
+          console.error("РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ access token:", error);
           clearInterval(this.tokenRefreshTimer);
           this.tokenRefreshTimer = null;
         }
@@ -134,8 +189,8 @@ export const useAuthStore = defineStore("auth", {
     },
 
     setToken(newAccessToken) {
-      this.accessToken = newAccessToken;
-      setAccessToken(newAccessToken);
+      this.accessToken = newAccessToken || null;
+      setAccessToken(newAccessToken || null);
     },
 
     setTokenAndReconnectWS(newAccessToken) {
@@ -152,7 +207,7 @@ export const useAuthStore = defineStore("auth", {
       try {
         await authApi.logout();
       } catch (error) {
-        console.error("Ошибка выхода:", error);
+        console.error("РћС€РёР±РєР° РІС‹С…РѕРґР°:", error);
       } finally {
         if (this.tokenRefreshTimer) {
           clearInterval(this.tokenRefreshTimer);
@@ -165,6 +220,7 @@ export const useAuthStore = defineStore("auth", {
         this.accessToken = null;
         this.userPermissions = null;
         this.permissionsLoaded = false;
+        this.defaultModulesByRole = {};
         clearSession();
       }
     },

@@ -1,5 +1,5 @@
-const ACCESS_TOKEN_KEY = "accessToken";
 const USER_KEY = "user";
+let accessTokenMemory = null;
 
 const parseUser = (value) => {
   if (!value) {
@@ -13,14 +13,14 @@ const parseUser = (value) => {
   }
 };
 
-export const getAccessToken = () => localStorage.getItem(ACCESS_TOKEN_KEY);
+export const getAccessToken = () => accessTokenMemory;
 
 export const setAccessToken = (token) => {
-  localStorage.setItem(ACCESS_TOKEN_KEY, token);
+  accessTokenMemory = token || null;
 };
 
 export const clearAccessToken = () => {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  accessTokenMemory = null;
 };
 
 export const getUser = () => parseUser(localStorage.getItem(USER_KEY));
