@@ -1224,7 +1224,8 @@ async function createAttempt(assessment, userId) {
     ]);
     const attemptNumber = Number(attemptCountRows[0].total || 0) + 1;
     logWithTime("createAttempt", `Текущее количество попыток пользователя: ${attemptNumber - 1}, новая попытка будет №${attemptNumber}`);
-    if (row.max_attempts != null && attemptNumber > Number(row.max_attempts)) {
+    // max_attempts = 0 означает безлимитный режим.
+    if (row.max_attempts != null && Number(row.max_attempts) > 0 && attemptNumber > Number(row.max_attempts)) {
       const error = new Error("Превышено количество попыток");
       error.status = 400;
       throw error;

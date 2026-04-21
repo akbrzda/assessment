@@ -1,9 +1,34 @@
 const Joi = require("joi");
 
+const availabilitySchema = {
+  availabilityMode: Joi.string().valid("unlimited", "relative_days", "fixed_dates").default("unlimited"),
+  availabilityDays: Joi.number().integer().min(1).max(3650).allow(null).default(null),
+  availabilityFrom: Joi.date().iso().allow(null).default(null),
+  availabilityTo: Joi.date().iso().allow(null).default(null),
+};
+
+function withAvailabilityValidation(schema) {
+  return schema.custom((value, helpers) => {
+    if (value.availabilityMode === "relative_days" && !value.availabilityDays) {
+      return helpers.error("any.invalid", { message: "Для режима срока в днях нужно указать количество дней" });
+    }
+    if (value.availabilityMode === "fixed_dates") {
+      if (!value.availabilityFrom || !value.availabilityTo) {
+        return helpers.error("any.invalid", { message: "Для фиксированных дат нужно указать начало и окончание действия курса" });
+      }
+      if (new Date(value.availabilityFrom).getTime() > new Date(value.availabilityTo).getTime()) {
+        return helpers.error("any.invalid", { message: "Дата начала действия курса не может быть позже даты окончания" });
+      }
+    }
+    return value;
+  });
+}
+
 const createCourseSchema = Joi.object({
   title: Joi.string().trim().min(3).max(255).required(),
   description: Joi.string().allow("", null).default(""),
   finalAssessmentId: Joi.number().integer().positive().allow(null).default(null),
+  ...availabilitySchema,
 });
 
 const updateCourseSchema = Joi.object({
@@ -11,6 +36,7 @@ const updateCourseSchema = Joi.object({
   description: Joi.string().allow("", null),
   finalAssessmentId: Joi.number().integer().positive().allow(null),
   status: Joi.string().valid("draft", "published", "archived"),
+  ...availabilitySchema,
 }).min(1);
 
 const createSectionSchema = Joi.object({
@@ -53,8 +79,8 @@ const updateTopicSchema = Joi.object({
 }).min(1);
 
 module.exports = {
-  createCourseSchema,
-  updateCourseSchema,
+  createCourseSchema: withAvailabilityValidation(createCourseSchema),
+  updateCourseSchema: withAvailabilityValidation(updateCourseSchema),
   createSectionSchema,
   updateSectionSchema,
   createTopicSchema,

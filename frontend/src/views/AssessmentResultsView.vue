@@ -36,7 +36,7 @@
             </div>
             <div class="stat-item">
               <div class="stat-label">Попытка</div>
-              <div class="stat-value">{{ result.attemptNumber }} из {{ assessment?.maxAttempts }}</div>
+              <div class="stat-value">{{ formatAttemptSummary(result.attemptNumber, assessment?.maxAttempts) }}</div>
             </div>
           </div>
         </div>
@@ -122,7 +122,10 @@ export default {
 
       // Используем данные из summaryItem для точного подсчета попыток
       const usedAttempts = summaryItem.value?.lastAttemptNumber || result.value.attemptNumber || 0;
-      const maxAttempts = assessment.value.maxAttempts || 1;
+      const maxAttempts = Number(assessment.value.maxAttempts || 0);
+      if (maxAttempts === 0) {
+        return assessment.value.status === "open";
+      }
       const attemptsLeft = maxAttempts - usedAttempts;
 
       return attemptsLeft > 0 && assessment.value.status === "open";
@@ -133,14 +136,25 @@ export default {
         return 0;
       }
       const usedAttempts = summaryItem.value?.lastAttemptNumber || result.value.attemptNumber || 0;
-      const remaining = (assessment.value.maxAttempts || 1) - usedAttempts;
+      if (Number(assessment.value.maxAttempts || 0) === 0) {
+        return Number.POSITIVE_INFINITY;
+      }
+      const remaining = Number(assessment.value.maxAttempts || 1) - usedAttempts;
       return remaining > 0 ? remaining : 0;
     });
 
     function pluralizeAttempts(count) {
+      if (!Number.isFinite(count)) return "попыток";
       if (count === 1) return "попытка";
       if (count >= 2 && count <= 4) return "попытки";
       return "попыток";
+    }
+
+    function formatAttemptSummary(attemptNumber, maxAttempts) {
+      if (Number(maxAttempts || 0) === 0) {
+        return `${attemptNumber} из ∞`;
+      }
+      return `${attemptNumber} из ${maxAttempts}`;
     }
 
     function formatDuration(seconds) {
@@ -175,7 +189,7 @@ export default {
           return null;
         }
 
-        if (parsed.type === "module" && Number(parsed.assessmentId) === assessmentId) {
+        if ((parsed.type === "module" || parsed.type === "section" || parsed.type === "topic") && Number(parsed.assessmentId) === assessmentId) {
           return parsed;
         }
 
@@ -357,6 +371,7 @@ export default {
       remainingAttempts,
       relatedCourseId,
       pluralizeAttempts,
+      formatAttemptSummary,
       retakeAssessment,
       isLoading,
     };

@@ -180,7 +180,7 @@ async function upsertCourseProgressOnStart({ courseId, userId, totalRequiredSect
       (course_id, user_id, status, progress_percent, completed_modules_count, total_modules_count, started_at, last_activity_at, created_at, updated_at)
      VALUES (?, ?, 'in_progress', 0.00, 0, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())
      ON DUPLICATE KEY UPDATE
-       status = IF(status = 'completed', status, 'in_progress'),
+       status = IF(status IN ('completed','closed'), status, 'in_progress'),
        total_modules_count = VALUES(total_modules_count),
        started_at = IF(started_at IS NULL, UTC_TIMESTAMP(), started_at),
        last_activity_at = UTC_TIMESTAMP(),
@@ -295,7 +295,7 @@ async function syncCourseProgress({ courseId, userId, aggregate, connection }) {
       (course_id, user_id, status, progress_percent, completed_modules_count, total_modules_count, started_at, last_activity_at, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, IF(? = 'not_started', NULL, UTC_TIMESTAMP()), UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())
      ON DUPLICATE KEY UPDATE
-       status = IF(status = 'completed', status, VALUES(status)),
+       status = IF(status IN ('completed','closed'), status, VALUES(status)),
        progress_percent = VALUES(progress_percent),
        completed_modules_count = VALUES(completed_modules_count),
        total_modules_count = VALUES(total_modules_count),
@@ -315,6 +315,18 @@ async function completeCourseProgress({ courseId, userId, totalSections, connect
       WHERE course_id = ? AND user_id = ?`,
     [totalSections, totalSections, courseId, userId],
   );
+}
+
+async function getCourseProgressStatus({ courseId, userId, connection }) {
+  const executor = connection || pool;
+  const [rows] = await executor.execute(
+    `SELECT status
+       FROM course_user_progress
+      WHERE course_id = ? AND user_id = ?
+      LIMIT 1`,
+    [courseId, userId],
+  );
+  return rows.length ? rows[0].status : null;
 }
 
 // ─── Административные запросы прогресса ─────────────────────────────────────
@@ -499,6 +511,7 @@ module.exports = {
   getCourseProgressAggregate,
   syncCourseProgress,
   completeCourseProgress,
+  getCourseProgressStatus,
   getAdminUsersProgress,
   getAdminUserDetailedProgress,
   resetUserProgressForCourse,

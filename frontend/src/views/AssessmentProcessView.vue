@@ -211,6 +211,7 @@ export default {
     const isSaving = ref(false);
     const isCompleted = ref(false);
     const PROGRESS_STORAGE_KEY = "assessmentAttemptProgress";
+    const COURSE_COMPLETION_STORAGE_KEY = "courseCompletionContext";
 
     const assessmentId = computed(() => Number(route.params.id));
 
@@ -310,6 +311,28 @@ export default {
       if (store[key]) {
         delete store[key];
         writeProgressStore(store);
+      }
+    };
+
+    const readCourseCompletionContext = (assessmentIdValue) => {
+      try {
+        const raw = window.sessionStorage.getItem(COURSE_COMPLETION_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") return null;
+        if (Number(parsed.assessmentId || parsed.finalAssessmentId) !== Number(assessmentIdValue)) return null;
+        return parsed;
+      } catch (error) {
+        console.warn("Не удалось прочитать контекст прохождения курса", error);
+        return null;
+      }
+    };
+
+    const clearCourseCompletionContext = () => {
+      try {
+        window.sessionStorage.removeItem(COURSE_COMPLETION_STORAGE_KEY);
+      } catch (error) {
+        console.warn("Не удалось очистить контекст прохождения курса", error);
       }
     };
 
@@ -653,13 +676,14 @@ export default {
       }
 
       // Дожидаемся завершения попытки перед редиректом
+      let completionResponse = null;
       if (attempt) {
         try {
           const answersPayload = buildBatchPayload();
           if (answersPayload.length) {
             await apiClient.submitAssessmentAnswersBatch(assessmentId.value, attempt, { answers: answersPayload });
           }
-          await apiClient.completeAssessmentAttempt(assessmentId.value, attempt);
+          completionResponse = await apiClient.completeAssessmentAttempt(assessmentId.value, attempt);
           // Увеличенная задержка для гарантии записи данных в БД
           await new Promise((resolve) => setTimeout(resolve, 500));
         } catch (error) {
@@ -674,6 +698,37 @@ export default {
       isSaving.value = false;
       document.body.style.overflow = "";
       telegramStore.hapticFeedback("impact", "medium");
+
+      const completionContext = readCourseCompletionContext(assessmentId.value);
+      if (attempt && completionContext && ["module", "section", "topic"].includes(completionContext.type)) {
+        try {
+          if (completionContext.type === "module") {
+            await apiClient.completeCourseModuleAttempt(Number(completionContext.moduleId), attempt);
+          } else if (completionContext.type === "section") {
+            await apiClient.completeCourseSectionAttempt(Number(completionContext.sectionId), attempt);
+          } else if (completionContext.type === "topic") {
+            await apiClient.completeCourseTopicAttempt(Number(completionContext.topicId), attempt);
+          }
+        } catch (syncError) {
+          console.warn("Не удалось синхронизировать прогресс курса", syncError);
+        }
+
+        const score = Math.round(Number(completionResponse?.attempt?.scorePercent || 0));
+        const passed = completionResponse?.attempt?.passed ? "1" : "0";
+        const attemptNumber = Number(completionResponse?.attempt?.attemptNumber || 1);
+        const targetCourseId = Number(completionContext.courseId);
+        clearCourseCompletionContext();
+        router.push({
+          path: `/courses/${targetCourseId}`,
+          query: {
+            resultType: completionContext.type,
+            score: String(score),
+            passed,
+            attemptNumber: String(attemptNumber),
+          },
+        });
+        return;
+      }
 
       const query = { fromAssessment: "true" };
       if (attemptId.value) {

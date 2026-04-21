@@ -3,49 +3,114 @@ const { toIsoUtc, mapCourseRow, mapSectionRow, mapTopicRow } = require("./course
 const { canAccessFinalAssessment } = require("./courses.repository");
 const { listAssignedCourseIds } = require("./courseAssignments.repository");
 
-async function listPublishedCoursesForUser(userId, userPositionId, userBranchId) {
-  // Получаем множество ID курсов, доступных этому пользователю
-  const allowedIds = await listAssignedCourseIds(userId, userPositionId, userBranchId);
-  if (allowedIds.size === 0) {
-    return [];
+function parseDate(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(String(value).replace(" ", "T"));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function addDays(baseDate, days) {
+  if (!baseDate || !days) return null;
+  const result = new Date(baseDate.getTime());
+  result.setUTCDate(result.getUTCDate() + Number(days));
+  return result;
+}
+
+function resolveAssignmentAndDeadline(row) {
+  const fallbackAssignedAt = parseDate(row.user_assigned_at) || parseDate(row.manual_assigned_at) || parseDate(row.published_at) || new Date();
+  const persistedDeadline = parseDate(row.user_deadline_at) || parseDate(row.manual_deadline_at);
+
+  if (persistedDeadline) {
+    return {
+      assignedAt: fallbackAssignedAt,
+      deadlineAt: persistedDeadline,
+    };
   }
+
+  if (row.availability_mode === "relative_days") {
+    return {
+      assignedAt: fallbackAssignedAt,
+      deadlineAt: addDays(fallbackAssignedAt, row.availability_days),
+    };
+  }
+
+  if (row.availability_mode === "fixed_dates") {
+    return {
+      assignedAt: fallbackAssignedAt,
+      deadlineAt: parseDate(row.availability_to),
+    };
+  }
+
+  return {
+    assignedAt: fallbackAssignedAt,
+    deadlineAt: null,
+  };
+}
+
+function mapUserProgress(row, fallbackRequiredTotal) {
+  const assignment = resolveAssignmentAndDeadline(row);
+  return {
+    status: row.user_status || "not_started",
+    progressPercent: row.progress_percent != null ? Number(row.progress_percent) : 0,
+    completedSectionsCount: row.completed_modules_count != null ? Number(row.completed_modules_count) : 0,
+    totalSectionsCount: row.total_modules_count != null ? Number(row.total_modules_count) : Number(fallbackRequiredTotal || 0),
+    startedAt: toIsoUtc(row.user_started_at),
+    completedAt: toIsoUtc(row.user_completed_at),
+    lastActivityAt: toIsoUtc(row.user_last_activity_at),
+    assignedAt: assignment.assignedAt ? assignment.assignedAt.toISOString() : null,
+    deadlineAt: assignment.deadlineAt ? assignment.deadlineAt.toISOString() : null,
+  };
+}
+
+async function listPublishedCoursesForUser(userId, userPositionId, userBranchId) {
+  const allowedIds = await listAssignedCourseIds(userId, userPositionId, userBranchId);
+  const [closedRows] = await pool.execute(
+    `SELECT course_id
+       FROM course_user_progress
+      WHERE user_id = ? AND status = 'closed'`,
+    [userId],
+  );
+  for (const row of closedRows) {
+    allowedIds.add(Number(row.course_id));
+  }
+  if (allowedIds.size === 0) return [];
 
   const idList = [...allowedIds].join(",");
   const [rows] = await pool.execute(
-    `SELECT c.id, c.title, c.description, c.status, c.version, c.final_assessment_id,
+    `SELECT c.id, c.title, c.description, c.availability_mode, c.availability_days, c.availability_from, c.availability_to,
+            c.status, c.version, c.final_assessment_id,
             c.created_by, c.updated_by, c.published_at, c.archived_at, c.created_at, c.updated_at,
             cup.status AS user_status, cup.progress_percent,
             cup.completed_modules_count, cup.total_modules_count,
             cup.started_at AS user_started_at, cup.completed_at AS user_completed_at,
-            cup.last_activity_at AS user_last_activity_at,
+            cup.last_activity_at AS user_last_activity_at, cup.assigned_at AS user_assigned_at, cup.deadline_at AS user_deadline_at,
+            cua.assigned_at AS manual_assigned_at, cua.deadline_at AS manual_deadline_at,
             (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id) AS sections_count,
-            (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id AND cs.is_required = 1) AS required_sections_count
+            (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id AND cs.is_required = 1) AS required_sections_count,
+            (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id AND cs.assessment_id IS NOT NULL) +
+            (SELECT COUNT(*) FROM course_topics ct WHERE ct.course_id = c.id AND ct.assessment_id IS NOT NULL) AS tests_count
        FROM courses c
        LEFT JOIN course_user_progress cup ON cup.course_id = c.id AND cup.user_id = ?
+       LEFT JOIN course_user_assignments cua ON cua.course_id = c.id AND cua.user_id = ?
       WHERE c.status = 'published' AND c.id IN (${idList})
       ORDER BY c.published_at DESC, c.id DESC`,
-    [userId],
+    [userId, userId],
   );
+
   return rows.map((row) => ({
     ...mapCourseRow(row),
     sectionsCount: Number(row.sections_count || 0),
     requiredSectionsCount: Number(row.required_sections_count || 0),
-    progress: {
-      status: row.user_status || "not_started",
-      progressPercent: row.progress_percent != null ? Number(row.progress_percent) : 0,
-      completedSectionsCount: row.completed_modules_count != null ? Number(row.completed_modules_count) : 0,
-      totalSectionsCount: row.total_modules_count != null ? Number(row.total_modules_count) : Number(row.required_sections_count || 0),
-      startedAt: toIsoUtc(row.user_started_at),
-      completedAt: toIsoUtc(row.user_completed_at),
-      lastActivityAt: toIsoUtc(row.user_last_activity_at),
-    },
+    testsCount: Number(row.tests_count || 0),
+    progress: mapUserProgress(row, row.required_sections_count),
   }));
 }
 
 async function getCourseProgressForUser(courseId, userId) {
   const [rows] = await pool.execute(
-    `SELECT status, progress_percent, completed_modules_count, total_modules_count,
-            started_at, completed_at, last_activity_at
+    `SELECT status AS user_status, progress_percent, completed_modules_count, total_modules_count,
+            started_at AS user_started_at, completed_at AS user_completed_at, last_activity_at AS user_last_activity_at,
+            assigned_at AS user_assigned_at, deadline_at AS user_deadline_at
        FROM course_user_progress WHERE course_id = ? AND user_id = ? LIMIT 1`,
     [courseId, userId],
   );
@@ -58,18 +123,11 @@ async function getCourseProgressForUser(courseId, userId) {
       startedAt: null,
       completedAt: null,
       lastActivityAt: null,
+      assignedAt: null,
+      deadlineAt: null,
     };
   }
-  const row = rows[0];
-  return {
-    status: row.status,
-    progressPercent: row.progress_percent != null ? Number(row.progress_percent) : 0,
-    completedSectionsCount: row.completed_modules_count != null ? Number(row.completed_modules_count) : 0,
-    totalSectionsCount: row.total_modules_count != null ? Number(row.total_modules_count) : 0,
-    startedAt: toIsoUtc(row.started_at),
-    completedAt: toIsoUtc(row.completed_at),
-    lastActivityAt: toIsoUtc(row.last_activity_at),
-  };
+  return mapUserProgress(rows[0], 0);
 }
 
 async function getCourseSnapshot(courseId, userId) {
@@ -88,21 +146,29 @@ async function getCourseSnapshot(courseId, userId) {
 }
 
 async function getCourseForUser(courseId, userId, { positionId = null, branchId = null } = {}) {
-  // Проверка назначения курса пользователю
   const allowedIds = await listAssignedCourseIds(userId, positionId, branchId);
-  if (!allowedIds.has(Number(courseId))) return null;
+  const [closedRows] = await pool.execute(
+    `SELECT course_id
+       FROM course_user_progress
+      WHERE user_id = ? AND status = 'closed' AND course_id = ?`,
+    [userId, courseId],
+  );
+  if (!allowedIds.has(Number(courseId)) && !closedRows.length) return null;
 
   const [courseRows] = await pool.execute(
-    `SELECT c.id, c.title, c.description, c.status, c.version, c.final_assessment_id,
+    `SELECT c.id, c.title, c.description, c.availability_mode, c.availability_days, c.availability_from, c.availability_to,
+            c.status, c.version, c.final_assessment_id,
             c.created_by, c.updated_by, c.published_at, c.archived_at, c.created_at, c.updated_at,
             cup.status AS user_status, cup.progress_percent,
             cup.completed_modules_count, cup.total_modules_count,
             cup.started_at AS user_started_at, cup.completed_at AS user_completed_at,
-            cup.last_activity_at AS user_last_activity_at
+            cup.last_activity_at AS user_last_activity_at, cup.assigned_at AS user_assigned_at, cup.deadline_at AS user_deadline_at,
+            cua.assigned_at AS manual_assigned_at, cua.deadline_at AS manual_deadline_at
        FROM courses c
        LEFT JOIN course_user_progress cup ON cup.course_id = c.id AND cup.user_id = ?
+       LEFT JOIN course_user_assignments cua ON cua.course_id = c.id AND cua.user_id = ?
       WHERE c.id = ? AND c.status = 'published' LIMIT 1`,
-    [userId, courseId],
+    [userId, userId, courseId],
   );
   if (!courseRows.length) return null;
 
@@ -135,9 +201,9 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
 
   const topicsBySectionId = {};
   for (const topicRow of topicRows) {
-    const sId = Number(topicRow.section_id);
-    if (!topicsBySectionId[sId]) topicsBySectionId[sId] = [];
-    topicsBySectionId[sId].push({
+    const sectionId = Number(topicRow.section_id);
+    if (!topicsBySectionId[sectionId]) topicsBySectionId[sectionId] = [];
+    topicsBySectionId[sectionId].push({
       ...mapTopicRow(topicRow),
       progress: {
         status: topicRow.user_topic_status || "not_started",
@@ -150,18 +216,24 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
     });
   }
 
+  const isClosedForUser = (row.user_status || "not_started") === "closed";
   const sections = sectionRows.map((sectionRow, sectionIndex) => {
     const section = mapSectionRow(sectionRow);
-    const prevRequired = sectionRows.slice(0, sectionIndex).filter((s) => Boolean(s.is_required));
-    const isLocked = prevRequired.some((s) => (s.user_section_status || "not_started") !== "passed");
+    const prevRequired = sectionRows.slice(0, sectionIndex).filter((item) => Boolean(item.is_required));
+    const isLockedBySequence = prevRequired.some((item) => (item.user_section_status || "not_started") !== "passed");
 
     const topics = (topicsBySectionId[section.id] || []).map((topic, topicIndex) => {
       const prevTopic = (topicsBySectionId[section.id] || [])[topicIndex - 1];
-      return { ...topic, progress: { ...topic.progress, locked: isLocked || (!!prevTopic && prevTopic.progress.status !== "completed") } };
+      return {
+        ...topic,
+        progress: {
+          ...topic.progress,
+          locked: isClosedForUser || isLockedBySequence || (!!prevTopic && prevTopic.progress.status !== "completed"),
+        },
+      };
     });
 
-    // Если в разделе нет тем — считаем «все темы выполнены» (раздел открыт только для теста)
-    const allTopicsCompleted = topics.length === 0 || topics.every((t) => t.progress.status === "completed");
+    const allTopicsCompleted = topics.length === 0 || topics.every((item) => item.progress.status === "completed");
     return {
       ...section,
       progress: {
@@ -171,9 +243,9 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
         lastAttemptId: sectionRow.section_last_attempt_id != null ? Number(sectionRow.section_last_attempt_id) : null,
         startedAt: toIsoUtc(sectionRow.section_started_at),
         completedAt: toIsoUtc(sectionRow.section_completed_at),
-        locked: isLocked,
+        locked: isClosedForUser || isLockedBySequence,
         allTopicsCompleted,
-        sectionTestAvailable: !isLocked && allTopicsCompleted && !!section.assessmentId,
+        sectionTestAvailable: !isClosedForUser && !isLockedBySequence && allTopicsCompleted && !!section.assessmentId,
       },
       topics,
     };
@@ -183,22 +255,15 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
 
   return {
     ...course,
-    progress: {
-      status: row.user_status || "not_started",
-      progressPercent: row.progress_percent != null ? Number(row.progress_percent) : 0,
-      completedSectionsCount: row.completed_modules_count != null ? Number(row.completed_modules_count) : 0,
-      totalSectionsCount: row.total_modules_count != null ? Number(row.total_modules_count) : sections.filter((s) => s.isRequired).length,
-      startedAt: toIsoUtc(row.user_started_at),
-      completedAt: toIsoUtc(row.user_completed_at),
-      lastActivityAt: toIsoUtc(row.user_last_activity_at),
-    },
+    testsCount: sectionRows.filter((item) => item.assessment_id != null).length + topicRows.filter((item) => item.assessment_id != null).length,
+    progress: mapUserProgress(row, sections.filter((item) => item.isRequired).length),
     sections,
     finalAssessment: {
       id: course.finalAssessmentId,
-      available: finalAccess.allowed,
-      reason: finalAccess.allowed ? null : finalAccess.reason,
+      available: !isClosedForUser && finalAccess.allowed,
+      reason: isClosedForUser ? "COURSE_CLOSED_BY_ADMIN" : finalAccess.allowed ? null : finalAccess.reason,
       passedRequiredSections: finalAccess.passedRequiredSections || 0,
-      totalRequiredSections: finalAccess.totalRequiredSections || sections.filter((s) => s.isRequired).length,
+      totalRequiredSections: finalAccess.totalRequiredSections || sections.filter((item) => item.isRequired).length,
     },
     snapshot,
   };

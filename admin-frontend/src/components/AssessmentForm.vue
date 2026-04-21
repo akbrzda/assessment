@@ -36,8 +36,19 @@
         <div class="form-grid-3">
           <Input v-model.number="form.timeLimitMinutes" type="number" label="Время на тест (мин)" min="1" required />
           <Input v-model.number="form.passScorePercent" type="number" label="Проходной балл (%)" min="0" max="100" required />
-          <Input v-model.number="form.maxAttempts" type="number" label="Максимум попыток" min="1" required />
+          <Input
+            v-model.number="form.maxAttempts"
+            type="number"
+            label="Максимум попыток"
+            :min="isUnlimitedAttempts ? 0 : 1"
+            :disabled="isUnlimitedAttempts"
+            required
+          />
         </div>
+        <label class="checkbox-item">
+          <input v-model="isUnlimitedAttempts" type="checkbox" />
+          <span>Без ограничений по попыткам</span>
+        </label>
       </section>
 
       <!-- Назначение -->
@@ -135,7 +146,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { getAssessmentById, createAssessment, updateAssessment } from "../api/assessments";
 import { getReferences } from "../api/users";
 import { validateDate, validateDateRange, dateToISOWithMidnight } from "../utils/dateValidation";
@@ -173,10 +184,12 @@ const form = ref({
   userIds: [],
   questions: [],
 });
+const isUnlimitedAttempts = ref(false);
 const { showToast } = useToast();
 
 const isFormValid = computed(() => {
   if (!form.value.title || !form.value.openAt || !form.value.closeAt) return false;
+  if (!isUnlimitedAttempts.value && Number(form.value.maxAttempts) < 1) return false;
   if (form.value.questions.length === 0) return false;
 
   // Проверить, что у всех вопросов есть правильный ответ
@@ -262,6 +275,7 @@ const loadAssessment = async () => {
         })),
       })),
     };
+    isUnlimitedAttempts.value = Number(assessment.max_attempts) === 0;
   } catch (error) {
     console.error("Load assessment error:", error);
     showToast("Ошибка загрузки аттестации", "error");
@@ -333,6 +347,14 @@ const setCorrectOption = (qIndex, oIndex) => {
   });
 };
 
+watch(isUnlimitedAttempts, (nextValue) => {
+  if (nextValue) {
+    form.value.maxAttempts = 0;
+  } else if (!form.value.maxAttempts || Number(form.value.maxAttempts) < 1) {
+    form.value.maxAttempts = 1;
+  }
+});
+
 const handleSubmit = async () => {
   // Валидация дат перед отправкой
   validateDateField("openAt");
@@ -353,6 +375,7 @@ const handleSubmit = async () => {
     // Преобразуем даты в формат с временем 00:00
     const assessmentData = {
       ...form.value,
+      maxAttempts: isUnlimitedAttempts.value ? 0 : Number(form.value.maxAttempts),
       openAt: dateToISOWithMidnight(form.value.openAt),
       closeAt: dateToISOWithMidnight(form.value.closeAt),
     };
@@ -360,11 +383,12 @@ const handleSubmit = async () => {
     if (props.assessmentId) {
       await updateAssessment(props.assessmentId, assessmentData);
       showToast("Аттестация обновлена", "success");
+      emit("submit", { assessmentId: props.assessmentId });
     } else {
-      await createAssessment(assessmentData);
+      const response = await createAssessment(assessmentData);
       showToast("Аттестация создана", "success");
+      emit("submit", { assessmentId: Number(response?.assessmentId || 0) || null });
     }
-    emit("submit");
   } catch (error) {
     console.error("Save assessment error:", error);
     showToast("Ошибка сохранения аттестации", "error");
@@ -377,7 +401,9 @@ onMounted(async () => {
   await loadReferences();
   if (props.assessmentId) {
     await loadAssessment();
+    return;
   }
+  isUnlimitedAttempts.value = false;
 });
 </script>
 

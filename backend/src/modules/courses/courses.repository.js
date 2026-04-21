@@ -7,7 +7,7 @@ async function findById(courseId, options = {}) {
   const executor = options.connection || pool;
   const lock = options.forUpdate ? " FOR UPDATE" : "";
   const [rows] = await executor.execute(
-    `SELECT id, title, description, status, version, final_assessment_id,
+    `SELECT id, title, description, availability_mode, availability_days, availability_from, availability_to, status, version, final_assessment_id,
             created_by, updated_by, published_at, archived_at, created_at, updated_at
        FROM courses WHERE id = ?${lock}`,
     [courseId],
@@ -31,7 +31,7 @@ async function listCoursesForAdmin({ status, search } = {}) {
 
   const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
   const [rows] = await pool.execute(
-    `SELECT c.id, c.title, c.description, c.status, c.version, c.final_assessment_id,
+    `SELECT c.id, c.title, c.description, c.availability_mode, c.availability_days, c.availability_from, c.availability_to, c.status, c.version, c.final_assessment_id,
             c.created_by, c.updated_by, c.published_at, c.archived_at, c.created_at, c.updated_at,
             (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id) AS sections_count
        FROM courses c ${where}
@@ -132,7 +132,9 @@ async function validatePublicationIntegrity(courseId, options = {}) {
   const sections = await listSectionsByCourseId(courseId, options);
   const errors = [];
 
-  if (course.finalAssessmentId) {
+  if (!course.finalAssessmentId) {
+    errors.push("Для публикации курса необходимо назначить итоговую аттестацию");
+  } else {
     const [rows] = await executor.execute("SELECT id FROM assessments WHERE id = ? LIMIT 1", [course.finalAssessmentId]);
     if (!rows.length) errors.push("Указанная итоговая аттестация курса не найдена");
   }
@@ -172,6 +174,10 @@ function buildCourseSnapshot(course, sections, topicsBySectionId) {
       id: course.id,
       title: course.title,
       description: course.description,
+      availabilityMode: course.availabilityMode,
+      availabilityDays: course.availabilityDays,
+      availabilityFrom: course.availabilityFrom,
+      availabilityTo: course.availabilityTo,
       version: course.version,
       finalAssessmentId: course.finalAssessmentId,
     },
@@ -201,6 +207,17 @@ async function canAccessFinalAssessment({ courseId, userId }, options = {}) {
   if (!courseRows.length) return { allowed: false, reason: "Курс не найден" };
   if (courseRows[0].status !== "published") return { allowed: false, reason: "Итоговая аттестация доступна только для опубликованного курса" };
   if (!courseRows[0].final_assessment_id) return { allowed: false, reason: "Итоговая аттестация для курса не настроена" };
+
+  const [progressRows] = await executor.execute(
+    `SELECT status
+       FROM course_user_progress
+      WHERE course_id = ? AND user_id = ?
+      LIMIT 1`,
+    [courseId, userId],
+  );
+  if (progressRows.length && progressRows[0].status === "closed") {
+    return { allowed: false, reason: "Курс закрыт администратором" };
+  }
 
   const [[agg]] = await executor.execute(
     `SELECT COUNT(CASE WHEN cs.is_required = 1 THEN 1 END) AS total,

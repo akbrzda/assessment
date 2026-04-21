@@ -233,9 +233,55 @@ async function addAssignment(req, res, next) {
     const userId = Number(req.body.userId);
     if (!userId || userId <= 0) return res.status(400).json({ error: "Некорректный идентификатор пользователя" });
 
-    await assignmentsRepo.addAssignment(courseId, userId, req.user.id);
+    const deadlineAt = req.body.deadlineAt ? new Date(req.body.deadlineAt) : null;
+    if (deadlineAt && Number.isNaN(deadlineAt.getTime())) {
+      return res.status(400).json({ error: "Некорректный формат даты дедлайна" });
+    }
+
+    await assignmentsRepo.addAssignment(courseId, userId, req.user.id, deadlineAt ? deadlineAt.toISOString().slice(0, 19).replace("T", " ") : null);
     const assignments = await assignmentsRepo.getAssignments(courseId);
     res.status(201).json({ assignments });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function closeAssignment(req, res, next) {
+  try {
+    const courseId = parseId(req.params.id);
+    const userId = parseId(req.params.userId);
+    if (!courseId || !userId) return res.status(400).json({ error: "Некорректные параметры" });
+
+    const changed = await assignmentsRepo.closeAssignment(courseId, userId, req.user.id);
+    if (!changed) {
+      return res.status(404).json({ error: "Назначение пользователя не найдено" });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.execute(
+        `INSERT INTO course_user_progress
+          (course_id, user_id, status, progress_percent, completed_modules_count, total_modules_count, assigned_at, deadline_at, closed_at, closed_by, created_at, updated_at)
+         VALUES (?, ?, 'closed', 0, 0, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP(), ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+         ON DUPLICATE KEY UPDATE
+           status = 'closed',
+           closed_at = UTC_TIMESTAMP(),
+           closed_by = VALUES(closed_by),
+           deadline_at = IFNULL(deadline_at, UTC_TIMESTAMP()),
+           updated_at = UTC_TIMESTAMP()`,
+        [courseId, userId, req.user.id],
+      );
+      await connection.commit();
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+
+    const assignments = await assignmentsRepo.getAssignments(courseId);
+    res.json({ assignments });
   } catch (error) {
     next(error);
   }
@@ -345,6 +391,7 @@ module.exports = {
   updateTargets,
   getAssignments,
   addAssignment,
+  closeAssignment,
   removeAssignment,
   getCourseUsers,
   getCourseUserProgress,

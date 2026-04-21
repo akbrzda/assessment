@@ -238,7 +238,7 @@ export default {
 
       // Статус "completed" только если нет возможности пройти снова
       if (hasPassed || item.lastAttemptStatus === "completed") {
-        const hasAttemptsLeft = attemptsUsed < maxAttempts;
+        const hasAttemptsLeft = maxAttempts === 0 ? true : attemptsUsed < maxAttempts;
         const isPerfectScore = bestScore === 100;
 
         // Если аттестация открыта (active) и есть попытки и результат не 100%, оставляем статус open

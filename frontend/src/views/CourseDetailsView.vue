@@ -13,6 +13,18 @@
 
         <div class="card card-large mb-12">
           <div class="summary-row mb-8">
+            <span class="body-small text-secondary">Статус</span>
+            <span class="body-small">{{ getCourseStatusText(course.progress.status) }}</span>
+          </div>
+          <div class="summary-row mb-8">
+            <span class="body-small text-secondary">Срок действия</span>
+            <span class="body-small">{{ getCourseValidityLabel(course) }}</span>
+          </div>
+          <div class="summary-row mb-8">
+            <span class="body-small text-secondary">Тестов в курсе</span>
+            <span class="body-small">{{ course.testsCount || 0 }}</span>
+          </div>
+          <div class="summary-row mb-8">
             <span class="body-small text-secondary">Прогресс</span>
             <span class="body-small">{{ Math.round(course.progress.progressPercent || 0) }}%</span>
           </div>
@@ -24,10 +36,12 @@
             <span class="body-small">{{ course.progress.completedSectionsCount || 0 }} / {{ course.progress.totalSectionsCount || 0 }}</span>
           </div>
 
-          <button v-if="course.progress.status === 'not_started'" class="btn btn-primary btn-full" :disabled="isStarting" @click="startCourseFlow">
+          <button v-if="course.progress.status === 'not_started'" class="btn btn-primary btn-full" :disabled="isStarting || course.progress.status === 'closed'" @click="startCourseFlow">
             {{ isStarting ? "Запускаем..." : "Начать прохождение" }}
           </button>
-          <button v-else class="btn btn-secondary btn-full" @click="scrollToSections">Продолжить курс</button>
+          <button v-else class="btn btn-secondary btn-full" :disabled="course.progress.status === 'closed'" @click="scrollToSections">
+            Продолжить курс
+          </button>
         </div>
 
         <div id="sections-list" class="mb-12">
@@ -157,12 +171,25 @@
         <p class="body-small text-secondary mb-12">Возможно, курс был скрыт или недоступен для вашей роли.</p>
         <router-link to="/assessments" class="btn btn-primary btn-full">Вернуться к обучению</router-link>
       </div>
+
+      <div v-if="attemptResultModal.visible" class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <h2 class="title-medium mb-16">{{ attemptResultModal.passed ? "Тест пройден" : "Тест не пройден" }}</h2>
+            <p class="body-medium mb-8">{{ attemptResultModal.title }}</p>
+            <p class="body-small text-secondary mb-20">
+              Результат: <strong>{{ attemptResultModal.score }}%</strong>, попытка №{{ attemptResultModal.attemptNumber }}
+            </p>
+            <button class="btn btn-primary btn-full" @click="closeAttemptResultModal">Продолжить курс</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { apiClient } from "../services/apiClient";
 import { useTelegramStore } from "../stores/telegram";
@@ -170,6 +197,7 @@ import { useUserStore } from "../stores/user";
 import { calculateReadingSeconds, formatReadingTime } from "../utils/readingTime";
 
 const COURSE_COMPLETION_STORAGE_KEY = "courseCompletionContext";
+const COURSE_AUTO_FINAL_OPENED_KEY = "courseAutoFinalOpened";
 
 export default {
   name: "CourseDetailsView",
@@ -186,6 +214,13 @@ export default {
     const activeTopicIdBySection = ref({});
     const readingSecondsLeft = ref({});
     const viewingMaterialId = ref(null);
+    const attemptResultModal = ref({
+      visible: false,
+      title: "",
+      score: 0,
+      passed: false,
+      attemptNumber: 1,
+    });
     let readingTimer = null;
 
     const courseId = computed(() => Number(route.params.id));
@@ -390,6 +425,8 @@ export default {
 
     function getFinalReasonText(reason) {
       switch (reason) {
+        case "COURSE_CLOSED_BY_ADMIN":
+          return "Курс закрыт администратором.";
         case "REQUIRED_MODULES_NOT_PASSED":
           return "Сначала завершите все обязательные темы курса.";
         case "COURSE_NOT_PUBLISHED":
@@ -524,6 +561,7 @@ export default {
             startReadingTimerForTopic(activeTopic);
           }
         }
+        consumeAttemptResultQuery();
       } catch (error) {
         console.error("Не удалось загрузить курс", error);
         telegramStore.showAlert(error.message || "Не удалось загрузить курс");
@@ -550,9 +588,84 @@ export default {
       }
     }
 
+    function getCourseStatusText(status) {
+      if (status === "completed") return "Завершен";
+      if (status === "in_progress") return "В процессе";
+      if (status === "closed") return "Закрыт";
+      return "Не начат";
+    }
+
+    function getCourseValidityLabel(currentCourse) {
+      if (!currentCourse) return "—";
+      if (currentCourse.progress?.deadlineAt) {
+        const deadline = new Date(currentCourse.progress.deadlineAt);
+        if (!Number.isNaN(deadline.getTime())) {
+          return `до ${deadline.toLocaleDateString("ru-RU")}`;
+        }
+      }
+      if (currentCourse.availabilityMode === "fixed_dates" && currentCourse.availabilityFrom && currentCourse.availabilityTo) {
+        return `${new Date(currentCourse.availabilityFrom).toLocaleDateString("ru-RU")} - ${new Date(currentCourse.availabilityTo).toLocaleDateString("ru-RU")}`;
+      }
+      if (currentCourse.availabilityMode === "relative_days" && Number(currentCourse.availabilityDays || 0) > 0) {
+        return `${currentCourse.availabilityDays} дн. от назначения`;
+      }
+      return "Бессрочно";
+    }
+
+    function closeAttemptResultModal() {
+      attemptResultModal.value.visible = false;
+    }
+
+    function consumeAttemptResultQuery() {
+      const resultType = String(route.query.resultType || "");
+      if (!["topic", "section", "module"].includes(resultType)) {
+        return;
+      }
+
+      const score = Number(route.query.score || 0);
+      const passed = String(route.query.passed || "0") === "1";
+      const attemptNumber = Number(route.query.attemptNumber || 1);
+      const titleByType = {
+        topic: "Результат теста подтемы",
+        section: "Результат теста темы курса",
+        module: "Результат теста темы курса",
+      };
+
+      attemptResultModal.value = {
+        visible: true,
+        title: titleByType[resultType] || "Результат теста",
+        score: Number.isFinite(score) ? score : 0,
+        passed,
+        attemptNumber: Number.isFinite(attemptNumber) && attemptNumber > 0 ? attemptNumber : 1,
+      };
+
+      const nextQuery = { ...route.query };
+      delete nextQuery.resultType;
+      delete nextQuery.score;
+      delete nextQuery.passed;
+      delete nextQuery.attemptNumber;
+      router.replace({ path: route.path, query: nextQuery });
+    }
+
     onMounted(() => {
       loadCourse();
     });
+
+    watch(
+      () => ({
+        id: course.value?.id,
+        status: course.value?.progress?.status,
+        finalAvailable: course.value?.finalAssessment?.available,
+      }),
+      (value) => {
+        if (!value?.id || value.status === "closed" || !value.finalAvailable) return;
+        const key = `${COURSE_AUTO_FINAL_OPENED_KEY}:${value.id}`;
+        if (window.sessionStorage.getItem(key)) return;
+        window.sessionStorage.setItem(key, "1");
+        openFinalAssessment();
+      },
+      { deep: true },
+    );
 
     onBeforeUnmount(() => {
       stopReadingTimer();
@@ -567,6 +680,8 @@ export default {
       sanitizeContent,
       getSectionStatusClass,
       getSectionStatusText,
+      getCourseStatusText,
+      getCourseValidityLabel,
       getTopicStatusIcon,
       getTopicTestButtonText,
       getSectionTestButtonText,
@@ -586,6 +701,8 @@ export default {
       openFinalAssessment,
       startCourseFlow,
       scrollToSections,
+      attemptResultModal,
+      closeAttemptResultModal,
     };
   },
 };
@@ -767,5 +884,22 @@ export default {
 
 .text-secondary {
   color: var(--text-secondary);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--bg-primary);
+  border-radius: 12px;
+  width: min(92vw, 420px);
+  padding: 20px;
 }
 </style>

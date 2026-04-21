@@ -252,7 +252,16 @@ exports.createAssessment = async (req, res, next) => {
       req.body;
 
     // Р’Р°Р»РёРґР°С†РёСЏ
-    if (!title || !openAt || !closeAt || !timeLimitMinutes || !passScorePercent || !maxAttempts || !questions || questions.length === 0) {
+    if (
+      !title ||
+      !openAt ||
+      !closeAt ||
+      timeLimitMinutes == null ||
+      passScorePercent == null ||
+      maxAttempts == null ||
+      !questions ||
+      questions.length === 0
+    ) {
       return res.status(400).json({ error: "Р’СЃРµ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹Рµ РїРѕР»СЏ РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ Р·Р°РїРѕР»РЅРµРЅС‹" });
     }
 

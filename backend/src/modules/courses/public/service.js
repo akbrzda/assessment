@@ -19,6 +19,12 @@ async function startCourse(courseId, userId, { positionId = null, branchId = nul
     error.status = 403;
     throw error;
   }
+  const progress = await coursesRepository.getCourseProgressForUser(courseId, userId);
+  if (progress.status === "closed") {
+    const error = new Error("Курс закрыт администратором");
+    error.status = 409;
+    throw error;
+  }
   await courseProgressService.startCourse({ courseId, userId });
   return coursesRepository.getCourseForUser(courseId, userId, { positionId, branchId });
 }
@@ -118,6 +124,19 @@ async function completeSectionAttempt({ sectionId, attemptId, userId }) {
 }
 
 async function getFinalAssessmentAccess(courseId, userId) {
+  const progress = await coursesRepository.getCourseProgressForUser(courseId, userId);
+  if (progress.status === "closed") {
+    return {
+      finalAssessment: {
+        available: false,
+        finalAssessmentId: null,
+        reason: "COURSE_CLOSED_BY_ADMIN",
+        passedRequiredSections: 0,
+        totalRequiredSections: progress.totalSectionsCount || 0,
+      },
+    };
+  }
+
   const finalAccess = await coursesRepository.canAccessFinalAssessment({
     courseId,
     userId,

@@ -52,7 +52,7 @@
               </div>
               <div class="info-item">
                 <span class="label">Попытки:</span>
-                <span class="value">{{ assessment.attemptsUsed || 0 }} из {{ assessment.maxAttempts }}</span>
+                <span class="value">{{ formatAttemptsLabel(assessment.attemptsUsed, assessment.maxAttempts) }}</span>
               </div>
             </div>
 
@@ -67,7 +67,7 @@
               <button
                 v-if="
                   assessment.status === 'open' &&
-                  assessment.attemptsUsed < assessment.maxAttempts &&
+                  hasAttemptsLeft(assessment.attemptsUsed, assessment.maxAttempts) &&
                   (!assessment.bestResult || assessment.bestResult.score < 100)
                 "
                 class="btn btn-primary btn-full"
@@ -79,7 +79,7 @@
               <button
                 v-else-if="
                   assessment.status === 'completed' ||
-                  assessment.attemptsUsed >= assessment.maxAttempts ||
+                  !hasAttemptsLeft(assessment.attemptsUsed, assessment.maxAttempts) ||
                   (assessment.bestResult && assessment.bestResult.score === 100)
                 "
                 class="btn btn-secondary btn-full"
@@ -123,12 +123,16 @@
 
             <div class="assessment-info mb-12">
               <div class="info-item">
+                <span class="label">Срок действия:</span>
+                <span class="value">{{ getCourseValidityLabel(course) }}</span>
+              </div>
+              <div class="info-item">
                 <span class="label">Тем курса:</span>
                 <span class="value">{{ course.sectionsCount }}</span>
               </div>
               <div class="info-item">
-                <span class="label">Обязательных:</span>
-                <span class="value">{{ course.requiredSectionsCount }}</span>
+                <span class="label">Тестов:</span>
+                <span class="value">{{ course.testsCount }}</span>
               </div>
               <div class="info-item">
                 <span class="label">Прогресс:</span>
@@ -254,6 +258,8 @@ export default {
       switch (status) {
         case "completed":
           return "badge-success";
+        case "closed":
+          return "badge-neutral";
         case "in_progress":
           return "badge-primary";
         default:
@@ -275,10 +281,30 @@ export default {
       }
     }
 
+    function isUnlimitedAttempts(maxAttempts) {
+      return Number(maxAttempts) === 0;
+    }
+
+    function hasAttemptsLeft(attemptsUsed, maxAttempts) {
+      if (isUnlimitedAttempts(maxAttempts)) {
+        return true;
+      }
+      return Number(attemptsUsed || 0) < Number(maxAttempts || 0);
+    }
+
+    function formatAttemptsLabel(attemptsUsed, maxAttempts) {
+      if (isUnlimitedAttempts(maxAttempts)) {
+        return `${Number(attemptsUsed || 0)} из ∞`;
+      }
+      return `${Number(attemptsUsed || 0)} из ${Number(maxAttempts || 0)}`;
+    }
+
     function getCourseActionText(status) {
       switch (status) {
         case "completed":
           return "Открыть курс";
+        case "closed":
+          return "Просмотр закрытого курса";
         case "in_progress":
           return "Продолжить";
         default:
@@ -396,7 +422,7 @@ export default {
       let status = statusMap[item.status] || "pending";
 
       if (bestScore != null || item.lastAttemptStatus === "completed") {
-        const hasAttemptsLeft = attemptsUsed < maxAttempts;
+        const hasAttemptsLeft = maxAttempts === 0 ? true : attemptsUsed < maxAttempts;
         const isPerfectScore = bestScore === 100;
         if (item.status === "active" && hasAttemptsLeft && !isPerfectScore) {
           status = "open";
@@ -438,13 +464,37 @@ export default {
         description: item.description || "",
         sectionsCount: Number(item.sectionsCount || 0),
         requiredSectionsCount: Number(item.requiredSectionsCount || 0),
+        testsCount: Number(item.testsCount || 0),
+        availabilityMode: item.availabilityMode || "unlimited",
+        availabilityDays: Number(item.availabilityDays || 0),
+        availabilityFrom: item.availabilityFrom || null,
+        availabilityTo: item.availabilityTo || null,
         progress: {
           status: item.progress?.status || "not_started",
           progressPercent: Number(item.progress?.progressPercent || 0),
           completedSectionsCount: Number(item.progress?.completedSectionsCount || 0),
           totalSectionsCount: Number(item.progress?.totalSectionsCount || 0),
+          assignedAt: item.progress?.assignedAt || null,
+          deadlineAt: item.progress?.deadlineAt || null,
         },
       };
+    }
+
+    function getCourseValidityLabel(course) {
+      if (!course) return "—";
+      if (course.progress?.deadlineAt) {
+        const deadline = new Date(course.progress.deadlineAt);
+        if (!Number.isNaN(deadline.getTime())) {
+          return `до ${deadline.toLocaleDateString("ru-RU")}`;
+        }
+      }
+      if (course.availabilityMode === "fixed_dates" && course.availabilityFrom && course.availabilityTo) {
+        return `${new Date(course.availabilityFrom).toLocaleDateString("ru-RU")} - ${new Date(course.availabilityTo).toLocaleDateString("ru-RU")}`;
+      }
+      if (course.availabilityMode === "relative_days" && course.availabilityDays > 0) {
+        return `${course.availabilityDays} дн. от назначения`;
+      }
+      return "Бессрочно";
     }
 
     async function loadAssessments() {
@@ -497,7 +547,10 @@ export default {
       getStatusText,
       getCourseStatusClass,
       getCourseStatusText,
+      getCourseValidityLabel,
       getCourseActionText,
+      hasAttemptsLeft,
+      formatAttemptsLabel,
       getActionButtonText,
       getStartButtonText,
       getEmptyStateTitle,

@@ -3,6 +3,15 @@ const coursesRepo = require("../modules/courses/courses.repository");
 const progressRepo = require("../modules/courses/courseProgress.repository");
 const eventsRepo = require("../modules/courses/courseEvents.repository");
 
+async function assertCourseNotClosed({ courseId, userId, connection }) {
+  const status = await progressRepo.getCourseProgressStatus({ courseId, userId, connection });
+  if (status === "closed") {
+    const error = new Error("Курс закрыт администратором");
+    error.status = 409;
+    throw error;
+  }
+}
+
 async function startCourse({ courseId, userId }) {
   const connection = await pool.getConnection();
   try {
@@ -19,6 +28,7 @@ async function startCourse({ courseId, userId }) {
       error.status = 409;
       throw error;
     }
+    await assertCourseNotClosed({ courseId, userId, connection });
 
     const sections = await coursesRepo.listSectionsByCourseId(courseId, { connection });
     if (!sections.length) {
@@ -72,6 +82,7 @@ async function handleTopicMaterialViewed({ topicId, userId }) {
       error.status = 422;
       throw error;
     }
+    await assertCourseNotClosed({ courseId: topic.courseId, userId, connection });
 
     // Проверка последовательности: предыдущая тема должна быть завершена
     const prevCompleted = await progressRepo.isPreviousTopicCompleted(
@@ -117,6 +128,7 @@ async function handleTopicAttemptCompletion({ topicId, userId, attemptId }) {
       error.status = 404;
       throw error;
     }
+    await assertCourseNotClosed({ courseId: result.courseId, userId, connection });
 
     // Проверка последовательности: предыдущая тема должна быть завершена
     const topicInfo = await progressRepo.findTopicWithSection(topicId, { connection });
@@ -177,6 +189,7 @@ async function handleSectionAttemptCompletion({ sectionId, userId, attemptId }) 
       error.status = 404;
       throw error;
     }
+    await assertCourseNotClosed({ courseId: result.courseId, userId, connection });
 
     // Проверка: все темы раздела должны быть завершены перед сдачей теста раздела
     const topicsCheck = await progressRepo.areAllTopicsCompletedBySection({ sectionId: result.sectionId, userId }, { connection });
@@ -237,6 +250,7 @@ async function handleFinalAttemptCompletion({ courseId, userId, attemptId }) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
+    await assertCourseNotClosed({ courseId, userId, connection });
 
     const finalAttempt = await progressRepo.getFinalAttemptResult({ courseId, userId, attemptId, connection });
     if (!finalAttempt) {

@@ -30,13 +30,15 @@ async function getTargets(courseId) {
 
 async function getAssignments(courseId) {
   const [rows] = await pool.execute(
-    `SELECT cua.user_id, cua.assigned_by, cua.assigned_at,
+    `SELECT cua.user_id, cua.assigned_by, cua.assigned_at, cua.status, cua.deadline_at, cua.closed_at, cua.closed_by,
             u.first_name AS user_first_name, u.last_name AS user_last_name, u.login AS user_login,
             ab.first_name AS ab_first_name, ab.last_name AS ab_last_name,
+            cb.first_name AS cb_first_name, cb.last_name AS cb_last_name,
             p.name AS position_title, b.name AS branch_title
        FROM course_user_assignments cua
        JOIN users u ON u.id = cua.user_id
        LEFT JOIN users ab ON ab.id = cua.assigned_by
+       LEFT JOIN users cb ON cb.id = cua.closed_by
        LEFT JOIN positions p ON p.id = u.position_id
        LEFT JOIN branches b ON b.id = u.branch_id
       WHERE cua.course_id = ?
@@ -51,6 +53,10 @@ async function getAssignments(courseId) {
     branchTitle: r.branch_title || null,
     assignedBy: [r.ab_first_name, r.ab_last_name].filter(Boolean).join(" ") || null,
     assignedAt: r.assigned_at ? new Date(r.assigned_at).toISOString() : null,
+    status: r.status || "active",
+    deadlineAt: r.deadline_at ? new Date(r.deadline_at).toISOString() : null,
+    closedAt: r.closed_at ? new Date(r.closed_at).toISOString() : null,
+    closedBy: [r.cb_first_name, r.cb_last_name].filter(Boolean).join(" ") || null,
   }));
 }
 
@@ -83,13 +89,13 @@ async function replaceTargets(courseId, { positionIds, branchIds }) {
   }
 }
 
-async function addAssignment(courseId, userId, assignedBy) {
+async function addAssignment(courseId, userId, assignedBy, deadlineAt = null) {
   try {
     await pool.execute(
-      `INSERT INTO course_user_assignments (course_id, user_id, assigned_by, assigned_at)
-       VALUES (?, ?, ?, UTC_TIMESTAMP())
-       ON DUPLICATE KEY UPDATE assigned_by = VALUES(assigned_by), assigned_at = UTC_TIMESTAMP()`,
-      [courseId, userId, assignedBy],
+      `INSERT INTO course_user_assignments (course_id, user_id, assigned_by, assigned_at, status, deadline_at, closed_at, closed_by)
+       VALUES (?, ?, ?, UTC_TIMESTAMP(), 'active', ?, NULL, NULL)
+       ON DUPLICATE KEY UPDATE assigned_by = VALUES(assigned_by), assigned_at = UTC_TIMESTAMP(), status = 'active', deadline_at = VALUES(deadline_at), closed_at = NULL, closed_by = NULL`,
+      [courseId, userId, assignedBy, deadlineAt],
     );
   } catch (error) {
     if (error.code === "ER_NO_REFERENCED_ROW_2") {
@@ -104,6 +110,34 @@ async function addAssignment(courseId, userId, assignedBy) {
 async function removeAssignment(courseId, userId) {
   const [result] = await pool.execute("DELETE FROM course_user_assignments WHERE course_id = ? AND user_id = ?", [courseId, userId]);
   return result.affectedRows > 0;
+}
+
+async function closeAssignment(courseId, userId, closedBy) {
+  const [result] = await pool.execute(
+    `UPDATE course_user_assignments
+        SET status = 'closed', closed_at = UTC_TIMESTAMP(), closed_by = ?, deadline_at = IFNULL(deadline_at, UTC_TIMESTAMP())
+      WHERE course_id = ? AND user_id = ?`,
+    [closedBy, courseId, userId],
+  );
+  return result.affectedRows > 0;
+}
+
+async function findUserAssignment(courseId, userId) {
+  const [rows] = await pool.execute(
+    `SELECT assigned_at, status, deadline_at, closed_at
+       FROM course_user_assignments
+      WHERE course_id = ? AND user_id = ?
+      LIMIT 1`,
+    [courseId, userId],
+  );
+  if (!rows.length) return null;
+  const row = rows[0];
+  return {
+    assignedAt: row.assigned_at ? new Date(row.assigned_at) : null,
+    status: row.status || "active",
+    deadlineAt: row.deadline_at ? new Date(row.deadline_at) : null,
+    closedAt: row.closed_at ? new Date(row.closed_at) : null,
+  };
 }
 
 // ─── Фильтрация курсов для пользователя ─────────────────────────────────────
@@ -135,7 +169,7 @@ async function listAssignedCourseIds(userId, userPositionId, userBranchId) {
           AND NOT EXISTS (SELECT 1 FROM course_branch_targets WHERE course_id = c.id)
           AND NOT EXISTS (SELECT 1 FROM course_user_assignments WHERE course_id = c.id)
           -- Или пользователь назначен вручную
-          OR EXISTS (SELECT 1 FROM course_user_assignments cua WHERE cua.course_id = c.id AND cua.user_id = ?)
+          OR EXISTS (SELECT 1 FROM course_user_assignments cua WHERE cua.course_id = c.id AND cua.user_id = ? AND cua.status = 'active')
           ${positionCond}
           ${branchCond}
         )`,
@@ -151,5 +185,7 @@ module.exports = {
   replaceTargets,
   addAssignment,
   removeAssignment,
+  closeAssignment,
+  findUserAssignment,
   listAssignedCourseIds,
 };

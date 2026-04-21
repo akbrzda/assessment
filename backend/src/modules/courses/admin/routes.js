@@ -31,6 +31,7 @@ router.put("/:id/targets", controller.updateTargets);
 // Назначения: ручные назначения пользователей
 router.get("/:id/assignments", controller.getAssignments);
 router.post("/:id/assignments", controller.addAssignment);
+router.post("/:id/assignments/:userId/close", controller.closeAssignment);
 router.delete("/:id/assignments/:userId", controller.removeAssignment);
 
 // Прогресс пользователей

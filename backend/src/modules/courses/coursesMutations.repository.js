@@ -6,12 +6,22 @@
 
 // ─── Курс ───────────────────────────────────────────────────────────────────
 
-async function insertCourse({ title, description, finalAssessmentId, userId }, connection) {
+async function insertCourse({ title, description, finalAssessmentId, availabilityMode, availabilityDays, availabilityFrom, availabilityTo, userId }, connection) {
   const [result] = await connection.execute(
     `INSERT INTO courses
-      (title, description, status, version, final_assessment_id, created_by, updated_by, created_at, updated_at)
-     VALUES (?, ?, 'draft', 0, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
-    [title, description || "", finalAssessmentId || null, userId || null, userId || null],
+      (title, description, availability_mode, availability_days, availability_from, availability_to, status, version, final_assessment_id, created_by, updated_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'draft', 0, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
+    [
+      title,
+      description || "",
+      availabilityMode || "unlimited",
+      availabilityDays || null,
+      availabilityFrom || null,
+      availabilityTo || null,
+      finalAssessmentId || null,
+      userId || null,
+      userId || null,
+    ],
   );
   return result.insertId;
 }
@@ -31,6 +41,22 @@ async function updateCourseFields(courseId, fields, userId, connection) {
   if (fields.finalAssessmentId !== undefined) {
     cols.push("final_assessment_id = ?");
     params.push(fields.finalAssessmentId || null);
+  }
+  if (fields.availabilityMode !== undefined) {
+    cols.push("availability_mode = ?");
+    params.push(fields.availabilityMode);
+  }
+  if (fields.availabilityDays !== undefined) {
+    cols.push("availability_days = ?");
+    params.push(fields.availabilityDays || null);
+  }
+  if (fields.availabilityFrom !== undefined) {
+    cols.push("availability_from = ?");
+    params.push(fields.availabilityFrom || null);
+  }
+  if (fields.availabilityTo !== undefined) {
+    cols.push("availability_to = ?");
+    params.push(fields.availabilityTo || null);
   }
   if (fields.status !== undefined) {
     cols.push("status = ?");

@@ -138,9 +138,16 @@ export const getCourseAssignments = async (courseId) => {
   return response.data;
 };
 
-export const addCourseAssignment = async (courseId, userId) => {
+export const addCourseAssignment = async (courseId, userId, deadlineAt = null) => {
   return mutateWithInvalidation(async () => {
-    const response = await axios.post(`/admin/courses/${courseId}/assignments`, { userId });
+    const response = await axios.post(`/admin/courses/${courseId}/assignments`, { userId, deadlineAt });
+    return response.data;
+  }, /get:\/admin\/courses/i);
+};
+
+export const closeCourseAssignment = async (courseId, userId) => {
+  return mutateWithInvalidation(async () => {
+    const response = await axios.post(`/admin/courses/${courseId}/assignments/${userId}/close`);
     return response.data;
   }, /get:\/admin\/courses/i);
 };

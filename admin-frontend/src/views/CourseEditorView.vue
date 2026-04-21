@@ -65,6 +65,37 @@
             placeholder="Кратко опишите цель и содержание курса"
             :rows="4"
           />
+          <Select
+            v-model="form.availabilityMode"
+            class="grid-span-full"
+            label="Срок действия курса"
+            :options="[
+              { value: 'unlimited', label: 'Бессрочный курс' },
+              { value: 'relative_days', label: 'N дней от назначения пользователю' },
+              { value: 'fixed_dates', label: 'Фиксированные даты' },
+            ]"
+          />
+          <Input
+            v-if="form.availabilityMode === 'relative_days'"
+            v-model="form.availabilityDays"
+            type="number"
+            min="1"
+            max="3650"
+            label="Количество дней"
+            placeholder="Например, 90"
+          />
+          <Input
+            v-if="form.availabilityMode === 'fixed_dates'"
+            v-model="form.availabilityFrom"
+            type="datetime-local"
+            label="Дата начала действия"
+          />
+          <Input
+            v-if="form.availabilityMode === 'fixed_dates'"
+            v-model="form.availabilityTo"
+            type="datetime-local"
+            label="Дата окончания действия"
+          />
         </div>
       </Card>
 
@@ -125,6 +156,17 @@
                   :options="assessmentOptions"
                   placeholder="Выберите тест"
                 />
+                <div class="inline-actions">
+                  <Button size="sm" variant="secondary" @click="openAssessmentEditor({ type: 'section', id: section.id })">Создать тест</Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    :disabled="!sectionDrafts[section.id].assessmentId"
+                    @click="openAssessmentEditor({ type: 'section', id: section.id }, sectionDrafts[section.id].assessmentId)"
+                  >
+                    Редактировать тест
+                  </Button>
+                </div>
                 <Input v-model="sectionDrafts[section.id].estimatedMinutes" type="number" min="1" max="1440" label="Время (мин.)" />
                 <div class="field-checkbox">
                   <label class="switch-label">
@@ -175,6 +217,17 @@
                         :options="assessmentOptions"
                         placeholder="Без теста"
                       />
+                      <div class="inline-actions">
+                        <Button size="sm" variant="secondary" @click="openAssessmentEditor({ type: 'topic', id: topic.id })">Создать тест</Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          :disabled="!topicDrafts[topic.id].assessmentId"
+                          @click="openAssessmentEditor({ type: 'topic', id: topic.id }, topicDrafts[topic.id].assessmentId)"
+                        >
+                          Редактировать тест
+                        </Button>
+                      </div>
                       <div class="field-checkbox">
                         <label class="switch-label">
                           <input v-model="topicDrafts[topic.id].hasMaterial" type="checkbox" />
@@ -203,6 +256,17 @@
                   <Input v-model="newTopics[section.id].title" label="Название подтемы" :error="newTopicErrors[section.id]?.title" required />
                   <Input v-model="newTopics[section.id].orderIndex" type="number" min="1" label="Порядок" />
                   <Select v-model="newTopics[section.id].assessmentId" label="Тест подтемы" :options="assessmentOptions" placeholder="Без теста" />
+                  <div class="inline-actions">
+                    <Button size="sm" variant="secondary" @click="openAssessmentEditor({ type: 'newTopic', id: section.id })">Создать тест</Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      :disabled="!newTopics[section.id].assessmentId"
+                      @click="openAssessmentEditor({ type: 'newTopic', id: section.id }, newTopics[section.id].assessmentId)"
+                    >
+                      Редактировать тест
+                    </Button>
+                  </div>
                   <div class="field-checkbox">
                     <label class="switch-label">
                       <input v-model="newTopics[section.id].hasMaterial" type="checkbox" />
@@ -233,6 +297,17 @@
             <Input v-model="newSection.title" label="Название темы курса" :error="newSectionErrors.title" required />
             <Input v-model="newSection.orderIndex" type="number" min="1" label="Порядок" />
             <Select v-model="newSection.assessmentId" label="Проверочный тест темы курса" :options="assessmentOptions" placeholder="Выберите тест" />
+            <div class="inline-actions">
+              <Button size="sm" variant="secondary" @click="openAssessmentEditor({ type: 'newSection' })">Создать тест</Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                :disabled="!newSection.assessmentId"
+                @click="openAssessmentEditor({ type: 'newSection' }, newSection.assessmentId)"
+              >
+                Редактировать тест
+              </Button>
+            </div>
             <Input v-model="newSection.estimatedMinutes" type="number" min="1" max="1440" label="Время (мин.)" />
             <div class="field-checkbox">
               <label class="switch-label">
@@ -255,6 +330,17 @@
 
         <div class="editor-grid">
           <Select v-model="form.finalAssessmentId" label="Итоговая аттестация курса" :options="assessmentOptions" placeholder="Выберите аттестацию" />
+          <div class="inline-actions">
+            <Button size="sm" variant="secondary" @click="openAssessmentEditor({ type: 'final' })">Создать итоговую аттестацию</Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              :disabled="!form.finalAssessmentId"
+              @click="openAssessmentEditor({ type: 'final' }, form.finalAssessmentId)"
+            >
+              Редактировать
+            </Button>
+          </div>
           <div class="status-summary">
             <span class="status-summary-label">Текущий выбор</span>
             <strong>{{ selectedFinalAssessmentLabel }}</strong>
@@ -372,6 +458,7 @@
 
           <div class="add-assignment">
             <Input v-model="newAssignmentUserId" label="ID пользователя" type="number" min="1" placeholder="Введите ID" />
+            <Input v-model="newAssignmentDeadlineAt" label="Индивидуальный дедлайн" type="datetime-local" />
             <Button :loading="addingAssignment" icon="plus" @click="handleAddAssignment">Добавить</Button>
           </div>
 
@@ -384,6 +471,8 @@
                 <th>Филиал</th>
                 <th>Кем назначен</th>
                 <th>Когда</th>
+                <th>Дедлайн</th>
+                <th>Статус</th>
                 <th></th>
               </tr>
             </thead>
@@ -394,7 +483,17 @@
                 <td>{{ a.branchTitle || "—" }}</td>
                 <td>{{ a.assignedBy || "—" }}</td>
                 <td>{{ formatAssignedAt(a.assignedAt) }}</td>
+                <td>{{ formatAssignedAt(a.deadlineAt) }}</td>
+                <td>{{ a.status === "closed" ? "Закрыт" : "Активен" }}</td>
                 <td>
+                  <Button
+                    v-if="a.status !== 'closed'"
+                    size="sm"
+                    variant="secondary"
+                    icon="archive"
+                    :loading="closingAssignmentUserId === a.userId"
+                    @click="handleCloseAssignment(a.userId)"
+                  />
                   <Button
                     size="sm"
                     variant="danger"
@@ -490,13 +589,17 @@
         </div>
       </Card>
     </template>
+    <Modal v-model="assessmentEditorOpen" size="xl" :title="assessmentEditorTitle">
+      <AssessmentForm :assessment-id="assessmentEditorAssessmentId" @submit="handleAssessmentEditorSubmit" @cancel="assessmentEditorOpen = false" />
+    </Modal>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { Badge, Button, Card, Input, Preloader, Select, Textarea } from "../components/ui";
+import { Badge, Button, Card, Input, Modal, Preloader, Select, Textarea } from "../components/ui";
+import AssessmentForm from "../components/AssessmentForm.vue";
 import {
   archiveCourse,
   createCourse,
@@ -513,6 +616,7 @@ import {
   updateCourseTargets,
   getCourseAssignments,
   addCourseAssignment,
+  closeCourseAssignment,
   removeCourseAssignment,
   getCourseUsers,
   getCourseUserProgress,
@@ -554,6 +658,10 @@ const form = ref({
   title: "",
   description: "",
   finalAssessmentId: "",
+  availabilityMode: "unlimited",
+  availabilityDays: "",
+  availabilityFrom: "",
+  availabilityTo: "",
 });
 
 const errors = ref({
@@ -570,8 +678,10 @@ const selectedBranchIds = ref([]);
 const savingTargets = ref(false);
 const assignments = ref([]);
 const newAssignmentUserId = ref("");
+const newAssignmentDeadlineAt = ref("");
 const addingAssignment = ref(false);
 const removingAssignmentUserId = ref(null);
+const closingAssignmentUserId = ref(null);
 
 const participants = ref([]);
 const loadingParticipants = ref(false);
@@ -579,6 +689,10 @@ const resettingProgressUserId = ref(null);
 const viewingProgressUserId = ref(null);
 const selectedUserProgress = ref(null);
 const selectedUserName = ref("");
+const assessmentEditorOpen = ref(false);
+const assessmentEditorAssessmentId = ref(null);
+const assessmentEditorTarget = ref(null);
+const assessmentEditorTitle = ref("Аттестация");
 
 const isEditMode = computed(() => {
   return Number.isInteger(Number(route.params.id)) && Number(route.params.id) > 0;
@@ -613,6 +727,17 @@ const selectedFinalAssessmentLabel = computed(() => {
   const option = assessmentOptions.value.find((item) => item.value === currentValue);
   return option?.label || "Не выбрана";
 });
+
+const assessmentTypeLabel = (type) => {
+  const labels = {
+    section: "теста темы курса",
+    newSection: "теста темы курса",
+    topic: "теста подтемы",
+    newTopic: "теста подтемы",
+    final: "итоговой аттестации",
+  };
+  return labels[type] || "аттестации";
+};
 const previewStats = computed(() => {
   const themes = course.value?.sections || [];
   return {
@@ -662,6 +787,14 @@ const sanitizeOptionalNumber = (value) => {
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const toLocalDateTimeInput = (iso) => {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return shifted.toISOString().slice(0, 16);
 };
 
 const syncSectionDrafts = (sections = []) => {
@@ -735,6 +868,10 @@ const applyCourseToForm = (courseItem) => {
     title: courseItem.title || "",
     description: courseItem.description || "",
     finalAssessmentId: courseItem.finalAssessmentId ? String(courseItem.finalAssessmentId) : "",
+    availabilityMode: courseItem.availabilityMode || "unlimited",
+    availabilityDays: courseItem.availabilityDays ? String(courseItem.availabilityDays) : "",
+    availabilityFrom: toLocalDateTimeInput(courseItem.availabilityFrom),
+    availabilityTo: toLocalDateTimeInput(courseItem.availabilityTo),
   };
 };
 
@@ -745,6 +882,10 @@ const loadCourse = async () => {
       title: "",
       description: "",
       finalAssessmentId: "",
+      availabilityMode: "unlimited",
+      availabilityDays: "",
+      availabilityFrom: "",
+      availabilityTo: "",
     };
     return;
   }
@@ -783,6 +924,21 @@ const validateCourse = () => {
     return false;
   }
 
+  if (form.value.availabilityMode === "relative_days" && !sanitizeOptionalNumber(form.value.availabilityDays)) {
+    showToast("Для режима в днях укажите количество дней", "error");
+    return false;
+  }
+  if (form.value.availabilityMode === "fixed_dates") {
+    if (!form.value.availabilityFrom || !form.value.availabilityTo) {
+      showToast("Для фиксированных дат заполните начало и окончание срока", "error");
+      return false;
+    }
+    if (new Date(form.value.availabilityFrom).getTime() > new Date(form.value.availabilityTo).getTime()) {
+      showToast("Дата начала не может быть позже даты окончания", "error");
+      return false;
+    }
+  }
+
   return true;
 };
 
@@ -795,6 +951,10 @@ const saveCourse = async () => {
     title: form.value.title.trim(),
     description: form.value.description.trim(),
     finalAssessmentId: sanitizeOptionalNumber(form.value.finalAssessmentId),
+    availabilityMode: form.value.availabilityMode || "unlimited",
+    availabilityDays: form.value.availabilityMode === "relative_days" ? sanitizeOptionalNumber(form.value.availabilityDays) : null,
+    availabilityFrom: form.value.availabilityMode === "fixed_dates" && form.value.availabilityFrom ? new Date(form.value.availabilityFrom).toISOString() : null,
+    availabilityTo: form.value.availabilityMode === "fixed_dates" && form.value.availabilityTo ? new Date(form.value.availabilityTo).toISOString() : null,
   };
 
   saving.value = true;
@@ -855,6 +1015,52 @@ const goToNextStep = async () => {
   if (currentStep.value === 4 && isEditMode.value) {
     await loadParticipants();
   }
+};
+
+const openAssessmentEditor = (target, assessmentId = null) => {
+  if (!target?.type) return;
+  assessmentEditorTarget.value = target;
+  assessmentEditorAssessmentId.value = assessmentId ? Number(assessmentId) : null;
+  assessmentEditorTitle.value = assessmentEditorAssessmentId.value
+    ? `Редактирование ${assessmentTypeLabel(target.type)}`
+    : `Создание ${assessmentTypeLabel(target.type)}`;
+  assessmentEditorOpen.value = true;
+};
+
+const handleAssessmentEditorSubmit = async ({ assessmentId } = {}) => {
+  if (!assessmentId) {
+    showToast("Не удалось определить ID аттестации", "error");
+    return;
+  }
+
+  await loadAssessments();
+
+  const nextId = String(assessmentId);
+  const target = assessmentEditorTarget.value;
+
+  if (!target?.type) {
+    assessmentEditorOpen.value = false;
+    return;
+  }
+
+  if (target.type === "section" && target.id && sectionDrafts.value[target.id]) {
+    sectionDrafts.value[target.id].assessmentId = nextId;
+    await saveSection(target.id);
+  } else if (target.type === "topic" && target.id && topicDrafts.value[target.id]) {
+    topicDrafts.value[target.id].assessmentId = nextId;
+    await saveTopic(target.id);
+  } else if (target.type === "newSection") {
+    newSection.value.assessmentId = nextId;
+    showToast("Тест привязан к новой теме курса", "success");
+  } else if (target.type === "newTopic" && target.id && newTopics.value[target.id]) {
+    newTopics.value[target.id].assessmentId = nextId;
+    showToast("Тест привязан к новой подтеме", "success");
+  } else if (target.type === "final") {
+    form.value.finalAssessmentId = nextId;
+    await saveCourse();
+  }
+
+  assessmentEditorOpen.value = false;
 };
 
 const toggleSectionEdit = (sectionId) => {
@@ -1088,14 +1294,32 @@ const handleAddAssignment = async () => {
 
   addingAssignment.value = true;
   try {
-    const response = await addCourseAssignment(courseId.value, userId);
+    const deadlineAt = newAssignmentDeadlineAt.value ? new Date(newAssignmentDeadlineAt.value).toISOString() : null;
+    const response = await addCourseAssignment(courseId.value, userId, deadlineAt);
     assignments.value = response.assignments || [];
     newAssignmentUserId.value = "";
+    newAssignmentDeadlineAt.value = "";
     showToast("Пользователь добавлен", "success");
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось добавить пользователя"), "error");
   } finally {
     addingAssignment.value = false;
+  }
+};
+
+const handleCloseAssignment = async (userId) => {
+  if (!window.confirm("Закрыть курс для этого пользователя?")) {
+    return;
+  }
+  closingAssignmentUserId.value = userId;
+  try {
+    const response = await closeCourseAssignment(courseId.value, userId);
+    assignments.value = response.assignments || [];
+    showToast("Курс закрыт для пользователя", "success");
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось закрыть курс для пользователя"), "error");
+  } finally {
+    closingAssignmentUserId.value = null;
   }
 };
 
@@ -1635,6 +1859,13 @@ onMounted(async () => {
   gap: 8px;
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+.inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .assignments-card {
