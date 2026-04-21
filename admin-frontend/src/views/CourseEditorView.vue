@@ -512,8 +512,47 @@
       <Card v-if="currentStep === 4 && isEditMode && course" class="participants-card">
         <div class="participants-header">
           <h2>Участники</h2>
-          <p>Пользователи, которые начали прохождение курса.</p>
+          <p>Отчет по прогрессу пользователей внутри курса.</p>
           <Button size="sm" variant="ghost" icon="refresh-ccw" :loading="loadingParticipants" @click="loadParticipants">Обновить</Button>
+        </div>
+
+        <div v-if="participantsReportSummary" class="participants-summary-grid">
+          <div class="participants-summary-item">
+            <span>Назначено</span>
+            <strong>{{ participantsReportSummary.totalUsers }}</strong>
+          </div>
+          <div class="participants-summary-item">
+            <span>Начали</span>
+            <strong>{{ participantsReportSummary.startedCount }}</strong>
+          </div>
+          <div class="participants-summary-item">
+            <span>Проходят</span>
+            <strong>{{ participantsReportSummary.inProgressCount }}</strong>
+          </div>
+          <div class="participants-summary-item">
+            <span>Завершили</span>
+            <strong>{{ participantsReportSummary.completedCount }}</strong>
+          </div>
+          <div class="participants-summary-item">
+            <span>Попытки тестов тем</span>
+            <strong>{{ participantsReportSummary.sectionTestsAttemptsCount }}</strong>
+          </div>
+          <div class="participants-summary-item">
+            <span>Попытки итоговой</span>
+            <strong>{{ participantsReportSummary.finalAssessmentAttemptsCount }}</strong>
+          </div>
+          <div class="participants-summary-item">
+            <span>Ср. балл курса</span>
+            <strong>{{ participantsReportSummary.avgCourseScore }}%</strong>
+          </div>
+          <div class="participants-summary-item">
+            <span>Ср. балл итоговой</span>
+            <strong>{{ participantsReportSummary.avgFinalScore }}%</strong>
+          </div>
+          <div class="participants-summary-item">
+            <span>Суммарное время</span>
+            <strong>{{ formatDuration(participantsReportSummary.totalTimeSpentSeconds) }}</strong>
+          </div>
         </div>
 
         <div v-if="loadingParticipants" class="participants-loading">Загрузка...</div>
@@ -526,6 +565,11 @@
               <th>Филиал</th>
               <th>Статус</th>
               <th>Прогресс</th>
+              <th>Попытки тем</th>
+              <th>Попытки итоговой</th>
+              <th>Ср. балл курса</th>
+              <th>Ср. балл итоговой</th>
+              <th>Время</th>
               <th>Начат</th>
               <th>Завершён</th>
               <th></th>
@@ -540,6 +584,11 @@
                 <span :class="['participant-status', `status-${p.status}`]">{{ getProgressStatusLabel(p.status) }}</span>
               </td>
               <td>{{ p.progressPercent }}%</td>
+              <td>{{ p.sectionTestsAttemptsCount || 0 }}</td>
+              <td>{{ p.finalAssessmentAttemptsCount || 0 }}</td>
+              <td>{{ p.avgCourseScore || 0 }}%</td>
+              <td>{{ p.avgFinalScore || 0 }}%</td>
+              <td>{{ formatDuration(p.totalTimeSpentSeconds) }}</td>
               <td>{{ formatAssignedAt(p.startedAt) }}</td>
               <td>{{ formatAssignedAt(p.completedAt) }}</td>
               <td class="participants-actions">
@@ -619,6 +668,7 @@ import {
   closeCourseAssignment,
   removeCourseAssignment,
   getCourseUsers,
+  getCourseProgressReport,
   getCourseUserProgress,
   resetCourseUserProgress,
 } from "../api/courses";
@@ -684,6 +734,7 @@ const removingAssignmentUserId = ref(null);
 const closingAssignmentUserId = ref(null);
 
 const participants = ref([]);
+const participantsReportSummary = ref(null);
 const loadingParticipants = ref(false);
 const resettingProgressUserId = ref(null);
 const viewingProgressUserId = ref(null);
@@ -1345,6 +1396,19 @@ const formatAssignedAt = (iso) => {
   return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 };
 
+const formatDuration = (secondsValue) => {
+  const totalSeconds = Number(secondsValue || 0);
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+    return "0м";
+  }
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}ч ${minutes}м`;
+  }
+  return `${minutes}м`;
+};
+
 const getProgressStatusLabel = (status) => {
   const labels = {
     not_started: "Не начат",
@@ -1360,8 +1424,9 @@ const loadParticipants = async () => {
   if (!isEditMode.value) return;
   loadingParticipants.value = true;
   try {
-    const response = await getCourseUsers(courseId.value);
-    participants.value = response.users || [];
+    const [usersResponse, reportResponse] = await Promise.all([getCourseUsers(courseId.value), getCourseProgressReport(courseId.value)]);
+    participants.value = (reportResponse.users || []).length > 0 ? reportResponse.users : usersResponse.users || [];
+    participantsReportSummary.value = reportResponse.summary || null;
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось загрузить участников"), "error");
   } finally {
@@ -2007,6 +2072,31 @@ onMounted(async () => {
   color: var(--text-secondary);
   font-size: 13px;
   flex: 1;
+}
+
+.participants-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.participants-summary-item {
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.participants-summary-item span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.participants-summary-item strong {
+  font-size: 16px;
 }
 
 .participants-loading {

@@ -387,7 +387,7 @@
 - вкладка «Курсы» по умолчанию;
 - последовательные подтемы;
 - таймер чтения и автозавершение;
-- popup-тест темы.
+- страничное прохождение теста темы + показ результата в popup/модальном окне.
 
 ### Этап 4. Сроки и статусы
 
@@ -402,6 +402,79 @@
 - попытки;
 - средний балл;
 - статистика начавших, проходящих и завершивших.
+
+---
+
+## 13. API-контракты аналитики (Admin)
+
+### 13.1 Воронка курсов
+
+`GET /admin/courses/analytics/funnel`
+
+Ответ:
+
+```json
+{
+  "courses": [
+    {
+      "courseId": 1,
+      "courseTitle": "Стандарты сервиса",
+      "assignedCount": 42,
+      "enrolledCount": 39,
+      "startedCount": 33,
+      "inProgressCount": 14,
+      "completedCount": 19,
+      "sectionTestsAttemptsCount": 126,
+      "finalAssessmentAttemptsCount": 47,
+      "avgCourseScore": 78.4,
+      "avgFinalScore": 74.1,
+      "avgProgress": 67.2,
+      "totalTimeSpentSeconds": 18420
+    }
+  ]
+}
+```
+
+### 13.2 Отчёт прогресса пользователей по курсу
+
+`GET /admin/courses/:id/analytics/progress-report`
+
+Ответ:
+
+```json
+{
+  "summary": {
+    "totalUsers": 39,
+    "startedCount": 33,
+    "inProgressCount": 14,
+    "completedCount": 19,
+    "avgProgress": 67.2,
+    "sectionTestsAttemptsCount": 126,
+    "finalAssessmentAttemptsCount": 47,
+    "avgCourseScore": 78.4,
+    "avgFinalScore": 74.1,
+    "totalTimeSpentSeconds": 18420
+  },
+  "users": [
+    {
+      "userId": 10,
+      "name": "Иван Иванов",
+      "status": "in_progress",
+      "progressPercent": 50,
+      "sectionTestsAttemptsCount": 4,
+      "finalAssessmentAttemptsCount": 0,
+      "avgCourseScore": 81.5,
+      "avgFinalScore": 0,
+      "totalTimeSpentSeconds": 1320
+    }
+  ]
+}
+```
+
+Примечание по обратной совместимости:
+
+- существующий `GET /admin/courses/:id/users` сохранен без изменений;
+- новые поля добавлены в отдельный эндпоинт отчёта и в ответ воронки.
 
 ---
 

@@ -443,56 +443,6 @@ async function resetUserProgressForCourse(courseId, userId, connection) {
   await connection.execute("DELETE FROM course_user_snapshots WHERE course_id = ? AND user_id = ?", [courseId, userId]);
 }
 
-// ─── Аналитика воронки ───────────────────────────────────────────────────────
-
-async function getCourseFunnelStats() {
-  const [rows] = await pool.execute(
-    `SELECT c.id AS course_id, c.title AS course_title, c.status AS course_status,
-            COUNT(cup.user_id) AS enrolled_count,
-            SUM(CASE WHEN cup.started_at IS NOT NULL THEN 1 ELSE 0 END) AS started_count,
-            SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) AS completed_count,
-            AVG(cup.progress_percent) AS avg_progress
-       FROM courses c
-       LEFT JOIN course_user_progress cup ON cup.course_id = c.id
-      WHERE c.status = 'published'
-      GROUP BY c.id, c.title, c.status
-      ORDER BY enrolled_count DESC, c.title ASC`,
-  );
-  return rows.map((r) => ({
-    courseId: Number(r.course_id),
-    courseTitle: r.course_title,
-    enrolledCount: Number(r.enrolled_count || 0),
-    startedCount: Number(r.started_count || 0),
-    completedCount: Number(r.completed_count || 0),
-    avgProgress: r.avg_progress !== null ? Number(Number(r.avg_progress).toFixed(1)) : 0,
-  }));
-}
-
-async function getSectionFailureStats(courseId) {
-  const [rows] = await pool.execute(
-    `SELECT cs.id AS section_id, cs.title AS section_title, cs.order_index,
-            COUNT(csup.user_id) AS total_attempts,
-            SUM(CASE WHEN csup.status = 'failed' THEN 1 ELSE 0 END) AS failed_count,
-            SUM(CASE WHEN csup.status = 'passed' THEN 1 ELSE 0 END) AS passed_count,
-            AVG(csup.score_percent) AS avg_score
-       FROM course_sections cs
-       LEFT JOIN course_section_user_progress csup ON csup.section_id = cs.id
-      WHERE cs.course_id = ?
-      GROUP BY cs.id, cs.title, cs.order_index
-      ORDER BY cs.order_index ASC`,
-    [courseId],
-  );
-  return rows.map((r) => ({
-    sectionId: Number(r.section_id),
-    sectionTitle: r.section_title,
-    orderIndex: Number(r.order_index),
-    totalAttempts: Number(r.total_attempts || 0),
-    failedCount: Number(r.failed_count || 0),
-    passedCount: Number(r.passed_count || 0),
-    avgScore: r.avg_score !== null ? Number(Number(r.avg_score).toFixed(1)) : null,
-  }));
-}
-
 module.exports = {
   findSectionWithCourse,
   findTopicWithSection,
@@ -515,6 +465,4 @@ module.exports = {
   getAdminUsersProgress,
   getAdminUserDetailedProgress,
   resetUserProgressForCourse,
-  getCourseFunnelStats,
-  getSectionFailureStats,
 };

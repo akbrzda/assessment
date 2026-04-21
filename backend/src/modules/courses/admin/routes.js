@@ -42,5 +42,6 @@ router.delete("/:id/users/:userId/progress", controller.resetCourseUserProgress)
 // Аналитика
 router.get("/analytics/funnel", controller.getAnalyticsFunnel);
 router.get("/:id/analytics/sections", controller.getSectionFailures);
+router.get("/:id/analytics/progress-report", controller.getCourseProgressReport);
 
 module.exports = router;

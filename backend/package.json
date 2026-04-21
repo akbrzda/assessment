@@ -8,8 +8,8 @@
     "start": "node src/server.js",
     "migrate": "node database/runMigrations.js",
     "test:smoke:admin": "node --test tests/admin-smoke.test.js",
-    "test:courses": "node --test tests/courses/topics.completion.test.js tests/courses/sections.completion.test.js tests/courses/progress.calculation.test.js tests/courses/assignments.filter.test.js tests/courses/course.e2e.test.js",
-    "test": "node --test tests/admin-smoke.test.js tests/courses/topics.completion.test.js tests/courses/sections.completion.test.js tests/courses/progress.calculation.test.js tests/courses/assignments.filter.test.js tests/courses/course.e2e.test.js"
+    "test:courses": "node --test tests/courses/topics.completion.test.js tests/courses/sections.completion.test.js tests/courses/progress.calculation.test.js tests/courses/assignments.filter.test.js tests/courses/course.e2e.test.js tests/courses/analytics.repository.test.js",
+    "test": "node --test tests/admin-smoke.test.js tests/courses/topics.completion.test.js tests/courses/sections.completion.test.js tests/courses/progress.calculation.test.js tests/courses/assignments.filter.test.js tests/courses/course.e2e.test.js tests/courses/analytics.repository.test.js"
   },
   "keywords": [],
   "author": "",

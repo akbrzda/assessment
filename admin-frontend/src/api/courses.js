@@ -188,3 +188,8 @@ export const getCourseSectionFailures = async (courseId) => {
   const response = await axios.get(`/admin/courses/${courseId}/analytics/sections`);
   return response.data;
 };
+
+export const getCourseProgressReport = async (courseId) => {
+  const response = await axios.get(`/admin/courses/${courseId}/analytics/progress-report`);
+  return response.data;
+};

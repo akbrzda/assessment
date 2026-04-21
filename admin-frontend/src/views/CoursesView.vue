@@ -111,16 +111,22 @@
     <Card v-if="funnel.length > 0" class="funnel-card">
       <div class="funnel-header">
         <h2>Воронка по курсам</h2>
-        <p>Зачисленные, начавшие и завершившие по каждому опубликованному курсу.</p>
+        <p>Назначения, прогресс и суммарное время прохождения по каждому опубликованному курсу.</p>
       </div>
       <div class="table-wrapper">
         <table class="courses-table">
           <thead>
             <tr>
               <th>Курс</th>
-              <th>Зачислено</th>
+              <th>Назначено</th>
               <th>Начали</th>
+              <th>Проходят</th>
               <th>Завершили</th>
+              <th>Попытки (темы)</th>
+              <th>Попытки (итог)</th>
+              <th>Время в курсе</th>
+              <th>Ср. балл курса</th>
+              <th>Ср. балл итога</th>
               <th>Ср. прогресс</th>
               <th>Конверсия</th>
             </tr>
@@ -130,12 +136,18 @@
               <td>
                 <span class="course-title">{{ row.courseTitle }}</span>
               </td>
-              <td>{{ row.enrolledCount }}</td>
+              <td>{{ row.assignedCount }}</td>
               <td>{{ row.startedCount }}</td>
+              <td>{{ row.inProgressCount }}</td>
               <td>{{ row.completedCount }}</td>
+              <td>{{ row.sectionTestsAttemptsCount }}</td>
+              <td>{{ row.finalAssessmentAttemptsCount }}</td>
+              <td>{{ formatDuration(row.totalTimeSpentSeconds) }}</td>
+              <td>{{ row.avgCourseScore }}%</td>
+              <td>{{ row.avgFinalScore }}%</td>
               <td>{{ row.avgProgress }}%</td>
               <td>
-                <span class="funnel-conv"> {{ row.enrolledCount > 0 ? Math.round((row.completedCount / row.enrolledCount) * 100) : 0 }}% </span>
+                <span class="funnel-conv"> {{ row.assignedCount > 0 ? Math.round((row.completedCount / row.assignedCount) * 100) : 0 }}% </span>
               </td>
             </tr>
           </tbody>
@@ -204,6 +216,21 @@ const formatDate = (value) => {
     hour: "2-digit",
     minute: "2-digit",
   });
+};
+
+const formatDuration = (secondsValue) => {
+  const totalSeconds = Number(secondsValue || 0);
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+    return "0м";
+  }
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  if (hours > 0) {
+    return `${hours}ч ${minutes}м`;
+  }
+  return `${minutes}м`;
 };
 
 const getErrorMessage = (error, fallbackText) => {

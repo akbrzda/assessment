@@ -2,6 +2,7 @@
 const contentService = require("./contentService");
 const assignmentsRepo = require("../courseAssignments.repository");
 const progressRepo = require("../courseProgress.repository");
+const analyticsRepo = require("../courseAnalytics.repository");
 const { pool } = require("../../../config/database");
 const {
   createCourseSchema,
@@ -355,7 +356,7 @@ async function resetCourseUserProgress(req, res, next) {
 
 async function getAnalyticsFunnel(req, res, next) {
   try {
-    const courses = await progressRepo.getCourseFunnelStats();
+    const courses = await analyticsRepo.getCourseFunnelStats();
     res.json({ courses });
   } catch (error) {
     next(error);
@@ -366,8 +367,19 @@ async function getSectionFailures(req, res, next) {
   try {
     const courseId = parseId(req.params.id);
     if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
-    const sections = await progressRepo.getSectionFailureStats(courseId);
+    const sections = await analyticsRepo.getSectionFailureStats(courseId);
     res.json({ sections });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getCourseProgressReport(req, res, next) {
+  try {
+    const courseId = parseId(req.params.id);
+    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
+    const report = await analyticsRepo.getCourseProgressReport(courseId);
+    res.json(report);
   } catch (error) {
     next(error);
   }
@@ -398,4 +410,5 @@ module.exports = {
   resetCourseUserProgress,
   getAnalyticsFunnel,
   getSectionFailures,
+  getCourseProgressReport,
 };
