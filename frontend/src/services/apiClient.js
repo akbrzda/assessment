@@ -157,6 +157,16 @@ export const apiClient = {
   getCourseProgress(id) {
     return request(`/courses/${id}/progress`);
   },
+  startCourseTopic(courseId, topicId) {
+    return request(`/courses/${courseId}/topics/${topicId}/start`, {
+      method: "POST",
+    });
+  },
+  completeCourseTopic(courseId, topicId) {
+    return request(`/courses/${courseId}/topics/${topicId}/complete`, {
+      method: "POST",
+    });
+  },
   completeCourseModuleAttempt(moduleId, attemptId) {
     return request(`/courses/modules/${moduleId}/attempts/${attemptId}/complete`, {
       method: "POST",

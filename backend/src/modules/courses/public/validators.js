@@ -25,6 +25,21 @@ function assertTopicId(rawTopicId) {
   throw error;
 }
 
+function assertCourseTopicParams({ courseId, topicId }) {
+  const normalizedCourseId = parsePositiveId(courseId);
+  const normalizedTopicId = parsePositiveId(topicId);
+  if (normalizedCourseId && normalizedTopicId) {
+    return {
+      courseId: normalizedCourseId,
+      topicId: normalizedTopicId,
+    };
+  }
+
+  const error = new Error("Некорректные параметры подтемы курса");
+  error.status = 400;
+  throw error;
+}
+
 function assertTopicAttemptParams({ topicId, attemptId }) {
   const normalizedTopicId = parsePositiveId(topicId);
   const normalizedAttemptId = parsePositiveId(attemptId);
@@ -87,6 +102,7 @@ function assertFinalAttemptParams({ courseId, attemptId }) {
 
 module.exports = {
   assertCourseId,
+  assertCourseTopicParams,
   assertTopicId,
   assertTopicAttemptParams,
   assertSectionAttemptParams,

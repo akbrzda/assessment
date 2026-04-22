@@ -61,7 +61,9 @@
               <h4 class="title-small mb-4">{{ section.title }}</h4>
               <p v-if="section.description" class="body-small text-secondary mb-8">{{ section.description }}</p>
 
-              <p v-if="section.progress.locked" class="body-small lock-text mb-12"> Сначала завершите предыдущие обязательные темы курса</p>
+              <div v-if="section.progress.locked" class="mb-12">
+                <LockBadge text="Тема заблокирована" @click="openSectionLockReason" />
+              </div>
 
               <div v-else class="topics-list mb-12">
                 <div v-if="!section.topics.length" class="body-small text-secondary">В теме пока нет подтем.</div>
@@ -184,6 +186,8 @@
           </div>
         </div>
       </div>
+
+      <BottomSheet v-model="lockSheet.visible" :title="lockSheet.title" :description="lockSheet.description" />
     </div>
   </div>
 </template>
@@ -195,12 +199,18 @@ import { apiClient } from "../services/apiClient";
 import { useTelegramStore } from "../stores/telegram";
 import { useUserStore } from "../stores/user";
 import { calculateReadingSeconds, formatReadingTime } from "../utils/readingTime";
+import BottomSheet from "../components/courses/BottomSheet.vue";
+import LockBadge from "../components/courses/LockBadge.vue";
 
 const COURSE_COMPLETION_STORAGE_KEY = "courseCompletionContext";
 const COURSE_AUTO_FINAL_OPENED_KEY = "courseAutoFinalOpened";
 
 export default {
   name: "CourseDetailsView",
+  components: {
+    BottomSheet,
+    LockBadge,
+  },
   setup() {
     const route = useRoute();
     const router = useRouter();
@@ -214,6 +224,12 @@ export default {
     const activeTopicIdBySection = ref({});
     const readingSecondsLeft = ref({});
     const viewingMaterialId = ref(null);
+    const startedTopicIds = ref({});
+    const lockSheet = ref({
+      visible: false,
+      title: "Тема недоступна",
+      description: "Сначала завершите предыдущую обязательную тему курса. После этого доступ откроется автоматически.",
+    });
     const attemptResultModal = ref({
       visible: false,
       title: "",
@@ -334,7 +350,7 @@ export default {
 
       viewingMaterialId.value = topic.id;
       try {
-        await apiClient.viewCourseTopicMaterial(topic.id);
+        await apiClient.completeCourseTopic(courseId.value, topic.id);
         topic.progress.materialViewed = true;
         if (!topic.assessmentId) {
           topic.progress.status = "completed";
@@ -349,11 +365,28 @@ export default {
       }
     }
 
+    async function startTopicReading(topic) {
+      if (!topic || topic.progress.materialViewed || startedTopicIds.value[topic.id]) {
+        return;
+      }
+
+      try {
+        await apiClient.startCourseTopic(courseId.value, topic.id);
+        startedTopicIds.value = {
+          ...startedTopicIds.value,
+          [topic.id]: true,
+        };
+      } catch (error) {
+        console.error("Не удалось зафиксировать начало чтения подтемы", error);
+      }
+    }
+
     function startReadingTimerForTopic(topic) {
       stopReadingTimer();
       if (!topic?.hasMaterial || topic.progress.materialViewed) {
         return;
       }
+      startTopicReading(topic);
 
       const requiredSeconds = calculateReadingSeconds(topic.content || "");
       readingSecondsLeft.value = {
@@ -436,6 +469,14 @@ export default {
         default:
           return "Итоговая аттестация пока недоступна.";
       }
+    }
+
+    function openSectionLockReason() {
+      lockSheet.value = {
+        visible: true,
+        title: "Тема недоступна",
+        description: "Сначала завершите предыдущую обязательную тему курса. После этого доступ откроется автоматически.",
+      };
     }
 
     function getFinalActionText() {
@@ -677,6 +718,7 @@ export default {
       course,
       activeTopicIdBySection,
       viewingMaterialId,
+      lockSheet,
       sanitizeContent,
       getSectionStatusClass,
       getSectionStatusText,
@@ -686,6 +728,7 @@ export default {
       getTopicTestButtonText,
       getSectionTestButtonText,
       getFinalReasonText,
+      openSectionLockReason,
       getFinalActionText,
       getActiveTopic,
       getActiveTopicIndex,

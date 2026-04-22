@@ -6,11 +6,11 @@
       </div>
 
       <div class="mode-switch mb-12">
-        <button class="mode-tab" :class="{ active: activeMode === 'materials' }" @click="setMode('materials')">Материалы</button>
         <button class="mode-tab" :class="{ active: activeMode === 'courses' }" @click="setMode('courses')">Курсы</button>
+        <button class="mode-tab" :class="{ active: activeMode === 'assessments' }" @click="setMode('assessments')">Аттестации</button>
       </div>
 
-      <template v-if="activeMode === 'materials'">
+      <template v-if="activeMode === 'assessments'">
         <div class="filter-tabs mb-12">
           <button
             v-for="filter in filters"
@@ -110,46 +110,7 @@
         </div>
 
         <div v-else-if="courses.length" class="assessments-list">
-          <div v-for="course in courses" :key="course.id" class="card assessment-card course-card" @click="openCourse(course.id)">
-            <div class="assessment-header">
-              <div>
-                <h3 class="title-small mb-8">{{ course.title }}</h3>
-                <p class="course-description">{{ course.description || "Описание курса пока не добавлено" }}</p>
-              </div>
-              <span class="badge" :class="getCourseStatusClass(course.progress.status)">
-                {{ getCourseStatusText(course.progress.status) }}
-              </span>
-            </div>
-
-            <div class="assessment-info mb-12">
-              <div class="info-item">
-                <span class="label">Срок действия:</span>
-                <span class="value">{{ getCourseValidityLabel(course) }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Тем курса:</span>
-                <span class="value">{{ course.sectionsCount }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Тестов:</span>
-                <span class="value">{{ course.testsCount }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Прогресс:</span>
-                <span class="value">{{ Math.round(course.progress.progressPercent || 0) }}%</span>
-              </div>
-            </div>
-
-            <div class="progress-bar mb-12">
-              <div class="progress-fill" :style="{ width: `${Math.min(Math.max(course.progress.progressPercent || 0, 0), 100)}%` }"></div>
-            </div>
-
-            <div class="assessment-actions">
-              <button class="btn btn-primary btn-full" @click.stop="openCourse(course.id)">
-                {{ getCourseActionText(course.progress.status) }}
-              </button>
-            </div>
-          </div>
+          <CourseCard v-for="course in courses" :key="course.id" :course="course" @open="openCourse" />
         </div>
 
         <div v-else class="empty-state">
@@ -171,12 +132,14 @@ import { BookOpen, FileText } from "lucide-vue-next";
 import { useTelegramStore } from "../stores/telegram";
 import { useUserStore } from "../stores/user";
 import { apiClient } from "../services/apiClient";
+import CourseCard from "../components/courses/CourseCard.vue";
 
 export default {
   name: "AssessmentsView",
   components: {
     BookOpen,
     FileText,
+    CourseCard,
   },
   setup() {
     const router = useRouter();
@@ -254,33 +217,6 @@ export default {
       }
     }
 
-    function getCourseStatusClass(status) {
-      switch (status) {
-        case "completed":
-          return "badge-success";
-        case "closed":
-          return "badge-neutral";
-        case "in_progress":
-          return "badge-primary";
-        default:
-          return "badge-neutral";
-      }
-    }
-
-    function getCourseStatusText(status) {
-      switch (status) {
-        case "completed":
-          return "Завершен";
-        case "closed":
-        case "archived":
-          return "Закрыт";
-        case "in_progress":
-          return "В процессе";
-        default:
-          return "Не начат";
-      }
-    }
-
     function isUnlimitedAttempts(maxAttempts) {
       return Number(maxAttempts) === 0;
     }
@@ -297,19 +233,6 @@ export default {
         return `${Number(attemptsUsed || 0)} из `;
       }
       return `${Number(attemptsUsed || 0)} из ${Number(maxAttempts || 0)}`;
-    }
-
-    function getCourseActionText(status) {
-      switch (status) {
-        case "completed":
-          return "Открыть курс";
-        case "closed":
-          return "Просмотр закрытого курса";
-        case "in_progress":
-          return "Продолжить";
-        default:
-          return "Начать курс";
-      }
     }
 
     function getActionButtonText(status) {
@@ -480,23 +403,6 @@ export default {
       };
     }
 
-    function getCourseValidityLabel(course) {
-      if (!course) return "—";
-      if (course.progress?.deadlineAt) {
-        const deadline = new Date(course.progress.deadlineAt);
-        if (!Number.isNaN(deadline.getTime())) {
-          return `до ${deadline.toLocaleDateString("ru-RU")}`;
-        }
-      }
-      if (course.availabilityMode === "fixed_dates" && course.availabilityFrom && course.availabilityTo) {
-        return `${new Date(course.availabilityFrom).toLocaleDateString("ru-RU")} - ${new Date(course.availabilityTo).toLocaleDateString("ru-RU")}`;
-      }
-      if (course.availabilityMode === "relative_days" && course.availabilityDays > 0) {
-        return `${course.availabilityDays} дн. от назначения`;
-      }
-      return "Бессрочно";
-    }
-
     async function loadAssessments() {
       if (!userStore.isInitialized) {
         await userStore.ensureStatus();
@@ -545,10 +451,6 @@ export default {
       setFilter,
       getStatusClass,
       getStatusText,
-      getCourseStatusClass,
-      getCourseStatusText,
-      getCourseValidityLabel,
-      getCourseActionText,
       hasAttemptsLeft,
       formatAttemptsLabel,
       getActionButtonText,
@@ -656,12 +558,6 @@ export default {
 
 .theory-hint.done {
   color: var(--success);
-}
-
-.course-description {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
 }
 
 .assessment-info {

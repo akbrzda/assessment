@@ -9,6 +9,8 @@ const router = express.Router();
 
 router.use(verifyInitData, resolveUser, requireRole(["employee", "manager", "superadmin"]));
 
+router.post("/:courseId/topics/:topicId/start", coursesController.startTopic);
+router.post("/:courseId/topics/:topicId/complete", coursesController.completeTopic);
 router.post("/topics/:topicId/view-material", coursesController.viewTopicMaterial);
 router.post("/topics/:topicId/attempts/:attemptId/complete", coursesController.completeTopicAttempt);
 router.post("/sections/:sectionId/attempts/:attemptId/complete", coursesController.completeSectionAttempt);

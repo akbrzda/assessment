@@ -3,6 +3,7 @@
     <div class="page-header">
       <Button variant="secondary" icon="arrow-left" @click="goBack">К списку курсов</Button>
       <div class="page-header-actions" v-if="isEditMode && course">
+        <DraftSaveIndicator :state="draftSaveState" :saved-at="draftSavedAt" />
         <Badge :variant="getStatusVariant(course.status)" rounded>
           {{ getStatusLabel(course.status) }}
         </Badge>
@@ -649,6 +650,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { Badge, Button, Card, Input, Modal, Preloader, Select, Textarea } from "../components/ui";
 import AssessmentForm from "../components/AssessmentForm.vue";
+import DraftSaveIndicator from "../components/courses/DraftSaveIndicator.vue";
 import {
   archiveCourse,
   createCourse,
@@ -685,6 +687,8 @@ const loading = ref(false);
 const saving = ref(false);
 const publishing = ref(false);
 const archiving = ref(false);
+const draftSaveState = ref("saved");
+const draftSavedAt = ref(null);
 
 const sectionDrafts = ref({});
 const sectionErrors = ref({});
@@ -1009,6 +1013,7 @@ const saveCourse = async () => {
   };
 
   saving.value = true;
+  draftSaveState.value = "saving";
   try {
     if (isEditMode.value) {
       const response = await updateCourse(courseId.value, payload);
@@ -1024,8 +1029,11 @@ const saveCourse = async () => {
       await router.replace(`/courses/${response.course.id}/edit`);
       await loadCourse();
     }
+    draftSaveState.value = "saved";
+    draftSavedAt.value = new Date().toISOString();
     return true;
   } catch (error) {
+    draftSaveState.value = "error";
     showToast(getErrorMessage(error, "Не удалось сохранить курс"), "error");
     return false;
   } finally {

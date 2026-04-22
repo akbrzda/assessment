@@ -1,6 +1,7 @@
 const coursesService = require("./service");
 const {
   assertCourseId,
+  assertCourseTopicParams,
   assertFinalAttemptParams,
   assertModuleAttemptParams,
   assertTopicId,
@@ -91,6 +92,38 @@ async function viewTopicMaterial(req, res, next) {
   }
 }
 
+async function startTopic(req, res, next) {
+  try {
+    const params = assertCourseTopicParams({
+      courseId: req.params.courseId,
+      topicId: req.params.topicId,
+    });
+    const payload = await coursesService.startTopic({
+      ...params,
+      userId: req.currentUser.id,
+    });
+    res.status(201).json(payload);
+  } catch (error) {
+    handleControllerError(error, res, next);
+  }
+}
+
+async function completeTopic(req, res, next) {
+  try {
+    const params = assertCourseTopicParams({
+      courseId: req.params.courseId,
+      topicId: req.params.topicId,
+    });
+    const payload = await coursesService.completeTopic({
+      ...params,
+      userId: req.currentUser.id,
+    });
+    res.json(payload);
+  } catch (error) {
+    handleControllerError(error, res, next);
+  }
+}
+
 async function completeTopicAttempt(req, res, next) {
   try {
     const params = assertTopicAttemptParams({
@@ -149,6 +182,8 @@ module.exports = {
   listCourses,
   getCourse,
   startCourse,
+  startTopic,
+  completeTopic,
   getCourseProgress,
   viewTopicMaterial,
   completeTopicAttempt,

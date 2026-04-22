@@ -107,6 +107,14 @@
       </div>
     </Card>
 
+    <Card class="analytics-summary-card">
+      <div class="funnel-header">
+        <h2>Сводка аналитики</h2>
+        <p>Заглушка карточек до подключения итоговых метрик модуля курсов.</p>
+      </div>
+      <AnalyticsSummaryCards />
+    </Card>
+
     <!-- Аналитика: воронка курсов -->
     <Card v-if="funnel.length > 0" class="funnel-card">
       <div class="funnel-header">
@@ -161,6 +169,7 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { Badge, Button, Card, Input, Preloader, Select } from "../components/ui";
+import AnalyticsSummaryCards from "../components/courses/AnalyticsSummaryCards.vue";
 import { archiveCourse, deleteCourse, getCourses, publishCourse, getCourseAnalyticsFunnel } from "../api/courses";
 import { useToast } from "../composables/useToast";
 
@@ -473,6 +482,10 @@ onMounted(async () => {
 }
 
 .funnel-card {
+  margin-top: 24px;
+}
+
+.analytics-summary-card {
   margin-top: 24px;
 }
 

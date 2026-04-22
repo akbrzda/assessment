@@ -202,8 +202,8 @@ async function upsertSectionProgressOnStart(courseId, sectionId, userId, connect
 async function upsertTopicProgressOnStart(topicId, sectionId, courseId, userId, connection) {
   await connection.execute(
     `INSERT INTO course_topic_user_progress
-      (topic_id, section_id, course_id, user_id, status, material_viewed, attempt_count, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'not_started', 0, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+      (topic_id, section_id, course_id, user_id, status, material_viewed, attempt_count, started_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'not_started', 0, 0, NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP())
      ON DUPLICATE KEY UPDATE updated_at = UTC_TIMESTAMP()`,
     [topicId, sectionId, courseId, userId],
   );
@@ -241,30 +241,66 @@ async function upsertSectionProgress({ courseId, sectionId, userId, status, atte
 async function upsertTopicProgress({ topicId, sectionId, courseId, userId, status, attemptId, scorePercent, attemptNumber, connection }) {
   await connection.execute(
     `INSERT INTO course_topic_user_progress
-      (topic_id, section_id, course_id, user_id, status, last_attempt_id, best_score_percent, attempt_count, completed_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, IF(? = 'completed', UTC_TIMESTAMP(), NULL), UTC_TIMESTAMP(), UTC_TIMESTAMP())
+      (topic_id, section_id, course_id, user_id, status, last_attempt_id, best_score_percent, attempt_count, started_at, completed_at, last_completed_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), IF(? = 'completed', UTC_TIMESTAMP(), NULL), NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP())
      ON DUPLICATE KEY UPDATE
        status = VALUES(status),
        last_attempt_id = VALUES(last_attempt_id),
        best_score_percent = GREATEST(IFNULL(best_score_percent, 0), VALUES(best_score_percent)),
        attempt_count = GREATEST(IFNULL(attempt_count, 0), VALUES(attempt_count)),
+       started_at = IF(started_at IS NULL, UTC_TIMESTAMP(), started_at),
        completed_at = IF(VALUES(status) = 'completed', UTC_TIMESTAMP(), completed_at),
        updated_at = UTC_TIMESTAMP()`,
     [topicId, sectionId, courseId, userId, status, attemptId, scorePercent, attemptNumber, status],
   );
 }
 
-async function markTopicMaterial({ topicId, sectionId, courseId, userId, completedStatus, connection }) {
+async function startTopicProgress({ topicId, sectionId, courseId, userId, connection }) {
   await connection.execute(
     `INSERT INTO course_topic_user_progress
-      (topic_id, section_id, course_id, user_id, material_viewed, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 1, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+      (topic_id, section_id, course_id, user_id, status, material_viewed, attempt_count, started_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'in_progress', 0, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())
+     ON DUPLICATE KEY UPDATE
+       status = IF(status = 'not_started', 'in_progress', status),
+       started_at = IF(started_at IS NULL, UTC_TIMESTAMP(), started_at),
+       updated_at = UTC_TIMESTAMP()`,
+    [topicId, sectionId, courseId, userId],
+  );
+}
+
+async function getTopicProgressState({ topicId, userId, connection }) {
+  const [rows] = await connection.execute(
+    `SELECT status, material_viewed, started_at, completed_at
+       FROM course_topic_user_progress
+      WHERE topic_id = ? AND user_id = ?
+      LIMIT 1`,
+    [topicId, userId],
+  );
+  if (!rows.length) {
+    return null;
+  }
+  const row = rows[0];
+  return {
+    status: row.status || "not_started",
+    materialViewed: Boolean(row.material_viewed),
+    startedAt: row.started_at ? new Date(row.started_at).toISOString() : null,
+    completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : null,
+  };
+}
+
+async function markTopicMaterial({ topicId, sectionId, courseId, userId, completedStatus, connection, topicOrderIndex = null }) {
+  await connection.execute(
+    `INSERT INTO course_topic_user_progress
+      (topic_id, section_id, course_id, user_id, material_viewed, status, started_at, last_completed_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 1, ?, UTC_TIMESTAMP(), ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
      ON DUPLICATE KEY UPDATE
        material_viewed = 1,
        status = IF(status IN ('completed','failed'), status, VALUES(status)),
+       started_at = IF(started_at IS NULL, UTC_TIMESTAMP(), started_at),
+       last_completed_order = IF(VALUES(status) = 'completed', VALUES(last_completed_order), last_completed_order),
        completed_at = IF(VALUES(status) = 'completed' AND completed_at IS NULL, UTC_TIMESTAMP(), completed_at),
        updated_at = UTC_TIMESTAMP()`,
-    [topicId, sectionId, courseId, userId, completedStatus],
+    [topicId, sectionId, courseId, userId, completedStatus, topicOrderIndex],
   );
 }
 
@@ -457,6 +493,8 @@ module.exports = {
   insertCourseSnapshot,
   upsertSectionProgress,
   upsertTopicProgress,
+  startTopicProgress,
+  getTopicProgressState,
   markTopicMaterial,
   getCourseProgressAggregate,
   syncCourseProgress,
