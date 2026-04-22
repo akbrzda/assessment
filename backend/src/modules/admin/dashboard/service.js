@@ -1,4 +1,4 @@
-﻿const { pool } = require("../../../config/database");
+const { pool } = require("../../../config/database");
 
 /**
  * РџРѕР»СѓС‡РёС‚СЊ РјРµС‚СЂРёРєРё РґР»СЏ Dashboard СЃ С„РёР»СЊС‚СЂР°РјРё

@@ -1,4 +1,4 @@
-﻿const { pool } = require("../../../../config/database");
+const { pool } = require("../../../../config/database");
 const { createAdminLog } = require("./repository");
 const assessmentModel = require("../../../../models/assessmentModel");
 

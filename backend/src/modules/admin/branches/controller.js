@@ -1,4 +1,4 @@
-﻿const branchService = require("./service");
+const branchService = require("./service");
 const {
   parseBranchId,
   parseUserId,

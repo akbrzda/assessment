@@ -1,4 +1,4 @@
-﻿const rulesEngine = require("../../../../../services/gamificationRulesEngine");
+const rulesEngine = require("../../../../../services/gamificationRulesEngine");
 const { pool } = require("../../../../../config/database");
 
 // РЎРёРјСѓР»СЏС†РёСЏ РЅР°С‡РёСЃР»РµРЅРёСЏ РѕС‡РєРѕРІ/Р±РµР№РґР¶РµР№ РїРѕ РІС…РѕРґРЅС‹Рј РґР°РЅРЅС‹Рј (Р±РµР· Р·Р°РїРёСЃРё РІ Р‘Р”)

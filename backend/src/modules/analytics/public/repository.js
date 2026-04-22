@@ -1,4 +1,4 @@
-﻿const analyticsModel = require("../../../models/analyticsModel");
+const analyticsModel = require("../../../models/analyticsModel");
 const referenceModel = require("../../../models/referenceModel");
 
 async function getSummary(filters) {

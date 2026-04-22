@@ -1,4 +1,4 @@
-﻿const express = require("express");
+const express = require("express");
 const verifyJWT = require("../../../middleware/verifyJWT");
 const verifyAdminRole = require("../../../middleware/verifyAdminRole");
 const checkModuleAccess = require("../../../middleware/checkModuleAccess");

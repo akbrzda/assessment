@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="courses-view">
     <div class="page-header">
       <Button icon="plus" @click="goToCreate">Создать курс</Button>

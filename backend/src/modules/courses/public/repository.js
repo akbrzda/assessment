@@ -1,4 +1,4 @@
-﻿const coursesRepo = require("../courses.repository");
+const coursesRepo = require("../courses.repository");
 const userViewRepo = require("../userCourseView.repository");
 
 async function listPublishedCoursesForUser(userId, positionId, branchId) {

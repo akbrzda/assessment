@@ -1,4 +1,4 @@
-﻿const config = require("../../../config/env");
+const config = require("../../../config/env");
 const { normalizeInviteCode } = require("../../../utils/inviteCode");
 const { buildAuditEntry, logAuditEvent } = require("../../../services/auditService");
 const authRepository = require("./repository");

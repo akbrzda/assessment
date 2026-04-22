@@ -1,4 +1,4 @@
-﻿const gamificationRepository = require("./repository");
+const gamificationRepository = require("./repository");
 
 async function getOverview(currentUser) {
   const overview = await gamificationRepository.getUserOverview(currentUser.id);

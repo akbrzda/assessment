@@ -1,4 +1,4 @@
-﻿const referencesService = require("./service");
+const referencesService = require("./service");
 
 async function getReferences(req, res, next) {
   try {

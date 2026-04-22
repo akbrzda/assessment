@@ -1,4 +1,4 @@
-﻿const permissionsService = require("./service");
+const permissionsService = require("./service");
 
 async function getSystemModules(req, res, next) {
   try {

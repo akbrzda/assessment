@@ -1,4 +1,4 @@
-﻿const routes = require("./public/routes");
+const routes = require("./public/routes");
 const admin = require("./admin");
 
 module.exports = {

@@ -1,4 +1,4 @@
-﻿const questionBankService = require("./service");
+const questionBankService = require("./service");
 
 async function getCategories(req, res, next) {
   try {

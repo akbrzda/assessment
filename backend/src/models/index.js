@@ -1,4 +1,4 @@
-﻿const analyticsModel = require("./analyticsModel");
+const analyticsModel = require("./analyticsModel");
 const assessmentModel = require("./assessmentModel");
 const courseModel = require("./courseModel");
 const gamificationModel = require("./gamificationModel");

@@ -1,4 +1,4 @@
-﻿const moduleService = require("./service");
+const moduleService = require("./service");
 
 async function getMetrics(req, res, next) {
   try {

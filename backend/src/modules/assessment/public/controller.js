@@ -1,4 +1,4 @@
-﻿const assessmentController = require("./core/assessment/controller");
+const assessmentController = require("./core/assessment/controller");
 const theoryController = require("./core/theory/controller");
 const adminTheoryController = require("../admin/theory/controller");
 const { ensureAssessmentId, ensureAttemptId } = require("./validators");
@@ -165,6 +165,14 @@ async function remove(req, res, next) {
   }
 }
 
+async function getUserAttemptHistory(req, res, next) {
+  try {
+    return await assessmentController.getUserAttemptHistory(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   listForUser,
   getForUser,
@@ -184,8 +192,5 @@ module.exports = {
   getDetail,
   update,
   remove,
+  getUserAttemptHistory,
 };
-
-
-
-

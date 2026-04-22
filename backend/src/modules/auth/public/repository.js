@@ -1,4 +1,4 @@
-﻿const userModel = require("../../../models/userModel");
+const userModel = require("../../../models/userModel");
 const assessmentModel = require("../../../models/assessmentModel");
 const referenceModel = require("../../../models/referenceModel");
 const invitationModel = require("../../../models/invitationModel");

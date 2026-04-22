@@ -1,4 +1,4 @@
-﻿const { pool } = require("../../../config/database");
+const { pool } = require("../../../config/database");
 const coursesRepo = require("../courses.repository");
 const mutationsRepo = require("../coursesMutations.repository");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");

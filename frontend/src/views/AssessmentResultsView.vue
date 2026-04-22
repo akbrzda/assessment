@@ -57,6 +57,10 @@
             </div>
             <div class="question-summary">
               <div class="question-text">{{ question.text }}</div>
+              <div v-if="!question.isCorrect && (question.correctOptionText || question.correctTextAnswer)" class="correct-answer-hint">
+                <span class="correct-answer-label">Правильный ответ:</span>
+                <span class="correct-answer-value">{{ question.correctOptionText || question.correctTextAnswer }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -307,6 +311,7 @@ export default {
           isCorrect: question.isCorrect === true,
           selectedOptionText: question.selectedOptionText,
           correctOptionText: question.correctOptionText,
+          correctTextAnswer: question.correctTextAnswer,
         }));
 
         const score = Number.isFinite(attempt.scorePercent) ? Math.round(attempt.scorePercent) : 0;
@@ -546,6 +551,30 @@ export default {
   margin-bottom: 8px;
   font-size: 14px;
   line-height: 1.4;
+}
+
+.correct-answer-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: rgba(52, 199, 89, 0.08);
+  border-left: 3px solid var(--success, #22c55e);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.correct-answer-label {
+  font-weight: 500;
+  color: var(--success, #22c55e);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.correct-answer-value {
+  color: var(--text-primary);
 }
 
 .text-secondary {

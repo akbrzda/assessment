@@ -1,4 +1,4 @@
-﻿const rulesModel = require("../../../../../models/gamificationRulesModel");
+const rulesModel = require("../../../../../models/gamificationRulesModel");
 const { createLog } = require("../../../../../services/adminLogService");
 const rulesEngine = require("../../../../../services/gamificationRulesEngine");
 

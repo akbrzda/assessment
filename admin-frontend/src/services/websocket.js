@@ -19,17 +19,17 @@ class WebSocketService {
     const token = authStore.token;
 
     if (!token) {
-      console.warn("WebSocket: не удалось подключиться, отсутствует токен");
+      console.warn("WebSocket: РЅРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґРєР»СЋС‡РёС‚СЊСЃСЏ, РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ С‚РѕРєРµРЅ");
       return;
     }
 
     if (this.socket?.connected) {
-      console.log("WebSocket: уже подключен");
+      console.log("WebSocket: СѓР¶Рµ РїРѕРґРєР»СЋС‡РµРЅ");
       return;
     }
 
     if (this.isTokenExpired(token)) {
-      console.log("WebSocket: токен истек, требуется обновление");
+      console.log("WebSocket: С‚РѕРєРµРЅ РёСЃС‚РµРє, С‚СЂРµР±СѓРµС‚СЃСЏ РѕР±РЅРѕРІР»РµРЅРёРµ");
       this.handleAuthError();
       return;
     }
@@ -55,7 +55,7 @@ class WebSocketService {
       const currentTime = Date.now();
       return expirationTime <= currentTime + 30000;
     } catch (error) {
-      console.error("WebSocket: ошибка при проверке токена:", error);
+      console.error("WebSocket: РѕС€РёР±РєР° РїСЂРё РїСЂРѕРІРµСЂРєРµ С‚РѕРєРµРЅР°:", error);
       return false;
     }
   }
@@ -70,18 +70,18 @@ class WebSocketService {
       this.reconnectAttempts = 0;
       this.isAuthErrorHandling = false;
       this.isReconnecting = false;
-      console.log("WebSocket подключен:", this.socket.id);
+      console.log("WebSocket РїРѕРґРєР»СЋС‡РµРЅ:", this.socket.id);
       this.emit("status:changed", { connected: true });
     });
 
     this.socket.on("disconnect", (reason) => {
       this.isConnected = false;
-      console.log("WebSocket отключен:", reason);
+      console.log("WebSocket РѕС‚РєР»СЋС‡РµРЅ:", reason);
       this.emit("status:changed", { connected: false });
     });
 
     this.socket.on("connect_error", (error) => {
-      console.error("WebSocket ошибка подключения:", error.message);
+      console.error("WebSocket РѕС€РёР±РєР° РїРѕРґРєР»СЋС‡РµРЅРёСЏ:", error.message);
 
       const isAuthError = error.message.includes("Authentication error") || error.message.includes("token expired");
       if (isAuthError && !this.isAuthErrorHandling) {
@@ -93,7 +93,7 @@ class WebSocketService {
 
       this.reconnectAttempts += 1;
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        console.error("WebSocket: превышено количество попыток переподключения");
+        console.error("WebSocket: РїСЂРµРІС‹С€РµРЅРѕ РєРѕР»РёС‡РµСЃС‚РІРѕ РїРѕРїС‹С‚РѕРє РїРµСЂРµРїРѕРґРєР»СЋС‡РµРЅРёСЏ");
         this.disconnect();
       }
     });
@@ -127,17 +127,17 @@ class WebSocketService {
     this.isAuthErrorHandling = false;
     this.isReconnecting = false;
     this.eventHandlers.clear();
-    console.log("WebSocket отключен вручную");
+    console.log("WebSocket РѕС‚РєР»СЋС‡РµРЅ РІСЂСѓС‡РЅСѓСЋ");
   }
 
   reconnectWithNewToken(newToken) {
     if (!newToken) {
-      console.warn("WebSocket: попытка переподключения без токена");
+      console.warn("WebSocket: РїРѕРїС‹С‚РєР° РїРµСЂРµРїРѕРґРєР»СЋС‡РµРЅРёСЏ Р±РµР· С‚РѕРєРµРЅР°");
       return;
     }
 
     if (this.isReconnecting) {
-      console.log("WebSocket: переподключение уже выполняется");
+      console.log("WebSocket: РїРµСЂРµРїРѕРґРєР»СЋС‡РµРЅРёРµ СѓР¶Рµ РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ");
       return;
     }
 
@@ -160,7 +160,7 @@ class WebSocketService {
       this.isAuthErrorHandling = false;
       this.reconnectWithNewToken(newAccessToken);
     } catch (error) {
-      console.error("WebSocket: не удалось обновить токен:", error);
+      console.error("WebSocket: РЅРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ С‚РѕРєРµРЅ:", error);
       this.isAuthErrorHandling = false;
       this.disconnect();
     }
@@ -197,7 +197,7 @@ class WebSocketService {
       try {
         handler(data);
       } catch (error) {
-        console.error(`Ошибка в обработчике события ${event}:`, error);
+        console.error(`РћС€РёР±РєР° РІ РѕР±СЂР°Р±РѕС‚С‡РёРєРµ СЃРѕР±С‹С‚РёСЏ ${event}:`, error);
       }
     });
   }
@@ -208,7 +208,7 @@ class WebSocketService {
       return;
     }
 
-    console.warn(`WebSocket: не удалось отправить ${event}, нет подключения`);
+    console.warn(`WebSocket: РЅРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ ${event}, РЅРµС‚ РїРѕРґРєР»СЋС‡РµРЅРёСЏ`);
   }
 
   ping() {

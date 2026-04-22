@@ -1,4 +1,4 @@
-﻿import axios, { mutateWithInvalidation } from "../utils/axios";
+import axios, { mutateWithInvalidation } from "../utils/axios";
 
 export const getCourses = async (filters = {}) => {
   const response = await axios.get("/admin/courses", {

@@ -26,7 +26,13 @@
       <Preloader v-if="loading" />
 
       <div v-else-if="assessments.length === 0" class="empty-state">
-        <p>Аттестации не найдены</p>
+        <div class="empty-state-icon">📋</div>
+        <p class="empty-state-title">Аттестации не найдены</p>
+        <p v-if="filters.search || filters.status || filters.branch">Попробуйте изменить фильтры поиска</p>
+        <p v-else>Создайте первую аттестацию, чтобы начать оценку сотрудников</p>
+        <Button v-if="!filters.search && !filters.status && !filters.branch" @click="$router.push('/assessments/create')">
+          Создать аттестацию
+        </Button>
       </div>
 
       <div v-else>
@@ -41,7 +47,7 @@
                 <th>Открытие</th>
                 <th>Закрытие</th>
                 <th>Назначено</th>
-                <th>Завершено</th>
+                <th>Завершено / Назначено</th>
                 <th>Средний балл</th>
                 <th class="actions-col">Действия</th>
               </tr>
@@ -64,7 +70,14 @@
                   <div>{{ formatDate(assessment.close_at) }}</div>
                 </td>
                 <td>{{ assessment.assigned_users }} чел.</td>
-                <td>{{ assessment.completed_attempts }}</td>
+                <td>
+                  <span :class="completionRateClass(assessment)">
+                    {{ assessment.completed_attempts }} / {{ assessment.assigned_users }}
+                    <span v-if="assessment.assigned_users > 0" class="completion-pct">
+                      ({{ Math.round((assessment.completed_attempts / assessment.assigned_users) * 100) }}%)
+                    </span>
+                  </span>
+                </td>
                 <td class="score-cell">
                   {{ formatAvgScore(assessment.avg_score) }}
                 </td>
@@ -120,7 +133,12 @@
               </div>
               <div class="assessment-card-row">
                 <span class="assessment-card-label">Завершено:</span>
-                <span class="assessment-card-value">{{ assessment.completed_attempts }}</span>
+                <span class="assessment-card-value">
+                  {{ assessment.completed_attempts }} / {{ assessment.assigned_users }}
+                  <span v-if="assessment.assigned_users > 0" class="completion-pct">
+                    ({{ Math.round((assessment.completed_attempts / assessment.assigned_users) * 100) }}%)
+                  </span>
+                </span>
               </div>
               <div class="assessment-card-row">
                 <span class="assessment-card-label">Средний балл:</span>
@@ -212,6 +230,14 @@ const branchOptions = computed(() => [
     label: formatBranchLabel(branch),
   })),
 ]);
+
+const completionRateClass = (assessment) => {
+  if (!assessment.assigned_users) return "";
+  const rate = assessment.completed_attempts / assessment.assigned_users;
+  if (rate >= 0.8) return "completion-high";
+  if (rate >= 0.4) return "completion-mid";
+  return "completion-low";
+};
 
 const loadReferences = async () => {
   try {
@@ -602,11 +628,43 @@ onMounted(() => {
 .empty-state {
   padding: 64px 32px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  opacity: 0.4;
+}
+
+.empty-state-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
 }
 
 .empty-state p {
   color: var(--text-secondary);
   margin: 0;
+}
+
+.completion-pct {
+  opacity: 0.75;
+  font-size: 0.9em;
+  margin-left: 2px;
+}
+
+.completion-high {
+  color: var(--accent-green, #22c55e);
+}
+.completion-mid {
+  color: var(--accent-yellow, #f59e0b);
+}
+.completion-low {
+  color: var(--accent-red, #ef4444);
 }
 
 /* Responsive */

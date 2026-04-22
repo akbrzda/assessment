@@ -1,4 +1,4 @@
-﻿const Joi = require("joi");
+const Joi = require("joi");
 
 const createSchema = Joi.object({
   firstName: Joi.string().trim().min(2).max(64).required(),

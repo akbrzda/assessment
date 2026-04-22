@@ -1,4 +1,4 @@
-﻿const authService = require("./service");
+const authService = require("./service");
 const { validateLoginPayload } = require("./validators");
 
 function handleKnownError(error, res, next) {

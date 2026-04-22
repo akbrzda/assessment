@@ -5,7 +5,7 @@
       <div class="wrapper">
         <div class="header-content">
           <h1 class="assessment-title">{{ assessment?.title }}</h1>
-          <div class="timer" :class="{ warning: timeRemaining < 300 }">
+          <div class="timer" :class="{ warning: timeRemaining < 300, 'half-warning': halfTimePassed && timeRemaining >= 300 }">
             {{ formatTime(timeRemaining) }}
           </div>
         </div>
@@ -121,6 +121,8 @@
             current: index === currentQuestionIndex,
             answered: userAnswers[index] !== undefined,
           }"
+          @click="navigateToQuestion(index)"
+          :title="`Вопрос ${index + 1}`"
         ></div>
       </div>
     </div>
@@ -204,6 +206,8 @@ export default {
     const attemptId = ref(null);
     const awaitingStart = ref(true);
     const timeRemaining = ref(0);
+    const halfTimePassed = ref(false);
+    const halfTimeNotified = ref(false);
     const showTimeUpModal = ref(false);
     const showFinishModal = ref(false);
     const showExitWarningModal = ref(false);
@@ -619,6 +623,17 @@ export default {
       persistQuestionOrder();
     }
 
+    function navigateToQuestion(index) {
+      if (index < 0 || index >= questions.value.length || isSaving.value) {
+        return;
+      }
+      // Сохраняем текущий ответ перед переходом
+      syncCurrentAnswer();
+      currentQuestionIndex.value = index;
+      applyStoredAnswer(index);
+      telegramStore.hapticFeedback("impact", "light");
+    }
+
     function showFinishConfirmation() {
       if (isSaving.value) {
         return;
@@ -761,7 +776,18 @@ export default {
         if (timeRemaining.value > 0) {
           timeRemaining.value -= 1;
 
+          // 50% предупреждение — однократное
+          if (!halfTimeNotified.value) {
+            const timeLimitSec = assessment.value?.timeLimitMinutes != null ? assessment.value.timeLimitMinutes * 60 : null;
+            if (timeLimitSec && timeRemaining.value <= timeLimitSec / 2) {
+              halfTimePassed.value = true;
+              halfTimeNotified.value = true;
+              telegramStore.hapticFeedback("notification", "warning");
+            }
+          }
+
           if (timeRemaining.value === 300) {
+            halfTimePassed.value = false; // убираем желтый, включается красный
             telegramStore.hapticFeedback("notification", "warning");
           }
 
@@ -1072,6 +1098,7 @@ export default {
       selectedTextAnswer,
       userAnswers,
       timeRemaining,
+      halfTimePassed,
       showTimeUpModal,
       showFinishModal,
       showExitWarningModal,
@@ -1084,6 +1111,7 @@ export default {
       handleMatchingChange,
       toggleAnswer,
       nextQuestion,
+      navigateToQuestion,
       finishAssessment,
       showFinishConfirmation,
       confirmFinishAssessment,
@@ -1237,11 +1265,32 @@ export default {
 
 .matching-select {
   width: 100%;
-  padding: 10px 12px;
+  padding: 10px 36px 10px 12px;
   border-radius: 8px;
-  border: 1px solid var(--divider);
-  background-color: var(--bg-primary);
+  border: 2px solid var(--divider);
+  background-color: var(--bg-secondary);
   color: var(--text-primary);
+  font-size: 15px;
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23888' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.matching-select:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.matching-select:hover {
+  border-color: var(--accent-blue);
 }
 
 .answers-list {
@@ -1421,6 +1470,13 @@ export default {
   border-radius: 50%;
   background-color: var(--divider);
   transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.question-dot:hover {
+  background-color: var(--accent-blue);
+  opacity: 0.7;
+  transform: scale(1.2);
 }
 
 .question-dot.current {
@@ -1431,6 +1487,10 @@ export default {
 
 .question-dot.answered {
   background-color: var(--success);
+}
+
+.timer.half-warning {
+  color: var(--warning, #f59e0b);
 }
 
 .text-warning {

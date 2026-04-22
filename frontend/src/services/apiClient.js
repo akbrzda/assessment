@@ -195,4 +195,11 @@ export const apiClient = {
     const path = query ? `/leaderboard/users?${query}` : "/leaderboard/users";
     return request(path);
   },
+  getUserAttemptHistory(params = {}) {
+    const searchParams = new URLSearchParams();
+    if (params.limit) searchParams.set("limit", String(params.limit));
+    if (params.offset) searchParams.set("offset", String(params.offset));
+    const query = searchParams.toString();
+    return request(query ? `/assessments/user/attempts?${query}` : "/assessments/user/attempts");
+  },
 };

@@ -1,4 +1,4 @@
-﻿const rulesService = require("./service");
+const rulesService = require("./service");
 
 async function list(req, res, next) {
   try {

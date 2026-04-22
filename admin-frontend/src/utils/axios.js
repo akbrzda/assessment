@@ -59,7 +59,7 @@ apiClient.interceptors.response.use(
           requestClient: apiClient,
         });
       } catch (refreshError) {
-        console.error("Не удалось обновить токен:", refreshError);
+        console.error("РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ С‚РѕРєРµРЅ:", refreshError);
 
         if (window.location.pathname !== "/login") {
           window.location.href = "/login";

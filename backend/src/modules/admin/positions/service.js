@@ -1,4 +1,4 @@
-﻿const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
+const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
 const positionsRepository = require("./repository");
 const {
   validatePositionPayload,

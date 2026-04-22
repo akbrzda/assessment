@@ -1,4 +1,4 @@
-﻿const Joi = require("joi");
+const Joi = require("joi");
 const theoryModel = require("../../../../../models/theoryModel");
 
 const completionSchema = Joi.object({

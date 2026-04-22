@@ -1,4 +1,4 @@
-﻿const levelsService = require("./service");
+const levelsService = require("./service");
 
 async function getLevels(req, res, next) {
   try {

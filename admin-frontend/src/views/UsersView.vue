@@ -222,9 +222,21 @@
         <strong>{{ selectedUser?.first_name }} {{ selectedUser?.last_name }}</strong
         >?
       </p>
+      <div class="delete-warning">
+        <span class="delete-warning-icon">⚠️</span>
+        <div>
+          <p class="delete-warning-title">Последствия удаления:</p>
+          <ul class="delete-warning-list">
+            <li>Все попытки прохождения аттестаций будут удалены</li>
+            <li>Накопленные очки и достижения будут удалены</li>
+            <li>История активности пользователя будет утеряна</li>
+          </ul>
+          <p class="delete-warning-note">Это действие необратимо.</p>
+        </div>
+      </div>
       <div class="modal-actions">
         <Button variant="secondary" @click="closeModals">Отмена</Button>
-        <Button variant="danger" :loading="actionLoading" @click="handleDelete">Удалить</Button>
+        <Button variant="danger" :loading="actionLoading" @click="handleDelete">Удалить безвозвратно</Button>
       </div>
     </Modal>
 
@@ -1451,6 +1463,45 @@ onMounted(async () => {
   border-left: 4px solid #f59e0b;
 }
 
+.delete-warning {
+  display: flex;
+  gap: 12px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-left: 4px solid #ef4444;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.delete-warning-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.delete-warning-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #b91c1c;
+  margin: 0 0 6px;
+}
+
+.delete-warning-list {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #7f1d1d;
+  line-height: 1.6;
+}
+
+.delete-warning-note {
+  font-size: 13px;
+  font-weight: 600;
+  color: #b91c1c;
+  margin: 0;
+}
+
 @media (max-width: 1280px) {
   .filters-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1829,7 +1880,6 @@ onMounted(async () => {
   color: var(--color-heading);
   font-size: 14px;
 }
-
 
 .history-actions {
   display: flex;

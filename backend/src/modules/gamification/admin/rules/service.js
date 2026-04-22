@@ -1,4 +1,4 @@
-﻿const manageRulesService = require("./manage/service");
+const manageRulesService = require("./manage/service");
 const simulationRulesService = require("./simulation/service");
 
 module.exports = {

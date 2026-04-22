@@ -8,10 +8,12 @@
     </div>
 
     <div v-else class="details-container">
-      <!-- Заголовок с навигацией -->
-      <div class="page-header">
-        <Button variant="ghost" icon="arrow-left" @click="goBack"> Назад </Button>
-      </div>
+      <!-- Хлебные крошки -->
+      <nav class="breadcrumbs" aria-label="breadcrumb">
+        <span class="breadcrumb-link" @click="$router.push('/assessments')">Аттестации</span>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-current">Детали аттестации</span>
+      </nav>
 
       <!-- Компонент детализации -->
       <AssessmentDetails :assessmentId="assessmentId" />
@@ -58,8 +60,33 @@ onMounted(() => {
   margin: 0 auto;
 }
 
-.page-header {
-  margin-bottom: 32px;
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+.breadcrumb-link {
+  color: var(--accent-blue);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.breadcrumb-link:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb-sep {
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
+.breadcrumb-current {
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
 .details-container {
@@ -77,11 +104,5 @@ onMounted(() => {
 .error-state p {
   margin: 0 0 16px 0;
   font-size: 18px;
-}
-
-@media (max-width: 768px) {
-  .page-header {
-    margin-bottom: 16px;
-  }
 }
 </style>

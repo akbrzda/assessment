@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="course-editor-view">
     <div class="page-header">
       <Button variant="secondary" icon="arrow-left" @click="goBack">К списку курсов</Button>

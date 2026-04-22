@@ -99,6 +99,32 @@
         <div class="skeleton-line mb-8 w-70"></div>
         <div class="skeleton-line mb-8 w-60"></div>
       </div>
+
+      <!-- Attempt History -->
+      <div class="card mt-12">
+        <h3 class="title-small mb-16">История попыток</h3>
+        <div v-if="historyLoading">
+          <div class="skeleton-line mb-8" v-for="n in 3" :key="n"></div>
+        </div>
+        <div v-else-if="attemptHistory.length" class="attempt-history-list">
+          <div v-for="attempt in attemptHistory" :key="attempt.attemptId" class="attempt-history-item">
+            <div class="attempt-history-title">{{ attempt.assessmentTitle }}</div>
+            <div class="attempt-history-meta">
+              <span class="attempt-history-date">{{ formatDate(attempt.completedAt || attempt.startedAt) }}</span>
+              <span
+                class="attempt-badge"
+                :class="attempt.passed ? 'badge-success' : attempt.status === 'in_progress' ? 'badge-neutral' : 'badge-error'"
+              >
+                {{ attempt.status === "in_progress" ? "В процессе" : attempt.passed ? "Пройдено" : "Не пройдено" }}
+              </span>
+              <span v-if="attempt.scorePercent != null" class="attempt-score">{{ attempt.scorePercent }}%</span>
+            </div>
+          </div>
+        </div>
+        <div v-else class="empty-state">
+          <p class="body-small text-secondary">Попыток ещё не было</p>
+        </div>
+      </div>
     </div>
 
     <!-- Edit Profile Modal -->
@@ -299,7 +325,28 @@ export default {
 
     onMounted(() => {
       loadProfileData();
+      loadAttemptHistory();
     });
+
+    const attemptHistory = ref([]);
+    const historyLoading = ref(false);
+
+    async function loadAttemptHistory() {
+      historyLoading.value = true;
+      try {
+        const res = await apiClient.getUserAttemptHistory({ limit: 10 });
+        attemptHistory.value = res?.attempts || [];
+      } catch {
+        attemptHistory.value = [];
+      } finally {
+        historyLoading.value = false;
+      }
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return "";
+      return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", year: "numeric" }).format(new Date(dateStr));
+    }
 
     return {
       userStore,
@@ -317,6 +364,9 @@ export default {
       closeEditModal,
       saveProfile,
       showBadgeDetails,
+      attemptHistory,
+      historyLoading,
+      formatDate,
     };
   },
 };
@@ -603,5 +653,46 @@ export default {
     border-radius: 16px;
     margin-bottom: 76px;
   }
+}
+
+.attempt-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.attempt-history-item {
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+
+.attempt-history-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.attempt-history-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.attempt-history-date {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.attempt-score {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-blue);
+}
+
+.mt-12 {
+  margin-top: 12px;
 }
 </style>

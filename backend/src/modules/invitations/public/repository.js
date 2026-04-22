@@ -1,4 +1,4 @@
-﻿const invitationModel = require("../../../models/invitationModel");
+const invitationModel = require("../../../models/invitationModel");
 const referenceModel = require("../../../models/referenceModel");
 
 async function findActiveByCode(code) {

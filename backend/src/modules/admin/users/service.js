@@ -1,4 +1,4 @@
-﻿const Joi = require("joi");
+const Joi = require("joi");
 const bcrypt = require("bcrypt");
 const userModel = require("../../../models/userModel");
 const { pool } = require("../../../config/database");

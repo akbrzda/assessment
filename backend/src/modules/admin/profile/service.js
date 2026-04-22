@@ -1,4 +1,4 @@
-﻿const userModel = require("../../../models/userModel");
+const userModel = require("../../../models/userModel");
 const { body, validationResult } = require("express-validator");
 
 // РџРѕР»СѓС‡РёС‚СЊ РїСЂРѕС„РёР»СЊ С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ

@@ -1,4 +1,4 @@
-﻿const { createAnalyticsReport } = require("../../../services/exportService");
+const { createAnalyticsReport } = require("../../../services/exportService");
 const analyticsRepository = require("./repository");
 
 async function getSummary(filters) {

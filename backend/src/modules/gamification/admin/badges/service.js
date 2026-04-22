@@ -1,4 +1,4 @@
-﻿const { pool } = require("../../../../config/database");
+const { pool } = require("../../../../config/database");
 const { createLog } = require("../../../../services/adminLogService");
 const multer = require("multer");
 const path = require("path");

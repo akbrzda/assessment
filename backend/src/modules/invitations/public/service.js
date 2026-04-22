@@ -1,4 +1,4 @@
-﻿const config = require("../../../config/env");
+const config = require("../../../config/env");
 const { generateInviteCode } = require("../../../utils/tokenGenerator");
 const invitationsRepository = require("./repository");
 

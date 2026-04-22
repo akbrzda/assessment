@@ -1,4 +1,4 @@
-﻿const badgesService = require("./service");
+const badgesService = require("./service");
 
 async function getBadges(req, res, next) {
   try {

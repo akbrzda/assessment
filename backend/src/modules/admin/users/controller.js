@@ -1,4 +1,4 @@
-﻿const moduleService = require("./service");
+const moduleService = require("./service");
 
 async function listUsers(req, res, next) {
   try {

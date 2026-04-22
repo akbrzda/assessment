@@ -62,6 +62,15 @@
 
         <!-- Гибкие правила геймификации -->
         <Card title="Гибкие правила геймификации" icon="Settings">
+          <!-- Индикатор активного режима -->
+          <div :class="['mode-indicator', rulesEnabled ? 'mode-rules' : 'mode-classic']">
+            <span class="mode-indicator-dot"></span>
+            <span class="mode-indicator-label">
+              Активный режим:
+              <strong>{{ rulesEnabled ? "Движок правил" : "Встроенная логика (Классический)" }}</strong>
+            </span>
+          </div>
+
           <div class="rules-toggle-container">
             <label class="rules-toggle-label">
               <input v-model="rulesEnabled" @change="toggleRulesEngine" type="checkbox" class="rules-toggle-checkbox" />
@@ -363,6 +372,43 @@ onMounted(() => {
 }
 
 /* Gamification Rules */
+.mode-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.mode-indicator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mode-rules {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.mode-rules .mode-indicator-dot {
+  background: #3b82f6;
+  box-shadow: 0 0 0 3px #bfdbfe;
+}
+
+.mode-classic {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.mode-classic .mode-indicator-dot {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px #bbf7d0;
+}
+
 .rules-toggle-container {
   margin-bottom: 24px;
 }

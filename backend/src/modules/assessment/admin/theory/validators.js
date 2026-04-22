@@ -34,7 +34,7 @@ const publishSchema = Joi.object({
 function parseAssessmentId(rawId) {
   const assessmentId = Number(rawId);
   if (!assessmentId) {
-    const error = new Error("Некорректный идентификатор аттестации");
+    const error = new Error("РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р°С‚С‚РµСЃС‚Р°С†РёРё");
     error.status = 400;
     throw error;
   }

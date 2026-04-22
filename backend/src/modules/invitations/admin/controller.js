@@ -1,4 +1,4 @@
-﻿const invitationsService = require("./service");
+const invitationsService = require("./service");
 const {
   parseInvitationId,
   validateCreatePayload,

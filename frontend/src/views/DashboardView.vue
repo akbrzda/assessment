@@ -10,6 +10,12 @@
       </div>
 
       <!-- Next Assessment Card -->
+      <div v-if="openAssessmentsCount > 1" class="open-assessments-banner mb-12">
+        <span class="open-assessments-icon">📋</span>
+        <span
+          >У вас <strong>{{ openAssessmentsCount }}</strong> открытых аттестаций</span
+        >
+      </div>
       <div class="card card-large mb-12">
         <div v-if="nextAssessment" class="assessment-card">
           <h3 class="title-medium mb-8">{{ nextAssessment.title }}</h3>
@@ -132,6 +138,7 @@ export default {
     const { initializeEruda, toggle, isErudaLoaded } = useDebugConsole();
 
     const nextAssessment = ref(null);
+    const openAssessmentsCount = ref(0);
     const userStats = ref({
       completed: 0,
       average: 0,
@@ -304,6 +311,7 @@ export default {
           .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
         nextAssessment.value = upcoming.length ? upcoming[0] : null;
+        openAssessmentsCount.value = upcoming.length;
 
         const completedAssessments = normalized.filter((assessment) => assessment.bestResult != null);
         const averageScore = completedAssessments.length
@@ -360,6 +368,7 @@ export default {
     return {
       userStore,
       nextAssessment,
+      openAssessmentsCount,
       userStats,
       recentActivity,
       progressPercentage,
@@ -540,5 +549,21 @@ export default {
   .stat-value {
     font-size: 18px;
   }
+}
+
+.open-assessments-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-primary-light, #eff6ff);
+  border: 1px solid var(--color-primary-border, #bfdbfe);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--color-primary, #2563eb);
+}
+
+.open-assessments-icon {
+  font-size: 18px;
 }
 </style>

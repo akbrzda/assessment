@@ -1,4 +1,4 @@
-﻿const courseProgressService = require("../../../services/courseProgressService");
+const courseProgressService = require("../../../services/courseProgressService");
 const coursesRepository = require("./repository");
 const eventsRepo = require("../courseEvents.repository");
 const { listAssignedCourseIds } = require("../courseAssignments.repository");

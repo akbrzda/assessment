@@ -1,4 +1,4 @@
-﻿async function createAdminLog() {
+async function createAdminLog() {
   return Promise.resolve();
 }
 

@@ -1,4 +1,4 @@
-﻿const theoryService = require("./service");
+const theoryService = require("./service");
 const {
   parseAssessmentId,
   validateDraftPayload,

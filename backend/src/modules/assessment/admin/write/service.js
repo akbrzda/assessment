@@ -1,4 +1,4 @@
-﻿const writeController = require("./controller");
+const writeController = require("./controller");
 
 async function createAssessment(req, res, next) {
   return writeController.createAssessment(req, res, next);

@@ -1,4 +1,4 @@
-﻿const { pool } = require("../../../config/database");
+const { pool } = require("../../../config/database");
 
 async function findUserByLogin(login) {
   const [users] = await pool.query(

@@ -1,4 +1,4 @@
-﻿const express = require("express");
+const express = require("express");
 const verifyJWT = require("../../../middleware/verifyJWT");
 const { cacheMiddleware } = require("../../../middleware/cache");
 const referencesController = require("./controller");

@@ -1,4 +1,4 @@
-﻿const express = require("express");
+const express = require("express");
 const verifyInitData = require("../../../middleware/verifyInitData");
 const resolveUser = require("../../../middleware/resolveUser");
 const requireRole = require("../../../middleware/requireRole");

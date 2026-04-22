@@ -1,4 +1,4 @@
-﻿const assessmentsService = require("./service");
+const assessmentsService = require("./service");
 const {
   parseAssessmentId,
   normalizeListFilters,

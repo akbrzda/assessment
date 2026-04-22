@@ -1,4 +1,4 @@
-﻿const profileService = require("./service");
+const profileService = require("./service");
 
 async function getProfile(req, res, next) {
   try {

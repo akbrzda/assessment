@@ -1,4 +1,4 @@
-﻿const Joi = require("joi");
+const Joi = require("joi");
 const assessmentModel = require("../../../../../models/assessmentModel");
 const theoryModel = require("../../../../../models/theoryModel");
 const referenceModel = require("../../../../../models/referenceModel");
@@ -31,13 +31,17 @@ const questionSchema = Joi.object({
   if (value.questionType === "single") {
     const correctCount = value.options.filter((option) => option.isCorrect).length;
     if (correctCount !== 1) {
-      return helpers.message("Р”Р»СЏ РІРѕРїСЂРѕСЃРѕРІ СЃ РѕРґРЅРёРј РѕС‚РІРµС‚РѕРј РЅРµРѕР±С…РѕРґРёРјРѕ РІС‹Р±СЂР°С‚СЊ СЂРѕРІРЅРѕ РѕРґРёРЅ РїСЂР°РІРёР»СЊРЅС‹Р№ РІР°СЂРёР°РЅС‚");
+      return helpers.message(
+        "Р”Р»СЏ РІРѕРїСЂРѕСЃРѕРІ СЃ РѕРґРЅРёРј РѕС‚РІРµС‚РѕРј РЅРµРѕР±С…РѕРґРёРјРѕ РІС‹Р±СЂР°С‚СЊ СЂРѕРІРЅРѕ РѕРґРёРЅ РїСЂР°РІРёР»СЊРЅС‹Р№ РІР°СЂРёР°РЅС‚",
+      );
     }
   }
   if (value.questionType === "multiple") {
     const correctCount = value.options.filter((option) => option.isCorrect).length;
     if (correctCount < 2) {
-      return helpers.message("Р”Р»СЏ РІРѕРїСЂРѕСЃРѕРІ СЃ РЅРµСЃРєРѕР»СЊРєРёРјРё РѕС‚РІРµС‚Р°РјРё РЅРµРѕР±С…РѕРґРёРјРѕ РІС‹Р±СЂР°С‚СЊ РјРёРЅРёРјСѓРј РґРІР° РїСЂР°РІРёР»СЊРЅС‹С… РІР°СЂРёР°РЅС‚Р°");
+      return helpers.message(
+        "Р”Р»СЏ РІРѕРїСЂРѕСЃРѕРІ СЃ РЅРµСЃРєРѕР»СЊРєРёРјРё РѕС‚РІРµС‚Р°РјРё РЅРµРѕР±С…РѕРґРёРјРѕ РІС‹Р±СЂР°С‚СЊ РјРёРЅРёРјСѓРј РґРІР° РїСЂР°РІРёР»СЊРЅС‹С… РІР°СЂРёР°РЅС‚Р°",
+      );
     }
   }
   if (value.questionType === "matching") {
@@ -60,7 +64,7 @@ const answerSchema = Joi.object({
     Joi.object({
       leftOptionId: Joi.number().integer().positive().required(),
       rightOptionId: Joi.number().integer().positive().required(),
-    })
+    }),
   ),
   textAnswer: Joi.string().allow("", null),
 }).custom((value, helpers) => {
@@ -101,7 +105,9 @@ const baseSchema = Joi.object({
   clientTimezoneOffsetMinutes: Joi.number().integer().min(-720).max(840).optional(),
 }).custom((value, helpers) => {
   if (!value.userIds.length && !value.positionIds.length && !value.branchIds.length) {
-    return helpers.message("РќРµРѕР±С…РѕРґРёРјРѕ РІС‹Р±СЂР°С‚СЊ С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕРіРѕ СЃРѕС‚СЂСѓРґРЅРёРєР°, РґРѕР»Р¶РЅРѕСЃС‚СЊ РёР»Рё С„РёР»РёР°Р»");
+    return helpers.message(
+      "РќРµРѕР±С…РѕРґРёРјРѕ РІС‹Р±СЂР°С‚СЊ С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕРіРѕ СЃРѕС‚СЂСѓРґРЅРёРєР°, РґРѕР»Р¶РЅРѕСЃС‚СЊ РёР»Рё С„РёР»РёР°Р»",
+    );
   }
   if (new Date(value.closeAt) <= new Date(value.openAt)) {
     return helpers.message("Р”Р°С‚Р° Р·Р°РєСЂС‹С‚РёСЏ РґРѕР»Р¶РЅР° Р±С‹С‚СЊ РїРѕР·Р¶Рµ РґР°С‚С‹ РѕС‚РєСЂС‹С‚РёСЏ");
@@ -239,7 +245,9 @@ async function prepareTargets(value, currentUser) {
     const invalidUsers = users.filter((user) => user.branchId !== currentUser.branchId);
     if (invalidUsers.length) {
       const names = invalidUsers.map((user) => `${user.firstName} ${user.lastName}`).join(", ");
-      const error = new Error(`Р’С‹ РјРѕР¶РµС‚Рµ РЅР°Р·РЅР°С‡Р°С‚СЊ Р°С‚С‚РµСЃС‚Р°С†РёРё С‚РѕР»СЊРєРѕ СЃРѕС‚СЂСѓРґРЅРёРєР°Рј СЃРІРѕРµРіРѕ С„РёР»РёР°Р»Р°. РџСЂРѕРІРµСЂСЊС‚Рµ: ${names}`);
+      const error = new Error(
+        `Р’С‹ РјРѕР¶РµС‚Рµ РЅР°Р·РЅР°С‡Р°С‚СЊ Р°С‚С‚РµСЃС‚Р°С†РёРё С‚РѕР»СЊРєРѕ СЃРѕС‚СЂСѓРґРЅРёРєР°Рј СЃРІРѕРµРіРѕ С„РёР»РёР°Р»Р°. РџСЂРѕРІРµСЂСЊС‚Рµ: ${names}`,
+      );
       error.status = 422;
       throw error;
     }
@@ -247,7 +255,9 @@ async function prepareTargets(value, currentUser) {
     const invalidUsers = users.filter((user) => user.branchId && !branchIds.includes(Number(user.branchId)));
     if (invalidUsers.length) {
       const names = invalidUsers.map((user) => `${user.firstName} ${user.lastName}`).join(", ");
-      const error = new Error(`РЎРѕС‚СЂСѓРґРЅРёРєРё РґРѕР»Р¶РЅС‹ РѕС‚РЅРѕСЃРёС‚СЊСЃСЏ Рє РІС‹Р±СЂР°РЅРЅС‹Рј С„РёР»РёР°Р»Р°Рј. РџСЂРѕРІРµСЂСЊС‚Рµ: ${names}`);
+      const error = new Error(
+        `РЎРѕС‚СЂСѓРґРЅРёРєРё РґРѕР»Р¶РЅС‹ РѕС‚РЅРѕСЃРёС‚СЊСЃСЏ Рє РІС‹Р±СЂР°РЅРЅС‹Рј С„РёР»РёР°Р»Р°Рј. РџСЂРѕРІРµСЂСЊС‚Рµ: ${names}`,
+      );
       error.status = 422;
       throw error;
     }
@@ -256,7 +266,7 @@ async function prepareTargets(value, currentUser) {
   if (positionIds.length) {
     if (currentUser.roleName === "manager") {
       const allowedPositions = new Set(
-        (await assessmentModel.listAssignablePositions({ roleName: "manager", branchId: currentUser.branchId })).map((item) => item.id)
+        (await assessmentModel.listAssignablePositions({ roleName: "manager", branchId: currentUser.branchId })).map((item) => item.id),
       );
       const invalidPositions = positionIds.filter((id) => !allowedPositions.has(id));
       if (invalidPositions.length) {
@@ -277,7 +287,9 @@ async function prepareTargets(value, currentUser) {
   }
 
   if (!branchIds.length && !userIds.length && !positionIds.length) {
-    const error = new Error("РќРµРѕР±С…РѕРґРёРјРѕ РІС‹Р±СЂР°С‚СЊ С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕРіРѕ СЃРѕС‚СЂСѓРґРЅРёРєР°, РґРѕР»Р¶РЅРѕСЃС‚СЊ РёР»Рё С„РёР»РёР°Р»");
+    const error = new Error(
+      "РќРµРѕР±С…РѕРґРёРјРѕ РІС‹Р±СЂР°С‚СЊ С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕРіРѕ СЃРѕС‚СЂСѓРґРЅРёРєР°, РґРѕР»Р¶РЅРѕСЃС‚СЊ РёР»Рё С„РёР»РёР°Р»",
+    );
     error.status = 422;
     throw error;
   }
@@ -375,13 +387,13 @@ async function startAttempt(req, res, next) {
 
     const assessment = await assessmentModel.getAssessmentForUser(assessmentId, req.currentUser.id);
     if (!assessment) {
-      return res.status(404).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР° РёР»Рё РЅРµРґРѕСЃС‚СѓРїРЅР°" });
+      return res.status(404).json({ error: "Аттестация не найдена или недоступна", code: "ASSESSMENT_NOT_FOUND" });
     }
     if (assessment.status === "pending") {
-      return res.status(400).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РµС‰С‘ РЅРµ РѕС‚РєСЂС‹С‚Р°" });
+      return res.status(400).json({ error: "Аттестация ещё не открыта", code: "ASSESSMENT_NOT_OPEN" });
     }
     if (assessment.status === "closed") {
-      return res.status(400).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ СѓР¶Рµ Р·Р°РєСЂС‹С‚Р°" });
+      return res.status(400).json({ error: "Аттестация уже закрыта", code: "ASSESSMENT_CLOSED" });
     }
 
     const theoryMeta = await theoryModel.getCurrentTheoryMeta(assessmentId);
@@ -427,10 +439,8 @@ async function submitAnswer(req, res, next) {
     const assessmentId = Number(req.params.id);
     const attemptId = Number(req.params.attemptId);
 
-    console.log(`[submitAnswer Controller] assessmentId=${assessmentId}, attemptId=${attemptId}, body=`, JSON.stringify(req.body));
-
     if (!assessmentId || !attemptId) {
-      return res.status(400).json({ error: "РќРµРєРѕСЂСЂРµРєС‚РЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹" });
+      return res.status(400).json({ error: "Некорректные параметры", code: "INVALID_PARAMS" });
     }
 
     const { error, value } = answerSchema.validate(req.body, { abortEarly: false });
@@ -448,18 +458,18 @@ async function submitAnswer(req, res, next) {
       matchPairs: value.matchPairs,
     });
 
-    // РџСЂРёРјРµРЅСЏРµРј РїСЂР°РІРёР»Р° РіРµР№РјРёС„РёРєР°С†РёРё РЅР° СѓСЂРѕРІРЅРµ РѕС‚РІРµС‚Р° (РµСЃР»Рё РІРєР»СЋС‡РµРЅС‹)
-    try {
-      await gamificationService.processAnswerEvent({
-        userId: req.currentUser.id,
-        attemptId,
-        assessmentId: result.assessmentId,
-        questionId: value.questionId,
-        answerCorrect: result.isCorrect,
-      });
-    } catch (gerr) {
-      logger.error("Gamification answer event failed for attempt %s: %s", attemptId, gerr.message);
-    }
+    // Геймификация в фоне — не блокируем ответ API
+    setImmediate(() => {
+      gamificationService
+        .processAnswerEvent({
+          userId: req.currentUser.id,
+          attemptId,
+          assessmentId: result.assessmentId,
+          questionId: value.questionId,
+          answerCorrect: result.isCorrect,
+        })
+        .catch((gerr) => logger.error("Gamification answer event failed for attempt %s: %s", attemptId, gerr.message));
+    });
 
     res.status(204).send();
   } catch (error) {
@@ -487,19 +497,22 @@ async function submitAnswersBatch(req, res, next) {
       answers: value.answers,
     });
 
-    for (const result of results) {
-      try {
-        await gamificationService.processAnswerEvent({
-          userId: req.currentUser.id,
-          attemptId,
-          assessmentId: result.assessmentId,
-          questionId: result.questionId,
-          answerCorrect: result.isCorrect,
-        });
-      } catch (gerr) {
-        logger.error("Gamification answer event failed for attempt %s: %s", attemptId, gerr.message);
-      }
-    }
+    // Геймификация в фоне — не блокируем ответ API
+    setImmediate(() => {
+      Promise.all(
+        results.map((result) =>
+          gamificationService
+            .processAnswerEvent({
+              userId: req.currentUser.id,
+              attemptId,
+              assessmentId: result.assessmentId,
+              questionId: result.questionId,
+              answerCorrect: result.isCorrect,
+            })
+            .catch((gerr) => logger.error("Gamification answer event failed for attempt %s: %s", attemptId, gerr.message)),
+        ),
+      );
+    });
 
     res.status(204).send();
   } catch (error) {
@@ -736,6 +749,56 @@ async function remove(req, res, next) {
   }
 }
 
+async function getUserAttemptHistory(req, res, next) {
+  try {
+    const userId = req.currentUser.id;
+    const limit = Math.min(Number(req.query.limit) || 20, 50);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+    const { pool } = require("../../../../../config/database");
+    const [rows] = await pool.query(
+      `SELECT
+        aa.id AS attempt_id,
+        aa.attempt_number,
+        aa.status,
+        aa.score_percent,
+        aa.started_at,
+        aa.completed_at,
+        a.id AS assessment_id,
+        a.title AS assessment_title,
+        a.pass_score_percent
+       FROM assessment_attempts aa
+       JOIN assessments a ON a.id = aa.assessment_id
+       WHERE aa.user_id = ?
+       ORDER BY aa.started_at DESC
+       LIMIT ? OFFSET ?`,
+      [userId, limit, offset],
+    );
+
+    const [countRows] = await pool.query(`SELECT COUNT(*) AS total FROM assessment_attempts WHERE user_id = ?`, [userId]);
+
+    res.json({
+      attempts: rows.map((row) => ({
+        attemptId: row.attempt_id,
+        attemptNumber: row.attempt_number,
+        status: row.status,
+        scorePercent: row.score_percent != null ? Math.round(row.score_percent) : null,
+        passed: row.score_percent != null ? row.score_percent >= row.pass_score_percent : null,
+        startedAt: row.started_at,
+        completedAt: row.completed_at,
+        assessmentId: row.assessment_id,
+        assessmentTitle: row.assessment_title,
+        passScorePercent: row.pass_score_percent,
+      })),
+      total: Number(countRows[0]?.total || 0),
+      limit,
+      offset,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   listManaged,
   listForUser,
@@ -750,4 +813,5 @@ module.exports = {
   submitAnswersBatch,
   completeAttempt,
   getAttemptResultController,
+  getUserAttemptHistory,
 };

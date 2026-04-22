@@ -1,4 +1,4 @@
-﻿const analyticsService = require("./service");
+const analyticsService = require("./service");
 
 async function getOverallStats(req, res, next) {
   try {

@@ -1,4 +1,4 @@
-﻿function buildValidationError(message) {
+function buildValidationError(message) {
   const error = new Error(message);
   error.status = 400;
   return error;

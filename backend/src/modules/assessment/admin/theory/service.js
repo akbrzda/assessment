@@ -1,4 +1,4 @@
-﻿const theoryRepository = require("./repository");
+const theoryRepository = require("./repository");
 
 async function getTheory(assessmentId) {
   const theory = await theoryRepository.getTheoryForAdmin(assessmentId);

@@ -1,4 +1,4 @@
-﻿const positionsService = require("./service");
+const positionsService = require("./service");
 const { parsePositionId, parseSearch } = require("./validators");
 
 async function getPositions(req, res, next) {

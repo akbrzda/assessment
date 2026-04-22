@@ -1,4 +1,4 @@
-﻿const cache = require("./cache");
+const cache = require("./cache");
 const canEditUser = require("./canEditUser");
 const checkModuleAccess = require("./checkModuleAccess");
 const errorHandler = require("./errorHandler");

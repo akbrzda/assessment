@@ -1,20 +1,37 @@
 const { pool } = require("../config/database");
+const logger = require("../utils/logger");
 
-function logWithTime(scope, message, payload) {
-  const prefix = `[${new Date().toISOString()}] [${scope}] ${message}`;
-  if (payload !== undefined) {
-    console.log(prefix, payload);
-  } else {
-    console.log(prefix);
+// Simple LRU cache for findAssessmentByIdForManager (TTL 60s, max 200 entries)
+const _assessmentCache = new Map();
+const _CACHE_TTL_MS = 60_000;
+const _CACHE_MAX = 200;
+
+function _cacheGet(key) {
+  const entry = _assessmentCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() - entry.ts > _CACHE_TTL_MS) {
+    _assessmentCache.delete(key);
+    return undefined;
   }
+  // LRU: move to end
+  _assessmentCache.delete(key);
+  _assessmentCache.set(key, entry);
+  return entry.value;
 }
 
-function logErrorWithTime(scope, message, error) {
-  const prefix = `[${new Date().toISOString()}] [${scope}] ${message}`;
-  if (error) {
-    console.error(prefix, error);
-  } else {
-    console.error(prefix);
+function _cacheSet(key, value) {
+  if (_assessmentCache.size >= _CACHE_MAX) {
+    // evict oldest
+    _assessmentCache.delete(_assessmentCache.keys().next().value);
+  }
+  _assessmentCache.set(key, { value, ts: Date.now() });
+}
+
+function _cacheInvalidate(assessmentId) {
+  for (const key of _assessmentCache.keys()) {
+    if (key.startsWith(`${assessmentId}:`)) {
+      _assessmentCache.delete(key);
+    }
   }
 }
 
@@ -231,7 +248,6 @@ async function createAssessment({ assessment, questions, branchIds, userIds, pos
 
 async function updateAssessment(assessmentId, { assessment, questions, branchIds, userIds, positionIds, userId }) {
   const connection = await pool.getConnection();
-  let committed = false;
   try {
     await connection.beginTransaction();
 
@@ -313,6 +329,7 @@ async function updateAssessment(assessmentId, { assessment, questions, branchIds
     }
 
     await connection.commit();
+    _cacheInvalidate(assessmentId);
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -322,6 +339,7 @@ async function updateAssessment(assessmentId, { assessment, questions, branchIds
 }
 
 async function deleteAssessment(assessmentId) {
+  _cacheInvalidate(assessmentId);
   await pool.execute("DELETE FROM assessments WHERE id = ?", [assessmentId]);
 }
 
@@ -351,9 +369,9 @@ async function listAssessmentsForManager({ userId, roleName, branchId }) {
       )
     )`;
     params.push(branchId, branchId, branchId);
-    console.log("[listAssessmentsForManager] Управляющий, branchId:", branchId);
+    logger.debug("[listAssessmentsForManager] Manager branchId=%s", branchId);
   } else {
-    console.log("[listAssessmentsForManager] Суперадмин, без фильтров");
+    logger.debug("[listAssessmentsForManager] Superadmin, no filters");
   }
   // Суперадмин видит все аттестации (whereClause остается пустым)
 
@@ -406,11 +424,15 @@ async function listAssessmentsForManager({ userId, roleName, branchId }) {
     params,
   );
 
-  console.log("[listAssessmentsForManager] Найдено аттестаций:", rows.length);
+  logger.debug("[listAssessmentsForManager] Found %d assessments", rows.length);
   return rows.map(mapAssessmentRow);
 }
 
 async function findAssessmentByIdForManager(assessmentId, { userId, roleName, branchId }) {
+  const cacheKey = `${assessmentId}:${roleName}:${branchId || ""}`;
+  const cached = _cacheGet(cacheKey);
+  if (cached) return cached;
+
   const params = [assessmentId];
   let whereClause = "WHERE a.id = ?";
 
@@ -433,9 +455,9 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
       )
     )`;
     params.push(branchId, branchId, branchId);
-    console.log("[findAssessmentByIdForManager] Управляющий ищет аттестацию:", assessmentId, "branchId:", branchId);
+    logger.debug("[findAssessmentByIdForManager] Manager lookup assessmentId=%s branchId=%s", assessmentId, branchId);
   } else {
-    console.log("[findAssessmentByIdForManager] Суперадмин ищет аттестацию:", assessmentId);
+    logger.debug("[findAssessmentByIdForManager] Superadmin lookup assessmentId=%s", assessmentId);
   }
   // Суперадмин видит все аттестации
 
@@ -695,6 +717,7 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
     };
   });
 
+  _cacheSet(cacheKey, base);
   return base;
 }
 
@@ -704,10 +727,9 @@ async function hasAttempts(assessmentId) {
 }
 
 async function hasInProgressAttempts(assessmentId) {
-  const [rows] = await pool.execute(
-    "SELECT COUNT(*) AS total FROM assessment_attempts WHERE assessment_id = ? AND status = 'in_progress'",
-    [assessmentId],
-  );
+  const [rows] = await pool.execute("SELECT COUNT(*) AS total FROM assessment_attempts WHERE assessment_id = ? AND status = 'in_progress'", [
+    assessmentId,
+  ]);
   return Number(rows[0].total || 0) > 0;
 }
 
@@ -842,7 +864,6 @@ async function assignUserToMatchingAssessments({ userId, branchId, positionId })
   const normalizedPositionId = normalizeId(positionId);
 
   const connection = await pool.getConnection();
-  let committed = false;
   try {
     await connection.beginTransaction();
 
@@ -902,15 +923,10 @@ async function assignUserToMatchingAssessments({ userId, branchId, positionId })
     }
 
     await connection.commit();
-    committed = true;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
   } finally {
-    if (!committed) {
-      try {
-        await connection.rollback();
-      } catch (error) {
-        // ignore rollback errors
-      }
-    }
     connection.release();
   }
 }
@@ -1278,9 +1294,7 @@ async function createAttempt(assessment, userId) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    logWithTime("createAttempt", `Начало создания попытки`, { assessmentId: assessment.id, userId });
-
-    logWithTime("createAttempt", "Блокируем запись аттестации для проверки ограничений");
+    logger.debug("createAttempt start assessmentId=%s userId=%s", assessment.id, userId);
     const [assessmentRow] = await connection.execute(
       "SELECT id, title, open_at, close_at, max_attempts, time_limit_minutes, created_by FROM assessments WHERE id = ? FOR UPDATE",
       [assessment.id],
@@ -1317,10 +1331,7 @@ async function createAttempt(assessment, userId) {
 
     if (existingAttemptRows.length) {
       const existing = existingAttemptRows[0];
-      logWithTime("createAttempt", "Найдена активная попытка, возвращаем её", {
-        attemptId: existing.id,
-        attemptNumber: existing.attempt_number,
-      });
+      logger.debug("createAttempt found existing in_progress attempt=%s", existing.id);
       await connection.commit();
       return {
         id: existing.id,
@@ -1338,15 +1349,15 @@ async function createAttempt(assessment, userId) {
       userId,
     ]);
     const attemptNumber = Number(attemptCountRows[0].total || 0) + 1;
-    logWithTime("createAttempt", `Текущее количество попыток пользователя: ${attemptNumber - 1}, новая попытка будет №${attemptNumber}`);
+    logger.debug("createAttempt attemptNumber=%s", attemptNumber);
     // max_attempts = 0 означает безлимитный режим.
     if (row.max_attempts != null && Number(row.max_attempts) > 0 && attemptNumber > Number(row.max_attempts)) {
       const error = new Error("Превышено количество попыток");
       error.status = 400;
+      error.code = "ATTEMPT_LIMIT_EXCEEDED";
       throw error;
     }
 
-    logWithTime("createAttempt", "Вставляем запись попытки");
     const [insertResult] = await connection.execute(
       `INSERT INTO assessment_attempts (assessment_id, user_id, attempt_number, status, started_at, created_at, updated_at)
        VALUES (?, ?, ?, 'in_progress', UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
@@ -1356,14 +1367,8 @@ async function createAttempt(assessment, userId) {
     const attemptId = insertResult.insertId;
     await createAttemptQuestionsSnapshot(connection, { attemptId, assessmentId: assessment.id });
 
-    logWithTime("createAttempt", "Создана попытка без рандомизации", {
-      attemptId,
-      attemptNumber,
-      assessmentId: assessment.id,
-    });
-
     await connection.commit();
-    logWithTime("createAttempt", "Транзакция успешно зафиксирована", { attemptId });
+    logger.debug("createAttempt committed attemptId=%s", attemptId);
 
     const timeLimitMinutes = row.time_limit_minutes != null ? Number(row.time_limit_minutes) : null;
 
@@ -1378,7 +1383,7 @@ async function createAttempt(assessment, userId) {
       startedAt: new Date().toISOString(),
     };
   } catch (error) {
-    logErrorWithTime("createAttempt", "Ошибка при создании попытки", error);
+    logger.error("createAttempt error: %s", error.message);
     await connection.rollback();
     throw error;
   } finally {
@@ -1550,15 +1555,7 @@ async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, 
   try {
     await connection.beginTransaction();
 
-    logWithTime("saveAnswer", "Входные данные", {
-      attemptId,
-      userId,
-      questionId,
-      optionId,
-      optionIds,
-      textAnswer,
-      matchPairs,
-    });
+    logger.debug("saveAnswer attemptId=%s questionId=%s", attemptId, questionId);
 
     const [attemptRows] = await connection.execute(
       "SELECT id, assessment_id, status FROM assessment_attempts WHERE id = ? AND user_id = ? FOR UPDATE",
@@ -1570,7 +1567,6 @@ async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, 
       throw error;
     }
     const attempt = attemptRows[0];
-    logWithTime("saveAnswer", "Получена попытка", { attemptId: attempt.id, status: attempt.status });
     if (attempt.status !== "in_progress") {
       const error = new Error("Попытка уже завершена");
       error.status = 400;
@@ -1582,25 +1578,11 @@ async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, 
       questionId,
     });
 
-    logWithTime("saveAnswer", "Детали вопроса", {
-      questionType: question.questionType,
-      optionId,
-      optionIds,
-      textAnswer,
-    });
-
     const { resolvedOptionId, selectedOptionIdsJson, resolvedTextAnswer, isCorrect } = scoreAnswer(question, {
       optionId,
       optionIds,
       textAnswer,
       matchPairs,
-    });
-
-    logWithTime("saveAnswer", "Сохраняем ответ", {
-      attemptId,
-      questionId,
-      isCorrect,
-      questionType: question.questionType,
     });
 
     await connection.execute(
@@ -1610,14 +1592,11 @@ async function saveAnswer({ attemptId, userId, questionId, optionId, optionIds, 
       [attemptId, questionId, resolvedOptionId, selectedOptionIdsJson, resolvedTextAnswer, isCorrect],
     );
 
-    logWithTime("saveAnswer", "Ответ сохранён", { questionId });
-
     await connection.commit();
-    logWithTime("saveAnswer", "Транзакция зафиксирована", { attemptId, questionId });
 
     return { isCorrect: !!isCorrect, assessmentId: attempt.assessment_id };
   } catch (error) {
-    logErrorWithTime("saveAnswer", "Ошибка при сохранении ответа", error);
+    logger.error("saveAnswer error: %s", error.message);
     await connection.rollback();
     throw error;
   } finally {
@@ -1686,7 +1665,6 @@ async function completeAttempt(attemptId, userId) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    logWithTime("completeAttempt", "Начало завершения попытки", { attemptId, userId });
 
     const [attemptRows] = await connection.execute(
       "SELECT id, assessment_id, status, started_at, attempt_number FROM assessment_attempts WHERE id = ? AND user_id = ? FOR UPDATE",
@@ -1698,7 +1676,6 @@ async function completeAttempt(attemptId, userId) {
       throw error;
     }
     const attempt = attemptRows[0];
-    logWithTime("completeAttempt", "Получена попытка", { attemptId: attempt.id, status: attempt.status });
     if (attempt.status !== "in_progress") {
       const error = new Error("Попытка уже завершена");
       error.status = 400;
@@ -1716,10 +1693,9 @@ async function completeAttempt(attemptId, userId) {
     }
     const assessment = assessmentRows[0];
 
-    const [[snapshotCountRow]] = await connection.execute(
-      "SELECT COUNT(*) AS total FROM assessment_attempt_questions WHERE attempt_id = ?",
-      [attemptId],
-    );
+    const [[snapshotCountRow]] = await connection.execute("SELECT COUNT(*) AS total FROM assessment_attempt_questions WHERE attempt_id = ?", [
+      attemptId,
+    ]);
     let totalQuestions = Number(snapshotCountRow.total || 0);
     if (totalQuestions === 0) {
       const [[questionRow]] = await connection.execute("SELECT COUNT(*) AS total FROM assessment_questions WHERE assessment_id = ?", [assessment.id]);
@@ -1731,14 +1707,7 @@ async function completeAttempt(attemptId, userId) {
     ]);
     const correctAnswers = Number(correctRow.total || 0);
 
-    logWithTime("completeAttempt", "Статистика ответов", { attemptId, totalQuestions, correctAnswers });
-
-    // Получим все ответы для отладки
-    const [allAnswers] = await connection.execute(
-      "SELECT question_id, option_id, selected_option_ids, text_answer, is_correct FROM assessment_answers WHERE attempt_id = ?",
-      [attemptId],
-    );
-    logWithTime("completeAttempt", "Список всех ответов", allAnswers);
+    logger.debug("completeAttempt attemptId=%s totalQuestions=%s correctAnswers=%s", attemptId, totalQuestions, correctAnswers);
 
     const scorePercent = totalQuestions > 0 ? Number(((correctAnswers / totalQuestions) * 100).toFixed(2)) : 0;
 
@@ -1761,12 +1730,7 @@ async function completeAttempt(attemptId, userId) {
     );
 
     await connection.commit();
-    logWithTime("completeAttempt", "Попытка завершена и зафиксирована", {
-      attemptId,
-      scorePercent,
-      correctAnswers,
-      totalQuestions,
-    });
+    logger.debug("completeAttempt committed attemptId=%s score=%s", attemptId, scorePercent);
 
     return {
       assessment: {
@@ -1786,7 +1750,7 @@ async function completeAttempt(attemptId, userId) {
       },
     };
   } catch (error) {
-    logErrorWithTime("completeAttempt", "Ошибка при завершении попытки", error);
+    logger.error("completeAttempt error: %s", error.message);
     await connection.rollback();
     throw error;
   } finally {
