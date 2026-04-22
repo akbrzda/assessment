@@ -129,7 +129,7 @@
           </button>
           <div v-else></div>
 
-          <button v-if="!isLastPage" class="btn btn-primary" :disabled="!canGoNext" @click="nextPage">Далее →</button>
+          <button v-if="!isLastPage" class="btn btn-primary" :disabled="!canGoNext" @click="nextPage">Далее -></button>
           <button v-else class="btn btn-primary" :disabled="!canSubmit || versionOutdated" @click="handlePrimaryAction">
             {{ primaryButtonLabel }}
           </button>

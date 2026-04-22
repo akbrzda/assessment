@@ -1395,8 +1395,73 @@ const normalizeTextAnswer = (value) => {
   if (typeof value !== "string") {
     return "";
   }
-  return value.trim().replace(/\s+/g, " ").toLowerCase();
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 };
+
+function splitAnswerVariants(value) {
+  if (typeof value !== "string") {
+    return [];
+  }
+
+  return value
+    .split("|")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+function splitKeywords(value) {
+  return value
+    .split(/[+,]/)
+    .map((part) => normalizeTextAnswer(part))
+    .filter((part) => part.length > 0);
+}
+
+function hasAllKeywords(userNormalized, keywords) {
+  if (!keywords.length) {
+    return false;
+  }
+
+  const words = new Set(userNormalized.split(" ").filter(Boolean));
+  return keywords.every((keyword) => words.has(keyword) || userNormalized.includes(keyword));
+}
+
+function isTextAnswerCorrect(userTextAnswer, correctTextAnswer) {
+  const userNormalized = normalizeTextAnswer(userTextAnswer);
+  if (!userNormalized) {
+    return false;
+  }
+
+  const variants = splitAnswerVariants(correctTextAnswer);
+  if (!variants.length) {
+    return false;
+  }
+
+  for (const variant of variants) {
+    const normalizedVariant = normalizeTextAnswer(variant);
+    if (!normalizedVariant) {
+      continue;
+    }
+
+    if (userNormalized === normalizedVariant) {
+      return true;
+    }
+
+    if (variant.includes("+") || variant.includes(",")) {
+      const keywords = splitKeywords(variant);
+      if (hasAllKeywords(userNormalized, keywords)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
 
 function buildHttpError(message, status = 400) {
   const error = new Error(message);
@@ -1492,9 +1557,7 @@ function scoreAnswer(question, payload) {
     }
 
     const resolvedTextAnswer = textAnswer.trim();
-    const normalizedUser = normalizeTextAnswer(resolvedTextAnswer);
-    const normalizedCorrect = normalizeTextAnswer(question.correctTextAnswer);
-    const isCorrect = normalizedUser && normalizedCorrect && normalizedUser === normalizedCorrect ? 1 : 0;
+    const isCorrect = isTextAnswerCorrect(resolvedTextAnswer, question.correctTextAnswer) ? 1 : 0;
 
     return {
       resolvedOptionId: null,
@@ -1998,12 +2061,40 @@ async function getUsersWithIncompleteAttempts(assessmentId) {
   return rows;
 }
 
-// Отменить попытки in_progress, у которых истек лимит времени
-async function cancelExpiredAttempts(assessmentId = null) {
+// Завершить просроченные попытки in_progress с расчетом итогового результата
+async function completeExpiredAttempts(assessmentId = null) {
   let query = `
     UPDATE assessment_attempts aa
     JOIN assessments a ON aa.assessment_id = a.id
-    SET aa.status = 'cancelled',
+    LEFT JOIN (
+      SELECT aq.attempt_id, COUNT(*) AS total_questions
+      FROM assessment_attempt_questions aq
+      GROUP BY aq.attempt_id
+    ) attempt_snapshot ON attempt_snapshot.attempt_id = aa.id
+    LEFT JOIN (
+      SELECT q.assessment_id, COUNT(*) AS total_questions
+      FROM assessment_questions q
+      GROUP BY q.assessment_id
+    ) assessment_questions_count ON assessment_questions_count.assessment_id = aa.assessment_id
+    LEFT JOIN (
+      SELECT ans.attempt_id, COUNT(*) AS correct_answers
+      FROM assessment_answers ans
+      WHERE ans.is_correct = 1
+      GROUP BY ans.attempt_id
+    ) answers_stats ON answers_stats.attempt_id = aa.id
+    SET aa.status = 'completed',
+        aa.score_percent = CASE
+          WHEN COALESCE(attempt_snapshot.total_questions, assessment_questions_count.total_questions, 0) > 0
+            THEN ROUND(
+              (COALESCE(answers_stats.correct_answers, 0) / COALESCE(attempt_snapshot.total_questions, assessment_questions_count.total_questions, 0)) * 100,
+              2
+            )
+          ELSE 0
+        END,
+        aa.correct_answers = COALESCE(answers_stats.correct_answers, 0),
+        aa.total_questions = COALESCE(attempt_snapshot.total_questions, assessment_questions_count.total_questions, 0),
+        aa.time_spent_seconds = TIMESTAMPDIFF(SECOND, aa.started_at, UTC_TIMESTAMP()),
+        aa.completed_at = UTC_TIMESTAMP(),
         aa.updated_at = UTC_TIMESTAMP()
     WHERE aa.status = 'in_progress'
       AND a.time_limit_minutes IS NOT NULL
@@ -2018,6 +2109,11 @@ async function cancelExpiredAttempts(assessmentId = null) {
 
   const [result] = await pool.execute(query, params);
   return result.affectedRows;
+}
+
+// Обратная совместимость: старое имя функции перенаправляем на новое поведение
+async function cancelExpiredAttempts(assessmentId = null) {
+  return completeExpiredAttempts(assessmentId);
 }
 
 module.exports = {
@@ -2043,9 +2139,13 @@ module.exports = {
   getRecentlyOpenedAssessments,
   getOpenAssessments,
   getUsersWithIncompleteAttempts,
+  completeExpiredAttempts,
   cancelExpiredAttempts,
   __test: {
     scoreAnswer,
     normalizeTextAnswer,
+    isTextAnswerCorrect,
+    splitAnswerVariants,
+    splitKeywords,
   },
 };

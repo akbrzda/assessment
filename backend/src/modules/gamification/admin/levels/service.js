@@ -2,7 +2,7 @@ const { pool } = require("../../../../config/database");
 const { createLog } = require("../../../../services/adminLogService");
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ РІСЃРµ СѓСЂРѕРІРЅРё
+ * Получить все уровни
  */
 exports.getLevels = async (req, res, next) => {
   try {
@@ -21,7 +21,7 @@ exports.getLevels = async (req, res, next) => {
 };
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ СѓСЂРѕРІРµРЅСЊ РїРѕ РЅРѕРјРµСЂСѓ
+ * Получить уровень по номеру
  */
 exports.getLevelByNumber = async (req, res, next) => {
   try {
@@ -36,7 +36,7 @@ exports.getLevelByNumber = async (req, res, next) => {
     );
 
     if (levels.length === 0) {
-      return res.status(404).json({ error: "РЈСЂРѕРІРµРЅСЊ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Уровень не найден" });
     }
 
     res.json({ level: levels[0] });
@@ -47,25 +47,25 @@ exports.getLevelByNumber = async (req, res, next) => {
 };
 
 /**
- * РЎРѕР·РґР°С‚СЊ РЅРѕРІС‹Р№ СѓСЂРѕРІРµРЅСЊ
+ * Создать новый уровень
  */
 exports.createLevel = async (req, res, next) => {
   try {
     const { level_number, code, name, description, min_points, color, is_active, sort_order } = req.body;
 
     if (!level_number || !code || !name || min_points === undefined) {
-      return res.status(400).json({ error: "РќРѕРјРµСЂ СѓСЂРѕРІРЅСЏ, РєРѕРґ, РЅР°Р·РІР°РЅРёРµ Рё РјРёРЅРёРјР°Р»СЊРЅС‹Рµ РѕС‡РєРё РѕР±СЏР·Р°С‚РµР»СЊРЅС‹" });
+      return res.status(400).json({ error: "Номер уровня, код, название и минимальные очки обязательны" });
     }
 
-    // РџСЂРѕРІРµСЂРёС‚СЊ СѓРЅРёРєР°Р»СЊРЅРѕСЃС‚СЊ РЅРѕРјРµСЂР° СѓСЂРѕРІРЅСЏ Рё РєРѕРґР°
+    // Проверить уникальность номера уровня и кода
     const [existingLevel] = await pool.query("SELECT level_number FROM gamification_levels WHERE level_number = ?", [level_number]);
     if (existingLevel.length > 0) {
-      return res.status(400).json({ error: "РЈСЂРѕРІРµРЅСЊ СЃ С‚Р°РєРёРј РЅРѕРјРµСЂРѕРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚" });
+      return res.status(400).json({ error: "Уровень с таким номером уже существует" });
     }
 
     const [existingCode] = await pool.query("SELECT level_number FROM gamification_levels WHERE code = ?", [code]);
     if (existingCode.length > 0) {
-      return res.status(400).json({ error: "РЈСЂРѕРІРµРЅСЊ СЃ С‚Р°РєРёРј РєРѕРґРѕРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚" });
+      return res.status(400).json({ error: "Уровень с таким кодом уже существует" });
     }
 
     await pool.query(
@@ -84,10 +84,10 @@ exports.createLevel = async (req, res, next) => {
       ]
     );
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ
-    await createLog(req.user.id, "CREATE", `РЎРѕР·РґР°РЅ СѓСЂРѕРІРµРЅСЊ: ${name} (${level_number}) СЃ РїРѕСЂРѕРіРѕРј ${min_points} РѕС‡РєРѕРІ`, "level", level_number, req);
+    // Логирование
+    await createLog(req.user.id, "CREATE", `Создан уровень: ${name} (${level_number}) с порогом ${min_points} очков`, "level", level_number, req);
 
-    res.status(201).json({ message: "РЈСЂРѕРІРµРЅСЊ СЃРѕР·РґР°РЅ СѓСЃРїРµС€РЅРѕ" });
+    res.status(201).json({ message: "Уровень создан успешно" });
   } catch (error) {
     console.error("Create level error:", error);
     next(error);
@@ -95,17 +95,17 @@ exports.createLevel = async (req, res, next) => {
 };
 
 /**
- * РћР±РЅРѕРІРёС‚СЊ СѓСЂРѕРІРµРЅСЊ
+ * Обновить уровень
  */
 exports.updateLevel = async (req, res, next) => {
   try {
     const { level_number } = req.params;
     const { name, description, min_points, color, is_active, sort_order } = req.body;
 
-    // РџСЂРѕРІРµСЂРёС‚СЊ СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёРµ
+    // Проверить существование
     const [existing] = await pool.query("SELECT level_number, name, min_points FROM gamification_levels WHERE level_number = ?", [level_number]);
     if (existing.length === 0) {
-      return res.status(404).json({ error: "РЈСЂРѕРІРµРЅСЊ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Уровень не найден" });
     }
 
     const oldData = existing[0];
@@ -117,17 +117,17 @@ exports.updateLevel = async (req, res, next) => {
       [name, description || null, min_points, color || "#6366F1", is_active !== undefined ? is_active : 1, sort_order || level_number, level_number]
     );
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ
+    // Логирование
     await createLog(
       req.user.id,
       "UPDATE",
-      `РћР±РЅРѕРІР»РµРЅ СѓСЂРѕРІРµРЅСЊ ${level_number}: ${name} (РїРѕСЂРѕРі: ${oldData.min_points} в†’ ${min_points})`,
+      `Обновлен уровень ${level_number}: ${name} (порог: ${oldData.min_points} → ${min_points})`,
       "level",
       level_number,
       req
     );
 
-    res.json({ message: "РЈСЂРѕРІРµРЅСЊ РѕР±РЅРѕРІР»РµРЅ СѓСЃРїРµС€РЅРѕ" });
+    res.json({ message: "Уровень обновлен успешно" });
   } catch (error) {
     console.error("Update level error:", error);
     next(error);
@@ -135,32 +135,32 @@ exports.updateLevel = async (req, res, next) => {
 };
 
 /**
- * РЈРґР°Р»РёС‚СЊ СѓСЂРѕРІРµРЅСЊ
+ * Удалить уровень
  */
 exports.deleteLevel = async (req, res, next) => {
   try {
     const { level_number } = req.params;
 
-    // РџСЂРѕРІРµСЂРёС‚СЊ СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёРµ
+    // Проверить существование
     const [levels] = await pool.query("SELECT level_number, name FROM gamification_levels WHERE level_number = ?", [level_number]);
     if (levels.length === 0) {
-      return res.status(404).json({ error: "РЈСЂРѕРІРµРЅСЊ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Уровень не найден" });
     }
 
     const level = levels[0];
 
-    // РџСЂРѕРІРµСЂРёС‚СЊ, РµСЃС‚СЊ Р»Рё РїРѕР»СЊР·РѕРІР°С‚РµР»Рё СЃ СЌС‚РёРј СѓСЂРѕРІРЅРµРј
+    // Проверить, есть ли пользователи с этим уровнем
     const [users] = await pool.query("SELECT COUNT(*) as count FROM users WHERE level = ?", [level_number]);
     if (users[0].count > 0) {
       return res.status(400).json({
-        error: `РќРµРІРѕР·РјРѕР¶РЅРѕ СѓРґР°Р»РёС‚СЊ СѓСЂРѕРІРµРЅСЊ. Р•СЃС‚СЊ ${users[0].count} РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ СЃ СЌС‚РёРј СѓСЂРѕРІРЅРµРј. РџРµСЂРµРІРµРґРёС‚Рµ РёС… РЅР° РґСЂСѓРіРѕР№ СѓСЂРѕРІРµРЅСЊ СЃРЅР°С‡Р°Р»Р°.`,
+        error: `Невозможно удалить уровень. Есть ${users[0].count} пользователей с этим уровнем. Переведите их на другой уровень сначала.`,
       });
     }
 
     await pool.query("DELETE FROM gamification_levels WHERE level_number = ?", [level_number]);
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ
-    await createLog(req.user.id, "DELETE", `РЈРґР°Р»РµРЅ СѓСЂРѕРІРµРЅСЊ: ${level.name} (${level_number})`, "level", level_number, req);
+    // Логирование
+    await createLog(req.user.id, "DELETE", `Удален уровень: ${level.name} (${level_number})`, "level", level_number, req);
 
     res.status(204).send();
   } catch (error) {
@@ -170,19 +170,19 @@ exports.deleteLevel = async (req, res, next) => {
 };
 
 /**
- * РџРµСЂРµСЃС‡РёС‚Р°С‚СЊ СѓСЂРѕРІРЅРё РІСЃРµС… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
+ * Пересчитать уровни всех пользователей
  */
 exports.recalculateLevels = async (req, res, next) => {
   let connection;
   try {
-    // РџРѕР»СѓС‡РёС‚СЊ РІСЃРµ СѓСЂРѕРІРЅРё РѕС‚СЃРѕСЂС‚РёСЂРѕРІР°РЅРЅС‹Рµ РїРѕ min_points
+    // Получить все уровни отсортированные по min_points
     const [levels] = await pool.query("SELECT level_number, min_points FROM gamification_levels WHERE is_active = 1 ORDER BY min_points DESC");
 
     if (levels.length === 0) {
-      return res.status(400).json({ error: "РќРµС‚ Р°РєС‚РёРІРЅС‹С… СѓСЂРѕРІРЅРµР№" });
+      return res.status(400).json({ error: "Нет активных уровней" });
     }
 
-    // РџРѕР»СѓС‡РёС‚СЊ РІСЃРµС… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ СЃ РёС… РѕС‡РєР°РјРё
+    // Получить всех пользователей с их очками
     const [users] = await pool.query("SELECT id, points FROM users");
 
     connection = await pool.getConnection();
@@ -191,8 +191,8 @@ exports.recalculateLevels = async (req, res, next) => {
     let updatedCount = 0;
 
     for (const user of users) {
-      // РќР°Р№С‚Рё РїРѕРґС…РѕРґСЏС‰РёР№ СѓСЂРѕРІРµРЅСЊ РґР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
-      let userLevel = levels[levels.length - 1].level_number; // РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ СЃР°РјС‹Р№ РЅРёР·РєРёР№ СѓСЂРѕРІРµРЅСЊ
+      // Найти подходящий уровень для пользователя
+      let userLevel = levels[levels.length - 1].level_number; // по умолчанию самый низкий уровень
 
       for (const level of levels) {
         if (user.points >= level.min_points) {
@@ -201,20 +201,20 @@ exports.recalculateLevels = async (req, res, next) => {
         }
       }
 
-      // РћР±РЅРѕРІРёС‚СЊ СѓСЂРѕРІРµРЅСЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РµСЃР»Рё РёР·РјРµРЅРёР»СЃСЏ
+      // Обновить уровень пользователя если изменился
       await connection.query("UPDATE users SET level = ? WHERE id = ?", [userLevel, user.id]);
       updatedCount++;
     }
 
     await connection.commit();
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ
+    // Логирование
     if (req.user && req.user.id) {
-      await createLog(req.user.id, "UPDATE", `РџРµСЂРµСЃС‡РёС‚Р°РЅС‹ СѓСЂРѕРІРЅРё РґР»СЏ ${updatedCount} РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№`, "level", null, req);
+      await createLog(req.user.id, "UPDATE", `Пересчитаны уровни для ${updatedCount} пользователей`, "level", null, req);
     }
 
     res.json({
-      message: `РЈСЂРѕРІРЅРё РїРµСЂРµСЃС‡РёС‚Р°РЅС‹ РґР»СЏ ${updatedCount} РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№`,
+      message: `Уровни пересчитаны для ${updatedCount} пользователей`,
       updatedCount,
     });
   } catch (error) {
@@ -224,7 +224,7 @@ exports.recalculateLevels = async (req, res, next) => {
     console.error("Recalculate levels error:", error);
     console.error("Error stack:", error.stack);
     res.status(500).json({
-      error: "РћС€РёР±РєР° РїСЂРё РїРµСЂРµСЃС‡С‘С‚Рµ СѓСЂРѕРІРЅРµР№",
+      error: "Ошибка при пересчёте уровней",
       details: error.message,
     });
   } finally {
@@ -235,7 +235,7 @@ exports.recalculateLevels = async (req, res, next) => {
 };
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚РёСЃС‚РёРєСѓ РїРѕ СѓСЂРѕРІРЅСЏРј
+ * Получить статистику по уровням
  */
 exports.getLevelsStats = async (req, res, next) => {
   try {

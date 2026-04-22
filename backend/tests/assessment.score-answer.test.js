@@ -72,3 +72,33 @@ test('scoreAnswer: text учитывает нормализацию пробел
 
   assert.equal(result.isCorrect, 1);
 });
+
+test('scoreAnswer: text поддерживает синонимы через |', () => {
+  const result = scoreAnswer(
+    {
+      questionType: 'text',
+      correctTextAnswer: 'кофе|капучино|латте',
+      options: [],
+    },
+    {
+      textAnswer: 'Капучино',
+    }
+  );
+
+  assert.equal(result.isCorrect, 1);
+});
+
+test('scoreAnswer: text поддерживает ключевые слова через + и ,', () => {
+  const result = scoreAnswer(
+    {
+      questionType: 'text',
+      correctTextAnswer: 'клиент+сервис,улыбка',
+      options: [],
+    },
+    {
+      textAnswer: 'Сервис для клиент важен: улыбка и скорость',
+    }
+  );
+
+  assert.equal(result.isCorrect, 1);
+});

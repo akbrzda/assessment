@@ -67,6 +67,10 @@ async function updateTimezone(userId, timezone) {
   return userModel.updateTimezone(userId, timezone);
 }
 
+async function completeOnboarding(userId) {
+  return userModel.completeOnboarding(userId);
+}
+
 module.exports = {
   getDashboardData,
   findUserByTelegramId,
@@ -84,5 +88,5 @@ module.exports = {
   getRoles,
   updateProfile,
   updateTimezone,
+  completeOnboarding,
 };
-

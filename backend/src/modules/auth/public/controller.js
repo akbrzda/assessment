@@ -73,6 +73,15 @@ async function updateTimezone(req, res, next) {
   }
 }
 
+async function completeOnboarding(req, res, next) {
+  try {
+    const result = await authService.completeOnboarding(req.currentUser);
+    res.json(result);
+  } catch (error) {
+    handleKnownError(error, res, next);
+  }
+}
+
 async function getReferences(req, res, next) {
   try {
     const payload = await authService.getReferences();
@@ -88,5 +97,6 @@ module.exports = {
   getProfile,
   updateProfile,
   updateTimezone,
+  completeOnboarding,
   getReferences,
 };

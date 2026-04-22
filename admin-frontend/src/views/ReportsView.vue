@@ -133,7 +133,7 @@
                 <td class="attempts-cell">{{ user.total_assessments }}</td>
                 <td class="score-cell">{{ formatUserScore(user.avg_score) }}%</td>
                 <td>
-                  <button @click="openUserReport(user.id)" class="action-btn" title="Посмотреть отчёт">👤</button>
+                  <button @click="openUserReport(user.id)" class="action-btn" title="Посмотреть отчёт"></button>
                 </td>
               </tr>
             </tbody>

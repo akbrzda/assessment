@@ -294,7 +294,7 @@ export default {
 
     function formatAttemptsLabel(attemptsUsed, maxAttempts) {
       if (isUnlimitedAttempts(maxAttempts)) {
-        return `${Number(attemptsUsed || 0)} из ∞`;
+        return `${Number(attemptsUsed || 0)} из `;
       }
       return `${Number(attemptsUsed || 0)} из ${Number(maxAttempts || 0)}`;
     }

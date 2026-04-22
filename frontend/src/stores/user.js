@@ -52,6 +52,8 @@ function mapUserPayload(baseUser, overview) {
     roleId: baseUser.roleId,
     role: baseUser.roleName || baseUser.role,
     roleName: baseUser.roleName || baseUser.role,
+    onboardingCompletedAt: baseUser.onboardingCompletedAt || null,
+    isFirstLogin: Boolean(baseUser.isFirstLogin),
     level: overview?.levelInfo?.name || baseUser.level,
     levelNumber: overview?.levelInfo?.levelNumber || null,
     points,

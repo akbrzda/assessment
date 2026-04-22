@@ -289,7 +289,7 @@
           <div v-else class="options-list">
             <div v-for="option in question.options" :key="option.id" class="option-item" :class="{ 'option-correct': option.is_correct }">
               <div class="option-text">
-                <span v-if="option.is_correct" class="correct-marker">✓</span>
+                <span v-if="option.is_correct" class="correct-marker"></span>
                 {{ option.option_text }}
               </div>
               <div class="option-stats">

@@ -5,8 +5,8 @@
 
 /**
  * Определяет статус темы после просмотра материала.
- * - Нет теста → тема завершена сразу
- * - Есть тест → переходит в in_progress до сдачи теста
+ * - Нет теста -> тема завершена сразу
+ * - Есть тест -> переходит в in_progress до сдачи теста
  * @param {boolean} hasMaterial
  * @param {number|null} assessmentId
  * @returns {'completed'|'in_progress'}

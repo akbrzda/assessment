@@ -16,8 +16,9 @@ router.get("/branches/detailed", analyticsController.getDetailedBranchAnalytics)
 router.get("/combined", analyticsController.getCombinedAnalytics);
 router.get("/assessment/:assessmentId", analyticsController.getAssessmentReport);
 router.get("/user/:userId", analyticsController.getUserReport);
+router.get("/failure-reasons", analyticsController.getFailureReasons);
 router.get("/export/excel", analyticsController.exportToExcel);
+router.get("/export/csv", analyticsController.exportToCsv);
 router.get("/export/pdf", analyticsController.exportToPDF);
 
 module.exports = router;
-

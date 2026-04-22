@@ -23,7 +23,7 @@ const cacheMiddleware = (options = {}) => {
     const cacheKey = keyGenerator(req);
 
     // Проверяем наличие в кеше
-    const cachedData = cacheService.get(cacheKey);
+    const cachedData = await cacheService.get(cacheKey);
     if (cachedData) {
       return res.json(cachedData);
     }
@@ -33,7 +33,7 @@ const cacheMiddleware = (options = {}) => {
     res.json = (data) => {
       // Кешируем только если нужно
       if (shouldCache(req, res)) {
-        cacheService.set(cacheKey, data, ttl);
+        cacheService.set(cacheKey, data, ttl).catch(() => {});
       }
       return originalJson(data);
     };
@@ -57,10 +57,10 @@ const invalidateCacheMiddleware = (pattern) => {
         if (typeof pattern === "function") {
           const computedPattern = pattern(req);
           if (computedPattern) {
-            cacheService.invalidate(computedPattern);
+            cacheService.invalidate(computedPattern).catch(() => {});
           }
         } else {
-          cacheService.invalidate(pattern);
+          cacheService.invalidate(pattern).catch(() => {});
         }
       }
 

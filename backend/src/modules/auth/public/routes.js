@@ -10,7 +10,7 @@ router.post("/register", verifyInitData, resolveUser, authController.register);
 router.get("/profile", verifyInitData, resolveUser, authController.getProfile);
 router.patch("/profile", verifyInitData, resolveUser, authController.updateProfile);
 router.patch("/timezone", verifyInitData, resolveUser, authController.updateTimezone);
+router.post("/onboarding/complete", verifyInitData, resolveUser, authController.completeOnboarding);
 router.get("/references", verifyInitData, authController.getReferences);
 
 module.exports = router;
-

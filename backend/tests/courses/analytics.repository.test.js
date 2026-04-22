@@ -6,6 +6,13 @@ const analyticsRepo = require("../../src/modules/courses/courseAnalytics.reposit
 
 test("аналитика воронки: возвращает расширенные метрики курса", async () => {
   const originalExecute = pool.execute;
+  const originalQuery = pool.query;
+  pool.query = async () => [
+    [
+      { table_name: "course_sections" },
+      { table_name: "course_section_user_progress" },
+    ],
+  ];
   pool.execute = async () => [
     [
       {
@@ -46,11 +53,19 @@ test("аналитика воронки: возвращает расширенн
     });
   } finally {
     pool.execute = originalExecute;
+    pool.query = originalQuery;
   }
 });
 
 test("отчет прогресса: агрегирует summary по пользователям", async () => {
   const originalExecute = pool.execute;
+  const originalQuery = pool.query;
+  pool.query = async () => [
+    [
+      { table_name: "course_sections" },
+      { table_name: "course_section_user_progress" },
+    ],
+  ];
   pool.execute = async () => [
     [
       {
@@ -115,5 +130,6 @@ test("отчет прогресса: агрегирует summary по поль�
     });
   } finally {
     pool.execute = originalExecute;
+    pool.query = originalQuery;
   }
 });

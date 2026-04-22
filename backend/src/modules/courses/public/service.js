@@ -32,7 +32,7 @@ async function startCourse(courseId, userId, { positionId = null, branchId = nul
 async function getCourseProgress(courseId, userId) {
   const course = await coursesRepository.findCourseById(courseId);
   if (!course || course.status !== "published") {
-    const error = new Error("РљСѓСЂСЃ РЅРµ РЅР°Р№РґРµРЅ РёР»Рё РЅРµРґРѕСЃС‚СѓРїРµРЅ");
+    const error = new Error("Курс не найден или недоступен");
     error.status = 404;
     throw error;
   }

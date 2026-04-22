@@ -281,7 +281,7 @@ export default {
         ? overview.badges.map((badge) => ({
             id: badge.code,
             name: badge.name,
-            icon: badge.icon || "🏅",
+            icon: badge.icon || "",
             earned: Boolean(badge.earned),
             description: badge.description,
             requirements: badge.description,

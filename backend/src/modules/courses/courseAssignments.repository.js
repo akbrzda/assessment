@@ -1,6 +1,6 @@
 const { pool } = require("../../config/database");
 
-// ─── Чтение назначений ───────────────────────────────────────────────────────
+// --- Чтение назначений -------------------------------------------------------
 
 async function getTargets(courseId) {
   const [[posRows], [branchRows]] = await Promise.all([
@@ -60,7 +60,7 @@ async function getAssignments(courseId) {
   }));
 }
 
-// ─── Обновление назначений ────────────────────────────────────────────────────
+// --- Обновление назначений ----------------------------------------------------
 
 async function replaceTargets(courseId, { positionIds, branchIds }) {
   const connection = await pool.getConnection();
@@ -140,7 +140,7 @@ async function findUserAssignment(courseId, userId) {
   };
 }
 
-// ─── Фильтрация курсов для пользователя ─────────────────────────────────────
+// --- Фильтрация курсов для пользователя -------------------------------------
 
 /**
  * Возвращает ID опубликованных курсов, доступных пользователю.

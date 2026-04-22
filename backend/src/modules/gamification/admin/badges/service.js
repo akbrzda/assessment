@@ -4,7 +4,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-// РќР°СЃС‚СЂРѕР№РєР° Р·Р°РіСЂСѓР·РєРё С„Р°Р№Р»РѕРІ
+// Настройка загрузки файлов
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(__dirname, "../../../../../uploads/badges");
@@ -29,12 +29,12 @@ const upload = multer({
     if (mimetype && extname) {
       return cb(null, true);
     }
-    cb(new Error("РўРѕР»СЊРєРѕ РёР·РѕР±СЂР°Р¶РµРЅРёСЏ СЂР°Р·СЂРµС€РµРЅС‹ (jpeg, jpg, png, gif, svg)"));
+    cb(new Error("Только изображения разрешены (jpeg, jpg, png, gif, svg)"));
   },
 }).single("icon");
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ РІСЃРµ Р±РµР№РґР¶Рё
+ * Получить все бейджи
  */
 exports.getBadges = async (req, res, next) => {
   try {
@@ -54,7 +54,7 @@ exports.getBadges = async (req, res, next) => {
 };
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ Р±РµР№РґР¶ РїРѕ ID
+ * Получить бейдж по ID
  */
 exports.getBadgeById = async (req, res, next) => {
   try {
@@ -70,7 +70,7 @@ exports.getBadgeById = async (req, res, next) => {
     );
 
     if (badges.length === 0) {
-      return res.status(404).json({ error: "Р‘РµР№РґР¶ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Бейдж не найден" });
     }
 
     res.json({ badge: badges[0] });
@@ -81,20 +81,20 @@ exports.getBadgeById = async (req, res, next) => {
 };
 
 /**
- * РЎРѕР·РґР°С‚СЊ РЅРѕРІС‹Р№ Р±РµР№РґР¶
+ * Создать новый бейдж
  */
 exports.createBadge = async (req, res, next) => {
   try {
     const { code, name, description, icon, color, condition_type, condition_data, points_reward, is_active, sort_order } = req.body;
 
     if (!code || !name) {
-      return res.status(400).json({ error: "РљРѕРґ Рё РЅР°Р·РІР°РЅРёРµ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹" });
+      return res.status(400).json({ error: "Код и название обязательны" });
     }
 
-    // РџСЂРѕРІРµСЂРёС‚СЊ СѓРЅРёРєР°Р»СЊРЅРѕСЃС‚СЊ РєРѕРґР°
+    // Проверить уникальность кода
     const [existing] = await pool.query("SELECT id FROM badges WHERE code = ?", [code]);
     if (existing.length > 0) {
-      return res.status(400).json({ error: "Р‘РµР№РґР¶ СЃ С‚Р°РєРёРј РєРѕРґРѕРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚" });
+      return res.status(400).json({ error: "Бейдж с таким кодом уже существует" });
     }
 
     const [result] = await pool.query(
@@ -115,10 +115,10 @@ exports.createBadge = async (req, res, next) => {
       ]
     );
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ
-    await createLog(req.user.id, "CREATE", `РЎРѕР·РґР°РЅ Р±РµР№РґР¶: ${name} (${code})`, "badge", result.insertId, req);
+    // Логирование
+    await createLog(req.user.id, "CREATE", `Создан бейдж: ${name} (${code})`, "badge", result.insertId, req);
 
-    res.status(201).json({ message: "Р‘РµР№РґР¶ СЃРѕР·РґР°РЅ СѓСЃРїРµС€РЅРѕ", badgeId: result.insertId });
+    res.status(201).json({ message: "Бейдж создан успешно", badgeId: result.insertId });
   } catch (error) {
     console.error("Create badge error:", error);
     next(error);
@@ -126,17 +126,17 @@ exports.createBadge = async (req, res, next) => {
 };
 
 /**
- * РћР±РЅРѕРІРёС‚СЊ Р±РµР№РґР¶
+ * Обновить бейдж
  */
 exports.updateBadge = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { name, description, icon, color, condition_type, condition_data, points_reward, is_active, sort_order } = req.body;
 
-    // РџСЂРѕРІРµСЂРёС‚СЊ СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёРµ
+    // Проверить существование
     const [existing] = await pool.query("SELECT id, name FROM badges WHERE id = ?", [id]);
     if (existing.length === 0) {
-      return res.status(404).json({ error: "Р‘РµР№РґР¶ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Бейдж не найден" });
     }
 
     await pool.query(
@@ -159,10 +159,10 @@ exports.updateBadge = async (req, res, next) => {
       ]
     );
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ
-    await createLog(req.user.id, "UPDATE", `РћР±РЅРѕРІР»РµРЅ Р±РµР№РґР¶: ${name} (ID: ${id})`, "badge", id, req);
+    // Логирование
+    await createLog(req.user.id, "UPDATE", `Обновлен бейдж: ${name} (ID: ${id})`, "badge", id, req);
 
-    res.json({ message: "Р‘РµР№РґР¶ РѕР±РЅРѕРІР»РµРЅ СѓСЃРїРµС€РЅРѕ" });
+    res.json({ message: "Бейдж обновлен успешно" });
   } catch (error) {
     console.error("Update badge error:", error);
     next(error);
@@ -170,7 +170,7 @@ exports.updateBadge = async (req, res, next) => {
 };
 
 /**
- * Р—Р°РіСЂСѓР·РёС‚СЊ РёРєРѕРЅРєСѓ РґР»СЏ Р±РµР№РґР¶Р°
+ * Загрузить иконку для бейджа
  */
 exports.uploadBadgeIcon = async (req, res, next) => {
   upload(req, res, async (err) => {
@@ -179,21 +179,21 @@ exports.uploadBadgeIcon = async (req, res, next) => {
     }
 
     if (!req.file) {
-      return res.status(400).json({ error: "Р¤Р°Р№Р» РЅРµ Р·Р°РіСЂСѓР¶РµРЅ" });
+      return res.status(400).json({ error: "Файл не загружен" });
     }
 
     try {
       const { id } = req.params;
 
-      // РџСЂРѕРІРµСЂРёС‚СЊ СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёРµ Р±РµР№РґР¶Р°
+      // Проверить существование бейджа
       const [badges] = await pool.query("SELECT id, icon_url FROM badges WHERE id = ?", [id]);
       if (badges.length === 0) {
-        // РЈРґР°Р»РёС‚СЊ Р·Р°РіСЂСѓР¶РµРЅРЅС‹Р№ С„Р°Р№Р»
+        // Удалить загруженный файл
         fs.unlinkSync(req.file.path);
-        return res.status(404).json({ error: "Р‘РµР№РґР¶ РЅРµ РЅР°Р№РґРµРЅ" });
+        return res.status(404).json({ error: "Бейдж не найден" });
       }
 
-      // РЈРґР°Р»РёС‚СЊ СЃС‚Р°СЂСѓСЋ РёРєРѕРЅРєСѓ РµСЃР»Рё РµСЃС‚СЊ
+      // Удалить старую иконку если есть
       if (badges[0].icon_url) {
         const oldPath = path.join(__dirname, "../../../../../uploads/badges", path.basename(badges[0].icon_url));
         if (fs.existsSync(oldPath)) {
@@ -203,15 +203,15 @@ exports.uploadBadgeIcon = async (req, res, next) => {
 
       const iconUrl = `/uploads/badges/${req.file.filename}`;
 
-      // РћР±РЅРѕРІРёС‚СЊ URL РёРєРѕРЅРєРё
+      // Обновить URL иконки
       await pool.query("UPDATE badges SET icon_url = ? WHERE id = ?", [iconUrl, id]);
 
-      // Р›РѕРіРёСЂРѕРІР°РЅРёРµ
-      await createLog(req.user.id, "UPDATE", `Р—Р°РіСЂСѓР¶РµРЅР° РёРєРѕРЅРєР° РґР»СЏ Р±РµР№РґР¶Р° ID: ${id}`, "badge", id, req);
+      // Логирование
+      await createLog(req.user.id, "UPDATE", `Загружена иконка для бейджа ID: ${id}`, "badge", id, req);
 
-      res.json({ message: "РРєРѕРЅРєР° Р·Р°РіСЂСѓР¶РµРЅР° СѓСЃРїРµС€РЅРѕ", iconUrl });
+      res.json({ message: "Иконка загружена успешно", iconUrl });
     } catch (error) {
-      // РЈРґР°Р»РёС‚СЊ Р·Р°РіСЂСѓР¶РµРЅРЅС‹Р№ С„Р°Р№Р» РІ СЃР»СѓС‡Р°Рµ РѕС€РёР±РєРё
+      // Удалить загруженный файл в случае ошибки
       if (req.file) {
         fs.unlinkSync(req.file.path);
       }
@@ -222,21 +222,21 @@ exports.uploadBadgeIcon = async (req, res, next) => {
 };
 
 /**
- * РЈРґР°Р»РёС‚СЊ Р±РµР№РґР¶
+ * Удалить бейдж
  */
 exports.deleteBadge = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // РџСЂРѕРІРµСЂРёС‚СЊ СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёРµ
+    // Проверить существование
     const [badges] = await pool.query("SELECT id, name, icon_url FROM badges WHERE id = ?", [id]);
     if (badges.length === 0) {
-      return res.status(404).json({ error: "Р‘РµР№РґР¶ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Бейдж не найден" });
     }
 
     const badge = badges[0];
 
-    // РЈРґР°Р»РёС‚СЊ РёРєРѕРЅРєСѓ РµСЃР»Рё РµСЃС‚СЊ
+    // Удалить иконку если есть
     if (badge.icon_url) {
       const iconPath = path.join(__dirname, "../../../../../uploads/badges", path.basename(badge.icon_url));
       if (fs.existsSync(iconPath)) {
@@ -244,11 +244,11 @@ exports.deleteBadge = async (req, res, next) => {
       }
     }
 
-    // РЈРґР°Р»РёС‚СЊ Р±РµР№РґР¶
+    // Удалить бейдж
     await pool.query("DELETE FROM badges WHERE id = ?", [id]);
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ
-    await createLog(req.user.id, "DELETE", `РЈРґР°Р»РµРЅ Р±РµР№РґР¶: ${badge.name} (ID: ${id})`, "badge", id, req);
+    // Логирование
+    await createLog(req.user.id, "DELETE", `Удален бейдж: ${badge.name} (ID: ${id})`, "badge", id, req);
 
     res.status(204).send();
   } catch (error) {
@@ -258,17 +258,17 @@ exports.deleteBadge = async (req, res, next) => {
 };
 
 /**
- * РР·РјРµРЅРёС‚СЊ РїРѕСЂСЏРґРѕРє СЃРѕСЂС‚РёСЂРѕРІРєРё Р±РµР№РґР¶РµР№
+ * Изменить порядок сортировки бейджей
  */
 exports.reorderBadges = async (req, res, next) => {
   try {
     const { badges } = req.body;
 
     if (!Array.isArray(badges)) {
-      return res.status(400).json({ error: "РўСЂРµР±СѓРµС‚СЃСЏ РјР°СЃСЃРёРІ Р±РµР№РґР¶РµР№" });
+      return res.status(400).json({ error: "Требуется массив бейджей" });
     }
 
-    // РћР±РЅРѕРІРёС‚СЊ РїРѕСЂСЏРґРѕРє РєР°Р¶РґРѕРіРѕ Р±РµР№РґР¶Р°
+    // Обновить порядок каждого бейджа
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -285,15 +285,12 @@ exports.reorderBadges = async (req, res, next) => {
       connection.release();
     }
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ
-    await createLog(req.user.id, "UPDATE", `РР·РјРµРЅРµРЅ РїРѕСЂСЏРґРѕРє Р±РµР№РґР¶РµР№`, "badge", null, req);
+    // Логирование
+    await createLog(req.user.id, "UPDATE", `Изменен порядок бейджей`, "badge", null, req);
 
-    res.json({ message: "РџРѕСЂСЏРґРѕРє Р±РµР№РґР¶РµР№ РѕР±РЅРѕРІР»РµРЅ" });
+    res.json({ message: "Порядок бейджей обновлен" });
   } catch (error) {
     console.error("Reorder badges error:", error);
     next(error);
   }
 };
-
-
-

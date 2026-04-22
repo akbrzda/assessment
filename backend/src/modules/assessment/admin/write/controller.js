@@ -3,7 +3,7 @@ const { createAdminLog } = require("./repository");
 const assessmentModel = require("../../../../models/assessmentModel");
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РІСЃРµС… Р°С‚С‚РµСЃС‚Р°С†РёР№ РґР»СЏ Р°РґРјРёРЅ-РїР°РЅРµР»Рё
+ * Получить список всех аттестаций для админ-панели
  */
 exports.getAssessments = async (req, res, next) => {
   try {
@@ -33,7 +33,7 @@ exports.getAssessments = async (req, res, next) => {
       params.push(pattern, pattern);
     }
 
-    // РћРіСЂР°РЅРёС‡РµРЅРёРµ РґР»СЏ СѓРїСЂР°РІР»СЏСЋС‰РµРіРѕ: С‚РѕР»СЊРєРѕ РµРіРѕ С„РёР»РёР°Р»С‹ РР›Р СЃРѕР·РґР°РЅРЅС‹Рµ РёРј СЃР°РјРёРј
+    // Ограничение для управляющего: только его филиалы или созданные им самим
     if (userRole === "manager") {
       conditions.push(`(
         a.created_by = ?
@@ -48,7 +48,7 @@ exports.getAssessments = async (req, res, next) => {
       params.push(userId, userId);
     }
 
-    // Р¤РёР»СЊС‚СЂ РїРѕ С„РёР»РёР°Р»Сѓ
+    // Фильтр по филиалу
     if (branch) {
       const branchId = Number(branch);
       if (!Number.isNaN(branchId)) {
@@ -114,22 +114,22 @@ exports.getAssessments = async (req, res, next) => {
 };
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ РґРµС‚Р°Р»Рё Р°С‚С‚РµСЃС‚Р°С†РёРё СЃ РІРѕРїСЂРѕСЃР°РјРё
+ * Получить детали аттестации СЃ вопросами
  */
 exports.getAssessmentById = async (req, res, next) => {
   try {
     const assessmentId = Number(req.params.id);
 
-    // РџРѕР»СѓС‡РёС‚СЊ РѕСЃРЅРѕРІРЅСѓСЋ РёРЅС„РѕСЂРјР°С†РёСЋ
+    // Получить основную информацию
     const [assessments] = await pool.query("SELECT * FROM assessments WHERE id = ?", [assessmentId]);
 
     if (assessments.length === 0) {
-      return res.status(404).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "Аттестация не найдена" });
     }
 
     const assessment = assessments[0];
 
-    // РџРѕР»СѓС‡РёС‚СЊ РІРѕРїСЂРѕСЃС‹ СЃ РІР°СЂРёР°РЅС‚Р°РјРё РѕС‚РІРµС‚РѕРІ
+    // Получить вопросы СЃ вариантами ответов
     const [questions] = await pool.query(
       `
       SELECT 
@@ -146,7 +146,7 @@ exports.getAssessmentById = async (req, res, next) => {
       [assessmentId]
     );
 
-    // РџРѕР»СѓС‡РёС‚СЊ РІР°СЂРёР°РЅС‚С‹ РѕС‚РІРµС‚РѕРІ РґР»СЏ РєР°Р¶РґРѕРіРѕ РІРѕРїСЂРѕСЃР°
+    // Получить варианты ответов для каждого вопроса
     for (const question of questions) {
       const [options] = await pool.query(
         `
@@ -160,7 +160,7 @@ exports.getAssessmentById = async (req, res, next) => {
       question.options = options;
     }
 
-    // РџРѕР»СѓС‡РёС‚СЊ РЅР°Р·РЅР°С‡РµРЅРЅС‹С… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
+    // Получить назначенных пользователей
     const [assignedUsers] = await pool.query(
       `
       SELECT 
@@ -204,7 +204,7 @@ exports.getAssessmentById = async (req, res, next) => {
       [assessmentId, assessmentId, assessmentId, assessmentId]
     );
 
-    // РџРѕР»СѓС‡РёС‚СЊ СЂРµР·СѓР»СЊС‚Р°С‚С‹ РїРѕРїС‹С‚РѕРє
+    // Получить результаты попыток
     const [attempts] = await pool.query(
       `
       SELECT 
@@ -241,7 +241,7 @@ exports.getAssessmentById = async (req, res, next) => {
 };
 
 /**
- * РЎРѕР·РґР°С‚СЊ РЅРѕРІСѓСЋ Р°С‚С‚РµСЃС‚Р°С†РёСЋ
+ * Создать новую аттестацию
  */
 exports.createAssessment = async (req, res, next) => {
   const connection = await pool.getConnection();
@@ -251,7 +251,7 @@ exports.createAssessment = async (req, res, next) => {
     const { title, description, openAt, closeAt, timeLimitMinutes, passScorePercent, maxAttempts, userIds, positionIds, branchIds, questions } =
       req.body;
 
-    // Р’Р°Р»РёРґР°С†РёСЏ
+    // Валидация
     if (
       !title ||
       !openAt ||
@@ -262,14 +262,14 @@ exports.createAssessment = async (req, res, next) => {
       !questions ||
       questions.length === 0
     ) {
-      return res.status(400).json({ error: "Р’СЃРµ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹Рµ РїРѕР»СЏ РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ Р·Р°РїРѕР»РЅРµРЅС‹" });
+      return res.status(400).json({ error: "Все обязательные поля должны быть заполнены" });
     }
 
     if (new Date(closeAt) <= new Date(openAt)) {
-      return res.status(400).json({ error: "Р”Р°С‚Р° Р·Р°РєСЂС‹С‚РёСЏ РґРѕР»Р¶РЅР° Р±С‹С‚СЊ РїРѕР·Р¶Рµ РґР°С‚С‹ РѕС‚РєСЂС‹С‚РёСЏ" });
+      return res.status(400).json({ error: "Дата закрытия должна быть позже даты открытия" });
     }
 
-    // РџРѕР»СѓС‡РёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ С‚РµРєСѓС‰РµРј РїРѕР»СЊР·РѕРІР°С‚РµР»Рµ
+    // Получить информацию Рѕ текущем пользователе
     const [currentUserData] = await connection.query(
       `SELECT u.id, u.branch_id, r.name as role_name
        FROM users u
@@ -279,24 +279,24 @@ exports.createAssessment = async (req, res, next) => {
     );
 
     if (currentUserData.length === 0) {
-      return res.status(403).json({ error: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(403).json({ error: "Пользователь не найден" });
     }
 
     const currentUser = currentUserData[0];
 
-    // Р”Р»СЏ СѓРїСЂР°РІР»СЏСЋС‰РµРіРѕ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё РїРѕРґСЃС‚Р°РІР»СЏРµРј РµРіРѕ С„РёР»РёР°Р»
+    // Для управляющего автоматически подставляем его филиал
     let finalBranchIds = branchIds || [];
     let finalPositionIds = positionIds || [];
     let finalUserIds = userIds || [];
 
     if (currentUser.role_name === "manager") {
       if (!currentUser.branch_id) {
-        return res.status(400).json({ error: "РЈ СѓРїСЂР°РІР»СЏСЋС‰РµРіРѕ РЅРµ СѓРєР°Р·Р°РЅ С„РёР»РёР°Р»" });
+        return res.status(400).json({ error: "РЈ управляющего не указан филиал" });
       }
-      // РЈРїСЂР°РІР»СЏСЋС‰РёР№ РјРѕР¶РµС‚ РЅР°Р·РЅР°С‡Р°С‚СЊ С‚РѕР»СЊРєРѕ РЅР° СЃРІРѕР№ С„РёР»РёР°Р»
+      // Управляющий может назначать только на свой филиал
       finalBranchIds = [currentUser.branch_id];
 
-      // Р’Р°Р»РёРґР°С†РёСЏ: РµСЃР»Рё СѓРєР°Р·Р°РЅС‹ РґРѕР»Р¶РЅРѕСЃС‚Рё, РїСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ РѕРЅРё РµСЃС‚СЊ РІ РµРіРѕ С„РёР»РёР°Р»Рµ
+      // Валидация: если указаны должности, проверяем что они есть в его филиале
       if (positionIds && positionIds.length > 0) {
         const [validPositions] = await connection.query(
           `SELECT DISTINCT p.id 
@@ -308,24 +308,24 @@ exports.createAssessment = async (req, res, next) => {
         const validPositionIds = validPositions.map((p) => p.id);
         const invalidPositions = positionIds.filter((id) => !validPositionIds.includes(id));
         if (invalidPositions.length > 0) {
-          return res.status(400).json({ error: "Р’С‹Р±СЂР°РЅС‹ РґРѕР»Р¶РЅРѕСЃС‚Рё, РєРѕС‚РѕСЂС‹С… РЅРµС‚ РІ РІР°С€РµРј С„РёР»РёР°Р»Рµ" });
+          return res.status(400).json({ error: "Выбраны должности, которых нет в вашем филиале" });
         }
         finalPositionIds = positionIds;
       }
 
-      // Р’Р°Р»РёРґР°С†РёСЏ: РµСЃР»Рё СѓРєР°Р·Р°РЅС‹ РїРѕР»СЊР·РѕРІР°С‚РµР»Рё, РїСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ РѕРЅРё РёР· РµРіРѕ С„РёР»РёР°Р»Р°
+      // Валидация: если указаны пользователи, проверяем что они из его филиала
       if (userIds && userIds.length > 0) {
         const [validUsers] = await connection.query(`SELECT id FROM users WHERE id IN (?) AND branch_id = ?`, [userIds, currentUser.branch_id]);
         const validUserIds = validUsers.map((u) => u.id);
         const invalidUsers = userIds.filter((id) => !validUserIds.includes(id));
         if (invalidUsers.length > 0) {
-          return res.status(400).json({ error: "Р’С‹Р±СЂР°РЅС‹ РїРѕР»СЊР·РѕРІР°С‚РµР»Рё, РєРѕС‚РѕСЂС‹Рµ РЅРµ РѕС‚РЅРѕСЃСЏС‚СЃСЏ Рє РІР°С€РµРјСѓ С„РёР»РёР°Р»Сѓ" });
+          return res.status(400).json({ error: "Выбраны пользователи, которые не относятся Рє вашему филиалу" });
         }
         finalUserIds = userIds;
       }
     }
 
-    // РЎРѕР·РґР°С‚СЊ Р°С‚С‚РµСЃС‚Р°С†РёСЋ
+    // Создать аттестацию
     const [result] = await connection.query(
       `
       INSERT INTO assessments (
@@ -338,33 +338,33 @@ exports.createAssessment = async (req, res, next) => {
 
     const assessmentId = result.insertId;
 
-    // Р”РѕР±Р°РІРёС‚СЊ РІРѕРїСЂРѕСЃС‹
+    // Добавить вопросы
     for (let i = 0; i < questions.length; i++) {
       const question = questions[i];
       const questionType = question.questionType || "single";
       const correctTextAnswer = questionType === "text" ? question.correctTextAnswer || "" : null;
       if (!["single", "multiple", "text", "matching"].includes(questionType)) {
-        return res.status(400).json({ error: "РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ С‚РёРї РІРѕРїСЂРѕСЃР°" });
+        return res.status(400).json({ error: "Недопустимый тип вопроса" });
       }
       if (questionType === "text" && !correctTextAnswer) {
-        return res.status(400).json({ error: "Р”Р»СЏ С‚РµРєСЃС‚РѕРІРѕРіРѕ РІРѕРїСЂРѕСЃР° РЅРµРѕР±С…РѕРґРёРјРѕ СѓРєР°Р·Р°С‚СЊ СЌС‚Р°Р»РѕРЅРЅС‹Р№ РѕС‚РІРµС‚" });
+        return res.status(400).json({ error: "Для текстового вопроса необходимо указать эталонный ответ" });
       }
       if (questionType !== "text") {
         if (!question.options || question.options.length < 2 || question.options.length > 6) {
-          return res.status(400).json({ error: "РќРµРѕР±С…РѕРґРёРјРѕ СѓРєР°Р·Р°С‚СЊ РѕС‚ 2 РґРѕ 6 РІР°СЂРёР°РЅС‚РѕРІ РѕС‚РІРµС‚РѕРІ" });
+          return res.status(400).json({ error: "Необходимо указать от 2 до 6 вариантов ответов" });
         }
         if (questionType === "matching") {
           const allPairsFilled = question.options.every((opt) => opt.text && opt.matchText && opt.matchText.trim().length > 0);
           if (!allPairsFilled) {
-            return res.status(400).json({ error: "Р”Р»СЏ СЃРѕРїРѕСЃС‚Р°РІР»РµРЅРёСЏ РЅРµРѕР±С…РѕРґРёРјРѕ Р·Р°РїРѕР»РЅРёС‚СЊ РІСЃРµ РїР°СЂС‹" });
+            return res.status(400).json({ error: "Для сопоставления необходимо заполнить все пары" });
           }
         } else {
           const correctCount = question.options.filter((opt) => opt.isCorrect).length;
           if (questionType === "single" && correctCount !== 1) {
-            return res.status(400).json({ error: "Р”Р»СЏ С‚РёРїР° 'РѕРґРёРЅ РІР°СЂРёР°РЅС‚' РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ СЂРѕРІРЅРѕ РѕРґРёРЅ РїСЂР°РІРёР»СЊРЅС‹Р№ РѕС‚РІРµС‚" });
+            return res.status(400).json({ error: "Для типа 'один вариант' должен быть ровно один правильный ответ" });
           }
           if (questionType === "multiple" && correctCount < 2) {
-            return res.status(400).json({ error: "Р”Р»СЏ С‚РёРїР° 'РјРЅРѕР¶РµСЃС‚РІРµРЅРЅС‹Р№ РІС‹Р±РѕСЂ' РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РјРёРЅРёРјСѓРј 2 РїСЂР°РІРёР»СЊРЅС‹С… РѕС‚РІРµС‚Р°" });
+            return res.status(400).json({ error: "Для типа 'множественный выбор' должно быть минимум 2 правильных ответа" });
           }
         }
       }
@@ -398,24 +398,24 @@ exports.createAssessment = async (req, res, next) => {
       }
     }
 
-    // РќР°Р·РЅР°С‡РёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
+    // Назначить пользователей
     let autoUserIds = [];
 
-    // РЎРѕС…СЂР°РЅРёС‚СЊ РЅР°Р·РЅР°С‡РµРЅРёСЏ РїРѕ С„РёР»РёР°Р»Р°Рј
+    // Сохранить назначения по филиалам
     if (finalBranchIds && finalBranchIds.length > 0) {
       const branchValues = finalBranchIds.map((bid) => [assessmentId, bid]);
       await connection.query("INSERT INTO assessment_branch_assignments (assessment_id, branch_id) VALUES ?", [branchValues]);
     }
 
-    // РЎРѕС…СЂР°РЅРёС‚СЊ РЅР°Р·РЅР°С‡РµРЅРёСЏ РїРѕ РґРѕР»Р¶РЅРѕСЃС‚СЏРј
+    // Сохранить назначения по должностям
     if (finalPositionIds && finalPositionIds.length > 0) {
       const positionValues = finalPositionIds.map((pid) => [assessmentId, pid]);
       await connection.query("INSERT INTO assessment_position_assignments (assessment_id, position_id) VALUES ?", [positionValues]);
     }
 
-    // РџРѕР»СѓС‡РёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РІ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РѕС‚ РєРѕРјР±РёРЅР°С†РёРё С„РёР»РёР°Р»РѕРІ Рё РґРѕР»Р¶РЅРѕСЃС‚РµР№
+    // Получить пользователей в зависимости от комбинации филиалов и должностей
     if (finalBranchIds && finalBranchIds.length > 0 && finalPositionIds && finalPositionIds.length > 0) {
-      // РљРѕРјР±РёРЅР°С†РёСЏ: С„РёР»РёР°Р» + РґРѕР»Р¶РЅРѕСЃС‚СЊ (РїРѕР»СЊР·РѕРІР°С‚РµР»Рё РґРѕР»Р¶РЅС‹ СЃРѕРѕС‚РІРµС‚СЃС‚РІРѕРІР°С‚СЊ РћР‘РћРРњ РєСЂРёС‚РµСЂРёСЏРј)
+      // Комбинация: филиал + должность (пользователи должны соответствовать обоим критериям)
       const [usersFromBoth] = await connection.query(
         `SELECT DISTINCT u.id, u.first_name, u.last_name FROM users u
          WHERE u.branch_id IN (?) 
@@ -425,7 +425,7 @@ exports.createAssessment = async (req, res, next) => {
       console.log("Users from branch+position:", usersFromBoth);
       autoUserIds.push(...usersFromBoth.map((u) => u.id));
     } else if (finalBranchIds && finalBranchIds.length > 0) {
-      // РўРѕР»СЊРєРѕ С„РёР»РёР°Р»С‹
+      // Только филиалы
       const [usersFromBranches] = await connection.query(
         `SELECT DISTINCT u.id, u.first_name, u.last_name FROM users u
          WHERE u.branch_id IN (?)`,
@@ -434,7 +434,7 @@ exports.createAssessment = async (req, res, next) => {
       console.log("Users from branches:", usersFromBranches);
       autoUserIds.push(...usersFromBranches.map((u) => u.id));
     } else if (finalPositionIds && finalPositionIds.length > 0) {
-      // РўРѕР»СЊРєРѕ РґРѕР»Р¶РЅРѕСЃС‚Рё
+      // Только должности
       const [usersFromPositions] = await connection.query(
         `SELECT DISTINCT u.id, u.first_name, u.last_name FROM users u
          WHERE u.position_id IN (?)`,
@@ -444,7 +444,7 @@ exports.createAssessment = async (req, res, next) => {
       autoUserIds.push(...usersFromPositions.map((u) => u.id));
     }
 
-    // РќР°Р·РЅР°С‡РёС‚СЊ РїРѕ userIds РЅР°РїСЂСЏРјСѓСЋ
+    // Назначить по userIds напрямую
     const directUserIds = Array.isArray(finalUserIds) ? [...new Set(finalUserIds)] : [];
     autoUserIds = [...new Set(autoUserIds)];
     const assignedUserIds = [...new Set([...autoUserIds, ...directUserIds])];
@@ -458,7 +458,7 @@ exports.createAssessment = async (req, res, next) => {
     console.log("Auto User IDs:", autoUserIds);
     console.log("=======================");
 
-    // Р’СЃС‚Р°РІРёС‚СЊ РЅР°Р·РЅР°С‡РµРЅРёСЏ
+    // Вставить назначения
     if (assignedUserIds.length > 0) {
       const autoValues = autoUserIds.map((uid) => [assessmentId, uid, 0]);
       const directValues = directUserIds.map((uid) => [assessmentId, uid, 1]);
@@ -475,17 +475,17 @@ exports.createAssessment = async (req, res, next) => {
 
     await connection.commit();
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ РґРµР№СЃС‚РІРёСЏ
+    // Логирование действия
     await createAdminLog(
       req.user.id,
       "CREATE",
-      `РЎРѕР·РґР°РЅР° Р°С‚С‚РµСЃС‚Р°С†РёСЏ: ${title} (ID: ${assessmentId}, РІРѕРїСЂРѕСЃРѕРІ: ${questions.length}, РЅР°Р·РЅР°С‡РµРЅРѕ: ${assignedUserIds.length})`,
+      `Создана аттестация: ${title} (ID: ${assessmentId}, вопросов: ${questions.length}, назначено: ${assignedUserIds.length})`,
       "assessment",
       assessmentId,
       req
     );
 
-    res.status(201).json({ assessmentId, message: "РђС‚С‚РµСЃС‚Р°С†РёСЏ СЃРѕР·РґР°РЅР° СѓСЃРїРµС€РЅРѕ" });
+    res.status(201).json({ assessmentId, message: "Аттестация создана успешно" });
   } catch (error) {
     await connection.rollback();
     console.error("Create assessment error:", error);
@@ -496,7 +496,7 @@ exports.createAssessment = async (req, res, next) => {
 };
 
 /**
- * РћР±РЅРѕРІРёС‚СЊ Р°С‚С‚РµСЃС‚Р°С†РёСЋ (С‚РѕР»СЊРєРѕ РµСЃР»Рё СЃС‚Р°С‚СѓСЃ = pending)
+ * Обновить аттестацию (только если статус = pending)
  */
 exports.updateAssessment = async (req, res, next) => {
   const connection = await pool.getConnection();
@@ -505,7 +505,7 @@ exports.updateAssessment = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    // РџСЂРѕРІРµСЂРёС‚СЊ Р°С‚С‚РµСЃС‚Р°С†РёСЋ Рё РІС‹С‡РёСЃР»РёС‚СЊ СЃС‚Р°С‚СѓСЃ
+    // Проверить аттестацию и вычислить статус
     const [assessments] = await connection.query(
       `SELECT 
         *,
@@ -519,16 +519,16 @@ exports.updateAssessment = async (req, res, next) => {
     );
 
     if (assessments.length === 0) {
-      return res.status(404).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "Аттестация не найдена" });
     }
 
     const assessment = assessments[0];
 
-    // РџСЂРѕРІРµСЂРєР° РґРѕСЃС‚СѓРїР° РґР»СЏ СѓРїСЂР°РІР»СЏСЋС‰РµРіРѕ
+    // Проверка доступа для управляющего
     if (userRole === "manager") {
-      // РЈРїСЂР°РІР»СЏСЋС‰РёР№ РјРѕР¶РµС‚ СЂРµРґР°РєС‚РёСЂРѕРІР°С‚СЊ С‚РѕР»СЊРєРѕ СЃРІРѕРё Р°С‚С‚РµСЃС‚Р°С†РёРё
+      // Управляющий может редактировать только свои аттестации
       if (assessment.created_by !== userId) {
-        return res.status(403).json({ error: "РќРµС‚ РґРѕСЃС‚СѓРїР° Рє СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЋ СЌС‚РѕР№ Р°С‚С‚РµСЃС‚Р°С†РёРё" });
+        return res.status(403).json({ error: "Нет доступа Рє редактированию этой аттестации" });
       }
     }
 
@@ -544,7 +544,7 @@ exports.updateAssessment = async (req, res, next) => {
     const hasInProgressAttempts = Number(inProgressStats?.total || 0) > 0;
     const canEditParameters = !hasInProgressAttempts;
 
-    // РћР±РЅРѕРІРёС‚СЊ РѕСЃРЅРѕРІРЅСѓСЋ РёРЅС„РѕСЂРјР°С†РёСЋ (title, description, РґР°С‚С‹ РјРѕР¶РЅРѕ РІСЃРµРіРґР°)
+    // Обновить основную информацию (title, description, даты можно всегда)
     const updateFields = ["title = ?", "description = ?", "open_at = ?", "close_at = ?"];
     const updateValues = [title, description || "", openAt, closeAt];
 
@@ -568,47 +568,47 @@ exports.updateAssessment = async (req, res, next) => {
 
     await connection.query(`UPDATE assessments SET ${updateFields.join(", ")} WHERE id = ?`, updateValues);
 
-    // РћР±РЅРѕРІРёС‚СЊ РЅР°Р·РЅР°С‡РµРЅРёСЏ
+    // Обновить назначения
     if (canEditParameters && (branchIds !== undefined || positionIds !== undefined || userIds !== undefined)) {
-      // РџРѕР»СѓС‡РёС‚СЊ С‚РµРєСѓС‰СѓСЋ СЂРѕР»СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+      // Получить текущую роль пользователя
       const currentUser = req.user;
 
-      // РћРїСЂРµРґРµР»РёС‚СЊ С„РёРЅР°Р»СЊРЅС‹Рµ РјР°СЃСЃРёРІС‹ РґР»СЏ РЅР°Р·РЅР°С‡РµРЅРёСЏ
+      // Определить финальные массивы для назначения
       let finalBranchIds = branchIds || [];
       let finalPositionIds = positionIds || [];
       let finalUserIds = userIds || [];
 
-      // Р•СЃР»Рё С‚РµРєСѓС‰РёР№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ - РјРµРЅРµРґР¶РµСЂ, РѕРіСЂР°РЅРёС‡РёС‚СЊ РЅР°Р·РЅР°С‡РµРЅРёРµ С‚РѕР»СЊРєРѕ РµРіРѕ С„РёР»РёР°Р»РѕРј
+      // Если текущий пользователь - менеджер, ограничить назначение только его филиалом
       if (currentUser.role === "manager") {
         if (!currentUser.branch_id) {
-          throw new Error("РЈ РјРµРЅРµРґР¶РµСЂР° РЅРµ СѓРєР°Р·Р°РЅ С„РёР»РёР°Р»");
+          throw new Error("РЈ менеджера не указан филиал");
         }
-        // РњРµРЅРµРґР¶РµСЂ РјРѕР¶РµС‚ РЅР°Р·РЅР°С‡Р°С‚СЊ С‚РѕР»СЊРєРѕ РЅР° СЃРІРѕР№ С„РёР»РёР°Р»
+        // Менеджер может назначать только на свой филиал
         finalBranchIds = [currentUser.branch_id];
       }
 
-      // РЈРґР°Р»РёС‚СЊ СЃС‚Р°СЂС‹Рµ РЅР°Р·РЅР°С‡РµРЅРёСЏ
+      // Удалить старые назначения
       await connection.query("DELETE FROM assessment_branch_assignments WHERE assessment_id = ?", [assessmentId]);
       await connection.query("DELETE FROM assessment_position_assignments WHERE assessment_id = ?", [assessmentId]);
       await connection.query("DELETE FROM assessment_user_assignments WHERE assessment_id = ?", [assessmentId]);
 
-      // Р”РѕР±Р°РІРёС‚СЊ РЅРѕРІС‹Рµ РЅР°Р·РЅР°С‡РµРЅРёСЏ РїРѕ С„РёР»РёР°Р»Р°Рј
+      // Добавить новые назначения по филиалам
       if (finalBranchIds && finalBranchIds.length > 0) {
         const branchValues = finalBranchIds.map((bid) => [assessmentId, bid]);
         await connection.query("INSERT INTO assessment_branch_assignments (assessment_id, branch_id) VALUES ?", [branchValues]);
       }
 
-      // Р”РѕР±Р°РІРёС‚СЊ РЅРѕРІС‹Рµ РЅР°Р·РЅР°С‡РµРЅРёСЏ РїРѕ РґРѕР»Р¶РЅРѕСЃС‚СЏРј
+      // Добавить новые назначения по должностям
       if (finalPositionIds && finalPositionIds.length > 0) {
         const positionValues = finalPositionIds.map((pid) => [assessmentId, pid]);
         await connection.query("INSERT INTO assessment_position_assignments (assessment_id, position_id) VALUES ?", [positionValues]);
       }
 
-      // РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РЅР° РѕСЃРЅРѕРІРµ РЅР°Р·РЅР°С‡РµРЅРёР№
+      // Получить список пользователей на основе назначений
       let autoUserIds = [];
 
       if (finalBranchIds && finalBranchIds.length > 0 && finalPositionIds && finalPositionIds.length > 0) {
-        // РљРѕРјР±РёРЅР°С†РёСЏ: С„РёР»РёР°Р» + РґРѕР»Р¶РЅРѕСЃС‚СЊ (РїРѕР»СЊР·РѕРІР°С‚РµР»Рё РґРѕР»Р¶РЅС‹ СЃРѕРѕС‚РІРµС‚СЃС‚РІРѕРІР°С‚СЊ РћР‘РћРРњ РєСЂРёС‚РµСЂРёСЏРј)
+        // Комбинация: филиал + должность (пользователи должны соответствовать обоим критериям)
         const [usersFromBoth] = await connection.query(
           `SELECT DISTINCT u.id FROM users u
            WHERE u.branch_id IN (?) 
@@ -617,21 +617,21 @@ exports.updateAssessment = async (req, res, next) => {
         );
         autoUserIds.push(...usersFromBoth.map((u) => u.id));
       } else if (finalBranchIds && finalBranchIds.length > 0) {
-        // РўРѕР»СЊРєРѕ С„РёР»РёР°Р»С‹
+        // Только филиалы
         const [usersFromBranches] = await connection.query(`SELECT DISTINCT u.id FROM users u WHERE u.branch_id IN (?)`, [finalBranchIds]);
         autoUserIds.push(...usersFromBranches.map((u) => u.id));
       } else if (finalPositionIds && finalPositionIds.length > 0) {
-        // РўРѕР»СЊРєРѕ РґРѕР»Р¶РЅРѕСЃС‚Рё
+        // Только должности
         const [usersFromPositions] = await connection.query(`SELECT DISTINCT u.id FROM users u WHERE u.position_id IN (?)`, [finalPositionIds]);
         autoUserIds.push(...usersFromPositions.map((u) => u.id));
       }
 
-      // Р”РѕР±Р°РІРёС‚СЊ РЅР°РїСЂСЏРјСѓСЋ РІС‹Р±СЂР°РЅРЅС‹С… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
+      // Добавить напрямую выбранных пользователей
       const directUserIds = Array.isArray(finalUserIds) ? [...new Set(finalUserIds)] : [];
       autoUserIds = [...new Set(autoUserIds)];
       const assignedUserIds = [...new Set([...autoUserIds, ...directUserIds])];
 
-      // Р”РѕР±Р°РІРёС‚СЊ Р·Р°РїРёСЃРё РІ assessment_user_assignments
+      // Добавить записи в assessment_user_assignments
       if (assignedUserIds.length > 0) {
         const autoValues = autoUserIds.map((uid) => [assessmentId, uid, 0]);
         const directValues = directUserIds.map((uid) => [assessmentId, uid, 1]);
@@ -645,11 +645,11 @@ exports.updateAssessment = async (req, res, next) => {
       }
 
       console.log(
-        `РћР±РЅРѕРІР»РµРЅС‹ РЅР°Р·РЅР°С‡РµРЅРёСЏ РґР»СЏ Р°С‚С‚РµСЃС‚Р°С†РёРё ${assessmentId}: С„РёР»РёР°Р»С‹=${finalBranchIds.length}, РґРѕР»Р¶РЅРѕСЃС‚Рё=${finalPositionIds.length}, РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№=${assignedUserIds.length}`
+        `Обновлены назначения для аттестации ${assessmentId}: филиалы=${finalBranchIds.length}, должности=${finalPositionIds.length}, пользователей=${assignedUserIds.length}`
       );
     }
 
-    // Р•СЃР»Рё РїРµСЂРµРґР°РЅС‹ РІРѕРїСЂРѕСЃС‹, РѕР±РЅРѕРІРёС‚СЊ РёС…
+    // Если переданы вопросы, обновить их
     if (questions && questions.length > 0) {
       if (hasInProgressAttempts) {
         const [[questionsStats]] = await connection.query("SELECT COUNT(*) AS total FROM assessment_questions WHERE assessment_id = ?", [
@@ -663,36 +663,36 @@ exports.updateAssessment = async (req, res, next) => {
         }
       }
 
-      // РЈРґР°Р»РёС‚СЊ СЃС‚Р°СЂС‹Рµ РІРѕРїСЂРѕСЃС‹ Рё РёС… РІР°СЂРёР°РЅС‚С‹ (CASCADE СѓРґР°Р»РёС‚ РІР°СЂРёР°РЅС‚С‹)
+      // Удалить старые вопросы и их варианты (CASCADE удалит варианты)
       await connection.query("DELETE FROM assessment_questions WHERE assessment_id = ?", [assessmentId]);
 
-      // Р”РѕР±Р°РІРёС‚СЊ РЅРѕРІС‹Рµ РІРѕРїСЂРѕСЃС‹
+      // Добавить новые вопросы
       for (let i = 0; i < questions.length; i++) {
         const question = questions[i];
         const questionType = question.questionType || "single";
         const correctTextAnswer = questionType === "text" ? question.correctTextAnswer || "" : null;
         if (!["single", "multiple", "text", "matching"].includes(questionType)) {
-          return res.status(400).json({ error: "РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ С‚РёРї РІРѕРїСЂРѕСЃР°" });
+          return res.status(400).json({ error: "Недопустимый тип вопроса" });
         }
         if (questionType === "text" && !correctTextAnswer) {
-          return res.status(400).json({ error: "Р”Р»СЏ С‚РµРєСЃС‚РѕРІРѕРіРѕ РІРѕРїСЂРѕСЃР° РЅРµРѕР±С…РѕРґРёРјРѕ СѓРєР°Р·Р°С‚СЊ СЌС‚Р°Р»РѕРЅРЅС‹Р№ РѕС‚РІРµС‚" });
+          return res.status(400).json({ error: "Для текстового вопроса необходимо указать эталонный ответ" });
         }
         if (questionType !== "text") {
           if (!question.options || question.options.length < 2 || question.options.length > 6) {
-            return res.status(400).json({ error: "РќРµРѕР±С…РѕРґРёРјРѕ СѓРєР°Р·Р°С‚СЊ РѕС‚ 2 РґРѕ 6 РІР°СЂРёР°РЅС‚РѕРІ РѕС‚РІРµС‚РѕРІ" });
+            return res.status(400).json({ error: "Необходимо указать от 2 до 6 вариантов ответов" });
           }
           if (questionType === "matching") {
             const allPairsFilled = question.options.every((opt) => opt.text && opt.matchText && opt.matchText.trim().length > 0);
             if (!allPairsFilled) {
-              return res.status(400).json({ error: "Р”Р»СЏ СЃРѕРїРѕСЃС‚Р°РІР»РµРЅРёСЏ РЅРµРѕР±С…РѕРґРёРјРѕ Р·Р°РїРѕР»РЅРёС‚СЊ РІСЃРµ РїР°СЂС‹" });
+              return res.status(400).json({ error: "Для сопоставления необходимо заполнить все пары" });
             }
           } else {
             const correctCount = question.options.filter((opt) => opt.isCorrect).length;
             if (questionType === "single" && correctCount !== 1) {
-              return res.status(400).json({ error: "Р”Р»СЏ С‚РёРїР° 'РѕРґРёРЅ РІР°СЂРёР°РЅС‚' РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ СЂРѕРІРЅРѕ РѕРґРёРЅ РїСЂР°РІРёР»СЊРЅС‹Р№ РѕС‚РІРµС‚" });
+              return res.status(400).json({ error: "Для типа 'один вариант' должен быть ровно один правильный ответ" });
             }
             if (questionType === "multiple" && correctCount < 2) {
-              return res.status(400).json({ error: "Р”Р»СЏ С‚РёРїР° 'РјРЅРѕР¶РµСЃС‚РІРµРЅРЅС‹Р№ РІС‹Р±РѕСЂ' РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РјРёРЅРёРјСѓРј 2 РїСЂР°РІРёР»СЊРЅС‹С… РѕС‚РІРµС‚Р°" });
+              return res.status(400).json({ error: "Для типа 'множественный выбор' должно быть минимум 2 правильных ответа" });
             }
           }
         }
@@ -729,10 +729,10 @@ exports.updateAssessment = async (req, res, next) => {
 
     await connection.commit();
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ РґРµР№СЃС‚РІРёСЏ
-    await createAdminLog(req.user.id, "UPDATE", `РћР±РЅРѕРІР»РµРЅР° Р°С‚С‚РµСЃС‚Р°С†РёСЏ: ${title} (ID: ${assessmentId})`, "assessment", assessmentId, req);
+    // Логирование действия
+    await createAdminLog(req.user.id, "UPDATE", `Обновлена аттестация: ${title} (ID: ${assessmentId})`, "assessment", assessmentId, req);
 
-    res.json({ message: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РѕР±РЅРѕРІР»РµРЅР° СѓСЃРїРµС€РЅРѕ" });
+    res.json({ message: "Аттестация обновлена успешно" });
   } catch (error) {
     await connection.rollback();
     console.error("Update assessment error:", error);
@@ -743,7 +743,7 @@ exports.updateAssessment = async (req, res, next) => {
 };
 
 /**
- * РЈРґР°Р»РёС‚СЊ Р°С‚С‚РµСЃС‚Р°С†РёСЋ (С‚РѕР»СЊРєРѕ РµСЃР»Рё СЃС‚Р°С‚СѓСЃ = pending)
+ * Удалить аттестацию (только если статус = pending)
  */
 exports.deleteAssessment = async (req, res, next) => {
   try {
@@ -765,27 +765,27 @@ exports.deleteAssessment = async (req, res, next) => {
     );
 
     if (assessments.length === 0) {
-      return res.status(404).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "Аттестация не найдена" });
     }
 
     const assessment = assessments[0];
 
-    // РџСЂРѕРІРµСЂРєР° РґРѕСЃС‚СѓРїР° РґР»СЏ СѓРїСЂР°РІР»СЏСЋС‰РµРіРѕ
+    // Проверка доступа для управляющего
     if (userRole === "manager") {
-      // РЈРїСЂР°РІР»СЏСЋС‰РёР№ РјРѕР¶РµС‚ СѓРґР°Р»СЏС‚СЊ С‚РѕР»СЊРєРѕ СЃРІРѕРё Р°С‚С‚РµСЃС‚Р°С†РёРё
+      // Управляющий может удалять только свои аттестации
       if (assessment.created_by !== userId) {
-        return res.status(403).json({ error: "РќРµС‚ РґРѕСЃС‚СѓРїР° Рє СѓРґР°Р»РµРЅРёСЋ СЌС‚РѕР№ Р°С‚С‚РµСЃС‚Р°С†РёРё" });
+        return res.status(403).json({ error: "Нет доступа Рє удалению этой аттестации" });
       }
     }
 
     if (assessment.status !== "pending") {
-      return res.status(400).json({ error: 'РњРѕР¶РЅРѕ СѓРґР°Р»СЏС‚СЊ С‚РѕР»СЊРєРѕ Р°С‚С‚РµСЃС‚Р°С†РёРё СЃРѕ СЃС‚Р°С‚СѓСЃРѕРј "РћР¶РёРґР°РµС‚"' });
+      return res.status(400).json({ error: 'Можно удалять только аттестации со статусом "Ожидает"' });
     }
 
     await pool.query("DELETE FROM assessments WHERE id = ?", [assessmentId]);
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ РґРµР№СЃС‚РІРёСЏ
-    await createAdminLog(req.user.id, "DELETE", `РЈРґР°Р»РµРЅР° Р°С‚С‚РµСЃС‚Р°С†РёСЏ: ${assessment.title} (ID: ${assessmentId})`, "assessment", assessmentId, req);
+    // Логирование действия
+    await createAdminLog(req.user.id, "DELETE", `Удалена аттестация: ${assessment.title} (ID: ${assessmentId})`, "assessment", assessmentId, req);
 
     res.status(204).send();
   } catch (error) {
@@ -795,7 +795,7 @@ exports.deleteAssessment = async (req, res, next) => {
 };
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ СЂРµР·СѓР»СЊС‚Р°С‚С‹ Р°С‚С‚РµСЃС‚Р°С†РёРё
+ * Получить результаты аттестации
  */
 exports.getAssessmentResults = async (req, res, next) => {
   try {
@@ -836,7 +836,7 @@ exports.getAssessmentResults = async (req, res, next) => {
 };
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ РґРµС‚Р°Р»РёР·Р°С†РёСЋ Р°С‚С‚РµСЃС‚Р°С†РёРё СЃ СЂРµР·СѓР»СЊС‚Р°С‚Р°РјРё Рё СЃС‚Р°С‚РёСЃС‚РёРєРѕР№
+ * Получить детализацию аттестации с результатами и статистикой
  */
 exports.getAssessmentDetails = async (req, res, next) => {
   try {
@@ -844,10 +844,10 @@ exports.getAssessmentDetails = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    // РћС‚РјРµРЅРёС‚СЊ РїСЂРѕСЃСЂРѕС‡РµРЅРЅС‹Рµ РїРѕРїС‹С‚РєРё РїРµСЂРµРґ РїРѕР»СѓС‡РµРЅРёРµРј РґР°РЅРЅС‹С…
-    await assessmentModel.cancelExpiredAttempts(assessmentId);
+    // Завершить просроченные попытки перед получением данных
+    await assessmentModel.completeExpiredAttempts(assessmentId);
 
-    // РћСЃРЅРѕРІРЅР°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ РѕР± Р°С‚С‚РµСЃС‚Р°С†РёРё
+    // Основная информация об аттестации
     const [assessments] = await pool.query(
       `
       SELECT 
@@ -864,16 +864,16 @@ exports.getAssessmentDetails = async (req, res, next) => {
     );
 
     if (assessments.length === 0) {
-      return res.status(404).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "Аттестация не найдена" });
     }
 
     const assessment = assessments[0];
 
-    // РџСЂРѕРІРµСЂРєР° РґРѕСЃС‚СѓРїР° РґР»СЏ СѓРїСЂР°РІР»СЏСЋС‰РµРіРѕ
+    // Проверка доступа для управляющего
     if (userRole === "manager") {
-      // РЈРїСЂР°РІР»СЏСЋС‰РёР№ РјРѕР¶РµС‚ РІРёРґРµС‚СЊ Р°С‚С‚РµСЃС‚Р°С†РёСЋ, РµСЃР»Рё:
-      // 1. РћРЅ СЃРѕР·РґР°Р» РµС‘ СЃР°Рј
-      // 2. РћРЅР° РЅР°Р·РЅР°С‡РµРЅР° РЅР° РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РёР· РµРіРѕ С„РёР»РёР°Р»Р°
+      // Управляющий может видеть аттестацию, если:
+      // 1. Он создал её сам
+      // 2. Она назначена на пользователей из его филиала
       const [access] = await pool.query(
         `SELECT 1 
          FROM assessments a
@@ -892,11 +892,11 @@ exports.getAssessmentDetails = async (req, res, next) => {
       );
 
       if (access.length === 0) {
-        return res.status(403).json({ error: "РќРµС‚ РґРѕСЃС‚СѓРїР° Рє СЌС‚РѕР№ Р°С‚С‚РµСЃС‚Р°С†РёРё" });
+        return res.status(403).json({ error: "Нет доступа Рє этой аттестации" });
       }
     }
 
-    // Р’РѕРїСЂРѕСЃС‹ СЃ РІР°СЂРёР°РЅС‚Р°РјРё РѕС‚РІРµС‚РѕРІ
+    // Вопросы СЃ вариантами ответов
     const [questions] = await pool.query(
       `
       SELECT 
@@ -913,7 +913,7 @@ exports.getAssessmentDetails = async (req, res, next) => {
       [assessmentId]
     );
 
-    // Р”Р»СЏ РєР°Р¶РґРѕРіРѕ РІРѕРїСЂРѕСЃР° РїРѕР»СѓС‡РёС‚СЊ РІР°СЂРёР°РЅС‚С‹ Рё СЃС‚Р°С‚РёСЃС‚РёРєСѓ РѕС‚РІРµС‚РѕРІ
+    // Для каждого вопроса получить варианты и статистику ответов
     for (const question of questions) {
       const [options] = await pool.query(
         `
@@ -926,7 +926,7 @@ exports.getAssessmentDetails = async (req, res, next) => {
       );
       question.options = options;
 
-      // РЎС‚Р°С‚РёСЃС‚РёРєР° РїРѕ РІРѕРїСЂРѕСЃСѓ (СЃРєРѕР»СЊРєРѕ СЂР°Р· РІС‹Р±РёСЂР°Р»Рё РєР°Р¶РґС‹Р№ РІР°СЂРёР°РЅС‚)
+      // Статистика по вопросу (сколько раз выбирали каждый вариант)
       const [stats] = await pool.query(
         `
         SELECT 
@@ -943,7 +943,7 @@ exports.getAssessmentDetails = async (req, res, next) => {
       question.answerStats = stats;
     }
 
-    // РЈС‡Р°СЃС‚РЅРёРєРё СЃ СЂРµР·СѓР»СЊС‚Р°С‚Р°РјРё (РїРѕРєР°Р·С‹РІР°РµРј С‚РµРєСѓС‰СѓСЋ in_progress РёР»Рё Р»СѓС‡С€СѓСЋ Р·Р°РІРµСЂС€РµРЅРЅСѓСЋ РїРѕРїС‹С‚РєСѓ)
+    // Участники СЃ результатами (показываем текущую in_progress или лучшую завершенную попытку)
     const [participants] = await pool.query(
       `
       SELECT 
@@ -1094,7 +1094,7 @@ exports.getAssessmentDetails = async (req, res, next) => {
       });
     }
 
-    // РЎС‚Р°С‚РёСЃС‚РёРєР° (РЅР° РѕСЃРЅРѕРІРµ Р»СѓС‡С€РµР№ Р·Р°РІРµСЂС€РµРЅРЅРѕР№ РїРѕРїС‹С‚РєРё РєР°Р¶РґРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ)
+    // Статистика (на основе лучшей завершенной попытки каждого пользователя)
     const [stats] = await pool.query(
       `
       SELECT 
@@ -1130,7 +1130,7 @@ exports.getAssessmentDetails = async (req, res, next) => {
       [assessment.pass_score_percent, assessmentId, assessmentId, assessmentId]
     );
 
-    // РРЅС„РѕСЂРјР°С†РёСЏ Рѕ РґРѕСЃС‚СѓРїРЅРѕСЃС‚Рё
+    // Информация о доступности
     const [assignedBranches] = await pool.query(
       `
       SELECT DISTINCT b.id, b.name
@@ -1153,20 +1153,20 @@ exports.getAssessmentDetails = async (req, res, next) => {
       [assessmentId]
     );
 
-    // РџРѕР»СѓС‡РёС‚СЊ С‚РѕР»СЊРєРѕ РЅР°РїСЂСЏРјСѓСЋ РЅР°Р·РЅР°С‡РµРЅРЅС‹С… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ (РЅРµ С‡РµСЂРµР· С„РёР»РёР°Р»С‹/РґРѕР»Р¶РЅРѕСЃС‚Рё)
+    // Получить только напрямую назначенных пользователей (не через филиалы/должности)
     const [directlyAssignedUsers] = await pool.query(
       `
       SELECT DISTINCT u.id, u.first_name, u.last_name
       FROM assessment_user_assignments aua
       JOIN users u ON aua.user_id = u.id
       WHERE aua.assessment_id = ?
-        -- РСЃРєР»СЋС‡Р°РµРј РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№, РЅР°Р·РЅР°С‡РµРЅРЅС‹С… С‡РµСЂРµР· С„РёР»РёР°Р»С‹
+        -- Исключаем пользователей, назначенных через филиалы
         AND NOT EXISTS (
           SELECT 1 FROM assessment_branch_assignments aba
           WHERE aba.assessment_id = aua.assessment_id
             AND aba.branch_id = u.branch_id
         )
-        -- РСЃРєР»СЋС‡Р°РµРј РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№, РЅР°Р·РЅР°С‡РµРЅРЅС‹С… С‡РµСЂРµР· РґРѕР»Р¶РЅРѕСЃС‚Рё
+        -- Исключаем пользователей, назначенных через должности
         AND NOT EXISTS (
           SELECT 1 FROM assessment_position_assignments apa
           WHERE apa.assessment_id = aua.assessment_id
@@ -1201,7 +1201,7 @@ exports.getUserAssessmentProgress = async (req, res, next) => {
     const attemptId = req.query.attemptId ? Number(req.query.attemptId) : null;
 
     if (!assessmentId || !userId) {
-      return res.status(400).json({ error: "РќРµРєРѕСЂСЂРµРєС‚РЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹" });
+      return res.status(400).json({ error: "Некорректные параметры" });
     }
 
     const [assessments] = await pool.query(
@@ -1222,7 +1222,7 @@ exports.getUserAssessmentProgress = async (req, res, next) => {
     );
 
     if (assessments.length === 0) {
-      return res.status(404).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "Аттестация не найдена" });
     }
 
     const assessment = assessments[0];
@@ -1247,7 +1247,7 @@ exports.getUserAssessmentProgress = async (req, res, next) => {
       );
 
       if (access.length === 0) {
-        return res.status(403).json({ error: "РќРµС‚ РґРѕСЃС‚СѓРїР° Рє СЌС‚РѕР№ Р°С‚С‚РµСЃС‚Р°С†РёРё" });
+        return res.status(403).json({ error: "Нет доступа Рє этой аттестации" });
       }
     }
 
@@ -1297,7 +1297,7 @@ exports.getUserAssessmentProgress = async (req, res, next) => {
     );
 
     if (users.length === 0) {
-      return res.status(404).json({ error: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р·РЅР°С‡РµРЅ РЅР° Р°С‚С‚РµСЃС‚Р°С†РёСЋ" });
+      return res.status(404).json({ error: "Пользователь не назначен на аттестацию" });
     }
 
     const user = users[0];
@@ -1507,23 +1507,23 @@ exports.getUserAssessmentProgress = async (req, res, next) => {
 };
 
 /**
- * Р­РєСЃРїРѕСЂС‚ Р°С‚С‚РµСЃС‚Р°С†РёРё РІ Excel
+ * Экспорт аттестации в Excel
  */
 exports.exportAssessmentToExcel = async (req, res, next) => {
   try {
     const assessmentId = Number(req.params.id);
     const ExcelJS = require("exceljs");
 
-    // РџРѕР»СѓС‡РёС‚СЊ РґР°РЅРЅС‹Рµ Р°С‚С‚РµСЃС‚Р°С†РёРё
+    // Получить данные аттестации
     const [assessments] = await pool.query("SELECT * FROM assessments WHERE id = ?", [assessmentId]);
 
     if (assessments.length === 0) {
-      return res.status(404).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "Аттестация не найдена" });
     }
 
     const assessment = assessments[0];
 
-    // РџРѕР»СѓС‡РёС‚СЊ СЂРµР·СѓР»СЊС‚Р°С‚С‹ СѓС‡Р°СЃС‚РЅРёРєРѕРІ (РїСЂРёРѕСЂРёС‚РµС‚ РѕС‚РґР°РµС‚СЃСЏ С‚РµРєСѓС‰РµР№ РїРѕРїС‹С‚РєРµ in_progress)
+    // Получить результаты участников (приоритет отдается текущей попытке in_progress)
     const [results] = await pool.query(
       `
       SELECT 
@@ -1569,31 +1569,31 @@ exports.exportAssessmentToExcel = async (req, res, next) => {
       [assessmentId, assessmentId, assessmentId]
     );
 
-    // РЎРѕР·РґР°С‚СЊ Excel workbook
+    // Создать Excel workbook
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Р РµР·СѓР»СЊС‚Р°С‚С‹ Р°С‚С‚РµСЃС‚Р°С†РёРё");
+    const worksheet = workbook.addWorksheet("Р езультаты аттестации");
 
-    // Р—Р°РіРѕР»РѕРІРѕРє
-    worksheet.addRow([`РђС‚С‚РµСЃС‚Р°С†РёСЏ: ${assessment.title}`]);
-    worksheet.addRow([`Р”Р°С‚Р° СЌРєСЃРїРѕСЂС‚Р°: ${new Date().toLocaleString("ru-RU")}`]);
+    // Заголовок
+    worksheet.addRow([`Аттестация: ${assessment.title}`]);
+    worksheet.addRow([`Дата экспорта: ${new Date().toLocaleString("ru-RU")}`]);
     worksheet.addRow([]);
 
-    // Р—Р°РіРѕР»РѕРІРєРё С‚Р°Р±Р»РёС†С‹
+    // Заголовки таблицы
     const headerRow = worksheet.addRow([
-      "Р¤Р°РјРёР»РёСЏ",
-      "РРјСЏ",
-      "Р¤РёР»РёР°Р»",
-      "Р”РѕР»Р¶РЅРѕСЃС‚СЊ",
-      "РЎС‚Р°С‚СѓСЃ",
-      "Р‘Р°Р»Р» (%)",
-      "РџСЂР°РІРёР»СЊРЅС‹С… РѕС‚РІРµС‚РѕРІ",
-      "Р’СЃРµРіРѕ РІРѕРїСЂРѕСЃРѕРІ",
-      "Р’СЂРµРјСЏ (СЃРµРє)",
-      "Р”Р°С‚Р° РЅР°С‡Р°Р»Р°",
-      "Р”Р°С‚Р° Р·Р°РІРµСЂС€РµРЅРёСЏ",
+      "Фамилия",
+      "Имя",
+      "Филиал",
+      "Должность",
+      "Статус",
+      "Балл (%)",
+      "Правильных ответов",
+      "Всего вопросов",
+      "Время (сек)",
+      "Дата начала",
+      "Дата завершения",
     ]);
 
-    // РЎС‚РёР»РёР·Р°С†РёСЏ Р·Р°РіРѕР»РѕРІРєР°
+    // Стилизация заголовка
     headerRow.font = { bold: true };
     headerRow.fill = {
       type: "pattern",
@@ -1601,14 +1601,14 @@ exports.exportAssessmentToExcel = async (req, res, next) => {
       fgColor: { argb: "FFE0E0E0" },
     };
 
-    // Р”Р°РЅРЅС‹Рµ
+    // Данные
     results.forEach((result) => {
       worksheet.addRow([
         result.last_name,
         result.first_name,
         result.branch_name || "вЂ”",
         result.position_name || "вЂ”",
-        result.status || "РќРµ РЅР°С‡Р°С‚",
+        result.status || "Не начат",
         result.score_percent || "вЂ”",
         result.correct_answers || "вЂ”",
         result.total_questions || "вЂ”",
@@ -1618,12 +1618,12 @@ exports.exportAssessmentToExcel = async (req, res, next) => {
       ]);
     });
 
-    // РђРІС‚РѕС€РёСЂРёРЅР° СЃС‚РѕР»Р±С†РѕРІ
+    // Автоширина столбцов
     worksheet.columns.forEach((column) => {
       column.width = 15;
     });
 
-    // РћС‚РїСЂР°РІРёС‚СЊ С„Р°Р№Р»
+    // Отправить файл
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="assessment_${assessmentId}_${Date.now()}.xlsx"`);
 
@@ -1634,4 +1634,3 @@ exports.exportAssessmentToExcel = async (req, res, next) => {
     next(error);
   }
 };
-

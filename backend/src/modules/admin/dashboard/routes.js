@@ -5,7 +5,7 @@ const dashboardController = require("./controller");
 
 const router = express.Router();
 
-// Р’СЃРµ РјР°СЂС€СЂСѓС‚С‹ С‚СЂРµР±СѓСЋС‚ JWT Рё РґРѕСЃС‚СѓРї Рє Р°РЅР°Р»РёС‚РёРєРµ (РґР°С€Р±РѕСЂРґ - СЌС‚Рѕ С‡Р°СЃС‚СЊ Р°РЅР°Р»РёС‚РёРєРё)
+// Все маршруты требуют JWT и доступ к аналитике (дашборд - это часть аналитики)
 router.use(verifyJWT, checkModuleAccess("analytics"));
 
 router.get("/metrics", dashboardController.getMetrics);
@@ -15,6 +15,6 @@ router.get(
   "/latest-assessment-activities",
   dashboardController.getLatestAssessmentActivities,
 );
+router.get("/observability", dashboardController.getObservability);
 
 module.exports = router;
-

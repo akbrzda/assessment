@@ -32,11 +32,19 @@ async function getLatestAssessmentActivities(req, res, next) {
   }
 }
 
+async function getObservability(req, res, next) {
+  try {
+    return await moduleService.getObservability(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getMetrics,
   getActivityTrends,
   getBranchKPI,
   getLatestAssessmentActivities,
+  getObservability,
 };
-
 

@@ -26,7 +26,7 @@
       <Preloader v-if="loading" />
 
       <div v-else-if="assessments.length === 0" class="empty-state">
-        <div class="empty-state-icon">📋</div>
+        <div class="empty-state-icon"></div>
         <p class="empty-state-title">Аттестации не найдены</p>
         <p v-if="filters.search || filters.status || filters.branch">Попробуйте изменить фильтры поиска</p>
         <p v-else>Создайте первую аттестацию, чтобы начать оценку сотрудников</p>

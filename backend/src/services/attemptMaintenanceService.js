@@ -6,9 +6,9 @@ const ATTEMPT_MAINTENANCE_INTERVAL_MS = 60 * 1000;
 function startAttemptMaintenance() {
   const run = async () => {
     try {
-      const cancelledCount = await assessmentModel.cancelExpiredAttempts();
-      if (cancelledCount > 0) {
-        logger.info("Автозавершение попыток: обновлено %d записей", cancelledCount);
+      const completedCount = await assessmentModel.completeExpiredAttempts();
+      if (completedCount > 0) {
+        logger.info("Автозавершение попыток: завершено %d записей", completedCount);
       }
     } catch (error) {
       logger.error("Ошибка автозавершения попыток: %s", error.message);

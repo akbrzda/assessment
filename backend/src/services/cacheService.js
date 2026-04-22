@@ -1,5 +1,8 @@
+const logger = require("../utils/logger");
+const { getRedisClient } = require("./redisService");
+
 /**
- * Простой in-memory кеш с поддержкой TTL и инвалидации
+ * Гибридный кеш: Redis (если доступен) + in-memory fallback
  */
 class CacheService {
   constructor() {
@@ -7,124 +10,113 @@ class CacheService {
     this.ttls = new Map();
   }
 
-  /**
-   * Сохранить значение в кеш
-   * @param {string} key - Ключ
-   * @param {*} value - Значение
-   * @param {number} ttl - Время жизни в секундах (по умолчанию 5 минут)
-   */
-  set(key, value, ttl = 300) {
+  get redis() {
+    return getRedisClient();
+  }
+
+  async set(key, value, ttl = 300) {
+    const payload = JSON.stringify(value);
+
+    if (this.redis && this.redis.status === "ready") {
+      try {
+        if (ttl > 0) {
+          await this.redis.set(key, payload, "EX", ttl);
+        } else {
+          await this.redis.set(key, payload);
+        }
+      } catch (error) {
+        logger.warn("Ошибка Redis set(%s): %s", key, error.message);
+      }
+    }
+
     this.cache.set(key, value);
-
     if (ttl > 0) {
-      const expiresAt = Date.now() + ttl * 1000;
-      this.ttls.set(key, expiresAt);
-
-      // Автоматическое удаление после истечения TTL
-      setTimeout(() => {
-        this.delete(key);
-      }, ttl * 1000);
+      this.ttls.set(key, Date.now() + ttl * 1000);
+      setTimeout(() => this.delete(key), ttl * 1000);
     }
   }
 
-  /**
-   * Получить значение из кеша
-   * @param {string} key - Ключ
-   * @returns {*} - Значение или undefined
-   */
-  get(key) {
-    // Проверяем, не истек ли TTL
-    if (this.ttls.has(key)) {
-      const expiresAt = this.ttls.get(key);
-      if (Date.now() > expiresAt) {
-        this.delete(key);
-        return undefined;
+  async get(key) {
+    if (this.redis && this.redis.status === "ready") {
+      try {
+        const raw = await this.redis.get(key);
+        if (raw != null) {
+          return JSON.parse(raw);
+        }
+      } catch (error) {
+        logger.warn("Ошибка Redis get(%s): %s", key, error.message);
       }
+    }
+
+    if (this.ttls.has(key) && Date.now() > this.ttls.get(key)) {
+      this.delete(key);
+      return undefined;
     }
 
     return this.cache.get(key);
   }
 
-  /**
-   * Проверить наличие ключа в кеше
-   * @param {string} key - Ключ
-   * @returns {boolean}
-   */
-  has(key) {
-    if (this.ttls.has(key)) {
-      const expiresAt = this.ttls.get(key);
-      if (Date.now() > expiresAt) {
-        this.delete(key);
-        return false;
+  async delete(key) {
+    if (this.redis && this.redis.status === "ready") {
+      try {
+        await this.redis.del(key);
+      } catch (error) {
+        logger.warn("Ошибка Redis del(%s): %s", key, error.message);
       }
     }
 
-    return this.cache.has(key);
-  }
-
-  /**
-   * Удалить значение из кеша
-   * @param {string} key - Ключ
-   */
-  delete(key) {
     this.cache.delete(key);
     this.ttls.delete(key);
   }
 
-  /**
-   * Очистить весь кеш
-   */
-  clear() {
+  async clear() {
+    if (this.redis && this.redis.status === "ready") {
+      try {
+        await this.redis.flushdb();
+      } catch (error) {
+        logger.warn("Ошибка Redis flushdb: %s", error.message);
+      }
+    }
+
     this.cache.clear();
     this.ttls.clear();
   }
 
-  /**
-   * Инвалидировать кеш по паттерну
-   * @param {string|RegExp} pattern - Паттерн для поиска ключей
-   */
-  invalidate(pattern) {
+  async invalidate(pattern) {
     const regex = typeof pattern === "string" ? new RegExp(pattern) : pattern;
 
-    const keysToDelete = [];
+    let deleted = 0;
     for (const key of this.cache.keys()) {
       if (regex.test(key)) {
-        keysToDelete.push(key);
+        this.cache.delete(key);
+        this.ttls.delete(key);
+        deleted += 1;
       }
     }
 
-    keysToDelete.forEach((key) => this.delete(key));
-    return keysToDelete.length;
-  }
-
-  /**
-   * Получить или установить значение
-   * @param {string} key - Ключ
-   * @param {Function} factory - Функция для получения значения
-   * @param {number} ttl - Время жизни в секундах
-   * @returns {Promise<*>}
-   */
-  async getOrSet(key, factory, ttl = 300) {
-    if (this.has(key)) {
-      return this.get(key);
+    if (this.redis && this.redis.status === "ready") {
+      try {
+        const keys = await this.redis.keys("http:GET:*");
+        const toDelete = keys.filter((key) => regex.test(key));
+        if (toDelete.length > 0) {
+          await this.redis.del(...toDelete);
+          deleted += toDelete.length;
+        }
+      } catch (error) {
+        logger.warn("Ошибка Redis invalidate: %s", error.message);
+      }
     }
 
-    const value = await factory();
-    this.set(key, value, ttl);
-    return value;
+    return deleted;
   }
 
-  /**
-   * Получить статистику кеша
-   * @returns {Object}
-   */
   getStats() {
     return {
-      size: this.cache.size,
-      keys: Array.from(this.cache.keys()),
+      memorySize: this.cache.size,
+      memoryKeys: Array.from(this.cache.keys()),
+      redisReady: Boolean(this.redis && this.redis.status === "ready"),
     };
   }
 }
 
-// Экспортируем singleton
 module.exports = new CacheService();

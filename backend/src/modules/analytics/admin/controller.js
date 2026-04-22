@@ -80,6 +80,22 @@ async function exportToExcel(req, res, next) {
   }
 }
 
+async function exportToCsv(req, res, next) {
+  try {
+    return await analyticsService.exportToCsv(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getFailureReasons(req, res, next) {
+  try {
+    return await analyticsService.getFailureReasons(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function exportToPDF(req, res, next) {
   try {
     return await analyticsService.exportToPDF(req, res, next);
@@ -98,8 +114,9 @@ module.exports = {
   getCombinedAnalytics,
   getAssessmentReport,
   getUserReport,
+  getFailureReasons,
   exportToExcel,
+  exportToCsv,
   exportToPDF,
 };
-
 

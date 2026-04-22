@@ -3,13 +3,13 @@ const { logAndSend, buildActorFromRequest } = require("../../../services/auditSe
 const settingsService = require("../../../services/settingsService");
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ РІСЃРµ РЅР°СЃС‚СЂРѕР№РєРё
+ * Получить все настройки
  */
 exports.getSettings = async (req, res, next) => {
   try {
     const [settings] = await pool.query("SELECT setting_key, setting_value, description, updated_at FROM system_settings ORDER BY setting_key");
 
-    // РџСЂРµРѕР±СЂР°Р·РѕРІР°С‚СЊ РІ РѕР±СЉРµРєС‚ РґР»СЏ СѓРґРѕР±СЃС‚РІР°
+    // Преобразовать в объект для удобства
     const settingsObject = {};
     settings.forEach((setting) => {
       settingsObject[setting.setting_key] = {
@@ -27,7 +27,7 @@ exports.getSettings = async (req, res, next) => {
 };
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ РєРѕРЅРєСЂРµС‚РЅСѓСЋ РЅР°СЃС‚СЂРѕР№РєСѓ
+ * Получить конкретную настройку
  */
 exports.getSettingByKey = async (req, res, next) => {
   try {
@@ -38,7 +38,7 @@ exports.getSettingByKey = async (req, res, next) => {
     ]);
 
     if (settings.length === 0) {
-      return res.status(404).json({ error: "РќР°СЃС‚СЂРѕР№РєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "Настройка не найдена" });
     }
 
     res.json({ setting: settings[0] });
@@ -49,7 +49,7 @@ exports.getSettingByKey = async (req, res, next) => {
 };
 
 /**
- * РћР±РЅРѕРІРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєСѓ
+ * Обновить настройку
  */
 exports.updateSetting = async (req, res, next) => {
   try {
@@ -57,22 +57,22 @@ exports.updateSetting = async (req, res, next) => {
     const { value } = req.body;
 
     if (value === undefined || value === null) {
-      return res.status(400).json({ error: "Р—РЅР°С‡РµРЅРёРµ РЅР°СЃС‚СЂРѕР№РєРё РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ" });
+      return res.status(400).json({ error: "Значение настройки обязательно" });
     }
 
-    // РџСЂРѕРІРµСЂРёС‚СЊ СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёРµ РЅР°СЃС‚СЂРѕР№РєРё
+    // Проверить существование настройки
     const [existing] = await pool.query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key = ?", [key]);
 
     if (existing.length === 0) {
-      return res.status(404).json({ error: "РќР°СЃС‚СЂРѕР№РєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "Настройка не найдена" });
     }
 
     const oldValue = existing[0].setting_value;
 
-    // РћР±РЅРѕРІРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєСѓ
+    // Обновить настройку
     await pool.query("UPDATE system_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = ?", [value.toString(), key]);
 
-    // РЎР±СЂРѕСЃРёС‚СЊ РєСЌС€ РЅР°СЃС‚СЂРѕРµРє
+    // Сбросить кэш настроек
     settingsService.clearCache();
 
     await logAndSend({
@@ -88,7 +88,7 @@ exports.updateSetting = async (req, res, next) => {
       },
     });
 
-    res.json({ message: "РќР°СЃС‚СЂРѕР№РєР° РѕР±РЅРѕРІР»РµРЅР° СѓСЃРїРµС€РЅРѕ" });
+    res.json({ message: "Настройка обновлена успешно" });
   } catch (error) {
     console.error("Update setting error:", error);
     next(error);
@@ -96,25 +96,25 @@ exports.updateSetting = async (req, res, next) => {
 };
 
 /**
- * РЎРѕР·РґР°С‚СЊ РЅРѕРІСѓСЋ РЅР°СЃС‚СЂРѕР№РєСѓ
+ * Создать новую настройку
  */
 exports.createSetting = async (req, res, next) => {
   try {
     const { key, value, description } = req.body;
 
     if (!key || !key.trim()) {
-      return res.status(400).json({ error: "РљР»СЋС‡ РЅР°СЃС‚СЂРѕР№РєРё РѕР±СЏР·Р°С‚РµР»РµРЅ" });
+      return res.status(400).json({ error: "Ключ настройки обязателен" });
     }
 
     if (value === undefined || value === null) {
-      return res.status(400).json({ error: "Р—РЅР°С‡РµРЅРёРµ РЅР°СЃС‚СЂРѕР№РєРё РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ" });
+      return res.status(400).json({ error: "Значение настройки обязательно" });
     }
 
-    // РџСЂРѕРІРµСЂРёС‚СЊ СѓРЅРёРєР°Р»СЊРЅРѕСЃС‚СЊ РєР»СЋС‡Р°
+    // Проверить уникальность ключа
     const [existing] = await pool.query("SELECT setting_key FROM system_settings WHERE setting_key = ?", [key.trim()]);
 
     if (existing.length > 0) {
-      return res.status(400).json({ error: "РќР°СЃС‚СЂРѕР№РєР° СЃ С‚Р°РєРёРј РєР»СЋС‡РѕРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚" });
+      return res.status(400).json({ error: "Настройка с таким ключом уже существует" });
     }
 
     await pool.query("INSERT INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)", [
@@ -123,7 +123,7 @@ exports.createSetting = async (req, res, next) => {
       description || null,
     ]);
 
-    // РЎР±СЂРѕСЃРёС‚СЊ РєСЌС€ РЅР°СЃС‚СЂРѕРµРє
+    // Сбросить кэш настроек
     settingsService.clearCache();
 
     await logAndSend({
@@ -138,7 +138,7 @@ exports.createSetting = async (req, res, next) => {
       },
     });
 
-    res.status(201).json({ message: "РќР°СЃС‚СЂРѕР№РєР° СЃРѕР·РґР°РЅР° СѓСЃРїРµС€РЅРѕ" });
+    res.status(201).json({ message: "Настройка создана успешно" });
   } catch (error) {
     console.error("Create setting error:", error);
     next(error);
@@ -146,22 +146,22 @@ exports.createSetting = async (req, res, next) => {
 };
 
 /**
- * РЈРґР°Р»РёС‚СЊ РЅР°СЃС‚СЂРѕР№РєСѓ
+ * Удалить настройку
  */
 exports.deleteSetting = async (req, res, next) => {
   try {
     const { key } = req.params;
 
-    // РџСЂРѕРІРµСЂРёС‚СЊ СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёРµ
+    // Проверить существование
     const [existing] = await pool.query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key = ?", [key]);
 
     if (existing.length === 0) {
-      return res.status(404).json({ error: "РќР°СЃС‚СЂРѕР№РєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "Настройка не найдена" });
     }
 
     await pool.query("DELETE FROM system_settings WHERE setting_key = ?", [key]);
 
-    // РЎР±СЂРѕСЃРёС‚СЊ РєСЌС€ РЅР°СЃС‚СЂРѕРµРє
+    // Сбросить кэш настроек
     settingsService.clearCache();
 
     await logAndSend({

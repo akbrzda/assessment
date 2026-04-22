@@ -11,11 +11,28 @@ const usersController = require("./controller");
 
 const router = express.Router();
 
-// Р’СЃРµ РјР°СЂС€СЂСѓС‚С‹ Р·Р°С‰РёС‰РµРЅС‹ JWT Рё РґРѕСЃС‚СѓРїРЅС‹ С‡РµСЂРµР· РїСЂРѕРІРµСЂРєСѓ РјРѕРґСѓР»СЏ users
+// Все маршруты защищены JWT и доступны через проверку модуля users
 router.use(verifyJWT, checkModuleAccess("users"));
 
 router.get("/", cacheMiddleware({ ttl: 60 }), usersController.listUsers);
 router.get("/export/excel", usersController.exportUsersToExcel);
+router.post(
+  "/bulk/role",
+  verifyAdminRole(["superadmin"]),
+  invalidateCacheMiddleware(/^http:GET:.*\/api\/admin\/users/),
+  usersController.bulkUpdateRole,
+);
+router.post(
+  "/bulk/branch",
+  verifyAdminRole(["superadmin"]),
+  invalidateCacheMiddleware(/^http:GET:.*\/api\/admin\/users/),
+  usersController.bulkTransferBranch,
+);
+router.post(
+  "/bulk/export",
+  verifyAdminRole(["superadmin", "manager"]),
+  usersController.bulkExportUsers,
+);
 router.get("/:id/stats", cacheMiddleware({ ttl: 120 }), usersController.getUserDetailedStats);
 router.get("/:id", cacheMiddleware({ ttl: 120 }), usersController.getUserById);
 router.post(
@@ -48,4 +65,3 @@ router.delete(
 );
 
 module.exports = router;
-

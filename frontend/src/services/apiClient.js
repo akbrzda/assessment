@@ -79,6 +79,11 @@ export const apiClient = {
       body: JSON.stringify({ timezone }),
     });
   },
+  completeOnboarding() {
+    return request("/auth/onboarding/complete", {
+      method: "POST",
+    });
+  },
   getReferences() {
     return request("/auth/references");
   },

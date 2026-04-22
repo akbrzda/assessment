@@ -5,7 +5,7 @@ const referencesController = require("./controller");
 
 const router = express.Router();
 
-// РЎРїСЂР°РІРѕС‡РЅРёРєРё РґРѕСЃС‚СѓРїРЅС‹ РІСЃРµРј Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹Рј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј
+// Справочники доступны всем авторизованным пользователям
 router.use(verifyJWT);
 
 router.get("/", cacheMiddleware({ ttl: 600 }), referencesController.getReferences);

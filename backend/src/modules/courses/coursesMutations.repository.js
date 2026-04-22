@@ -4,7 +4,7 @@
  * Управление транзакциями — на уровне сервиса (admin/service.js).
  */
 
-// ─── Курс ───────────────────────────────────────────────────────────────────
+// --- Курс -------------------------------------------------------------------
 
 async function insertCourse({ title, description, finalAssessmentId, availabilityMode, availabilityDays, availabilityFrom, availabilityTo, userId }, connection) {
   const [result] = await connection.execute(
@@ -98,7 +98,7 @@ async function archiveCourseById(courseId, userId, connection) {
   );
 }
 
-// ─── Разделы ────────────────────────────────────────────────────────────────
+// --- Разделы ----------------------------------------------------------------
 
 async function getNextSectionOrder(courseId, connection) {
   const [[row]] = await connection.execute("SELECT COALESCE(MAX(order_index), 0) AS max_order FROM course_sections WHERE course_id = ?", [courseId]);
@@ -195,7 +195,7 @@ async function touchCourse(courseId, userId, bumpVersion, connection) {
   }
 }
 
-// ─── Темы ───────────────────────────────────────────────────────────────────
+// --- Темы -------------------------------------------------------------------
 
 async function getNextTopicOrder(sectionId, connection) {
   const [[row]] = await connection.execute("SELECT COALESCE(MAX(order_index), 0) AS max_order FROM course_topics WHERE section_id = ?", [sectionId]);

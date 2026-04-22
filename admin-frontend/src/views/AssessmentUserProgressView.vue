@@ -128,8 +128,8 @@
 
           <div v-else class="options-list">
             <div v-for="option in question.options" :key="option.id" class="option-item" :class="getOptionClass(question, option)">
-              <span class="option-marker" v-if="getOptionLabelType(question, option) === 'correct'">✓</span>
-              <span class="option-marker" v-else-if="getOptionLabelType(question, option) === 'wrong'">✕</span>
+              <span class="option-marker" v-if="getOptionLabelType(question, option) === 'correct'"></span>
+              <span class="option-marker" v-else-if="getOptionLabelType(question, option) === 'wrong'"></span>
               <span class="option-text">{{ option.option_text }}</span>
             </div>
           </div>

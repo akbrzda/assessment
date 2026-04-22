@@ -96,7 +96,7 @@ async function register(context, payload) {
       targetBranchId = invitation.branch_id;
     }
 
-    managerPosition = await authRepository.getPositionByName("РЈРїСЂР°РІР»СЏСЋС‰РёР№");
+    managerPosition = await authRepository.getPositionByName("Управляющий");
     if (!managerPosition) {
       throw buildError("Manager position not configured", 500);
     }
@@ -234,6 +234,20 @@ async function updateTimezone(currentUser, timezone) {
   return { success: true };
 }
 
+async function completeOnboarding(currentUser) {
+  if (!currentUser) {
+    throw buildError("User not found", 404);
+  }
+
+  await authRepository.completeOnboarding(currentUser.id);
+  const user = await authRepository.getDashboardData(currentUser.id);
+
+  return {
+    success: true,
+    onboardingCompletedAt: user?.onboardingCompletedAt || null,
+  };
+}
+
 async function getReferences() {
   const [branches, positions, roles] = await Promise.all([
     authRepository.getBranches(),
@@ -250,6 +264,6 @@ module.exports = {
   getProfile,
   updateProfile,
   updateTimezone,
+  completeOnboarding,
   getReferences,
 };
-

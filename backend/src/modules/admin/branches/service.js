@@ -11,13 +11,13 @@ function mapManagerRows(managers) {
 
 function assertManagerRole(user) {
   if (!user) {
-    const error = new Error("РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ");
+    const error = new Error("Пользователь не найден");
     error.status = 404;
     throw error;
   }
 
   if (user.role_name !== "manager" && user.role_name !== "superadmin") {
-    const error = new Error("РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ СЏРІР»СЏРµС‚СЃСЏ СѓРїСЂР°РІР»СЏСЋС‰РёРј РёР»Рё СЃСѓРїРµСЂР°РґРјРёРЅРѕРј");
+    const error = new Error("Пользователь не является управляющим или суперадмином");
     error.status = 400;
     throw error;
   }
@@ -30,7 +30,7 @@ async function getBranches({ search }) {
 async function getBranchById(branchId) {
   const branch = await branchesRepository.findBranchById(branchId);
   if (!branch) {
-    const error = new Error("Р¤РёР»РёР°Р» РЅРµ РЅР°Р№РґРµРЅ");
+    const error = new Error("Филиал не найден");
     error.status = 404;
     throw error;
   }
@@ -56,7 +56,7 @@ async function createBranch(payload, req) {
 
   const existing = await branchesRepository.findBranchByName(data.name);
   if (existing) {
-    const error = new Error("Р¤РёР»РёР°Р» СЃ С‚Р°РєРёРј РЅР°Р·РІР°РЅРёРµРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚");
+    const error = new Error("Филиал с таким названием уже существует");
     error.status = 400;
     throw error;
   }
@@ -78,14 +78,14 @@ async function createBranch(payload, req) {
 
   return {
     branchId,
-    message: "Р¤РёР»РёР°Р» СЃРѕР·РґР°РЅ СѓСЃРїРµС€РЅРѕ",
+    message: "Филиал создан успешно",
   };
 }
 
 async function updateBranch(branchId, payload, req) {
   const existing = await branchesRepository.findBranchById(branchId);
   if (!existing) {
-    const error = new Error("Р¤РёР»РёР°Р» РЅРµ РЅР°Р№РґРµРЅ");
+    const error = new Error("Филиал не найден");
     error.status = 404;
     throw error;
   }
@@ -98,7 +98,7 @@ async function updateBranch(branchId, payload, req) {
     excludeId: branchId,
   });
   if (duplicate) {
-    const error = new Error("Р¤РёР»РёР°Р» СЃ С‚Р°РєРёРј РЅР°Р·РІР°РЅРёРµРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚");
+    const error = new Error("Филиал с таким названием уже существует");
     error.status = 400;
     throw error;
   }
@@ -121,13 +121,13 @@ async function updateBranch(branchId, payload, req) {
     },
   });
 
-  return { message: "Р¤РёР»РёР°Р» РѕР±РЅРѕРІР»РµРЅ СѓСЃРїРµС€РЅРѕ" };
+  return { message: "Филиал обновлен успешно" };
 }
 
 async function deleteBranch(branchId, req) {
   const existing = await branchesRepository.findBranchById(branchId);
   if (!existing) {
-    const error = new Error("Р¤РёР»РёР°Р» РЅРµ РЅР°Р№РґРµРЅ");
+    const error = new Error("Филиал не найден");
     error.status = 404;
     throw error;
   }
@@ -135,7 +135,7 @@ async function deleteBranch(branchId, req) {
   const usersCount = await branchesRepository.countUsersByBranch(branchId);
   if (usersCount > 0) {
     const error = new Error(
-      `РќРµРІРѕР·РјРѕР¶РЅРѕ СѓРґР°Р»РёС‚СЊ С„РёР»РёР°Р». Р’ РЅРµРј ${usersCount} СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ. РЎРЅР°С‡Р°Р»Р° РїРµСЂРµРјРµСЃС‚РёС‚Рµ РёР»Рё СѓРґР°Р»РёС‚Рµ СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ.`,
+      `Невозможно удалить филиал. В нем ${usersCount} сотрудников. Сначала переместите или удалите сотрудников.`,
     );
     error.status = 400;
     throw error;
@@ -158,7 +158,7 @@ async function deleteBranch(branchId, req) {
 async function assignManager(branchId, userId, req) {
   const branch = await branchesRepository.findBranchById(branchId);
   if (!branch) {
-    const error = new Error("Р¤РёР»РёР°Р» РЅРµ РЅР°Р№РґРµРЅ");
+    const error = new Error("Филиал не найден");
     error.status = 404;
     throw error;
   }
@@ -168,7 +168,7 @@ async function assignManager(branchId, userId, req) {
 
   const existing = await branchesRepository.findManagerAssignment(branchId, userId);
   if (existing) {
-    const error = new Error("Р­С‚РѕС‚ СѓРїСЂР°РІР»СЏСЋС‰РёР№ СѓР¶Рµ РЅР°Р·РЅР°С‡РµРЅ Рє РґР°РЅРЅРѕРјСѓ С„РёР»РёР°Р»Сѓ");
+    const error = new Error("Этот управляющий уже назначен к данному филиалу");
     error.status = 400;
     throw error;
   }
@@ -188,27 +188,27 @@ async function assignManager(branchId, userId, req) {
     },
   });
 
-  return { message: "РЈРїСЂР°РІР»СЏСЋС‰РёР№ РЅР°Р·РЅР°С‡РµРЅ СѓСЃРїРµС€РЅРѕ" };
+  return { message: "Управляющий назначен успешно" };
 }
 
 async function removeManager(branchId, userId, req) {
   const branch = await branchesRepository.findBranchById(branchId);
   if (!branch) {
-    const error = new Error("Р¤РёР»РёР°Р» РЅРµ РЅР°Р№РґРµРЅ");
+    const error = new Error("Филиал не найден");
     error.status = 404;
     throw error;
   }
 
   const user = await branchesRepository.findUserWithRole(userId);
   if (!user) {
-    const error = new Error("РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ");
+    const error = new Error("Пользователь не найден");
     error.status = 404;
     throw error;
   }
 
   const affectedRows = await branchesRepository.deleteManagerAssignment(branchId, userId);
   if (!affectedRows) {
-    const error = new Error("РќР°Р·РЅР°С‡РµРЅРёРµ РЅРµ РЅР°Р№РґРµРЅРѕ");
+    const error = new Error("Назначение не найдено");
     error.status = 404;
     throw error;
   }
@@ -226,7 +226,7 @@ async function removeManager(branchId, userId, req) {
     },
   });
 
-  return { message: "РЈРїСЂР°РІР»СЏСЋС‰РёР№ СѓРґР°Р»РµРЅ СѓСЃРїРµС€РЅРѕ" };
+  return { message: "Управляющий удален успешно" };
 }
 
 async function assignManagerToBranches(userId, branchIds, req) {
@@ -235,7 +235,7 @@ async function assignManagerToBranches(userId, branchIds, req) {
 
   const branches = await branchesRepository.findBranchesByIds(branchIds);
   if (branches.length !== branchIds.length) {
-    const error = new Error("РћРґРёРЅ РёР»Рё РЅРµСЃРєРѕР»СЊРєРѕ С„РёР»РёР°Р»РѕРІ РЅРµ РЅР°Р№РґРµРЅС‹");
+    const error = new Error("Один или несколько филиалов не найдены");
     error.status = 404;
     throw error;
   }
@@ -256,7 +256,7 @@ async function assignManagerToBranches(userId, branchIds, req) {
     },
   });
 
-  return { message: "РЈРїСЂР°РІР»СЏСЋС‰РёР№ РЅР°Р·РЅР°С‡РµРЅ Рє РІС‹Р±СЂР°РЅРЅС‹Рј С„РёР»РёР°Р»Р°Рј СѓСЃРїРµС€РЅРѕ" };
+  return { message: "Управляющий назначен к выбранным филиалам успешно" };
 }
 
 async function getManagers() {

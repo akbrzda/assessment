@@ -68,6 +68,42 @@
           </div>
         </Card>
       </div>
+
+      <Card title="Дельта KPI к предыдущему периоду" icon="TrendingUp" class="kpi-delta-card">
+        <div class="kpi-delta-grid">
+          <div v-for="item in kpiDeltas" :key="item.key" class="kpi-delta-item">
+            <p class="kpi-delta-label">{{ item.label }}</p>
+            <p class="kpi-delta-value">{{ item.value }}</p>
+            <p class="kpi-delta-change" :class="getDeltaClass(item.percent)">
+              {{ formatDeltaPercent(item.percent) }}
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      <Card title="Причины провалов" icon="AlertTriangle" class="failure-reasons-card">
+        <div class="failure-reasons-grid">
+          <div class="failure-reason-item">
+            <div class="failure-reason-head">
+              <p class="failure-reason-label">Таймаут</p>
+              <p class="failure-reason-value">{{ failureReasons.timeout.count }} ({{ failureReasons.timeout.percent.toFixed(1) }}%)</p>
+            </div>
+            <div class="failure-reason-bar">
+              <div class="failure-reason-fill timeout" :style="{ width: `${failureReasons.timeout.percent}%` }"></div>
+            </div>
+          </div>
+          <div class="failure-reason-item">
+            <div class="failure-reason-head">
+              <p class="failure-reason-label">Неверные ответы</p>
+              <p class="failure-reason-value">{{ failureReasons.wrongAnswers.count }} ({{ failureReasons.wrongAnswers.percent.toFixed(1) }}%)</p>
+            </div>
+            <div class="failure-reason-bar">
+              <div class="failure-reason-fill wrong" :style="{ width: `${failureReasons.wrongAnswers.percent}%` }"></div>
+            </div>
+          </div>
+        </div>
+        <p class="failure-reason-total">Всего провалов: {{ failureReasons.totalFailed }}</p>
+      </Card>
       <!-- Топ-3 сотрудников -->
       <Card title="Топ-3 сотрудников по очкам" icon="Trophy" class="top-users-card">
         <div v-if="metrics.topUsers && metrics.topUsers.length > 0" class="top-users-list">
@@ -188,6 +224,29 @@
           </div>
         </Card>
       </div>
+
+      <div class="dashboard-row-full">
+        <Card title="Наблюдаемость API" icon="Radar" class="observability-card">
+          <div class="observability-grid">
+            <div class="observability-item">
+              <p class="observability-label">API p95</p>
+              <p class="observability-value">{{ Number(observability.api.p95LatencyMs || 0).toFixed(2) }} ms</p>
+            </div>
+            <div class="observability-item">
+              <p class="observability-label">Очередь геймификации</p>
+              <p class="observability-value">{{ formatQueueDepth(observability.queue.depth) }}</p>
+            </div>
+            <div class="observability-item">
+              <p class="observability-label">Ошибки scoring</p>
+              <p class="observability-value">{{ observability.scoring.errorsTotal || 0 }}</p>
+            </div>
+            <div class="observability-item">
+              <p class="observability-label">Redis</p>
+              <p class="observability-value">{{ observability.redis.status || "unknown" }}</p>
+            </div>
+          </div>
+        </Card>
+      </div>
     </div>
   </div>
 </template>
@@ -242,11 +301,59 @@ const metrics = ref({
 const activityData = ref([]);
 const branchKPI = ref([]);
 const latestActivities = ref([]);
+const observability = ref({
+  api: { p95LatencyMs: 0 },
+  queue: { depth: null },
+  scoring: { errorsTotal: 0 },
+  redis: { status: "unknown" },
+});
+const failureReasons = ref({
+  totalFailed: 0,
+  timeout: { count: 0, percent: 0 },
+  wrongAnswers: { count: 0, percent: 0 },
+});
 
 const REFRESH_INTERVAL = 300000; // 5 минут
 let refreshTimer = null;
 
 const sortedBranchKPI = computed(() => [...branchKPI.value].sort((a, b) => (b.success_rate || 0) - (a.success_rate || 0)));
+const kpiDeltas = computed(() => [
+  {
+    key: "activeAssessments",
+    label: "Активные аттестации",
+    value: String(metrics.value.activeAssessments || 0),
+    percent: toNumber(metrics.value.activeAssessmentsTrend?.percent),
+  },
+  {
+    key: "totalUsers",
+    label: "Всего сотрудников",
+    value: String(metrics.value.totalUsers || 0),
+    percent: toNumber(metrics.value.totalUsersTrend?.percent),
+  },
+  {
+    key: "attempts",
+    label: "Всего попыток",
+    value: String(metrics.value.assessmentStats?.total_attempts || 0),
+    percent: toNumber(metrics.value.assessmentStats?.trends?.attempts?.percent),
+  },
+  {
+    key: "completed",
+    label: "Завершено попыток",
+    value: String(metrics.value.assessmentStats?.completed_attempts || 0),
+    percent: toNumber(metrics.value.assessmentStats?.trends?.completed?.percent),
+  },
+  {
+    key: "avgScore",
+    label: "Средний балл",
+    value: `${formatScore(metrics.value.assessmentStats?.avg_score)}%`,
+    percent: toNumber(metrics.value.assessmentStats?.trends?.avgScore?.percent),
+  },
+]);
+
+const toNumber = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
 
 const activityDatasets = computed(() => {
   if (!activityData.value.length) return [];
@@ -355,6 +462,66 @@ const fetchLatestAssessmentActivities = async (params) => {
   latestActivities.value = data.latestActivities || [];
 };
 
+const fetchObservability = async () => {
+  const { data } = await dashboardApi.getObservability();
+  observability.value = {
+    api: data.api || { p95LatencyMs: 0 },
+    queue: data.queue || { depth: null },
+    scoring: data.scoring || { errorsTotal: 0 },
+    redis: data.redis || { status: "unknown" },
+  };
+};
+
+const resolveDateRange = (params) => {
+  const now = new Date();
+  const result = {
+    dateFrom: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+    dateTo: now,
+  };
+
+  if (params.period === "month") {
+    result.dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    return result;
+  }
+
+  if (params.period === "quarter") {
+    result.dateFrom = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    return result;
+  }
+
+  if (params.period === "custom" && params.date_from && params.date_to) {
+    result.dateFrom = new Date(`${params.date_from}T00:00:00.000Z`);
+    result.dateTo = new Date(`${params.date_to}T23:59:59.999Z`);
+  }
+
+  return result;
+};
+
+const fetchFailureReasons = async (params) => {
+  const { dateFrom, dateTo } = resolveDateRange(params);
+  const requestParams = {
+    dateFrom: dateFrom.toISOString(),
+    dateTo: dateTo.toISOString(),
+  };
+
+  if (params.branch_id) {
+    requestParams.branchId = params.branch_id;
+  }
+
+  const { data } = await dashboardApi.getFailureReasons(requestParams);
+  failureReasons.value = {
+    totalFailed: Number(data?.totalFailed || 0),
+    timeout: {
+      count: Number(data?.timeout?.count || 0),
+      percent: toNumber(data?.timeout?.percent),
+    },
+    wrongAnswers: {
+      count: Number(data?.wrongAnswers?.count || 0),
+      percent: toNumber(data?.wrongAnswers?.percent),
+    },
+  };
+};
+
 const loadAllData = async ({ silent = false } = {}) => {
   const params = buildParams();
 
@@ -370,7 +537,14 @@ const loadAllData = async ({ silent = false } = {}) => {
   }
 
   try {
-    await Promise.all([fetchMetrics(params), fetchActivityTrends(params), fetchBranchKPI(params), fetchLatestAssessmentActivities(params)]);
+    await Promise.all([
+      fetchMetrics(params),
+      fetchActivityTrends(params),
+      fetchBranchKPI(params),
+      fetchLatestAssessmentActivities(params),
+      fetchObservability(),
+      fetchFailureReasons(params),
+    ]);
   } catch (error) {
     console.error("Dashboard load error:", error);
     showToast("Не удалось загрузить данные дашборда", "error");
@@ -487,13 +661,34 @@ const formatTime = (dateStr) => {
   });
 };
 
+const formatQueueDepth = (value) => {
+  if (value == null) {
+    return "fallback";
+  }
+  return String(value);
+};
+
+const formatDeltaPercent = (value) => {
+  const numeric = toNumber(value);
+  if (numeric > 0) return `+${numeric.toFixed(1)}%`;
+  if (numeric < 0) return `${numeric.toFixed(1)}%`;
+  return "0.0%";
+};
+
+const getDeltaClass = (value) => {
+  const numeric = toNumber(value);
+  if (numeric > 0) return "delta-positive";
+  if (numeric < 0) return "delta-negative";
+  return "delta-neutral";
+};
+
 const navigateToAssessments = () => {
   router.push("/assessments");
 };
 
 const getMedalEmoji = (index) => {
-  const medals = ["🥇", "🥈", "🥉"];
-  return medals[index] || "🏅";
+  const medals = ["", "", ""];
+  return medals[index] || "";
 };
 
 const handleOnline = async () => {
@@ -606,6 +801,137 @@ onBeforeUnmount(() => {
 }
 .offline-banner :deep(svg) {
   color: inherit;
+}
+
+.kpi-delta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.kpi-delta-item {
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--bg-secondary);
+}
+
+.kpi-delta-label {
+  margin: 0 0 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.kpi-delta-value {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.kpi-delta-change {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.delta-positive {
+  color: #047857;
+}
+
+.delta-negative {
+  color: #b91c1c;
+}
+
+.delta-neutral {
+  color: var(--text-secondary);
+}
+
+.failure-reasons-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.failure-reason-item {
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--bg-secondary);
+}
+
+.failure-reason-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.failure-reason-label {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.failure-reason-value {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.failure-reason-bar {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--bg-tertiary, #e5e7eb);
+  overflow: hidden;
+}
+
+.failure-reason-fill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.failure-reason-fill.timeout {
+  background: #f59e0b;
+}
+
+.failure-reason-fill.wrong {
+  background: #ef4444;
+}
+
+.failure-reason-total {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.observability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.observability-item {
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--bg-secondary);
+}
+
+.observability-label {
+  margin: 0 0 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.observability-value {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 /* Metrics Grid */

@@ -14,4 +14,10 @@ export default {
   getLatestAssessmentActivities(params) {
     return apiClient.get("/admin/dashboard/latest-assessment-activities", { params });
   },
+  getObservability() {
+    return apiClient.get("/admin/dashboard/observability");
+  },
+  getFailureReasons(params) {
+    return apiClient.get("/admin/analytics/failure-reasons", { params });
+  },
 };

@@ -72,6 +72,30 @@ async function resetAssessmentProgress(req, res, next) {
   }
 }
 
+async function bulkUpdateRole(req, res, next) {
+  try {
+    return await moduleService.bulkUpdateRole(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function bulkTransferBranch(req, res, next) {
+  try {
+    return await moduleService.bulkTransferBranch(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function bulkExportUsers(req, res, next) {
+  try {
+    return await moduleService.bulkExportUsers(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   listUsers,
   exportUsersToExcel,
@@ -82,6 +106,8 @@ module.exports = {
   deleteUser,
   resetPassword,
   resetAssessmentProgress,
+  bulkUpdateRole,
+  bulkTransferBranch,
+  bulkExportUsers,
 };
-
 

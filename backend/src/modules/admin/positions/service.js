@@ -12,7 +12,7 @@ async function getPositions({ search }) {
 async function getPositionById(positionId) {
   const position = await positionsRepository.findPositionById(positionId);
   if (!position) {
-    const error = new Error("Р”РѕР»Р¶РЅРѕСЃС‚СЊ РЅРµ РЅР°Р№РґРµРЅР°");
+    const error = new Error("Должность не найдена");
     error.status = 404;
     throw error;
   }
@@ -29,7 +29,7 @@ async function createPosition(payload, req) {
 
   const existing = await positionsRepository.findByName(data.name);
   if (existing) {
-    const error = new Error("Р”РѕР»Р¶РЅРѕСЃС‚СЊ СЃ С‚Р°РєРёРј РЅР°Р·РІР°РЅРёРµРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚");
+    const error = new Error("Должность с таким названием уже существует");
     error.status = 400;
     throw error;
   }
@@ -50,14 +50,14 @@ async function createPosition(payload, req) {
 
   return {
     positionId,
-    message: "Р”РѕР»Р¶РЅРѕСЃС‚СЊ СЃРѕР·РґР°РЅР° СѓСЃРїРµС€РЅРѕ",
+    message: "Должность создана успешно",
   };
 }
 
 async function updatePosition(positionId, payload, req) {
   const existing = await positionsRepository.findPositionById(positionId);
   if (!existing) {
-    const error = new Error("Р”РѕР»Р¶РЅРѕСЃС‚СЊ РЅРµ РЅР°Р№РґРµРЅР°");
+    const error = new Error("Должность не найдена");
     error.status = 404;
     throw error;
   }
@@ -73,7 +73,7 @@ async function updatePosition(positionId, payload, req) {
   });
 
   if (duplicate) {
-    const error = new Error("Р”РѕР»Р¶РЅРѕСЃС‚СЊ СЃ С‚Р°РєРёРј РЅР°Р·РІР°РЅРёРµРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚");
+    const error = new Error("Должность с таким названием уже существует");
     error.status = 400;
     throw error;
   }
@@ -95,14 +95,14 @@ async function updatePosition(positionId, payload, req) {
   });
 
   return {
-    message: "Р”РѕР»Р¶РЅРѕСЃС‚СЊ РѕР±РЅРѕРІР»РµРЅР° СѓСЃРїРµС€РЅРѕ",
+    message: "Должность обновлена успешно",
   };
 }
 
 async function deletePosition(positionId, req) {
   const existing = await positionsRepository.findPositionById(positionId);
   if (!existing) {
-    const error = new Error("Р”РѕР»Р¶РЅРѕСЃС‚СЊ РЅРµ РЅР°Р№РґРµРЅР°");
+    const error = new Error("Должность не найдена");
     error.status = 404;
     throw error;
   }
@@ -110,7 +110,7 @@ async function deletePosition(positionId, req) {
   const usersCount = await positionsRepository.countUsersByPosition(positionId);
   if (usersCount > 0) {
     const error = new Error(
-      `РќРµРІРѕР·РјРѕР¶РЅРѕ СѓРґР°Р»РёС‚СЊ РґРѕР»Р¶РЅРѕСЃС‚СЊ. ${usersCount} СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ РёСЃРїРѕР»СЊР·СѓСЋС‚ РµРµ.`,
+      `Невозможно удалить должность. ${usersCount} сотрудников используют ее.`,
     );
     error.status = 400;
     throw error;

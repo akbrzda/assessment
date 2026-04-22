@@ -19,6 +19,8 @@ function mapUserRow(row) {
     level: row.level,
     points: row.points,
     timezone: row.timezone || "UTC",
+    onboardingCompletedAt: row.onboarding_completed_at || null,
+    isFirstLogin: !row.onboarding_completed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -27,7 +29,7 @@ function mapUserRow(row) {
 async function findByTelegramId(telegramId) {
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.timezone, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at, u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -58,7 +60,7 @@ async function updateProfile(userId, { firstName, lastName }) {
 async function getDashboardData(userId) {
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.timezone, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at, u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -76,7 +78,7 @@ async function getDashboardData(userId) {
 async function listUsers() {
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.timezone, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at, u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -92,7 +94,7 @@ async function listUsers() {
 async function findById(userId) {
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.timezone, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at, u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -164,7 +166,7 @@ async function findByIds(ids) {
   const placeholders = ids.map(() => "?").join(",");
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.timezone, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at, u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -182,6 +184,13 @@ async function updateTimezone(userId, timezone) {
   await pool.execute("UPDATE users SET timezone = ?, updated_at = NOW() WHERE id = ?", [timezone, userId]);
 }
 
+async function completeOnboarding(userId) {
+  await pool.execute(
+    "UPDATE users SET onboarding_completed_at = COALESCE(onboarding_completed_at, NOW()), updated_at = NOW() WHERE id = ?",
+    [userId],
+  );
+}
+
 module.exports = {
   findByTelegramId,
   createUser,
@@ -194,4 +203,5 @@ module.exports = {
   updateAvatar,
   findByIds,
   updateTimezone,
+  completeOnboarding,
 };

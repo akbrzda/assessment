@@ -3,7 +3,7 @@ const ExcelJS = require("exceljs");
 const PDFDocument = require("pdfkit");
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ РѕР±С‰СѓСЋ СЃС‚Р°С‚РёСЃС‚РёРєСѓ
+ * Получить общую статистику
  */
 exports.getOverallStats = async (req, res, next) => {
   try {
@@ -14,7 +14,7 @@ exports.getOverallStats = async (req, res, next) => {
     let whereConditions = ['aa.status = "completed"'];
     const params = [];
 
-    // Р¤РёР»СЊС‚СЂ РґР»СЏ СѓРїСЂР°РІР»СЏСЋС‰РµРіРѕ - С‚РѕР»СЊРєРѕ РµРіРѕ С„РёР»РёР°Р»
+    // Фильтр для управляющего - только его филиал
     if (userRole === "manager") {
       whereConditions.push("u.branch_id = (SELECT branch_id FROM users WHERE id = ?)");
       params.push(userId);
@@ -42,7 +42,7 @@ exports.getOverallStats = async (req, res, next) => {
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
-    // РћР±С‰Р°СЏ СЃС‚Р°С‚РёСЃС‚РёРєР°
+    // Общая статистика
     const [stats] = await pool.query(
       `
       SELECT 
@@ -69,7 +69,7 @@ exports.getOverallStats = async (req, res, next) => {
 };
 
 /**
- * РђРЅР°Р»РёС‚РёРєР° РїРѕ С„РёР»РёР°Р»Р°Рј
+ * Аналитика по филиалам
  */
 exports.getBranchAnalytics = async (req, res, next) => {
   try {
@@ -121,7 +121,7 @@ exports.getBranchAnalytics = async (req, res, next) => {
 };
 
 /**
- * РђРЅР°Р»РёС‚РёРєР° РїРѕ РґРѕР»Р¶РЅРѕСЃС‚СЏРј
+ * Аналитика по должностям
  */
 exports.getPositionAnalytics = async (req, res, next) => {
   try {
@@ -189,7 +189,7 @@ exports.getPositionAnalytics = async (req, res, next) => {
 };
 
 /**
- * РўРѕРї СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ
+ * Топ сотрудников
  */
 exports.getTopUsers = async (req, res, next) => {
   try {
@@ -260,7 +260,7 @@ exports.getTopUsers = async (req, res, next) => {
 };
 
 /**
- * Р”РёРЅР°РјРёРєР° Р°С‚С‚РµСЃС‚Р°С†РёР№ РїРѕ РґР°С‚Р°Рј
+ * Динамика аттестаций по датам
  */
 exports.getAssessmentTrends = async (req, res, next) => {
   try {
@@ -315,7 +315,7 @@ exports.getAssessmentTrends = async (req, res, next) => {
       params
     );
 
-    // Р Р°СЃСЃС‡РёС‚С‹РІР°РµРј РїСЂРѕС†РµРЅС‚С‹ РїСЂРёСЂРѕСЃС‚Р°/СЃРЅРёР¶РµРЅРёСЏ
+    // Рассчитываем проценты прироста/снижения
     const trendsWithChanges = trends.map((item, index) => {
       if (index === 0) {
         return { ...item, change_percent: 0, change_direction: "neutral" };
@@ -340,7 +340,7 @@ exports.getAssessmentTrends = async (req, res, next) => {
 };
 
 /**
- * Р”РµС‚Р°Р»СЊРЅР°СЏ Р°РЅР°Р»РёС‚РёРєР° РїРѕ С„РёР»РёР°Р»Р°Рј СЃ РјРµРґРёР°РЅРѕР№ Рё РґРѕР»СЏРјРё
+ * Детальная аналитика по филиалам с медианой и долями
  */
 exports.getDetailedBranchAnalytics = async (req, res, next) => {
   try {
@@ -386,11 +386,11 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
       userRole === "manager" ? [...attemptParams, userId] : attemptParams
     );
 
-    // Р Р°СЃСЃС‡РёС‚С‹РІР°РµРј РјРµРґРёР°РЅСѓ Рё РґРѕР»Рё РґР»СЏ РєР°Р¶РґРѕРіРѕ С„РёР»РёР°Р»Р°
+    // Рассчитываем медиану и доли для каждого филиала
     const detailedBranches = await Promise.all(
       branches.map(async (branch) => {
         if (branch.total_attempts > 0) {
-          // РџРѕР»СѓС‡Р°РµРј РјРµРґРёР°РЅСѓ
+          // Получаем медиану
           const [medianResult] = await pool.query(
             `
             SELECT aa.score_percent
@@ -425,7 +425,7 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
 };
 
 /**
- * РљРѕРјР±РёРЅРёСЂРѕРІР°РЅРЅР°СЏ Р°РЅР°Р»РёС‚РёРєР°: С„РёР»РёР°Р»С‹ + РґРѕР»Р¶РЅРѕСЃС‚Рё
+ * Комбинированная аналитика: филиалы + должности
  */
 exports.getCombinedAnalytics = async (req, res, next) => {
   try {
@@ -495,7 +495,7 @@ exports.getCombinedAnalytics = async (req, res, next) => {
 };
 
 /**
- * РћС‚С‡С‘С‚ РїРѕ РєРѕРЅРєСЂРµС‚РЅРѕР№ Р°С‚С‚РµСЃС‚Р°С†РёРё
+ * Отчёт по конкретной аттестации
  */
 exports.getAssessmentReport = async (req, res, next) => {
   try {
@@ -503,7 +503,7 @@ exports.getAssessmentReport = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    // РћСЃРЅРѕРІРЅР°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ РѕР± Р°С‚С‚РµСЃС‚Р°С†РёРё
+    // Основная информация об аттестации
     const [assessments] = await pool.query(
       `
     SELECT 
@@ -520,20 +520,20 @@ exports.getAssessmentReport = async (req, res, next) => {
     );
 
     if (assessments.length === 0) {
-      return res.status(404).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "Аттестация не найдена" });
     }
 
     const assessment = assessments[0];
 
-    // РџСЂРѕРІРµСЂРєР° РїСЂР°РІ РґРѕСЃС‚СѓРїР°
+    // Проверка прав доступа
     if (userRole === "manager") {
       const [userBranch] = await pool.query("SELECT branch_id FROM users WHERE id = ?", [userId]);
       if (userBranch[0].branch_id !== assessment.branch_id) {
-        return res.status(403).json({ error: "РќРµС‚ РґРѕСЃС‚СѓРїР° Рє СЌС‚РѕР№ Р°С‚С‚РµСЃС‚Р°С†РёРё" });
+        return res.status(403).json({ error: "Нет доступа к этой аттестации" });
       }
     }
 
-    // РЈС‡Р°СЃС‚РЅРёРєРё СЃ СЂРµР·СѓР»СЊС‚Р°С‚Р°РјРё
+    // Участники с результатами
     const [participants] = await pool.query(
       `
       SELECT 
@@ -558,7 +558,7 @@ exports.getAssessmentReport = async (req, res, next) => {
       [assessmentId]
     );
 
-    // РЎС‚Р°С‚РёСЃС‚РёРєР° РїРѕ РІРѕРїСЂРѕСЃР°Рј
+    // Статистика по вопросам
     const [questionStats] = await pool.query(
       `
       SELECT 
@@ -598,7 +598,7 @@ exports.getAssessmentReport = async (req, res, next) => {
 };
 
 /**
- * РћС‚С‡С‘С‚ РїРѕ РєРѕРЅРєСЂРµС‚РЅРѕРјСѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ
+ * Отчёт по конкретному пользователю
  */
 exports.getUserReport = async (req, res, next) => {
   try {
@@ -607,7 +607,7 @@ exports.getUserReport = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    // РџРѕР»СѓС‡Р°РµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РїРѕР»СЊР·РѕРІР°С‚РµР»Рµ
+    // Получаем информацию о пользователе
     let users;
     try {
       [users] = await pool.query(
@@ -647,22 +647,22 @@ exports.getUserReport = async (req, res, next) => {
     }
 
     if (users.length === 0) {
-      return res.status(404).json({ error: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Пользователь не найден" });
     }
 
     const user = users[0];
 
-    // РџСЂРѕРІРµСЂРєР° РїСЂР°РІ РґРѕСЃС‚СѓРїР°
+    // Проверка прав доступа
     if (userRole === "manager") {
       const [userBranch] = await pool.query("SELECT branch_id FROM users WHERE id = ?", [userId]);
       const managerBranchId = userBranch[0]?.branch_id;
 
       if (!managerBranchId) {
-        return res.status(403).json({ error: "РќРµС‚ РґРѕСЃС‚СѓРїР° Рє СЌС‚РѕРјСѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ" });
+        return res.status(403).json({ error: "Нет доступа к этому пользователю" });
       }
 
       if (managerBranchId !== user.branch_id) {
-        return res.status(403).json({ error: "РќРµС‚ РґРѕСЃС‚СѓРїР° Рє СЌС‚РѕРјСѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ" });
+        return res.status(403).json({ error: "Нет доступа к этому пользователю" });
       }
     }
 
@@ -679,7 +679,7 @@ exports.getUserReport = async (req, res, next) => {
       params.push(dateTo);
     }
 
-    // РЎС‚Р°С‚РёСЃС‚РёРєР° РїРѕ Р°С‚С‚РµСЃС‚Р°С†РёСЏРј
+    // Статистика по аттестациям
     const [stats] = await pool.query(
       `
       SELECT 
@@ -695,7 +695,7 @@ exports.getUserReport = async (req, res, next) => {
       params
     );
 
-    // РСЃС‚РѕСЂРёСЏ Р°С‚С‚РµСЃС‚Р°С†РёР№
+    // История аттестаций
     const [attempts] = await pool.query(
       `
       SELECT 
@@ -703,7 +703,7 @@ exports.getUserReport = async (req, res, next) => {
         a.title as assessment_title,
         aa.score_percent,
         aa.completed_at,
-        CASE WHEN aa.score_percent >= a.pass_score_percent THEN 'РџСЂРѕР№РґРµРЅРѕ' ELSE 'РќРµ РїСЂРѕР№РґРµРЅРѕ' END as status
+        CASE WHEN aa.score_percent >= a.pass_score_percent THEN 'Пройдено' ELSE 'Не пройдено' END as status
       FROM assessment_attempts aa
       JOIN assessments a ON aa.assessment_id = a.id
       WHERE aa.user_id = ? AND aa.status = 'completed'${dateCondition}
@@ -712,7 +712,7 @@ exports.getUserReport = async (req, res, next) => {
       params
     );
 
-    // Р”РёРЅР°РјРёРєР° СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ
+    // Динамика результатов
     const [trends] = await pool.query(
       `
       SELECT 
@@ -726,7 +726,7 @@ exports.getUserReport = async (req, res, next) => {
       params
     );
 
-    // РЎСЂР°РІРЅРµРЅРёРµ СЃ РєРѕР»Р»РµРіР°РјРё С‚РѕРіРѕ Р¶Рµ СѓСЂРѕРІРЅСЏ/РґРѕР»Р¶РЅРѕСЃС‚Рё
+    // Сравнение с коллегами того же уровня/должности
     const [comparison] = await pool.query(
       `
       SELECT 
@@ -753,7 +753,7 @@ exports.getUserReport = async (req, res, next) => {
 };
 
 /**
- * Р­РєСЃРїРѕСЂС‚ РІ Excel
+ * Экспорт в Excel
  */
 exports.exportToExcel = async (req, res, next) => {
   try {
@@ -766,8 +766,8 @@ exports.exportToExcel = async (req, res, next) => {
     workbook.created = new Date();
 
     if (type === "branches") {
-      // Р­РєСЃРїРѕСЂС‚ Р°РЅР°Р»РёС‚РёРєРё РїРѕ С„РёР»РёР°Р»Р°Рј
-      const sheet = workbook.addWorksheet("Р¤РёР»РёР°Р»С‹");
+      // Экспорт аналитики по филиалам
+      const sheet = workbook.addWorksheet("Филиалы");
 
       let whereConditions = ['aa.status = "completed"'];
       const params = [];
@@ -792,12 +792,12 @@ exports.exportToExcel = async (req, res, next) => {
       const [branches] = await pool.query(
         `
         SELECT 
-          b.name as 'Р¤РёР»РёР°Р»',
-          COUNT(DISTINCT aa.id) as 'Р’СЃРµРіРѕ РїРѕРїС‹С‚РѕРє',
-          COUNT(DISTINCT aa.user_id) as 'РЈРЅРёРєР°Р»СЊРЅС‹С… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№',
-          ROUND(AVG(aa.score_percent), 2) as 'РЎСЂРµРґРЅРёР№ Р±Р°Р»Р»',
-          SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as 'РџСЂРѕС€Р»Рё',
-          ROUND((SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) / COUNT(aa.id)) * 100, 2) as 'РџСЂРѕС†РµРЅС‚ СѓСЃРїРµС…Р°'
+          b.name as 'Филиал',
+          COUNT(DISTINCT aa.id) as 'Всего попыток',
+          COUNT(DISTINCT aa.user_id) as 'Уникальных пользователей',
+          ROUND(AVG(aa.score_percent), 2) as 'Средний балл',
+          SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as 'Прошли',
+          ROUND((SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) / COUNT(aa.id)) * 100, 2) as 'Процент успеха'
         FROM branches b
         LEFT JOIN users u ON b.id = u.branch_id
         LEFT JOIN assessment_attempts aa ON u.id = aa.user_id ${whereConditions.length > 0 ? "AND " + whereConditions.slice(1).join(" AND ") : ""}
@@ -811,7 +811,7 @@ exports.exportToExcel = async (req, res, next) => {
       sheet.columns = Object.keys(branches[0] || {}).map((key) => ({ header: key, key, width: 20 }));
       sheet.addRows(branches);
 
-      // РЎС‚РёР»РёР·Р°С†РёСЏ Р·Р°РіРѕР»РѕРІРєРѕРІ
+      // Стилизация заголовков
       sheet.getRow(1).font = { bold: true };
       sheet.getRow(1).fill = {
         type: "pattern",
@@ -820,8 +820,8 @@ exports.exportToExcel = async (req, res, next) => {
       };
       sheet.getRow(1).font.color = { argb: "FFFFFFFF" };
     } else if (type === "users") {
-      // Р­РєСЃРїРѕСЂС‚ РїРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј
-      const sheet = workbook.addWorksheet("РЎРѕС‚СЂСѓРґРЅРёРєРё");
+      // Экспорт по пользователям
+      const sheet = workbook.addWorksheet("Сотрудники");
 
       let whereConditions = ['aa.status = "completed"'];
       const params = [];
@@ -856,14 +856,14 @@ exports.exportToExcel = async (req, res, next) => {
       const [users] = await pool.query(
         `
         SELECT 
-          u.first_name as 'РРјСЏ',
-          u.last_name as 'Р¤Р°РјРёР»РёСЏ',
-          b.name as 'Р¤РёР»РёР°Р»',
-          p.name as 'Р”РѕР»Р¶РЅРѕСЃС‚СЊ',
-          COUNT(DISTINCT aa.assessment_id) as 'РџСЂРѕР№РґРµРЅРѕ Р°С‚С‚РµСЃС‚Р°С†РёР№',
-          COUNT(aa.id) as 'Р’СЃРµРіРѕ РїРѕРїС‹С‚РѕРє',
-          ROUND(AVG(aa.score_percent), 2) as 'РЎСЂРµРґРЅРёР№ Р±Р°Р»Р»',
-          SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as 'РџСЂРѕС€Р»Рё'
+          u.first_name as 'Имя',
+          u.last_name as 'Фамилия',
+          b.name as 'Филиал',
+          p.name as 'Должность',
+          COUNT(DISTINCT aa.assessment_id) as 'Пройдено аттестаций',
+          COUNT(aa.id) as 'Всего попыток',
+          ROUND(AVG(aa.score_percent), 2) as 'Средний балл',
+          SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as 'Прошли'
         FROM users u
         LEFT JOIN branches b ON u.branch_id = b.id
         LEFT JOIN positions p ON u.position_id = p.id
@@ -900,7 +900,7 @@ exports.exportToExcel = async (req, res, next) => {
 };
 
 /**
- * Р­РєСЃРїРѕСЂС‚ РІ PDF
+ * Экспорт в PDF
  */
 exports.exportToPDF = async (req, res, next) => {
   try {
@@ -915,10 +915,10 @@ exports.exportToPDF = async (req, res, next) => {
 
     doc.pipe(res);
 
-    // Р—Р°РіРѕР»РѕРІРѕРє
-    doc.fontSize(20).text("РћС‚С‡С‘С‚ РїРѕ Р°С‚С‚РµСЃС‚Р°С†РёСЏРј", { align: "center" });
+    // Заголовок
+    doc.fontSize(20).text("Отчёт по аттестациям", { align: "center" });
     doc.moveDown();
-    doc.fontSize(12).text(`Р”Р°С‚Р° С„РѕСЂРјРёСЂРѕРІР°РЅРёСЏ: ${new Date().toLocaleDateString("ru-RU")}`, { align: "center" });
+    doc.fontSize(12).text(`Дата формирования: ${new Date().toLocaleDateString("ru-RU")}`, { align: "center" });
     doc.moveDown(2);
 
     if (type === "branches") {
@@ -960,14 +960,14 @@ exports.exportToPDF = async (req, res, next) => {
         userRole === "manager" ? [userId] : []
       );
 
-      doc.fontSize(16).text("РЎС‚Р°С‚РёСЃС‚РёРєР° РїРѕ С„РёР»РёР°Р»Р°Рј", { underline: true });
+      doc.fontSize(16).text("Статистика по филиалам", { underline: true });
       doc.moveDown();
 
       branches.forEach((branch, index) => {
         doc.fontSize(12).text(`${index + 1}. ${branch.name}`, { bold: true });
-        doc.fontSize(10).text(`   Р’СЃРµРіРѕ РїРѕРїС‹С‚РѕРє: ${branch.total_attempts}`);
-        doc.text(`   РЎСЂРµРґРЅРёР№ Р±Р°Р»Р»: ${branch.avg_score}%`);
-        doc.text(`   РџСЂРѕС€Р»Рё: ${branch.passed_count} РёР· ${branch.total_count}`);
+        doc.fontSize(10).text(`   Всего попыток: ${branch.total_attempts}`);
+        doc.text(`   Средний балл: ${branch.avg_score}%`);
+        doc.text(`   Прошли: ${branch.passed_count} из ${branch.total_count}`);
         doc.moveDown();
       });
     }
@@ -979,3 +979,157 @@ exports.exportToPDF = async (req, res, next) => {
   }
 };
 
+/**
+ * Причины провалов: таймаут vs неверные ответы
+ */
+exports.getFailureReasons = async (req, res, next) => {
+  try {
+    const { dateFrom, dateTo, branchId } = req.query;
+    const userRole = req.user.role;
+    const userId = req.user.id;
+
+    const where = ["aa.status = 'completed'", "aa.score_percent < a.pass_score_percent"];
+    const params = [];
+
+    if (dateFrom) {
+      where.push("aa.completed_at >= ?");
+      params.push(dateFrom);
+    }
+    if (dateTo) {
+      where.push("aa.completed_at <= ?");
+      params.push(dateTo);
+    }
+    if (userRole === "manager") {
+      where.push("u.branch_id = (SELECT branch_id FROM users WHERE id = ?)");
+      params.push(userId);
+    } else if (branchId) {
+      where.push("u.branch_id = ?");
+      params.push(Number(branchId));
+    }
+
+    const [rows] = await pool.query(
+      `
+      SELECT
+        SUM(
+          CASE
+            WHEN a.time_limit_minutes IS NOT NULL
+              AND aa.time_spent_seconds IS NOT NULL
+              AND aa.time_spent_seconds >= (a.time_limit_minutes * 60)
+            THEN 1 ELSE 0
+          END
+        ) AS timeout_count,
+        SUM(
+          CASE
+            WHEN NOT (
+              a.time_limit_minutes IS NOT NULL
+              AND aa.time_spent_seconds IS NOT NULL
+              AND aa.time_spent_seconds >= (a.time_limit_minutes * 60)
+            )
+            THEN 1 ELSE 0
+          END
+        ) AS wrong_answers_count,
+        COUNT(*) AS total_failed
+      FROM assessment_attempts aa
+      JOIN assessments a ON a.id = aa.assessment_id
+      JOIN users u ON u.id = aa.user_id
+      WHERE ${where.join(" AND ")}
+      `,
+      params,
+    );
+
+    const timeoutCount = Number(rows?.[0]?.timeout_count || 0);
+    const wrongAnswersCount = Number(rows?.[0]?.wrong_answers_count || 0);
+    const totalFailed = Number(rows?.[0]?.total_failed || 0);
+
+    const toPercent = (value) => (totalFailed > 0 ? Number(((value / totalFailed) * 100).toFixed(1)) : 0);
+
+    res.json({
+      totalFailed,
+      timeout: {
+        count: timeoutCount,
+        percent: toPercent(timeoutCount),
+      },
+      wrongAnswers: {
+        count: wrongAnswersCount,
+        percent: toPercent(wrongAnswersCount),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.exportToCsv = async (req, res, next) => {
+  try {
+    const { type = "users", dateFrom, dateTo } = req.query;
+    const userRole = req.user.role;
+    const userId = req.user.id;
+
+    let whereConditions = ['aa.status = "completed"'];
+    const params = [];
+
+    if (userRole === "manager") {
+      whereConditions.push("u.branch_id = (SELECT branch_id FROM users WHERE id = ?)");
+      params.push(userId);
+    }
+
+    if (dateFrom) {
+      whereConditions.push("aa.completed_at >= ?");
+      params.push(dateFrom);
+    }
+
+    if (dateTo) {
+      whereConditions.push("aa.completed_at <= ?");
+      params.push(dateTo);
+    }
+
+    let rows = [];
+    if (type === "branches") {
+      [rows] = await pool.query(
+        `
+        SELECT b.name AS branch_name,
+               COUNT(DISTINCT aa.id) AS attempts,
+               ROUND(AVG(aa.score_percent), 2) AS avg_score
+        FROM branches b
+        LEFT JOIN users u ON u.branch_id = b.id
+        LEFT JOIN assessment_attempts aa ON aa.user_id = u.id
+        LEFT JOIN assessments a ON a.id = aa.assessment_id
+        WHERE ${whereConditions.join(" AND ")}
+        GROUP BY b.id, b.name
+        ORDER BY b.name ASC
+        `,
+        params,
+      );
+    } else {
+      [rows] = await pool.query(
+        `
+        SELECT u.id,
+               u.first_name,
+               u.last_name,
+               COUNT(DISTINCT aa.id) AS attempts,
+               ROUND(AVG(aa.score_percent), 2) AS avg_score
+        FROM users u
+        JOIN assessment_attempts aa ON aa.user_id = u.id
+        JOIN assessments a ON a.id = aa.assessment_id
+        WHERE ${whereConditions.join(" AND ")}
+        GROUP BY u.id, u.first_name, u.last_name
+        ORDER BY u.id ASC
+        `,
+        params,
+      );
+    }
+
+    const headers = rows.length ? Object.keys(rows[0]) : ["empty"];
+    const escape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const lines = [headers.join(",")];
+    for (const row of rows) {
+      lines.push(headers.map((key) => escape(row[key])).join(","));
+    }
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename=analytics_${type}_${Date.now()}.csv`);
+    res.send(`${lines.join("\n")}\n`);
+  } catch (error) {
+    next(error);
+  }
+};

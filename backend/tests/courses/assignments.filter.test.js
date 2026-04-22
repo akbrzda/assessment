@@ -12,7 +12,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-// ─── Реализация stub-логики (повторяет SQL-логику listAssignedCourseIds) ─────
+// --- Реализация stub-логики (повторяет SQL-логику listAssignedCourseIds) -----
 
 /**
  * Имитирует логику listAssignedCourseIds без обращения к БД.
@@ -50,7 +50,7 @@ function resolveAssignedCourseIds(courses, userId, userPositionId, userBranchId)
   return result;
 }
 
-// ─── Тесты ───────────────────────────────────────────────────────────────────
+// --- Тесты -------------------------------------------------------------------
 
 test("назначение: открытый курс виден всем пользователям", () => {
   const courses = [{ id: 1, positionTargets: [], branchTargets: [], userAssignments: [] }];

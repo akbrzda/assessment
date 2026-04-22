@@ -5,7 +5,7 @@ const questionBankController = require("./controller");
 
 const router = express.Router();
 
-// Р’СЃРµ РјР°СЂС€СЂСѓС‚С‹ С‚СЂРµР±СѓСЋС‚ JWT Рё РґРѕСЃС‚СѓРї Рє РјРѕРґСѓР»СЋ questions
+// Все маршруты требуют JWT и доступ к модулю questions
 router.use(verifyJWT);
 router.use(checkModuleAccess("questions"));
 

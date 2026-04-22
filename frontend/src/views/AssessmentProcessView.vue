@@ -42,19 +42,46 @@
           </div>
 
           <div v-else-if="currentQuestion.questionType === 'matching'" class="matching-block">
-            <div v-for="answer in currentQuestion.answers" :key="answer.id" class="matching-row">
-              <div class="matching-left">{{ answer.text }}</div>
-              <select
-                class="matching-select"
-                :value="selectedMatchingPairs[answer.id] || ''"
-                @change="(event) => handleMatchingChange(answer.id, event.target.value)"
-              >
-                <option value="">Выберите пару</option>
-                <option v-for="option in getMatchingOptions(answer.id)" :key="option.id" :value="option.id">
-                  {{ option.text }}
-                </option>
-              </select>
-            </div>
+            <template v-if="isMobileMatchingView">
+              <div v-for="answer in currentQuestion.answers" :key="answer.id" class="matching-card">
+                <div class="matching-left">{{ answer.text }}</div>
+                <div class="matching-card-options">
+                  <button
+                    v-for="option in getMatchingOptions(answer.id)"
+                    :key="option.id"
+                    type="button"
+                    class="matching-chip"
+                    :class="{ active: Number(selectedMatchingPairs[answer.id]) === option.id }"
+                    @click="selectMatchingCard(answer.id, option.id)"
+                  >
+                    {{ option.text }}
+                  </button>
+                  <button
+                    v-if="selectedMatchingPairs[answer.id]"
+                    type="button"
+                    class="matching-clear-btn"
+                    @click="handleMatchingChange(answer.id, '')"
+                  >
+                    Сбросить выбор
+                  </button>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <div v-for="answer in currentQuestion.answers" :key="answer.id" class="matching-row">
+                <div class="matching-left">{{ answer.text }}</div>
+                <select
+                  class="matching-select"
+                  :value="selectedMatchingPairs[answer.id] || ''"
+                  @change="(event) => handleMatchingChange(answer.id, event.target.value)"
+                >
+                  <option value="">Выберите пару</option>
+                  <option v-for="option in getMatchingOptions(answer.id)" :key="option.id" :value="option.id">
+                    {{ option.text }}
+                  </option>
+                </select>
+              </div>
+            </template>
           </div>
 
           <div v-else class="answers-list" :class="{ multiple: isMultiChoice(currentQuestion.questionType) }">
@@ -214,6 +241,7 @@ export default {
     const timer = ref(null);
     const isSaving = ref(false);
     const isCompleted = ref(false);
+    const isMobile = ref(false);
     const PROGRESS_STORAGE_KEY = "assessmentAttemptProgress";
     const COURSE_COMPLETION_STORAGE_KEY = "courseCompletionContext";
 
@@ -221,6 +249,7 @@ export default {
 
     const currentQuestion = computed(() => questions.value[currentQuestionIndex.value] || null);
     const isMultiChoice = (questionType) => questionType === "multiple";
+    const isMobileMatchingView = computed(() => isMobile.value && currentQuestion.value?.questionType === "matching");
 
     const progressPercentage = computed(() => {
       if (!questions.value.length) {
@@ -534,6 +563,10 @@ export default {
 
       syncCurrentAnswer();
       telegramStore.hapticFeedback("selection");
+    };
+
+    const selectMatchingCard = (leftId, optionId) => {
+      handleMatchingChange(leftId, optionId);
     };
 
     function toggleAnswer(optionId) {
@@ -964,6 +997,13 @@ export default {
     }
 
     onMounted(async () => {
+      const updateViewportFlags = () => {
+        isMobile.value = typeof window !== "undefined" ? window.innerWidth <= 768 : false;
+      };
+      updateViewportFlags();
+      window.addEventListener("resize", updateViewportFlags);
+      window._assessmentResizeHandler = updateViewportFlags;
+
       const ready = await loadAssessment();
       if (!ready) {
         return;
@@ -1086,6 +1126,10 @@ export default {
         window.removeEventListener("beforeunload", window._assessmentBeforeUnloadHandler);
         delete window._assessmentBeforeUnloadHandler;
       }
+      if (window._assessmentResizeHandler) {
+        window.removeEventListener("resize", window._assessmentResizeHandler);
+        delete window._assessmentResizeHandler;
+      }
     });
 
     return {
@@ -1097,6 +1141,7 @@ export default {
       selectedMatchingPairs,
       selectedTextAnswer,
       userAnswers,
+      isMobileMatchingView,
       timeRemaining,
       halfTimePassed,
       showTimeUpModal,
@@ -1109,6 +1154,7 @@ export default {
       isMultiChoice,
       getMatchingOptions,
       handleMatchingChange,
+      selectMatchingCard,
       toggleAnswer,
       nextQuestion,
       navigateToQuestion,
@@ -1291,6 +1337,46 @@ export default {
 
 .matching-select:hover {
   border-color: var(--accent-blue);
+}
+
+.matching-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+}
+
+.matching-card-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.matching-chip {
+  border: 1px solid var(--divider);
+  border-radius: 999px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.matching-chip.active {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.matching-clear-btn {
+  border: none;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--error);
+  padding: 8px 12px;
+  font-size: 13px;
 }
 
 .answers-list {

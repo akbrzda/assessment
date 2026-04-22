@@ -9,6 +9,17 @@
         </div>
       </div>
 
+      <div v-if="showOnboarding" class="onboarding-card mb-12">
+        <p class="onboarding-title">{{ onboardingSlides[onboardingStep].title }}</p>
+        <p class="onboarding-text">{{ onboardingSlides[onboardingStep].description }}</p>
+        <div class="onboarding-actions">
+          <button v-if="onboardingStep > 0" class="btn btn-secondary" @click="prevOnboardingStep">Назад</button>
+          <button class="btn btn-primary" @click="nextOnboardingStep">
+            {{ onboardingStep === onboardingSlides.length - 1 ? "Понятно" : "Далее" }}
+          </button>
+        </div>
+      </div>
+
       <!-- Next Assessment Card -->
       <div v-if="openAssessmentsCount > 1" class="open-assessments-banner mb-12">
         <span class="open-assessments-icon">📋</span>
@@ -146,6 +157,22 @@ export default {
     });
     const recentActivity = ref([]);
     const isDataLoading = ref(false);
+    const showOnboarding = ref(false);
+    const onboardingStep = ref(0);
+    const onboardingSlides = [
+      {
+        title: "Добро пожаловать",
+        description: "Здесь вы видите ближайшую аттестацию и текущий статус прохождения.",
+      },
+      {
+        title: "Ваш прогресс",
+        description: "В блоке прогресса доступны очки, уровень и общая статистика по результатам.",
+      },
+      {
+        title: "История активности",
+        description: "Ниже отображаются последние попытки и результаты для быстрого контроля.",
+      },
+    ];
 
     const debugConsoleReady = computed(() => isErudaLoaded.value);
 
@@ -357,8 +384,38 @@ export default {
       }
     }
 
-    onMounted(() => {
-      loadDashboardData();
+    async function maybeShowOnboarding() {
+      showOnboarding.value = Boolean(userStore.user?.isFirstLogin);
+      onboardingStep.value = 0;
+    }
+
+    async function nextOnboardingStep() {
+      if (onboardingStep.value < onboardingSlides.length - 1) {
+        onboardingStep.value += 1;
+        return;
+      }
+
+      showOnboarding.value = false;
+      try {
+        const response = await apiClient.completeOnboarding();
+        if (userStore.user) {
+          userStore.user.onboardingCompletedAt = response?.onboardingCompletedAt || new Date().toISOString();
+          userStore.user.isFirstLogin = false;
+        }
+      } catch (error) {
+        console.error("Не удалось завершить онбординг", error);
+      }
+    }
+
+    function prevOnboardingStep() {
+      if (onboardingStep.value > 0) {
+        onboardingStep.value -= 1;
+      }
+    }
+
+    onMounted(async () => {
+      await loadDashboardData();
+      await maybeShowOnboarding();
     });
 
     function toggleDebugConsole() {
@@ -374,6 +431,9 @@ export default {
       progressPercentage,
       isDataLoading,
       debugConsoleReady,
+      showOnboarding,
+      onboardingStep,
+      onboardingSlides,
       getStatusClass,
       getStatusText,
       formatDate,
@@ -381,6 +441,8 @@ export default {
       startAssessment,
       openTheory,
       toggleDebugConsole,
+      nextOnboardingStep,
+      prevOnboardingStep,
     };
   },
 };
@@ -565,5 +627,32 @@ export default {
 
 .open-assessments-icon {
   font-size: 18px;
+}
+
+.onboarding-card {
+  background: linear-gradient(135deg, #eff6ff 0%, #ecfeff 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.onboarding-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.onboarding-text {
+  margin: 0;
+  color: #1e40af;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.onboarding-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
 }
 </style>

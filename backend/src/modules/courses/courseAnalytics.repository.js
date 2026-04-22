@@ -8,7 +8,7 @@ async function ensureCourseAnalyticsSchema() {
   }
 
   schemaValidationPromise = pool
-    .execute(
+    .query(
       `SELECT table_name
          FROM information_schema.tables
         WHERE table_schema = DATABASE()

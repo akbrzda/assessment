@@ -13,6 +13,31 @@
       </div>
 
       <div class="topbar-actions">
+        <div class="global-search">
+          <input
+            v-model="searchQuery"
+            type="search"
+            class="global-search-input"
+            placeholder="Глобальный поиск..."
+            @input="handleSearchInput"
+          />
+          <div v-if="showSearchResults" class="global-search-dropdown">
+            <div v-if="searchLoading" class="global-search-empty">Поиск...</div>
+            <template v-else>
+              <button
+                v-for="item in flattenedSearchResults"
+                :key="item.key"
+                class="global-search-item"
+                @click="openSearchResult(item)"
+              >
+                <span class="global-search-type">{{ item.type }}</span>
+                <span class="global-search-title">{{ item.title }}</span>
+              </button>
+              <div v-if="flattenedSearchResults.length === 0" class="global-search-empty">Ничего не найдено</div>
+            </template>
+          </div>
+        </div>
+
         <!-- Индикатор подключения WebSocket -->
         <div
           class="connection-status"
@@ -76,12 +101,18 @@ import { useRoute, useRouter } from "vue-router";
 import { useThemeStore } from "../../stores/theme";
 import { useAuthStore } from "../../stores/auth";
 import { useWebSocket } from "../../composables/useWebSocket";
+import { globalSearch } from "../../api/users";
 import Icon from "../ui/Icon.vue";
 
 const authStore = useAuthStore();
 const router = useRouter();
 const isProfileMenuOpen = ref(false);
 const profileMenuRef = ref(null);
+const searchQuery = ref("");
+const searchLoading = ref(false);
+const searchResults = ref({ users: [], assessments: [], questions: [] });
+const showSearchResults = ref(false);
+let searchDebounceTimer = null;
 
 defineProps({
   sidebarCollapsed: {
@@ -166,6 +197,60 @@ const handleLogout = async () => {
   router.push("/login");
 };
 
+const flattenedSearchResults = computed(() => {
+  const users = (searchResults.value.users || []).map((user) => ({
+    key: `u-${user.id}`,
+    type: "Пользователь",
+    title: `${user.first_name} ${user.last_name}`,
+    route: `/users`,
+  }));
+  const assessments = (searchResults.value.assessments || []).map((assessment) => ({
+    key: `a-${assessment.id}`,
+    type: "Аттестация",
+    title: assessment.title,
+    route: `/assessments/${assessment.id}`,
+  }));
+  const questions = (searchResults.value.questions || []).map((question) => ({
+    key: `q-${question.id}`,
+    type: "Вопрос",
+    title: question.question_text,
+    route: `/questions/${question.id}`,
+  }));
+
+  return [...users, ...assessments, ...questions].slice(0, 10);
+});
+
+const handleSearchInput = () => {
+  const query = String(searchQuery.value || "").trim();
+  showSearchResults.value = query.length >= 2;
+
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer);
+  }
+
+  if (query.length < 2) {
+    searchResults.value = { users: [], assessments: [], questions: [] };
+    return;
+  }
+
+  searchDebounceTimer = setTimeout(async () => {
+    try {
+      searchLoading.value = true;
+      searchResults.value = await globalSearch({ query, limit: 6 });
+    } catch {
+      searchResults.value = { users: [], assessments: [], questions: [] };
+    } finally {
+      searchLoading.value = false;
+    }
+  }, 250);
+};
+
+const openSearchResult = (item) => {
+  showSearchResults.value = false;
+  searchQuery.value = "";
+  router.push(item.route);
+};
+
 // Закрытие меню при клике вне его
 const handleClickOutside = (event) => {
   const profileMenu = document.querySelector(".profile-menu");
@@ -180,6 +265,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener("click", handleClickOutside);
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer);
+  }
 });
 </script>
 
@@ -585,6 +673,74 @@ onUnmounted(() => {
   .user-profile {
     border-left: none;
     padding-left: 0;
+  }
+}
+.global-search {
+  position: relative;
+  width: 320px;
+}
+
+.global-search-input {
+  width: 100%;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--divider);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  padding: 0 12px;
+}
+
+.global-search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  box-shadow: 0 12px 24px #00000026;
+  overflow: hidden;
+  z-index: 40;
+}
+
+.global-search-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.global-search-item:hover {
+  background: var(--bg-secondary);
+}
+
+.global-search-type {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.global-search-title {
+  color: var(--text-primary);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.global-search-empty {
+  padding: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+@media (max-width: 1023px) {
+  .global-search {
+    display: none;
   }
 }
 </style>

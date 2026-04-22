@@ -11,12 +11,12 @@ async function getTheory(req, res, next) {
   try {
     const assessmentId = Number(req.params.id);
     if (!assessmentId) {
-      return res.status(400).json({ error: "РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р°С‚С‚РµСЃС‚Р°С†РёРё" });
+      return res.status(400).json({ error: "Некорректный идентификатор аттестации" });
     }
 
     const theory = await theoryModel.getTheoryForUser({ assessmentId, userId: req.currentUser.id });
     if (!theory) {
-      return res.status(404).json({ error: "РўРµРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР° РёР»Рё РЅРµ РѕРїСѓР±Р»РёРєРѕРІР°РЅР°" });
+      return res.status(404).json({ error: "Теория не найдена или не опубликована" });
     }
 
     res.json({ theory });
@@ -29,7 +29,7 @@ async function completeTheory(req, res, next) {
   try {
     const assessmentId = Number(req.params.id);
     if (!assessmentId) {
-      return res.status(400).json({ error: "РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р°С‚С‚РµСЃС‚Р°С†РёРё" });
+      return res.status(400).json({ error: "Некорректный идентификатор аттестации" });
     }
 
     const { error, value } = completionSchema.validate(req.body, { abortEarly: false });

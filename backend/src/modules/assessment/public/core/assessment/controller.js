@@ -5,6 +5,8 @@ const referenceModel = require("../../../../../models/referenceModel");
 const userModel = require("../../../../../models/userModel");
 const logger = require("../../../../../utils/logger");
 const gamificationService = require("../../../../../services/gamificationService");
+const gamificationQueueService = require("../../../../../services/gamificationQueueService");
+const metricsService = require("../../../../../services/metricsService");
 const { logAndSend, buildActorFromRequest } = require("../../../../../services/auditService");
 
 const optionSchema = Joi.object({
@@ -32,7 +34,7 @@ const questionSchema = Joi.object({
     const correctCount = value.options.filter((option) => option.isCorrect).length;
     if (correctCount !== 1) {
       return helpers.message(
-        "Р”Р»СЏ РІРѕРїСЂРѕСЃРѕРІ СЃ РѕРґРЅРёРј РѕС‚РІРµС‚РѕРј РЅРµРѕР±С…РѕРґРёРјРѕ РІС‹Р±СЂР°С‚СЊ СЂРѕРІРЅРѕ РѕРґРёРЅ РїСЂР°РІРёР»СЊРЅС‹Р№ РІР°СЂРёР°РЅС‚",
+        "          ",
       );
     }
   }
@@ -40,18 +42,18 @@ const questionSchema = Joi.object({
     const correctCount = value.options.filter((option) => option.isCorrect).length;
     if (correctCount < 2) {
       return helpers.message(
-        "Р”Р»СЏ РІРѕРїСЂРѕСЃРѕРІ СЃ РЅРµСЃРєРѕР»СЊРєРёРјРё РѕС‚РІРµС‚Р°РјРё РЅРµРѕР±С…РѕРґРёРјРѕ РІС‹Р±СЂР°С‚СЊ РјРёРЅРёРјСѓРј РґРІР° РїСЂР°РІРёР»СЊРЅС‹С… РІР°СЂРёР°РЅС‚Р°",
+        "          ",
       );
     }
   }
   if (value.questionType === "matching") {
     const allPairsFilled = value.options.every((option) => option.matchText && option.matchText.trim().length > 0);
     if (!allPairsFilled) {
-      return helpers.message("Р”Р»СЏ СЃРѕРїРѕСЃС‚Р°РІР»РµРЅРёСЏ РЅРµРѕР±С…РѕРґРёРјРѕ Р·Р°РїРѕР»РЅРёС‚СЊ РІСЃРµ РїР°СЂС‹");
+      return helpers.message("     ");
     }
   }
   if (value.questionType === "text" && !value.correctTextAnswer?.trim()) {
-    return helpers.message("Р”Р»СЏ С‚РµРєСЃС‚РѕРІРѕРіРѕ РІРѕРїСЂРѕСЃР° РЅРµРѕР±С…РѕРґРёРјРѕ СѓРєР°Р·Р°С‚СЊ СЌС‚Р°Р»РѕРЅРЅС‹Р№ РѕС‚РІРµС‚");
+    return helpers.message("      ");
   }
   return value;
 });
@@ -74,7 +76,7 @@ const answerSchema = Joi.object({
     (!value.matchPairs || value.matchPairs.length === 0) &&
     (value.textAnswer == null || value.textAnswer === "")
   ) {
-    return helpers.message("РќРµ СѓРєР°Р·Р°РЅ РѕС‚РІРµС‚");
+    return helpers.message("  ");
   }
   return value;
 });
@@ -85,7 +87,7 @@ const answerBatchSchema = Joi.object({
   const ids = value.answers.map((answer) => answer.questionId);
   const unique = new Set(ids);
   if (unique.size !== ids.length) {
-    return helpers.message("Р’ РѕС‚РІРµС‚Р°С… РЅРµ РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РґСѓР±Р»РёРєР°С‚РѕРІ РІРѕРїСЂРѕСЃРѕРІ");
+    return helpers.message("      ");
   }
   return value;
 });
@@ -106,11 +108,11 @@ const baseSchema = Joi.object({
 }).custom((value, helpers) => {
   if (!value.userIds.length && !value.positionIds.length && !value.branchIds.length) {
     return helpers.message(
-      "РќРµРѕР±С…РѕРґРёРјРѕ РІС‹Р±СЂР°С‚СЊ С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕРіРѕ СЃРѕС‚СЂСѓРґРЅРёРєР°, РґРѕР»Р¶РЅРѕСЃС‚СЊ РёР»Рё С„РёР»РёР°Р»",
+      "     ,   ",
     );
   }
   if (new Date(value.closeAt) <= new Date(value.openAt)) {
-    return helpers.message("Р”Р°С‚Р° Р·Р°РєСЂС‹С‚РёСЏ РґРѕР»Р¶РЅР° Р±С‹С‚СЊ РїРѕР·Р¶Рµ РґР°С‚С‹ РѕС‚РєСЂС‹С‚РёСЏ");
+    return helpers.message("      ");
   }
   return value;
 });
@@ -133,7 +135,7 @@ function normalizeQuestionPayload(questions) {
 
 function formatDateTime(value) {
   if (!value) {
-    return "вЂ”";
+    return "";
   }
   return new Date(value).toLocaleString("ru-RU");
 }
@@ -182,7 +184,7 @@ async function getForUser(req, res, next) {
 
     const assessment = await assessmentModel.getAssessmentForUser(assessmentId, req.currentUser.id);
     if (!assessment) {
-      return res.status(404).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР° РёР»Рё РЅРµРґРѕСЃС‚СѓРїРЅР°" });
+      return res.status(404).json({ error: "    " });
     }
     res.json({ assessment });
   } catch (error) {
@@ -216,7 +218,7 @@ async function prepareTargets(value, currentUser) {
 
   if (currentUser.roleName === "manager") {
     if (!currentUser.branchId) {
-      const error = new Error("Р”Р»СЏ СѓРїСЂР°РІР»СЏСЋС‰РµРіРѕ РЅРµ СѓРєР°Р·Р°РЅ С„РёР»РёР°Р»");
+      const error = new Error("    ");
       error.status = 422;
       throw error;
     }
@@ -226,7 +228,7 @@ async function prepareTargets(value, currentUser) {
     if (branches.length !== branchIds.length) {
       const foundIds = new Set(branches.map((branch) => branch.id));
       const missing = branchIds.filter((id) => !foundIds.has(id));
-      const error = new Error(`РќРµРєРѕСЂСЂРµРєС‚РЅС‹Рµ С„РёР»РёР°Р»С‹: ${missing.join(", ")}`);
+      const error = new Error(` : ${missing.join(", ")}`);
       error.status = 422;
       throw error;
     }
@@ -236,7 +238,7 @@ async function prepareTargets(value, currentUser) {
   if (userIds.length && users.length !== userIds.length) {
     const foundIds = new Set(users.map((item) => item.id));
     const missing = userIds.filter((id) => !foundIds.has(id));
-    const error = new Error(`РќРµРєРѕСЂСЂРµРєС‚РЅС‹Рµ СЃРѕС‚СЂСѓРґРЅРёРєРё: ${missing.join(", ")}`);
+    const error = new Error(` : ${missing.join(", ")}`);
     error.status = 422;
     throw error;
   }
@@ -246,7 +248,7 @@ async function prepareTargets(value, currentUser) {
     if (invalidUsers.length) {
       const names = invalidUsers.map((user) => `${user.firstName} ${user.lastName}`).join(", ");
       const error = new Error(
-        `Р’С‹ РјРѕР¶РµС‚Рµ РЅР°Р·РЅР°С‡Р°С‚СЊ Р°С‚С‚РµСЃС‚Р°С†РёРё С‚РѕР»СЊРєРѕ СЃРѕС‚СЂСѓРґРЅРёРєР°Рј СЃРІРѕРµРіРѕ С„РёР»РёР°Р»Р°. РџСЂРѕРІРµСЂСЊС‚Рµ: ${names}`,
+        `       . : ${names}`,
       );
       error.status = 422;
       throw error;
@@ -256,7 +258,7 @@ async function prepareTargets(value, currentUser) {
     if (invalidUsers.length) {
       const names = invalidUsers.map((user) => `${user.firstName} ${user.lastName}`).join(", ");
       const error = new Error(
-        `РЎРѕС‚СЂСѓРґРЅРёРєРё РґРѕР»Р¶РЅС‹ РѕС‚РЅРѕСЃРёС‚СЊСЃСЏ Рє РІС‹Р±СЂР°РЅРЅС‹Рј С„РёР»РёР°Р»Р°Рј. РџСЂРѕРІРµСЂСЊС‚Рµ: ${names}`,
+        `     . : ${names}`,
       );
       error.status = 422;
       throw error;
@@ -270,7 +272,7 @@ async function prepareTargets(value, currentUser) {
       );
       const invalidPositions = positionIds.filter((id) => !allowedPositions.has(id));
       if (invalidPositions.length) {
-        const error = new Error("Р’С‹ РјРѕР¶РµС‚Рµ РІС‹Р±РёСЂР°С‚СЊ С‚РѕР»СЊРєРѕ РґРѕР»Р¶РЅРѕСЃС‚Рё РІР°С€РµРіРѕ С„РёР»РёР°Р»Р°");
+        const error = new Error("      ");
         error.status = 422;
         throw error;
       }
@@ -279,7 +281,7 @@ async function prepareTargets(value, currentUser) {
       if (positions.length !== positionIds.length) {
         const foundIds = new Set(positions.map((item) => item.id));
         const missing = positionIds.filter((id) => !foundIds.has(id));
-        const error = new Error(`РќРµРєРѕСЂСЂРµРєС‚РЅС‹Рµ РґРѕР»Р¶РЅРѕСЃС‚Рё: ${missing.join(", ")}`);
+        const error = new Error(` : ${missing.join(", ")}`);
         error.status = 422;
         throw error;
       }
@@ -288,7 +290,7 @@ async function prepareTargets(value, currentUser) {
 
   if (!branchIds.length && !userIds.length && !positionIds.length) {
     const error = new Error(
-      "РќРµРѕР±С…РѕРґРёРјРѕ РІС‹Р±СЂР°С‚СЊ С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕРіРѕ СЃРѕС‚СЂСѓРґРЅРёРєР°, РґРѕР»Р¶РЅРѕСЃС‚СЊ РёР»Рё С„РёР»РёР°Р»",
+      "     ,   ",
     );
     error.status = 422;
     throw error;
@@ -373,7 +375,7 @@ async function getDetail(req, res, next) {
       branchId: req.currentUser.branchId,
     });
     if (!assessment) {
-      return res.status(404).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "  " });
     }
     res.json({ assessment });
   } catch (error) {
@@ -387,13 +389,13 @@ async function startAttempt(req, res, next) {
 
     const assessment = await assessmentModel.getAssessmentForUser(assessmentId, req.currentUser.id);
     if (!assessment) {
-      return res.status(404).json({ error: "Аттестация не найдена или недоступна", code: "ASSESSMENT_NOT_FOUND" });
+      return res.status(404).json({ error: "    ", code: "ASSESSMENT_NOT_FOUND" });
     }
     if (assessment.status === "pending") {
-      return res.status(400).json({ error: "Аттестация ещё не открыта", code: "ASSESSMENT_NOT_OPEN" });
+      return res.status(400).json({ error: "   ", code: "ASSESSMENT_NOT_OPEN" });
     }
     if (assessment.status === "closed") {
-      return res.status(400).json({ error: "Аттестация уже закрыта", code: "ASSESSMENT_CLOSED" });
+      return res.status(400).json({ error: "  ", code: "ASSESSMENT_CLOSED" });
     }
 
     const theoryMeta = await theoryModel.getCurrentTheoryMeta(assessmentId);
@@ -406,7 +408,7 @@ async function startAttempt(req, res, next) {
 
       if (!hasCompletion) {
         return res.status(409).json({
-          error: "РќРµРѕР±С…РѕРґРёРјРѕ РїСЂРѕР№С‚Рё РѕР±СЏР·Р°С‚РµР»СЊРЅСѓСЋ С‚РµРѕСЂРёСЋ РїРµСЂРµРґ РЅР°С‡Р°Р»РѕРј С‚РµСЃС‚Р°",
+          error: "      ",
           code: "THEORY_NOT_COMPLETED",
           theory: {
             versionId: theoryMeta.versionId,
@@ -440,7 +442,7 @@ async function submitAnswer(req, res, next) {
     const attemptId = Number(req.params.attemptId);
 
     if (!assessmentId || !attemptId) {
-      return res.status(400).json({ error: "Некорректные параметры", code: "INVALID_PARAMS" });
+      return res.status(400).json({ error: " ", code: "INVALID_PARAMS" });
     }
 
     const { error, value } = answerSchema.validate(req.body, { abortEarly: false });
@@ -458,21 +460,17 @@ async function submitAnswer(req, res, next) {
       matchPairs: value.matchPairs,
     });
 
-    // Геймификация в фоне — не блокируем ответ API
-    setImmediate(() => {
-      gamificationService
-        .processAnswerEvent({
-          userId: req.currentUser.id,
-          attemptId,
-          assessmentId: result.assessmentId,
-          questionId: value.questionId,
-          answerCorrect: result.isCorrect,
-        })
-        .catch((gerr) => logger.error("Gamification answer event failed for attempt %s: %s", attemptId, gerr.message));
+    await gamificationQueueService.enqueueAnswerEvent({
+      userId: req.currentUser.id,
+      attemptId,
+      assessmentId: result.assessmentId,
+      questionId: value.questionId,
+      answerCorrect: result.isCorrect,
     });
 
     res.status(204).send();
   } catch (error) {
+    metricsService.incrementScoringError("submitAnswer");
     next(error);
   }
 }
@@ -483,7 +481,7 @@ async function submitAnswersBatch(req, res, next) {
     const attemptId = Number(req.params.attemptId);
 
     if (!assessmentId || !attemptId) {
-      return res.status(400).json({ error: "РќРµРєРѕСЂСЂРµРєС‚РЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹" });
+      return res.status(400).json({ error: " " });
     }
 
     const { error, value } = answerBatchSchema.validate(req.body, { abortEarly: false });
@@ -497,25 +495,21 @@ async function submitAnswersBatch(req, res, next) {
       answers: value.answers,
     });
 
-    // Геймификация в фоне — не блокируем ответ API
-    setImmediate(() => {
-      Promise.all(
-        results.map((result) =>
-          gamificationService
-            .processAnswerEvent({
-              userId: req.currentUser.id,
-              attemptId,
-              assessmentId: result.assessmentId,
-              questionId: result.questionId,
-              answerCorrect: result.isCorrect,
-            })
-            .catch((gerr) => logger.error("Gamification answer event failed for attempt %s: %s", attemptId, gerr.message)),
-        ),
-      );
-    });
+    await Promise.all(
+      results.map((result) =>
+        gamificationQueueService.enqueueAnswerEvent({
+          userId: req.currentUser.id,
+          attemptId,
+          assessmentId: result.assessmentId,
+          questionId: result.questionId,
+          answerCorrect: result.isCorrect,
+        }),
+      ),
+    );
 
     res.status(204).send();
   } catch (error) {
+    metricsService.incrementScoringError("submitAnswersBatch");
     next(error);
   }
 }
@@ -526,7 +520,7 @@ async function completeAttempt(req, res, next) {
     const attemptId = Number(req.params.attemptId);
 
     if (!assessmentId || !attemptId) {
-      return res.status(400).json({ error: "РќРµРєРѕСЂСЂРµРєС‚РЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹" });
+      return res.status(400).json({ error: " " });
     }
 
     const summary = await assessmentModel.completeAttempt(attemptId, req.currentUser.id);
@@ -591,7 +585,7 @@ async function getAttemptResultController(req, res, next) {
     const attemptId = Number(req.params.attemptId);
 
     if (!assessmentId || !attemptId) {
-      return res.status(400).json({ error: "РќРµРєРѕСЂСЂРµРєС‚РЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹" });
+      return res.status(400).json({ error: " " });
     }
 
     const result = await assessmentModel.getAttemptResult({
@@ -601,7 +595,7 @@ async function getAttemptResultController(req, res, next) {
     });
 
     if (!result) {
-      return res.status(404).json({ error: "Р РµР·СѓР»СЊС‚Р°С‚ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "  " });
     }
 
     res.json({ result });
@@ -620,7 +614,7 @@ async function update(req, res, next) {
       branchId: req.currentUser.branchId,
     });
     if (!existing) {
-      return res.status(404).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "  " });
     }
 
     const hasInProgressAttempts = await assessmentModel.hasInProgressAttempts(assessmentId);
@@ -646,19 +640,19 @@ async function update(req, res, next) {
 
       if (hasParameterChanges) {
         return res.status(409).json({
-          error: "Нельзя менять параметры аттестации при активных попытках",
+          error: "      ",
         });
       }
 
       const currentQuestionsCount = Array.isArray(existing.questions) ? existing.questions.length : 0;
       if (Array.isArray(value.questions) && value.questions.length < currentQuestionsCount) {
         return res.status(409).json({
-          error: "Нельзя удалять вопросы при активных попытках",
+          error: "     ",
         });
       }
     }
 
-    // Р”Р°РЅРЅС‹Рµ РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ - РёСЃРїРѕР»СЊР·СѓРµРј СЃС‚Р°СЂС‹Рµ Р·РЅР°С‡РµРЅРёСЏ РїР°СЂР°РјРµС‚СЂРѕРІ РµСЃР»Рё СЃС‚Р°С‚СѓСЃ РЅРµ pending
+    //    -        pending
     const assessmentData = {
       title: value.title.trim(),
       description: value.description?.trim() || "",
@@ -717,16 +711,16 @@ async function remove(req, res, next) {
       branchId: req.currentUser.branchId,
     });
     if (!existing) {
-      return res.status(404).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "  " });
     }
 
     if (new Date(existing.openAt) <= new Date()) {
-      return res.status(400).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЋ РЅРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ РїРѕСЃР»Рµ РѕС‚РєСЂС‹С‚РёСЏ" });
+      return res.status(400).json({ error: "    " });
     }
 
     const hasAttempts = await assessmentModel.hasAttempts(assessmentId);
     if (hasAttempts) {
-      return res.status(400).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЋ РЅРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ, С‚Р°Рє РєР°Рє СѓР¶Рµ РµСЃС‚СЊ РїРѕРїС‹С‚РєРё" });
+      return res.status(400).json({ error: "  ,     " });
     }
 
     await assessmentModel.deleteAssessment(assessmentId);

@@ -5,7 +5,7 @@
 
 const { pool } = require("../../config/database");
 
-// ─── Поиск с контекстом ─────────────────────────────────────────────────────
+// --- Поиск с контекстом -----------------------------------------------------
 
 async function findSectionWithCourse(sectionId, options = {}) {
   const executor = options.connection;
@@ -92,7 +92,7 @@ async function areAllTopicsCompletedBySection({ sectionId, userId }, options = {
   return { total, completed, allCompleted: total === 0 || total === completed };
 }
 
-// ─── Результаты попыток ──────────────────────────────────────────────────────
+// --- Результаты попыток ------------------------------------------------------
 
 async function getSectionAttemptResult({ sectionId, userId, attemptId, connection }) {
   const [rows] = await connection.execute(
@@ -172,7 +172,7 @@ async function getFinalAttemptResult({ courseId, userId, attemptId, connection }
   };
 }
 
-// ─── Инициализация прогресса ─────────────────────────────────────────────────
+// --- Инициализация прогресса -------------------------------------------------
 
 async function upsertCourseProgressOnStart({ courseId, userId, totalRequiredSectionsCount, connection }) {
   await connection.execute(
@@ -219,7 +219,7 @@ async function insertCourseSnapshot(courseId, userId, version, snapshotJson, con
   );
 }
 
-// ─── Обновление прогресса ────────────────────────────────────────────────────
+// --- Обновление прогресса ----------------------------------------------------
 
 async function upsertSectionProgress({ courseId, sectionId, userId, status, attemptId, scorePercent, attemptNumber, connection }) {
   await connection.execute(
@@ -268,7 +268,7 @@ async function markTopicMaterial({ topicId, sectionId, courseId, userId, complet
   );
 }
 
-// ─── Агрегация и синхронизация ───────────────────────────────────────────────
+// --- Агрегация и синхронизация -----------------------------------------------
 
 async function getCourseProgressAggregate({ courseId, userId, connection }) {
   const [[row]] = await connection.execute(
@@ -329,7 +329,7 @@ async function getCourseProgressStatus({ courseId, userId, connection }) {
   return rows.length ? rows[0].status : null;
 }
 
-// ─── Административные запросы прогресса ─────────────────────────────────────
+// --- Административные запросы прогресса -------------------------------------
 
 async function getAdminUsersProgress(courseId) {
   const [rows] = await pool.execute(

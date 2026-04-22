@@ -102,7 +102,7 @@ async function runMigrations() {
         await connection.query(sql);
         await connection.query("INSERT INTO migrations (name) VALUES (?)", [file]);
         await connection.commit();
-        console.info(`[migrate]   ✓ выполнена: ${file}`);
+        console.info(`[migrate]    выполнена: ${file}`);
         count++;
       } catch (err) {
         try {

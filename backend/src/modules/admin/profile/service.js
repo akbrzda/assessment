@@ -1,27 +1,27 @@
 const userModel = require("../../../models/userModel");
 const { body, validationResult } = require("express-validator");
 
-// РџРѕР»СѓС‡РёС‚СЊ РїСЂРѕС„РёР»СЊ С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+// Получить профиль текущего пользователя
 const getProfile = async (req, res) => {
   try {
     const userId = req.user.id;
     const user = await userModel.findById(userId);
 
     if (!user) {
-      return res.status(404).json({ message: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ message: "Пользователь не найден" });
     }
 
     res.json(user);
   } catch (error) {
     console.error("Get profile error:", error);
-    res.status(500).json({ message: "РћС€РёР±РєР° РїСЂРё РїРѕР»СѓС‡РµРЅРёРё РїСЂРѕС„РёР»СЏ" });
+    res.status(500).json({ message: "Ошибка при получении профиля" });
   }
 };
 
-// РћР±РЅРѕРІРёС‚СЊ РїСЂРѕС„РёР»СЊ С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+// Обновить профиль текущего пользователя
 const updateProfile = [
-  body("firstName").trim().notEmpty().withMessage("РРјСЏ РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ"),
-  body("lastName").trim().notEmpty().withMessage("Р¤Р°РјРёР»РёСЏ РѕР±СЏР·Р°С‚РµР»СЊРЅР°"),
+  body("firstName").trim().notEmpty().withMessage("Имя обязательно"),
+  body("lastName").trim().notEmpty().withMessage("Фамилия обязательна"),
 
   async (req, res) => {
     try {
@@ -35,16 +35,16 @@ const updateProfile = [
 
       await userModel.updateProfile(userId, { firstName, lastName });
 
-      // РџРѕР»СѓС‡Р°РµРј РѕР±РЅРѕРІР»РµРЅРЅС‹Рµ РґР°РЅРЅС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+      // Получаем обновленные данные пользователя
       const updatedUser = await userModel.findById(userId);
 
       res.json({
-        message: "РџСЂРѕС„РёР»СЊ СѓСЃРїРµС€РЅРѕ РѕР±РЅРѕРІР»РµРЅ",
+        message: "Профиль успешно обновлен",
         user: updatedUser,
       });
     } catch (error) {
       console.error("Update profile error:", error);
-      res.status(500).json({ message: "РћС€РёР±РєР° РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё РїСЂРѕС„РёР»СЏ" });
+      res.status(500).json({ message: "Ошибка при обновлении профиля" });
     }
   },
 ];
@@ -53,4 +53,3 @@ module.exports = {
   getProfile,
   updateProfile,
 };
-

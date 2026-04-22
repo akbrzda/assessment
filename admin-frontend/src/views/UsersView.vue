@@ -29,13 +29,35 @@
       <div v-if="activeFilters.length > 0" class="active-filters">
         <span v-for="filter in activeFilters" :key="filter.key" class="filter-tag">
           {{ filter.label }}
-          <button @click="removeFilter(filter.key)" class="filter-tag-remove">×</button>
+          <button @click="removeFilter(filter.key)" class="filter-tag-remove">x</button>
         </span>
       </div>
     </Card>
 
     <!-- Content -->
     <Card class="users-card" padding="none">
+      <div class="bulk-actions">
+        <span class="bulk-selected">Выбрано: {{ selectedUserIds.length }}</span>
+        <Select v-model="bulkActionType" :options="[
+          { value: 'role', label: 'Назначить роль' },
+          { value: 'branch', label: 'Перевести в филиал' },
+          { value: 'export', label: 'Экспортировать CSV' },
+        ]" placeholder="Массовое действие" />
+        <Select
+          v-if="bulkActionType === 'role'"
+          v-model="bulkRoleId"
+          :options="roleOptions"
+          placeholder="Выберите роль"
+        />
+        <Select
+          v-if="bulkActionType === 'branch'"
+          v-model="bulkBranchId"
+          :options="branchOptions"
+          placeholder="Выберите филиал"
+        />
+        <Button size="sm" :loading="actionLoading" @click="runBulkAction">Применить</Button>
+      </div>
+
       <Preloader v-if="loading" />
 
       <div v-else-if="users.length === 0" class="empty-state">
@@ -49,6 +71,9 @@
           <table class="users-table">
             <thead>
               <tr>
+                <th>
+                  <input type="checkbox" :checked="allUsersSelected" @change="toggleSelectAllUsers" />
+                </th>
                 <th>ID</th>
                 <th>ФИО</th>
                 <th>Логин</th>
@@ -62,6 +87,13 @@
             </thead>
             <tbody>
               <tr v-for="user in users" :key="user.id">
+                <td>
+                  <input
+                    type="checkbox"
+                    :checked="selectedUserIds.includes(user.id)"
+                    @change="toggleUserSelection(user.id)"
+                  />
+                </td>
                 <td class="id-cell">{{ user.id }}</td>
                 <td class="name-cell clickable" @click="openProfileModal(user)">
                   <div class="name-primary">{{ user.first_name }} {{ user.last_name }}</div>
@@ -223,7 +255,7 @@
         >?
       </p>
       <div class="delete-warning">
-        <span class="delete-warning-icon">⚠️</span>
+        <span class="delete-warning-icon"></span>
         <div>
           <p class="delete-warning-title">Последствия удаления:</p>
           <ul class="delete-warning-list">
@@ -400,7 +432,18 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useAuthStore } from "../stores/auth";
 import apiClient from "../utils/axios";
-import { getUsers, getReferences, createUser, updateUser, deleteUser, resetPassword, resetAssessmentProgress } from "../api/users";
+import {
+  getUsers,
+  getReferences,
+  createUser,
+  updateUser,
+  deleteUser,
+  resetPassword,
+  resetAssessmentProgress,
+  bulkUpdateUserRole,
+  bulkTransferUsersToBranch,
+  bulkExportUsers,
+} from "../api/users";
 import Card from "../components/ui/Card.vue";
 import Button from "../components/ui/Button.vue";
 import Input from "../components/ui/Input.vue";
@@ -453,6 +496,10 @@ const { showToast } = useToast();
 const generatedPassword = ref("");
 const passwordGenerating = ref(false);
 const passwordApplying = ref(false);
+const selectedUserIds = ref([]);
+const bulkActionType = ref("");
+const bulkRoleId = ref("");
+const bulkBranchId = ref("");
 
 const canEditUser = (user) => {
   // Superadmin может редактировать всех
@@ -488,6 +535,7 @@ const stats = computed(() => {
   return { total, superadmin, manager };
 });
 const totalPages = computed(() => Math.max(1, Math.ceil(totalUsers.value / pagination.value.perPage)));
+const allUsersSelected = computed(() => users.value.length > 0 && users.value.every((user) => selectedUserIds.value.includes(user.id)));
 
 const branchOptions = computed(() => [
   ...references.value.branches.map((branch) => ({
@@ -572,11 +620,82 @@ const loadUsers = async () => {
     });
     users.value = data.users || [];
     totalUsers.value = Number(data.total || 0);
+    selectedUserIds.value = selectedUserIds.value.filter((id) => users.value.some((user) => user.id === id));
   } catch (error) {
     console.error("Ошибка загрузки пользователей", error);
     showToast("Не удалось загрузить пользователей", "error");
   } finally {
     loading.value = false;
+  }
+};
+
+const toggleSelectAllUsers = () => {
+  if (allUsersSelected.value) {
+    selectedUserIds.value = [];
+    return;
+  }
+  selectedUserIds.value = users.value.map((user) => user.id);
+};
+
+const toggleUserSelection = (userId) => {
+  if (selectedUserIds.value.includes(userId)) {
+    selectedUserIds.value = selectedUserIds.value.filter((id) => id !== userId);
+    return;
+  }
+  selectedUserIds.value = [...selectedUserIds.value, userId];
+};
+
+const runBulkAction = async () => {
+  if (!selectedUserIds.value.length) {
+    showToast("Выберите пользователей для массового действия", "warning");
+    return;
+  }
+
+  actionLoading.value = true;
+  try {
+    if (bulkActionType.value === "role") {
+      if (!bulkRoleId.value) {
+        showToast("Выберите роль для массового назначения", "warning");
+        return;
+      }
+      await bulkUpdateUserRole({
+        userIds: selectedUserIds.value,
+        roleId: Number(bulkRoleId.value),
+      });
+      showToast("Роль назначена выбранным пользователям", "success");
+    } else if (bulkActionType.value === "branch") {
+      if (!bulkBranchId.value) {
+        showToast("Выберите филиал для массового перевода", "warning");
+        return;
+      }
+      await bulkTransferUsersToBranch({
+        userIds: selectedUserIds.value,
+        branchId: Number(bulkBranchId.value),
+      });
+      showToast("Пользователи переведены в выбранный филиал", "success");
+    } else if (bulkActionType.value === "export") {
+      const blob = await bulkExportUsers({ userIds: selectedUserIds.value });
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `users_bulk_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showToast("Экспорт сформирован", "success");
+    } else {
+      showToast("Выберите тип массового действия", "warning");
+      return;
+    }
+
+    await loadUsers();
+    selectedUserIds.value = [];
+  } catch (error) {
+    console.error("Ошибка массового действия", error);
+    showToast("Не удалось выполнить массовое действие", "error");
+  } finally {
+    actionLoading.value = false;
   }
 };
 
@@ -1912,6 +2031,25 @@ onMounted(async () => {
   .filters-grid .input-group {
     grid-column-end: 6;
     grid-column-start: 1;
+  }
+}
+.bulk-actions {
+  display: grid;
+  grid-template-columns: 140px minmax(200px, 1fr) minmax(200px, 1fr) minmax(200px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.bulk-selected {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 1023px) {
+  .bulk-actions {
+    grid-template-columns: 1fr;
   }
 }
 </style>

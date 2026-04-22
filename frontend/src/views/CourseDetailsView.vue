@@ -61,7 +61,7 @@
               <h4 class="title-small mb-4">{{ section.title }}</h4>
               <p v-if="section.description" class="body-small text-secondary mb-8">{{ section.description }}</p>
 
-              <p v-if="section.progress.locked" class="body-small lock-text mb-12">🔒 Сначала завершите предыдущие обязательные темы курса</p>
+              <p v-if="section.progress.locked" class="body-small lock-text mb-12"> Сначала завершите предыдущие обязательные темы курса</p>
 
               <div v-else class="topics-list mb-12">
                 <div v-if="!section.topics.length" class="body-small text-secondary">В теме пока нет подтем.</div>
@@ -139,7 +139,7 @@
               </div>
 
               <div v-if="section.progress.status === 'passed'" class="section-done-note body-small text-success mt-8">
-                ✓ Тема курса пройдена{{ section.progress.bestScorePercent != null ? ` (${Math.round(section.progress.bestScorePercent)}%)` : "" }}
+                 Тема курса пройдена{{ section.progress.bestScorePercent != null ? ` (${Math.round(section.progress.bestScorePercent)}%)` : "" }}
               </div>
             </div>
           </div>
@@ -257,10 +257,10 @@ export default {
     }
 
     function getSectionStatusText(status, locked) {
-      if (locked) return "🔒 Закрыт";
+      if (locked) return " Закрыт";
       switch (status) {
         case "passed":
-          return "✓ Пройден";
+          return " Пройден";
         case "in_progress":
           return "В процессе";
         case "failed":
@@ -271,16 +271,16 @@ export default {
     }
 
     function getTopicStatusIcon(status, locked) {
-      if (locked) return "🔒";
+      if (locked) return "";
       switch (status) {
         case "completed":
-          return "✓";
+          return "";
         case "in_progress":
-          return "⏳";
+          return "";
         case "failed":
-          return "✗";
+          return "";
         default:
-          return "○";
+          return "";
       }
     }
 

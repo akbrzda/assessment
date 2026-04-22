@@ -1,14 +1,17 @@
 const { pool } = require("../../../config/database");
+const metricsService = require("../../../services/metricsService");
+const gamificationQueueService = require("../../../services/gamificationQueueService");
+const { getRedisStatus } = require("../../../services/redisService");
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ РјРµС‚СЂРёРєРё РґР»СЏ Dashboard СЃ С„РёР»СЊС‚СЂР°РјРё
+ * Получить метрики для Dashboard с фильтрами
  */
 exports.getMetrics = async (req, res) => {
   try {
     const userId = req.user.id;
     const userRole = req.user.role;
 
-    // Р¤РёР»СЊС‚СЂС‹ РёР· query params
+    // Фильтры из query params
     const {
       period = "week", // week, month, quarter, custom
       date_from,
@@ -21,7 +24,7 @@ exports.getMetrics = async (req, res) => {
     const branchFilter = branch_id ? Number(branch_id) : null;
     const positionFilter = position_id ? Number(position_id) : null;
 
-    // РћРїСЂРµРґРµР»СЏРµРј РґРёР°РїР°Р·РѕРЅ РґР°С‚ РЅР° РѕСЃРЅРѕРІРµ РїРµСЂРёРѕРґР°
+    // Определяем диапазон дат на основе периода
     let dateFrom, dateTo;
     const now = new Date();
 
@@ -42,12 +45,12 @@ exports.getMetrics = async (req, res) => {
       dateTo = now;
     }
 
-    // РџСЂРµРґС‹РґСѓС‰РёР№ РїРµСЂРёРѕРґ РґР»СЏ СЃСЂР°РІРЅРµРЅРёСЏ
+    // Предыдущий период для сравнения
     const periodLength = dateTo - dateFrom;
     const prevDateFrom = new Date(dateFrom.getTime() - periodLength);
     const prevDateTo = new Date(dateFrom.getTime());
 
-    // Р‘Р°Р·РѕРІС‹Рµ СѓСЃР»РѕРІРёСЏ РґР»СЏ С„РёР»СЊС‚СЂРѕРІ
+    // Базовые условия для фильтров
     let filterConditions = [];
     let filterParams = [];
     let prevFilterParams = [];
@@ -72,30 +75,57 @@ exports.getMetrics = async (req, res) => {
 
     const whereClause = filterConditions.length > 0 ? "AND " + filterConditions.join(" AND ") : "";
 
-    // РђРєС‚РёРІРЅС‹Рµ Р°С‚С‚РµСЃС‚Р°С†РёРё (С‚РµРєСѓС‰РёР№ РїРµСЂРёРѕРґ)
+    // Активные аттестации (текущий период)
     const [activeAssessments] = await pool.query(
       `SELECT COUNT(*) as count FROM assessments 
        WHERE open_at <= ? AND close_at >= ?`,
       [dateTo, dateFrom]
     );
 
-    // РђРєС‚РёРІРЅС‹Рµ Р°С‚С‚РµСЃС‚Р°С†РёРё (РїСЂРµРґС‹РґСѓС‰РёР№ РїРµСЂРёРѕРґ)
+    // Активные аттестации (предыдущий период)
     const [prevActiveAssessments] = await pool.query(
       `SELECT COUNT(*) as count FROM assessments 
        WHERE open_at <= ? AND close_at >= ?`,
       [prevDateTo, prevDateFrom]
     );
 
-    // Р’СЃРµРіРѕ СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ
-    const [totalUsers] = await pool.query(`SELECT COUNT(*) as count FROM users`, filterParams);
+    // Всего сотрудников
+    const usersWhereConditions = ["1=1"];
+    const usersParams = [];
+    const prevUsersParams = [prevDateTo];
 
-    const [prevTotalUsers] = await pool.query(`SELECT COUNT(*) as count FROM users`, [prevDateTo, ...prevFilterParams]);
+    if (userRole === "manager") {
+      usersWhereConditions.push("branch_id = (SELECT branch_id FROM users WHERE id = ?)");
+      usersParams.push(userId);
+      prevUsersParams.push(userId);
+    }
 
-    // Р¤РёР»РёР°Р»С‹ Рё РґРѕР»Р¶РЅРѕСЃС‚Рё
+    if (branchFilter) {
+      usersWhereConditions.push("branch_id = ?");
+      usersParams.push(branchFilter);
+      prevUsersParams.push(branchFilter);
+    }
+
+    if (positionFilter) {
+      usersWhereConditions.push("position_id = ?");
+      usersParams.push(positionFilter);
+      prevUsersParams.push(positionFilter);
+    }
+
+    const usersWhereClause = usersWhereConditions.join(" AND ");
+
+    const [totalUsers] = await pool.query(`SELECT COUNT(*) as count FROM users WHERE ${usersWhereClause}`, usersParams);
+
+    const [prevTotalUsers] = await pool.query(
+      `SELECT COUNT(*) as count FROM users WHERE created_at <= ? AND ${usersWhereClause}`,
+      prevUsersParams,
+    );
+
+    // Филиалы и должности
     const [totalBranches] = await pool.query("SELECT COUNT(*) as count FROM branches");
     const [totalPositions] = await pool.query("SELECT COUNT(*) as count FROM positions");
 
-    // РўРѕРї-3 СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ РїРѕ РѕС‡РєР°Рј (СЃ СѓС‡РµС‚РѕРј С„РёР»СЊС‚СЂРѕРІ)
+    // Топ-3 сотрудников по очкам (с учетом фильтров)
     const [topUsers] = await pool.query(
       `
       SELECT u.id, u.first_name, u.last_name, u.points, u.level,
@@ -111,7 +141,7 @@ exports.getMetrics = async (req, res) => {
       filterParams
     );
 
-    // РЎСЂРµРґРЅРёР№ РїСЂРѕС†РµРЅС‚ СѓСЃРїРµС€РЅРѕСЃС‚Рё РїРѕ С„РёР»РёР°Р»Р°Рј
+    // Средний процент успешности по филиалам
     const [avgSuccessRate] = await pool.query(
       `
       SELECT 
@@ -126,7 +156,7 @@ exports.getMetrics = async (req, res) => {
       [dateFrom, dateTo, ...filterParams]
     );
 
-    // РЎС‚Р°С‚РёСЃС‚РёРєР° РїРѕ Р°С‚С‚РµСЃС‚Р°С†РёСЏРј (С‚РµРєСѓС‰РёР№ РїРµСЂРёРѕРґ)
+    // Статистика по аттестациям (текущий период)
     const [assessmentStats] = await pool.query(
       `
       SELECT 
@@ -142,7 +172,7 @@ exports.getMetrics = async (req, res) => {
       [dateFrom, dateTo, ...filterParams]
     );
 
-    // РЎС‚Р°С‚РёСЃС‚РёРєР° РїРѕ Р°С‚С‚РµСЃС‚Р°С†РёСЏРј (РїСЂРµРґС‹РґСѓС‰РёР№ РїРµСЂРёРѕРґ)
+    // Статистика по аттестациям (предыдущий период)
     const [prevAssessmentStats] = await pool.query(
       `
       SELECT 
@@ -157,7 +187,7 @@ exports.getMetrics = async (req, res) => {
       [prevDateFrom, prevDateTo, ...prevFilterParams]
     );
 
-    // Р’С‹С‡РёСЃР»СЏРµРј С‚СЂРµРЅРґС‹
+    // Вычисляем тренды
     const calcTrend = (current, previous) => {
       if (!previous || previous === 0) return { change: 0, percent: 0 };
       const change = current - previous;
@@ -199,12 +229,12 @@ exports.getMetrics = async (req, res) => {
     });
   } catch (error) {
     console.error("Get metrics error:", error);
-    res.status(500).json({ error: "РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РјРµС‚СЂРёРє" });
+    res.status(500).json({ error: "Ошибка получения метрик" });
   }
 };
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ РґРёРЅР°РјРёРєСѓ Р°РєС‚РёРІРЅРѕСЃС‚Рё (РіСЂР°С„РёРєРё)
+ * Получить динамику активности (графики)
  */
 exports.getActivityTrends = async (req, res) => {
   try {
@@ -215,7 +245,7 @@ exports.getActivityTrends = async (req, res) => {
     const branchFilter = branch_id ? Number(branch_id) : null;
     const positionFilter = position_id ? Number(position_id) : null;
 
-    // РћРїСЂРµРґРµР»СЏРµРј РґРёР°РїР°Р·РѕРЅ РґР°С‚
+    // Определяем диапазон дат
     let dateFrom, dateTo;
     const now = new Date();
 
@@ -256,7 +286,7 @@ exports.getActivityTrends = async (req, res) => {
 
     const whereClause = filterConditions.length > 0 ? "AND " + filterConditions.join(" AND ") : "";
 
-    // Р”РёРЅР°РјРёРєР° РїРѕ РґРЅСЏРј
+    // Динамика по дням
     const [dailyActivity] = await pool.query(
       `
       SELECT 
@@ -280,12 +310,12 @@ exports.getActivityTrends = async (req, res) => {
     });
   } catch (error) {
     console.error("Get activity trends error:", error);
-    res.status(500).json({ error: "РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РґРёРЅР°РјРёРєРё Р°РєС‚РёРІРЅРѕСЃС‚Рё" });
+    res.status(500).json({ error: "Ошибка получения динамики активности" });
   }
 };
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ KPI РїРѕ С„РёР»РёР°Р»Р°Рј
+ * Получить KPI по филиалам
  */
 exports.getBranchKPI = async (req, res) => {
   try {
@@ -296,7 +326,7 @@ exports.getBranchKPI = async (req, res) => {
     const branchFilter = branch_id ? Number(branch_id) : null;
     const positionFilter = position_id ? Number(position_id) : null;
 
-    // РћРїСЂРµРґРµР»СЏРµРј РґРёР°РїР°Р·РѕРЅ РґР°С‚
+    // Определяем диапазон дат
     let dateFrom, dateTo;
     const now = new Date();
 
@@ -337,7 +367,7 @@ exports.getBranchKPI = async (req, res) => {
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
-    // KPI РїРѕ С„РёР»РёР°Р»Р°Рј
+    // KPI по филиалам
     const [branchKPI] = await pool.query(
       `
       SELECT 
@@ -362,7 +392,7 @@ exports.getBranchKPI = async (req, res) => {
       [dateFrom, dateTo, ...whereParams]
     );
 
-    // Р”РѕР±Р°РІР»СЏРµРј sparkline РґР°РЅРЅС‹Рµ РґР»СЏ РєР°Р¶РґРѕРіРѕ С„РёР»РёР°Р»Р° (РїРѕСЃР»РµРґРЅРёРµ 7 РґРЅРµР№)
+    // Добавляем sparkline данные для каждого филиала (последние 7 дней)
     for (let branch of branchKPI) {
       const sparklineConditions = ["u.branch_id = ?"];
       const sparklineParams = [branch.id];
@@ -397,12 +427,12 @@ exports.getBranchKPI = async (req, res) => {
     });
   } catch (error) {
     console.error("Get branch KPI error:", error);
-    res.status(500).json({ error: "РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ KPI С„РёР»РёР°Р»РѕРІ" });
+    res.status(500).json({ error: "Ошибка получения KPI филиалов" });
   }
 };
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ РїРѕСЃР»РµРґРЅРёРµ РїРѕРїС‹С‚РєРё Р°С‚С‚РµСЃС‚Р°С†РёР№
+ * Получить последние попытки аттестаций
  */
 exports.getLatestAssessmentActivities = async (req, res) => {
   try {
@@ -462,9 +492,9 @@ exports.getLatestAssessmentActivities = async (req, res) => {
         CONCAT(u.first_name, ' ', u.last_name) as user_name,
         a.title as assessment_name,
         CASE 
-          WHEN aa.status = 'in_progress' THEN 'РЅР°С‡Р°Р»'
-          WHEN aa.status = 'completed' THEN 'Р·Р°РІРµСЂС€РёР»'
-          ELSE 'РїСЂРѕСЃРјР°С‚СЂРёРІР°РµС‚'
+          WHEN aa.status = 'in_progress' THEN 'начал'
+          WHEN aa.status = 'completed' THEN 'завершил'
+          ELSE 'просматривает'
         END as activity_type,
         aa.created_at,
         aa.updated_at,
@@ -483,7 +513,27 @@ exports.getLatestAssessmentActivities = async (req, res) => {
     res.json({ latestActivities });
   } catch (error) {
     console.error("Get latest assessment activities error:", error);
-    res.status(500).json({ error: "РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РїРѕСЃР»РµРґРЅРёС… РґРµР№СЃС‚РІРёР№ Р°С‚С‚РµСЃС‚Р°С†РёР№" });
+    res.status(500).json({ error: "Ошибка получения последних действий аттестаций" });
   }
 };
+exports.getObservability = async (req, res) => {
+  try {
+    const snapshot = metricsService.getMetricsSnapshot();
+    const queueDepth = await gamificationQueueService.getQueueDepth();
 
+    res.json({
+      api: snapshot.api,
+      scoring: snapshot.scoring,
+      queue: {
+        enabled: gamificationQueueService.isQueueEnabled(),
+        depth: queueDepth,
+      },
+      redis: {
+        status: getRedisStatus(),
+      },
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Ошибка получения метрик наблюдаемости" });
+  }
+};

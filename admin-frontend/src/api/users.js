@@ -76,6 +76,36 @@ export const resetAssessmentProgress = async (userId, assessmentId) => {
   }, new RegExp(`get:/admin/users/${userId}`));
 };
 
+export const bulkUpdateUserRole = async ({ userIds, roleId }) => {
+  const { data } = await apiClient.post("/admin/users/bulk/role", { userIds, roleId });
+  return data;
+};
+
+export const bulkTransferUsersToBranch = async ({ userIds, branchId }) => {
+  const { data } = await apiClient.post("/admin/users/bulk/branch", { userIds, branchId });
+  return data;
+};
+
+export const bulkExportUsers = async ({ userIds }) => {
+  const response = await apiClient.post(
+    "/admin/users/bulk/export",
+    { userIds },
+    {
+      responseType: "blob",
+      cache: false,
+    },
+  );
+  return response.data;
+};
+
+export const globalSearch = async ({ query, limit = 8 }) => {
+  const { data } = await apiClient.get("/admin/search", {
+    params: { q: query, limit },
+    cacheMaxAge: 10000,
+  });
+  return data;
+};
+
 export default {
   getUsers,
   getUserById,
@@ -88,4 +118,8 @@ export default {
   updateUserPermissions,
   getSystemModules,
   resetAssessmentProgress,
+  bulkUpdateUserRole,
+  bulkTransferUsersToBranch,
+  bulkExportUsers,
+  globalSearch,
 };

@@ -19,6 +19,7 @@ const updateSchema = Joi.object({
 
 async function listUsers(req, res, next) {
   try {
+    const currentUser = req.user || {};
     const { branch, position, role, level, search } = req.query;
     const rawPage = Number(req.query?.page);
     const rawLimit = Number(req.query?.limit);
@@ -52,8 +53,13 @@ async function listUsers(req, res, next) {
 
     const params = [];
 
-    // Manager РІРёРґРёС‚ РІСЃРµС… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
-    // РќРµ РґРѕР±Р°РІР»СЏРµРј С„РёР»СЊС‚СЂР°С†РёСЋ РїРѕ СЂРѕР»Рё РґР»СЏ manager
+    if (currentUser.role === "manager") {
+      const managerBranchId = Number(currentUser.branch_id || currentUser.branchId || 0);
+      if (managerBranchId > 0) {
+        whereClause += " AND u.branch_id = ?";
+        params.push(managerBranchId);
+      }
+    }
 
     if (branch) {
       whereClause += " AND u.branch_id = ?";
@@ -123,38 +129,38 @@ async function updateUser(req, res, next) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // РћРіСЂР°РЅРёС‡РµРЅРёСЏ РґР»СЏ manager
+    // Ограничения для manager
     if (currentUser.role === "manager") {
       const isEditingSelf = userId === currentUser.id;
 
       if (!isEditingSelf) {
-        // Manager РјРѕР¶РµС‚ СЂРµРґР°РєС‚РёСЂРѕРІР°С‚СЊ С‚РѕР»СЊРєРѕ employee
+        // Manager может редактировать только employee
         if (existing.roleId !== 1) {
           // 1 = employee
-          return res.status(403).json({ error: "Р’С‹ РјРѕР¶РµС‚Рµ СЂРµРґР°РєС‚РёСЂРѕРІР°С‚СЊ С‚РѕР»СЊРєРѕ СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ СЃ СЂРѕР»СЊСЋ employee" });
+          return res.status(403).json({ error: "Вы можете редактировать только сотрудников с ролью employee" });
         }
 
-        // Manager РЅРµ РјРѕР¶РµС‚ РјРµРЅСЏС‚СЊ СЂРѕР»СЊ Сѓ employee
+        // Manager не может менять роль Сѓ employee
         if (value.roleId && value.roleId !== existing.roleId) {
-          return res.status(403).json({ error: "Р’С‹ РЅРµ РјРѕР¶РµС‚Рµ РёР·РјРµРЅСЏС‚СЊ СЂРѕР»СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ" });
+          return res.status(403).json({ error: "Вы не можете изменять роль пользователя" });
         }
 
-        // Manager РЅРµ РјРѕР¶РµС‚ РјРµРЅСЏС‚СЊ Р»РѕРіРёРЅ Сѓ employee
+        // Manager не может менять логин Сѓ employee
         if (value.login !== undefined && value.login !== existing.login) {
-          return res.status(403).json({ error: "Р’С‹ РЅРµ РјРѕР¶РµС‚Рµ РёР·РјРµРЅСЏС‚СЊ Р»РѕРіРёРЅ СЃРѕС‚СЂСѓРґРЅРёРєР°" });
+          return res.status(403).json({ error: "Вы не можете изменять логин сотрудника" });
         }
 
-        // РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј Р·РЅР°С‡РµРЅРёСЏ РёР· existing РґР»СЏ РїРѕР»РµР№, РєРѕС‚РѕСЂС‹Рµ manager РЅРµ РјРѕР¶РµС‚ РјРµРЅСЏС‚СЊ Сѓ employee
+        // Устанавливаем значения из existing для полей, которые manager не может менять Сѓ employee
         value.roleId = existing.roleId;
         value.login = existing.login;
       } else {
-        // РџСЂРё СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРё СЃРµР±СЏ:
-        // Manager РЅРµ РјРѕР¶РµС‚ РјРµРЅСЏС‚СЊ СЃРІРѕСЋ СЂРѕР»СЊ
+        // При редактировании себя:
+        // Manager не может менять свою роль
         if (value.roleId && value.roleId !== existing.roleId) {
-          return res.status(403).json({ error: "Р’С‹ РЅРµ РјРѕР¶РµС‚Рµ РёР·РјРµРЅСЏС‚СЊ СЃРІРѕСЋ СЂРѕР»СЊ" });
+          return res.status(403).json({ error: "Вы не можете изменять свою роль" });
         }
         value.roleId = existing.roleId;
-        // Manager РјРѕР¶РµС‚ РјРµРЅСЏС‚СЊ СЃРІРѕР№ С„РёР»РёР°Р» Рё РґСЂСѓРіРёРµ РїРѕР»СЏ
+        // Manager может менять свой филиал и другие поля
       }
     }
 
@@ -173,11 +179,11 @@ async function updateUser(req, res, next) {
       return res.status(422).json({ error: "Role does not exist" });
     }
 
-    // РџСЂРѕРІРµСЂРєР° СѓРЅРёРєР°Р»СЊРЅРѕСЃС‚Рё Р»РѕРіРёРЅР°, РµСЃР»Рё РѕРЅ Р±С‹Р» РїРµСЂРµРґР°РЅ
+    // Проверка уникальности логина, если он был передан
     if (value.login && value.login.trim() !== "") {
       const [loginExists] = await pool.query("SELECT id FROM users WHERE login = ? AND id != ?", [value.login.trim(), userId]);
       if (loginExists.length > 0) {
-        return res.status(422).json({ error: "Р›РѕРіРёРЅ СѓР¶Рµ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РґСЂСѓРіРёРј РїРѕР»СЊР·РѕРІР°С‚РµР»РµРј" });
+        return res.status(422).json({ error: "Логин уже используется другим пользователем" });
       }
     }
 
@@ -191,7 +197,7 @@ async function updateUser(req, res, next) {
       points: value.points ?? existing.points,
     };
 
-    // Р”РѕР±Р°РІР»СЏРµРј Р»РѕРіРёРЅ РІ payload, РµСЃР»Рё РѕРЅ Р±С‹Р» РїРµСЂРµРґР°РЅ
+    // Добавляем логин в payload, если он был передан
     if (value.login !== undefined) {
       payload.login = value.login.trim() || null;
     }
@@ -230,9 +236,9 @@ async function deleteUser(req, res, next) {
     const userId = Number(req.params.id);
     const currentUser = req.user;
 
-    // Manager РЅРµ РјРѕР¶РµС‚ СѓРґР°Р»СЏС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
+    // Manager не может удалять пользователей
     if (currentUser.role === "manager") {
-      return res.status(403).json({ error: "РЈ РІР°СЃ РЅРµС‚ РїСЂР°РІ РЅР° СѓРґР°Р»РµРЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№" });
+      return res.status(403).json({ error: "У вас нет прав на удаление пользователей" });
     }
 
     const existing = await userModel.findById(userId);
@@ -241,7 +247,7 @@ async function deleteUser(req, res, next) {
     }
 
     if (userId === req.user.id) {
-      return res.status(400).json({ error: "РќРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ СЃР°РјРѕРіРѕ СЃРµР±СЏ" });
+      return res.status(400).json({ error: "Нельзя удалить самого себя" });
     }
 
     await userModel.deleteUser(userId);
@@ -266,13 +272,13 @@ async function deleteUser(req, res, next) {
 }
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ РґРµС‚Р°Р»СЊРЅСѓСЋ СЃС‚Р°С‚РёСЃС‚РёРєСѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+ * Получить детальную статистику пользователя
  */
 async function getUserDetailedStats(req, res, next) {
   try {
     const userId = Number(req.params.id);
 
-    // РћСЃРЅРѕРІРЅР°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ
+    // Основная информация
     const [users] = await pool.query(
       `SELECT 
         u.id, u.telegram_id, u.first_name, u.last_name,
@@ -287,10 +293,10 @@ async function getUserDetailedStats(req, res, next) {
     );
 
     if (!users || users.length === 0) {
-      return res.status(404).json({ error: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Пользователь не найден" });
     }
 
-    // РЎС‚Р°С‚РёСЃС‚РёРєР° Р°С‚С‚РµСЃС‚Р°С†РёР№
+    // Статистика аттестаций
     const [assessmentStats] = await pool.query(
       `SELECT 
         COUNT(DISTINCT aa.assessment_id) as total_assessments,
@@ -310,7 +316,7 @@ async function getUserDetailedStats(req, res, next) {
       [userId]
     );
 
-    // РЎРІРѕРґРєР° РїРѕ Р°С‚С‚РµСЃС‚Р°С†РёСЏРј
+    // Сводка по аттестациям
     const [assessmentSummary] = await pool.query(
       `SELECT 
         a.id,
@@ -328,7 +334,7 @@ async function getUserDetailedStats(req, res, next) {
       [userId]
     );
 
-    // Р‘РµР№РґР¶Рё
+    // Бейджи
     const [badges] = await pool.query(
       `SELECT 
         b.id, b.code, b.name, b.description, b.icon,
@@ -340,7 +346,7 @@ async function getUserDetailedStats(req, res, next) {
       [userId]
     );
 
-    // Р РµР№С‚РёРЅРі
+    // Рейтинг
     const [rankData] = await pool.query(
       `SELECT 
         (SELECT COUNT(*) + 1 FROM users WHERE points > ?) as user_rank,
@@ -349,7 +355,7 @@ async function getUserDetailedStats(req, res, next) {
       [users[0].points]
     );
 
-    // РџСЂРѕРіСЂРµСЃСЃ РґРѕ СЃР»РµРґСѓСЋС‰РµРіРѕ СѓСЂРѕРІРЅСЏ
+    // Прогресс до следующего уровня
     const [levels] = await pool.query(
       `SELECT level_number, min_points 
        FROM gamification_levels 
@@ -380,14 +386,14 @@ async function getUserDetailedStats(req, res, next) {
 }
 
 /**
- * Р­РєСЃРїРѕСЂС‚ СЃРїРёСЃРєР° РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РІ Excel
+ * Экспорт списка пользователей в Excel
  */
 async function exportUsersToExcel(req, res, next) {
   try {
     const { branch, position, role, level, search } = req.query;
     const ExcelJS = require("exceljs");
 
-    // РџРѕР»СѓС‡Р°РµРј РґР°РЅРЅС‹Рµ СЃ СѓС‡РµС‚РѕРј С„РёР»СЊС‚СЂРѕРІ
+    // Получаем данные с учетом фильтров
     let query = `
       SELECT 
         u.id, 
@@ -440,26 +446,26 @@ async function exportUsersToExcel(req, res, next) {
 
     const [users] = await pool.query(query, params);
 
-    // РЎРѕР·РґР°РµРј workbook
+    // Создаем workbook
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("РџРѕР»СЊР·РѕРІР°С‚РµР»Рё");
+    const worksheet = workbook.addWorksheet("Пользователи");
 
-    // Р—Р°РіРѕР»РѕРІРєРё
+    // Заголовки
     worksheet.columns = [
       { header: "ID", key: "id", width: 10 },
-      { header: "РРјСЏ", key: "first_name", width: 20 },
-      { header: "Р¤Р°РјРёР»РёСЏ", key: "last_name", width: 20 },
-      { header: "Р›РѕРіРёРЅ", key: "login", width: 20 },
+      { header: "Имя", key: "first_name", width: 20 },
+      { header: "Фамилия", key: "last_name", width: 20 },
+      { header: "Логин", key: "login", width: 20 },
       { header: "Telegram ID", key: "telegram_id", width: 15 },
-      { header: "Р¤РёР»РёР°Р»", key: "branch_name", width: 25 },
-      { header: "Р”РѕР»Р¶РЅРѕСЃС‚СЊ", key: "position_name", width: 25 },
-      { header: "Р РѕР»СЊ", key: "role_name", width: 15 },
-      { header: "РЈСЂРѕРІРµРЅСЊ", key: "level", width: 10 },
-      { header: "РћС‡РєРё", key: "points", width: 10 },
-      { header: "Р”Р°С‚Р° СЃРѕР·РґР°РЅРёСЏ", key: "created_at", width: 20 },
+      { header: "Филиал", key: "branch_name", width: 25 },
+      { header: "Должность", key: "position_name", width: 25 },
+      { header: "Роль", key: "role_name", width: 15 },
+      { header: "Уровень", key: "level", width: 10 },
+      { header: "Очки", key: "points", width: 10 },
+      { header: "Дата создания", key: "created_at", width: 20 },
     ];
 
-    // РЎС‚РёР»РёР·Р°С†РёСЏ Р·Р°РіРѕР»РѕРІРєРѕРІ
+    // Стилизация заголовков
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).fill = {
       type: "pattern",
@@ -467,24 +473,24 @@ async function exportUsersToExcel(req, res, next) {
       fgColor: { argb: "FFE0E0E0" },
     };
 
-    // Р”РѕР±Р°РІР»СЏРµРј РґР°РЅРЅС‹Рµ
+    // Добавляем данные
     users.forEach((user) => {
       worksheet.addRow({
         id: user.id,
         first_name: user.first_name,
         last_name: user.last_name,
-        login: user.login || "вЂ”",
-        telegram_id: user.telegram_id || "вЂ”",
-        branch_name: user.branch_name || "вЂ”",
-        position_name: user.position_name || "вЂ”",
-        role_name: user.role_name || "вЂ”",
+        login: user.login || "-",
+        telegram_id: user.telegram_id || "-",
+        branch_name: user.branch_name || "-",
+        position_name: user.position_name || "-",
+        role_name: user.role_name || "-",
         level: user.level || 1,
         points: user.points || 0,
-        created_at: user.created_at ? new Date(user.created_at).toLocaleDateString("ru-RU") : "вЂ”",
+        created_at: user.created_at ? new Date(user.created_at).toLocaleDateString("ru-RU") : "-",
       });
     });
 
-    // РћС‚РїСЂР°РІРєР° С„Р°Р№Р»Р°
+    // Отправка файла
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename=users_${Date.now()}.xlsx`);
 
@@ -509,7 +515,7 @@ module.exports = {
 };
 
 /**
- * РЎР±СЂРѕСЃРёС‚СЊ РїСЂРѕРіСЂРµСЃСЃ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РїРѕ Р°С‚С‚РµСЃС‚Р°С†РёРё
+ * Сбросить прогресс пользователя по аттестации
  */
 async function resetAssessmentProgress(req, res, next) {
   const connection = await pool.getConnection();
@@ -518,24 +524,24 @@ async function resetAssessmentProgress(req, res, next) {
     const assessmentId = parseInt(req.params.assessmentId, 10);
 
     if (isNaN(userId) || isNaN(assessmentId)) {
-      return res.status(400).json({ error: "РќРµРІРµСЂРЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹" });
+      return res.status(400).json({ error: "Неверные параметры" });
     }
 
-    // РџСЂРѕРІРµСЂСЏРµРј СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+    // Проверяем существование пользователя
     const [users] = await connection.query("SELECT id, first_name, last_name FROM users WHERE id = ?", [userId]);
     if (users.length === 0) {
-      return res.status(404).json({ error: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Пользователь не найден" });
     }
 
-    // РџСЂРѕРІРµСЂСЏРµРј СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёРµ Р°С‚С‚РµСЃС‚Р°С†РёРё
+    // Проверяем существование аттестации
     const [assessments] = await connection.query("SELECT id, title FROM assessments WHERE id = ?", [assessmentId]);
     if (assessments.length === 0) {
-      return res.status(404).json({ error: "РђС‚С‚РµСЃС‚Р°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "Аттестация не найдена" });
     }
 
     await connection.beginTransaction();
 
-    // РџРѕР»СѓС‡Р°РµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РїРѕРїС‹С‚РєР°С… РїРµСЂРµРґ СѓРґР°Р»РµРЅРёРµРј РґР»СЏ Р»РѕРіРёСЂРѕРІР°РЅРёСЏ
+    // Получаем информацию о попытках перед удалением для логирования
     const [attempts] = await connection.query(
       `SELECT id, attempt_number, status, score_percent 
        FROM assessment_attempts 
@@ -543,7 +549,7 @@ async function resetAssessmentProgress(req, res, next) {
       [userId, assessmentId]
     );
 
-    // РЈРґР°Р»СЏРµРј РѕС‚РІРµС‚С‹ РЅР° РІРѕРїСЂРѕСЃС‹
+    // Удаляем ответы на вопросы
     await connection.query(
       `DELETE aa FROM assessment_answers aa
        INNER JOIN assessment_attempts at ON aa.attempt_id = at.id
@@ -551,15 +557,15 @@ async function resetAssessmentProgress(req, res, next) {
       [userId, assessmentId]
     );
 
-    // РЈРґР°Р»СЏРµРј РїРѕРїС‹С‚РєРё
+    // Удаляем попытки
     await connection.query("DELETE FROM assessment_attempts WHERE user_id = ? AND assessment_id = ?", [userId, assessmentId]);
 
-    // РЈРґР°Р»СЏРµРј Р·Р°РІРµСЂС€РµРЅРёРµ С‚РµРѕСЂРёРё
+    // Удаляем завершение теории
     await connection.query("DELETE FROM assessment_theory_completions WHERE user_id = ? AND assessment_id = ?", [userId, assessmentId]);
 
     await connection.commit();
 
-    // Р›РѕРіРёСЂСѓРµРј РґРµР№СЃС‚РІРёРµ
+    // Логируем действие
     await logAndSend({
       action: "reset_assessment_progress",
       entityType: "assessment_attempt",
@@ -582,7 +588,7 @@ async function resetAssessmentProgress(req, res, next) {
     });
 
     res.json({
-      message: "РџСЂРѕРіСЂРµСЃСЃ Р°С‚С‚РµСЃС‚Р°С†РёРё СѓСЃРїРµС€РЅРѕ СЃР±СЂРѕС€РµРЅ",
+      message: "Прогресс аттестации успешно сброшен",
       deletedAttempts: attempts.length,
     });
   } catch (error) {
@@ -594,39 +600,39 @@ async function resetAssessmentProgress(req, res, next) {
 }
 
 /**
- * РЎРѕР·РґР°С‚СЊ РЅРѕРІРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ (С‚РѕР»СЊРєРѕ РґР»СЏ СЃСѓРїРµСЂР°РґРјРёРЅР°)
+ * Создать нового пользователя (только для суперадмина)
  */
 async function createUser(req, res, next) {
   try {
     const currentUser = req.user;
 
-    // РўРѕР»СЊРєРѕ superadmin РјРѕР¶РµС‚ СЃРѕР·РґР°РІР°С‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
+    // Только superadmin может создавать пользователей
     if (currentUser.role !== "superadmin") {
-      return res.status(403).json({ error: "РЈ РІР°СЃ РЅРµС‚ РїСЂР°РІ РЅР° СЃРѕР·РґР°РЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№" });
+      return res.status(403).json({ error: "У вас нет прав на создание пользователей" });
     }
 
     const { firstName, lastName, branchId, positionId, roleId, login, password } = req.body;
 
-    // Р’Р°Р»РёРґР°С†РёСЏ
+    // Валидация
     if (!firstName || !lastName || !branchId || !positionId || !roleId) {
-      return res.status(400).json({ error: "Р’СЃРµ РїРѕР»СЏ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹" });
+      return res.status(400).json({ error: "Все поля обязательны" });
     }
 
-    // РџСЂРѕРІРµСЂРєР° СѓРЅРёРєР°Р»СЊРЅРѕСЃС‚Рё Р»РѕРіРёРЅР°
+    // Проверка уникальности логина
     if (login) {
       const [existing] = await pool.query("SELECT id FROM users WHERE login = ?", [login]);
       if (existing.length > 0) {
-        return res.status(400).json({ error: "Р›РѕРіРёРЅ СѓР¶Рµ Р·Р°РЅСЏС‚" });
+        return res.status(400).json({ error: "Логин уже занят" });
       }
     }
 
-    // РҐРµС€РёСЂСѓРµРј РїР°СЂРѕР»СЊ, РµСЃР»Рё СѓРєР°Р·Р°РЅ
+    // Хешируем пароль, если указан
     let hashedPassword = null;
     if (password) {
       hashedPassword = await bcrypt.hash(password, 10);
     }
 
-    // Р“РµРЅРµСЂРёСЂСѓРµРј СѓРЅРёРєР°Р»СЊРЅС‹Р№ telegram_id РґР»СЏ СЂСѓС‡РЅРѕРіРѕ СЃРѕР·РґР°РЅРёСЏ
+    // Генерируем уникальный telegram_id для ручного создания
     const telegramId = "manual_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
 
     const [result] = await pool.query(
@@ -679,7 +685,7 @@ async function createUser(req, res, next) {
 }
 
 /**
- * РЎР±СЂРѕСЃРёС‚СЊ РїР°СЂРѕР»СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+ * Сбросить пароль пользователя
  */
 async function resetPassword(req, res, next) {
   try {
@@ -689,7 +695,7 @@ async function resetPassword(req, res, next) {
     const { newPassword } = req.body;
 
     if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: "РџР°СЂРѕР»СЊ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РЅРµ РјРµРЅРµРµ 6 СЃРёРјРІРѕР»РѕРІ" });
+      return res.status(400).json({ error: "Пароль должен быть не менее 6 символов" });
     }
 
     const [users] = await pool.query(
@@ -700,16 +706,16 @@ async function resetPassword(req, res, next) {
       [userId]
     );
     if (users.length === 0) {
-      return res.status(404).json({ error: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Пользователь не найден" });
     }
 
     const targetUser = users[0];
 
-    // Manager РјРѕР¶РµС‚ СЃР±СЂР°СЃС‹РІР°С‚СЊ РїР°СЂРѕР»Рё С‚РѕР»СЊРєРѕ employee (Рё СЃРµР±Рµ)
+    // Manager может сбрасывать пароли только employee (и себе)
     if (currentUser.role === "manager") {
       if (targetUser.id !== currentUser.id && targetUser.role_name !== "employee") {
         return res.status(403).json({
-          error: "Р’С‹ РјРѕР¶РµС‚Рµ СЃР±СЂР°СЃС‹РІР°С‚СЊ РїР°СЂРѕР»Рё С‚РѕР»СЊРєРѕ СЃРѕС‚СЂСѓРґРЅРёРєР°Рј СЃ СЂРѕР»СЊСЋ employee",
+          error: "Вы можете сбрасывать пароли только сотрудникам с ролью employee",
         });
       }
     }
@@ -728,14 +734,14 @@ async function resetPassword(req, res, next) {
       },
     });
 
-    res.json({ message: "РџР°СЂРѕР»СЊ СѓСЃРїРµС€РЅРѕ СЃР±СЂРѕС€РµРЅ" });
+    res.json({ message: "Пароль успешно сброшен" });
   } catch (error) {
     next(error);
   }
 }
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РїРѕ ID
+ * Получить пользователя по ID
  */
 async function getUserById(req, res, next) {
   try {
@@ -758,10 +764,10 @@ async function getUserById(req, res, next) {
     );
 
     if (users.length === 0) {
-      return res.status(404).json({ error: "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Пользователь не найден" });
     }
 
-    // РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚РёСЃС‚РёРєСѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+    // Получить статистику пользователя
     const [stats] = await pool.query(
       `
       SELECT 
@@ -784,3 +790,164 @@ async function getUserById(req, res, next) {
     next(error);
   }
 }
+
+function parseUserIds(input) {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+  const unique = new Set();
+  for (const value of input) {
+    const id = Number(value);
+    if (Number.isInteger(id) && id > 0) {
+      unique.add(id);
+    }
+  }
+  return [...unique];
+}
+
+function buildInClause(ids) {
+  return ids.map(() => "?").join(", ");
+}
+
+async function bulkUpdateRole(req, res, next) {
+  try {
+    const userIds = parseUserIds(req.body?.userIds);
+    const roleId = Number(req.body?.roleId);
+
+    if (!userIds.length || !Number.isInteger(roleId) || roleId <= 0) {
+      return res.status(400).json({ error: "Некорректные параметры массового изменения роли" });
+    }
+
+    const sql = `UPDATE users SET role_id = ? WHERE id IN (${buildInClause(userIds)})`;
+    const [result] = await pool.query(sql, [roleId, ...userIds]);
+
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "users.bulk.role.updated",
+      entity: "users",
+      entityId: null,
+      metadata: {
+        userIds,
+        roleId,
+        affectedRows: result.affectedRows,
+      },
+    });
+
+    return res.json({
+      affectedRows: result.affectedRows,
+      userIds,
+      roleId,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function bulkTransferBranch(req, res, next) {
+  try {
+    const userIds = parseUserIds(req.body?.userIds);
+    const branchId = Number(req.body?.branchId);
+
+    if (!userIds.length || !Number.isInteger(branchId) || branchId <= 0) {
+      return res.status(400).json({ error: "Некорректные параметры массового перевода в филиал" });
+    }
+
+    const sql = `UPDATE users SET branch_id = ? WHERE id IN (${buildInClause(userIds)})`;
+    const [result] = await pool.query(sql, [branchId, ...userIds]);
+
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "users.bulk.branch.updated",
+      entity: "users",
+      entityId: null,
+      metadata: {
+        userIds,
+        branchId,
+        affectedRows: result.affectedRows,
+      },
+    });
+
+    return res.json({
+      affectedRows: result.affectedRows,
+      userIds,
+      branchId,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+function toCsv(rows) {
+  if (!rows.length) {
+    return "id,first_name,last_name,login,branch_name,position_name,role_name\n";
+  }
+
+  const headers = Object.keys(rows[0]);
+  const escaped = (value) => {
+    if (value == null) {
+      return "";
+    }
+    const stringValue = String(value).replace(/"/g, '""');
+    return `"${stringValue}"`;
+  };
+
+  const lines = [headers.join(",")];
+  for (const row of rows) {
+    lines.push(headers.map((header) => escaped(row[header])).join(","));
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+async function bulkExportUsers(req, res, next) {
+  try {
+    const userIds = parseUserIds(req.body?.userIds);
+    if (!userIds.length) {
+      return res.status(400).json({ error: "Не выбраны пользователи для экспорта" });
+    }
+
+    const currentUser = req.user || {};
+    const isManager = currentUser.role === "manager";
+    const managerBranchId = Number(currentUser.branch_id || currentUser.branchId || 0);
+    const managerBranchFilter = isManager && managerBranchId > 0 ? " AND u.branch_id = ?" : "";
+
+    const [rows] = await pool.query(
+      `
+      SELECT u.id, u.first_name, u.last_name, u.login,
+             b.name AS branch_name,
+             p.name AS position_name,
+             r.name AS role_name
+      FROM users u
+      LEFT JOIN branches b ON b.id = u.branch_id
+      LEFT JOIN positions p ON p.id = u.position_id
+      LEFT JOIN roles r ON r.id = u.role_id
+      WHERE u.id IN (${buildInClause(userIds)})${managerBranchFilter}
+      ORDER BY u.id ASC
+      `,
+      isManager && managerBranchId > 0 ? [...userIds, managerBranchId] : userIds,
+    );
+
+    const csv = toCsv(rows);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename=users_bulk_${Date.now()}.csv`);
+    res.send(csv);
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = {
+  listUsers,
+  updateUser,
+  deleteUser,
+  createUser,
+  resetPassword,
+  getUserById,
+  getUserDetailedStats,
+  exportUsersToExcel,
+  resetAssessmentProgress,
+  bulkUpdateRole,
+  bulkTransferBranch,
+  bulkExportUsers,
+};

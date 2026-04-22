@@ -1,6 +1,6 @@
--- Рефакторинг иерархии курсов: Модуль → Раздел (Section) + Тема (Topic)
--- До: Курс → Модуль (course_modules)
--- После: Курс → Раздел (course_sections) → Тема (course_topics)
+-- Рефакторинг иерархии курсов: Модуль -> Раздел (Section) + Тема (Topic)
+-- До: Курс -> Модуль (course_modules)
+-- После: Курс -> Раздел (course_sections) -> Тема (course_topics)
 -- Дата создания: 2026-04-14
 
 SET NAMES utf8mb4;

@@ -2,7 +2,7 @@ const { pool } = require("../../../config/database");
 const { createLog } = require("../../../services/adminLogService");
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РєР°С‚РµРіРѕСЂРёР№
+ * Получить список категорий
  */
 exports.getCategories = async (req, res, next) => {
   try {
@@ -26,7 +26,7 @@ exports.getCategories = async (req, res, next) => {
 };
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РІРѕРїСЂРѕСЃРѕРІ РёР· Р±Р°РЅРєР°
+ * Получить список вопросов из банка
  */
 exports.getQuestions = async (req, res, next) => {
   try {
@@ -86,7 +86,7 @@ exports.getQuestions = async (req, res, next) => {
       [...params, limit, offset]
     );
 
-    // Р—Р°РіСЂСѓР¶Р°РµРј РѕРїС†РёРё РґР»СЏ РєР°Р¶РґРѕРіРѕ РІРѕРїСЂРѕСЃР°
+    // Загружаем опции для каждого вопроса
     for (const question of questions) {
       const [options] = await pool.query(
         "SELECT id, option_text, match_text, is_correct, order_index FROM question_bank_options WHERE question_id = ? ORDER BY order_index",
@@ -104,7 +104,7 @@ exports.getQuestions = async (req, res, next) => {
 };
 
 /**
- * РџРѕР»СѓС‡РёС‚СЊ РІРѕРїСЂРѕСЃ РїРѕ ID СЃ РІР°СЂРёР°РЅС‚Р°РјРё РѕС‚РІРµС‚РѕРІ
+ * Получить вопрос по ID с вариантами ответов
  */
 exports.getQuestionById = async (req, res, next) => {
   try {
@@ -123,12 +123,12 @@ exports.getQuestionById = async (req, res, next) => {
     );
 
     if (questions.length === 0) {
-      return res.status(404).json({ error: "Р’РѕРїСЂРѕСЃ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Вопрос не найден" });
     }
 
     const question = questions[0];
 
-    // Р”Р»СЏ С‚РёРїРѕРІ СЃ РІР°СЂРёР°РЅС‚Р°РјРё РѕС‚РІРµС‚РѕРІ Р·Р°РіСЂСѓР¶Р°РµРј РѕРїС†РёРё
+    // Для типов с вариантами ответов загружаем опции
     if (question.question_type !== "text") {
       const [options] = await pool.query(
         "SELECT id, option_text, match_text, is_correct, order_index FROM question_bank_options WHERE question_id = ? ORDER BY order_index",
@@ -147,7 +147,7 @@ exports.getQuestionById = async (req, res, next) => {
 };
 
 /**
- * РЎРѕР·РґР°С‚СЊ РЅРѕРІС‹Р№ РІРѕРїСЂРѕСЃ
+ * Создать новый вопрос
  */
 exports.createQuestion = async (req, res, next) => {
   const connection = await pool.getConnection();
@@ -156,43 +156,43 @@ exports.createQuestion = async (req, res, next) => {
 
     const { categoryId, questionText, questionType, correctTextAnswer, options } = req.body;
 
-    // Р’Р°Р»РёРґР°С†РёСЏ С‚РёРїР°
+    // Валидация типа
     if (!["single", "multiple", "text", "matching"].includes(questionType)) {
-      return res.status(400).json({ error: "РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ С‚РёРї РІРѕРїСЂРѕСЃР°" });
+      return res.status(400).json({ error: "Недопустимый тип вопроса" });
     }
 
-    // Р’Р°Р»РёРґР°С†РёСЏ РґР»СЏ С‚РµРєСЃС‚РѕРІРѕРіРѕ С‚РёРїР°
+    // Валидация для текстового типа
     if (questionType === "text") {
       if (!correctTextAnswer) {
-        return res.status(400).json({ error: "Р”Р»СЏ С‚РµРєСЃС‚РѕРІРѕРіРѕ РІРѕРїСЂРѕСЃР° РЅРµРѕР±С…РѕРґРёРјРѕ СѓРєР°Р·Р°С‚СЊ СЌС‚Р°Р»РѕРЅРЅС‹Р№ РѕС‚РІРµС‚" });
+        return res.status(400).json({ error: "Для текстового вопроса необходимо указать эталонный ответ" });
       }
     }
 
-    // Р’Р°Р»РёРґР°С†РёСЏ РґР»СЏ С‚РёРїРѕРІ СЃ РІР°СЂРёР°РЅС‚Р°РјРё РѕС‚РІРµС‚РѕРІ
+    // Валидация для типов с вариантами ответов
     if (questionType === "single" || questionType === "multiple" || questionType === "matching") {
       if (!options || options.length < 2 || options.length > 6) {
-        return res.status(400).json({ error: "РќРµРѕР±С…РѕРґРёРјРѕ СѓРєР°Р·Р°С‚СЊ РѕС‚ 2 РґРѕ 6 РІР°СЂРёР°РЅС‚РѕРІ РѕС‚РІРµС‚РѕРІ" });
+        return res.status(400).json({ error: "Необходимо указать от 2 до 6 вариантов ответов" });
       }
 
       if (questionType === "matching") {
         const allPairsFilled = options.every((opt) => opt.text && opt.matchText && opt.matchText.trim().length > 0);
         if (!allPairsFilled) {
-          return res.status(400).json({ error: "Р”Р»СЏ СЃРѕРїРѕСЃС‚Р°РІР»РµРЅРёСЏ РЅРµРѕР±С…РѕРґРёРјРѕ Р·Р°РїРѕР»РЅРёС‚СЊ РІСЃРµ РїР°СЂС‹" });
+          return res.status(400).json({ error: "Для сопоставления необходимо заполнить все пары" });
         }
       } else {
         const correctOptions = options.filter((opt) => opt.isCorrect);
 
         if (questionType === "single" && correctOptions.length !== 1) {
-          return res.status(400).json({ error: "Р”Р»СЏ С‚РёРїР° 'РѕРґРёРЅ РІР°СЂРёР°РЅС‚' РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ СЂРѕРІРЅРѕ РѕРґРёРЅ РїСЂР°РІРёР»СЊРЅС‹Р№ РѕС‚РІРµС‚" });
+          return res.status(400).json({ error: "Для типа 'один вариант' должен быть ровно один правильный ответ" });
         }
 
         if (questionType === "multiple" && correctOptions.length < 2) {
-          return res.status(400).json({ error: "Р”Р»СЏ С‚РёРїР° 'РјРЅРѕР¶РµСЃС‚РІРµРЅРЅС‹Р№ РІС‹Р±РѕСЂ' РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РјРёРЅРёРјСѓРј 2 РїСЂР°РІРёР»СЊРЅС‹С… РѕС‚РІРµС‚Р°" });
+          return res.status(400).json({ error: "Для типа 'множественный выбор' должно быть минимум 2 правильных ответа" });
         }
       }
     }
 
-    // РЎРѕР·РґР°С‚СЊ РІРѕРїСЂРѕСЃ
+    // Создать вопрос
     const [result] = await connection.query(
       `
       INSERT INTO question_bank (category_id, question_text, question_type, correct_text_answer, created_by)
@@ -203,7 +203,7 @@ exports.createQuestion = async (req, res, next) => {
 
     const questionId = result.insertId;
 
-    // Р”РѕР±Р°РІРёС‚СЊ РІР°СЂРёР°РЅС‚С‹ РѕС‚РІРµС‚РѕРІ РґР»СЏ С‚РёРїРѕРІ СЃ РІР°СЂРёР°РЅС‚Р°РјРё
+    // Добавить варианты ответов для типов с вариантами
     if (questionType !== "text" && options) {
       for (let i = 0; i < options.length; i++) {
         const option = options[i];
@@ -219,10 +219,10 @@ exports.createQuestion = async (req, res, next) => {
 
     await connection.commit();
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ РґРµР№СЃС‚РІРёСЏ
-    await createLog(req.user.id, "CREATE", `РЎРѕР·РґР°РЅ РІРѕРїСЂРѕСЃ РІ Р±Р°РЅРєРµ (ID: ${questionId}, С‚РёРї: ${questionType})`, "question", questionId, req);
+    // Логирование действия
+    await createLog(req.user.id, "CREATE", `Создан вопрос в банке (ID: ${questionId}, тип: ${questionType})`, "question", questionId, req);
 
-    res.status(201).json({ questionId, message: "Р’РѕРїСЂРѕСЃ СЃРѕР·РґР°РЅ СѓСЃРїРµС€РЅРѕ" });
+    res.status(201).json({ questionId, message: "Вопрос создан успешно" });
   } catch (error) {
     await connection.rollback();
     console.error("Create question error:", error);
@@ -233,61 +233,61 @@ exports.createQuestion = async (req, res, next) => {
 };
 
 /**
- * РћР±РЅРѕРІРёС‚СЊ РІРѕРїСЂРѕСЃ
+ * Обновить вопрос
  */
 exports.updateQuestion = async (req, res, next) => {
   const connection = await pool.getConnection();
   try {
     const questionId = Number(req.params.id);
 
-    // РџСЂРѕРІРµСЂРёС‚СЊ СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёРµ
+    // Проверить существование
     const [questions] = await connection.query("SELECT id, question_type FROM question_bank WHERE id = ?", [questionId]);
 
     if (questions.length === 0) {
-      return res.status(404).json({ error: "Р’РѕРїСЂРѕСЃ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Вопрос не найден" });
     }
 
     await connection.beginTransaction();
 
     const { categoryId, questionText, questionType, correctTextAnswer, options } = req.body;
 
-    // Р’Р°Р»РёРґР°С†РёСЏ С‚РёРїР°
+    // Валидация типа
     if (!["single", "multiple", "text", "matching"].includes(questionType)) {
-      return res.status(400).json({ error: "РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ С‚РёРї РІРѕРїСЂРѕСЃР°" });
+      return res.status(400).json({ error: "Недопустимый тип вопроса" });
     }
 
-    // Р’Р°Р»РёРґР°С†РёСЏ РґР»СЏ С‚РµРєСЃС‚РѕРІРѕРіРѕ С‚РёРїР°
+    // Валидация для текстового типа
     if (questionType === "text") {
       if (!correctTextAnswer) {
-        return res.status(400).json({ error: "Р”Р»СЏ С‚РµРєСЃС‚РѕРІРѕРіРѕ РІРѕРїСЂРѕСЃР° РЅРµРѕР±С…РѕРґРёРјРѕ СѓРєР°Р·Р°С‚СЊ СЌС‚Р°Р»РѕРЅРЅС‹Р№ РѕС‚РІРµС‚" });
+        return res.status(400).json({ error: "Для текстового вопроса необходимо указать эталонный ответ" });
       }
     }
 
-    // Р’Р°Р»РёРґР°С†РёСЏ РґР»СЏ С‚РёРїРѕРІ СЃ РІР°СЂРёР°РЅС‚Р°РјРё РѕС‚РІРµС‚РѕРІ
+    // Валидация для типов с вариантами ответов
     if (questionType === "single" || questionType === "multiple" || questionType === "matching") {
       if (!options || options.length < 2 || options.length > 6) {
-        return res.status(400).json({ error: "РќРµРѕР±С…РѕРґРёРјРѕ СѓРєР°Р·Р°С‚СЊ РѕС‚ 2 РґРѕ 6 РІР°СЂРёР°РЅС‚РѕРІ РѕС‚РІРµС‚РѕРІ" });
+        return res.status(400).json({ error: "Необходимо указать от 2 до 6 вариантов ответов" });
       }
 
       if (questionType === "matching") {
         const allPairsFilled = options.every((opt) => opt.text && opt.matchText && opt.matchText.trim().length > 0);
         if (!allPairsFilled) {
-          return res.status(400).json({ error: "Р”Р»СЏ СЃРѕРїРѕСЃС‚Р°РІР»РµРЅРёСЏ РЅРµРѕР±С…РѕРґРёРјРѕ Р·Р°РїРѕР»РЅРёС‚СЊ РІСЃРµ РїР°СЂС‹" });
+          return res.status(400).json({ error: "Для сопоставления необходимо заполнить все пары" });
         }
       } else {
         const correctOptions = options.filter((opt) => opt.isCorrect);
 
         if (questionType === "single" && correctOptions.length !== 1) {
-          return res.status(400).json({ error: "Р”Р»СЏ С‚РёРїР° 'РѕРґРёРЅ РІР°СЂРёР°РЅС‚' РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ СЂРѕРІРЅРѕ РѕРґРёРЅ РїСЂР°РІРёР»СЊРЅС‹Р№ РѕС‚РІРµС‚" });
+          return res.status(400).json({ error: "Для типа 'один вариант' должен быть ровно один правильный ответ" });
         }
 
         if (questionType === "multiple" && correctOptions.length < 2) {
-          return res.status(400).json({ error: "Р”Р»СЏ С‚РёРїР° 'РјРЅРѕР¶РµСЃС‚РІРµРЅРЅС‹Р№ РІС‹Р±РѕСЂ' РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РјРёРЅРёРјСѓРј 2 РїСЂР°РІРёР»СЊРЅС‹С… РѕС‚РІРµС‚Р°" });
+          return res.status(400).json({ error: "Для типа 'множественный выбор' должно быть минимум 2 правильных ответа" });
         }
       }
     }
 
-    // РћР±РЅРѕРІРёС‚СЊ РІРѕРїСЂРѕСЃ
+    // Обновить вопрос
     await connection.query(
       `
       UPDATE question_bank 
@@ -297,10 +297,10 @@ exports.updateQuestion = async (req, res, next) => {
       [categoryId || null, questionText, questionType, questionType === "text" ? correctTextAnswer : null, questionId]
     );
 
-    // РЈРґР°Р»РёС‚СЊ СЃС‚Р°СЂС‹Рµ РІР°СЂРёР°РЅС‚С‹ РѕС‚РІРµС‚РѕРІ
+    // Удалить старые варианты ответов
     await connection.query("DELETE FROM question_bank_options WHERE question_id = ?", [questionId]);
 
-    // Р”РѕР±Р°РІРёС‚СЊ РЅРѕРІС‹Рµ РІР°СЂРёР°РЅС‚С‹ РѕС‚РІРµС‚РѕРІ РґР»СЏ С‚РёРїРѕРІ СЃ РІР°СЂРёР°РЅС‚Р°РјРё
+    // Добавить новые варианты ответов для типов с вариантами
     if (questionType !== "text" && options) {
       for (let i = 0; i < options.length; i++) {
         const option = options[i];
@@ -316,10 +316,10 @@ exports.updateQuestion = async (req, res, next) => {
 
     await connection.commit();
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ РґРµР№СЃС‚РІРёСЏ
-    await createLog(req.user.id, "UPDATE", `РћР±РЅРѕРІР»РµРЅ РІРѕРїСЂРѕСЃ РІ Р±Р°РЅРєРµ (ID: ${questionId}, С‚РёРї: ${questionType})`, "question", questionId, req);
+    // Логирование действия
+    await createLog(req.user.id, "UPDATE", `Обновлен вопрос в банке (ID: ${questionId}, тип: ${questionType})`, "question", questionId, req);
 
-    res.json({ message: "Р’РѕРїСЂРѕСЃ РѕР±РЅРѕРІР»РµРЅ СѓСЃРїРµС€РЅРѕ" });
+    res.json({ message: "Вопрос обновлен успешно" });
   } catch (error) {
     await connection.rollback();
     console.error("Update question error:", error);
@@ -330,7 +330,7 @@ exports.updateQuestion = async (req, res, next) => {
 };
 
 /**
- * РЈРґР°Р»РёС‚СЊ РІРѕРїСЂРѕСЃ
+ * Удалить вопрос
  */
 exports.deleteQuestion = async (req, res, next) => {
   try {
@@ -339,13 +339,13 @@ exports.deleteQuestion = async (req, res, next) => {
     const [questions] = await pool.query("SELECT question_text FROM question_bank WHERE id = ?", [questionId]);
 
     if (questions.length === 0) {
-      return res.status(404).json({ error: "Р’РѕРїСЂРѕСЃ РЅРµ РЅР°Р№РґРµРЅ" });
+      return res.status(404).json({ error: "Вопрос не найден" });
     }
 
     await pool.query("DELETE FROM question_bank WHERE id = ?", [questionId]);
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ РґРµР№СЃС‚РІРёСЏ
-    await createLog(req.user.id, "DELETE", `РЈРґР°Р»РµРЅ РІРѕРїСЂРѕСЃ РёР· Р±Р°РЅРєР° (ID: ${questionId})`, "question", questionId, req);
+    // Логирование действия
+    await createLog(req.user.id, "DELETE", `Удален вопрос из банка (ID: ${questionId})`, "question", questionId, req);
 
     res.status(204).send();
   } catch (error) {
@@ -355,14 +355,14 @@ exports.deleteQuestion = async (req, res, next) => {
 };
 
 /**
- * РЎРѕР·РґР°С‚СЊ РЅРѕРІСѓСЋ РєР°С‚РµРіРѕСЂРёСЋ
+ * Создать новую категорию
  */
 exports.createCategory = async (req, res, next) => {
   try {
     const { name, description } = req.body;
 
     if (!name) {
-      return res.status(400).json({ error: "РќР°Р·РІР°РЅРёРµ РєР°С‚РµРіРѕСЂРёРё РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ" });
+      return res.status(400).json({ error: "Название категории обязательно" });
     }
 
     const [result] = await pool.query(
@@ -373,10 +373,10 @@ exports.createCategory = async (req, res, next) => {
       [name, description || ""]
     );
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ РґРµР№СЃС‚РІРёСЏ
-    await createLog(req.user.id, "CREATE", `РЎРѕР·РґР°РЅР° РєР°С‚РµРіРѕСЂРёСЏ РІРѕРїСЂРѕСЃРѕРІ: ${name} (ID: ${result.insertId})`, "category", result.insertId, req);
+    // Логирование действия
+    await createLog(req.user.id, "CREATE", `Создана категория вопросов: ${name} (ID: ${result.insertId})`, "category", result.insertId, req);
 
-    res.status(201).json({ categoryId: result.insertId, message: "РљР°С‚РµРіРѕСЂРёСЏ СЃРѕР·РґР°РЅР°" });
+    res.status(201).json({ categoryId: result.insertId, message: "Категория создана" });
   } catch (error) {
     console.error("Create category error:", error);
     next(error);
@@ -384,7 +384,7 @@ exports.createCategory = async (req, res, next) => {
 };
 
 /**
- * РћР±РЅРѕРІРёС‚СЊ РєР°С‚РµРіРѕСЂРёСЋ
+ * Обновить категорию
  */
 exports.updateCategory = async (req, res, next) => {
   try {
@@ -392,7 +392,7 @@ exports.updateCategory = async (req, res, next) => {
     const { name, description } = req.body;
 
     if (!name) {
-      return res.status(400).json({ error: "РќР°Р·РІР°РЅРёРµ РєР°С‚РµРіРѕСЂРёРё РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ" });
+      return res.status(400).json({ error: "Название категории обязательно" });
     }
 
     const [result] = await pool.query(
@@ -405,13 +405,13 @@ exports.updateCategory = async (req, res, next) => {
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ error: "РљР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "Категория не найдена" });
     }
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ РґРµР№СЃС‚РІРёСЏ
-    await createLog(req.user.id, "UPDATE", `РћР±РЅРѕРІР»РµРЅР° РєР°С‚РµРіРѕСЂРёСЏ РІРѕРїСЂРѕСЃРѕРІ: ${name} (ID: ${categoryId})`, "category", categoryId, req);
+    // Логирование действия
+    await createLog(req.user.id, "UPDATE", `Обновлена категория вопросов: ${name} (ID: ${categoryId})`, "category", categoryId, req);
 
-    res.json({ message: "РљР°С‚РµРіРѕСЂРёСЏ РѕР±РЅРѕРІР»РµРЅР°" });
+    res.json({ message: "Категория обновлена" });
   } catch (error) {
     console.error("Update category error:", error);
     next(error);
@@ -419,27 +419,27 @@ exports.updateCategory = async (req, res, next) => {
 };
 
 /**
- * РЈРґР°Р»РёС‚СЊ РєР°С‚РµРіРѕСЂРёСЋ
+ * Удалить категорию
  */
 exports.deleteCategory = async (req, res, next) => {
   try {
     const categoryId = Number(req.params.id);
 
-    // РџСЂРѕРІРµСЂРёС‚СЊ, РµСЃС‚СЊ Р»Рё РІРѕРїСЂРѕСЃС‹ РІ РєР°С‚РµРіРѕСЂРёРё
+    // Проверить, есть ли вопросы в категории
     const [questions] = await pool.query("SELECT COUNT(*) as count FROM question_bank WHERE category_id = ?", [categoryId]);
 
     if (questions[0].count > 0) {
-      return res.status(400).json({ error: "РќРµРІРѕР·РјРѕР¶РЅРѕ СѓРґР°Р»РёС‚СЊ РєР°С‚РµРіРѕСЂРёСЋ СЃ РІРѕРїСЂРѕСЃР°РјРё" });
+      return res.status(400).json({ error: "Невозможно удалить категорию с вопросами" });
     }
 
     const [result] = await pool.query("DELETE FROM question_categories WHERE id = ?", [categoryId]);
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ error: "РљР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°" });
+      return res.status(404).json({ error: "Категория не найдена" });
     }
 
-    // Р›РѕРіРёСЂРѕРІР°РЅРёРµ РґРµР№СЃС‚РІРёСЏ
-    await createLog(req.user.id, "DELETE", `РЈРґР°Р»РµРЅР° РєР°С‚РµРіРѕСЂРёСЏ РІРѕРїСЂРѕСЃРѕРІ (ID: ${categoryId})`, "category", categoryId, req);
+    // Логирование действия
+    await createLog(req.user.id, "DELETE", `Удалена категория вопросов (ID: ${categoryId})`, "category", categoryId, req);
 
     res.status(204).send();
   } catch (error) {
