@@ -66,6 +66,23 @@
             placeholder="Кратко опишите цель и содержание курса"
             :rows="4"
           />
+          <Input
+            v-model="form.coverUrl"
+            class="grid-span-full"
+            label="Ссылка на обложку"
+            placeholder="https://cdn.example.com/course-cover.jpg"
+          />
+          <Input
+            v-model="form.category"
+            label="Категория"
+            placeholder="Например: Сервис"
+          />
+          <Input
+            v-model="form.tagsInput"
+            class="grid-span-full"
+            label="Теги"
+            placeholder="например: касса, стандарты, клиентский сервис"
+          />
           <Select
             v-model="form.availabilityMode"
             class="grid-span-full"
@@ -119,8 +136,9 @@
           <p>Темы курса ещё не добавлены.</p>
         </div>
 
-        <div class="sections-list">
-          <div v-for="section in course.sections" :key="section.id" class="section-item">
+        <draggable v-model="course.sections" item-key="id" handle=".section-drag-handle" class="sections-list" @end="handleSectionsReorder">
+          <template #item="{ element: section }">
+          <div class="section-item">
             <!-- Строка раздела -->
             <div class="section-row">
               <span class="section-order">{{ section.orderIndex }}</span>
@@ -131,6 +149,14 @@
                 <span v-else class="section-badge-ok">тест привязан</span>
               </div>
               <div class="section-actions">
+                <button
+                  v-if="(course.sections || []).length > 1"
+                  type="button"
+                  class="drag-handle section-drag-handle"
+                  title="Перетащите для изменения порядка"
+                >
+                  ↕
+                </button>
                 <Button size="sm" variant="ghost" :icon="sectionEditingId === section.id ? 'x' : 'pencil'" @click="toggleSectionEdit(section.id)">
                   {{ sectionEditingId === section.id ? "Закрыть" : "Редактировать" }}
                 </Button>
@@ -187,16 +213,33 @@
             <!-- Темы раздела -->
             <div class="topics-container">
               <div v-if="!section.topics || section.topics.length === 0" class="empty-topics">Подтем пока нет.</div>
-              <div v-else class="topics-list">
-                <div v-for="topic in section.topics" :key="topic.id" class="topic-item">
+              <draggable
+                v-else
+                v-model="section.topics"
+                item-key="id"
+                handle=".topic-drag-handle"
+                class="topics-list"
+                @end="() => handleTopicsReorder(section)"
+              >
+                <template #item="{ element: topic }">
+                <div class="topic-item">
                   <div class="topic-row">
                     <span class="topic-order">{{ topic.orderIndex }}</span>
                     <div class="topic-info">
                       <span class="topic-name">{{ topic.title }}</span>
+                      <span v-if="!topic.isRequired" class="topic-badge topic-badge-optional">необязательная</span>
                       <span v-if="topic.hasMaterial" class="topic-badge">материал</span>
                       <span v-if="topic.assessmentId" class="topic-badge">тест</span>
                     </div>
                     <div class="topic-actions">
+                      <button
+                        v-if="(section.topics || []).length > 1"
+                        type="button"
+                        class="drag-handle topic-drag-handle"
+                        title="Перетащите для изменения порядка"
+                      >
+                        ↕
+                      </button>
                       <Button size="sm" variant="ghost" :icon="topicEditingId === topic.id ? 'x' : 'pencil'" @click="toggleTopicEdit(topic.id)" />
                       <Button
                         size="sm"
@@ -231,6 +274,12 @@
                       </div>
                       <div class="field-checkbox">
                         <label class="switch-label">
+                          <input v-model="topicDrafts[topic.id].isRequired" type="checkbox" />
+                          <span>Обязательная подтема</span>
+                        </label>
+                      </div>
+                      <div class="field-checkbox">
+                        <label class="switch-label">
                           <input v-model="topicDrafts[topic.id].hasMaterial" type="checkbox" />
                           <span>Есть материал</span>
                         </label>
@@ -248,7 +297,8 @@
                     </div>
                   </div>
                 </div>
-              </div>
+              </template>
+              </draggable>
 
               <!-- Добавить тему -->
               <div v-if="newTopics[section.id]" class="new-topic">
@@ -267,6 +317,12 @@
                     >
                       Редактировать тест
                     </Button>
+                  </div>
+                  <div class="field-checkbox">
+                    <label class="switch-label">
+                      <input v-model="newTopics[section.id].isRequired" type="checkbox" />
+                      <span>Обязательная подтема</span>
+                    </label>
                   </div>
                   <div class="field-checkbox">
                     <label class="switch-label">
@@ -290,7 +346,8 @@
               </div>
             </div>
           </div>
-        </div>
+        </template>
+        </draggable>
 
         <div class="new-section">
           <h3>Новая тема курса</h3>
@@ -371,6 +428,14 @@
           <div class="preview-item">
             <span class="preview-label">Статус</span>
             <strong>{{ getStatusLabel(course.status) }}</strong>
+          </div>
+          <div class="preview-item">
+            <span class="preview-label">Категория</span>
+            <strong>{{ form.category || "—" }}</strong>
+          </div>
+          <div class="preview-item">
+            <span class="preview-label">Теги</span>
+            <strong>{{ form.tagsInput || "—" }}</strong>
           </div>
           <div class="preview-item">
             <span class="preview-label">Тем курса</span>
@@ -648,6 +713,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import draggable from "vuedraggable";
 import { Badge, Button, Card, Input, Modal, Preloader, Select, Textarea } from "../components/ui";
 import AssessmentForm from "../components/AssessmentForm.vue";
 import DraftSaveIndicator from "../components/courses/DraftSaveIndicator.vue";
@@ -656,9 +722,11 @@ import {
   createCourse,
   createCourseSection,
   updateCourseSection,
+  reorderCourseSections,
   deleteCourseSection,
   createCourseTopic,
   updateCourseTopic,
+  reorderCourseTopics,
   deleteCourseTopic,
   getCourseById,
   publishCourse,
@@ -707,10 +775,15 @@ const deletingTopicId = ref(null);
 const newTopics = ref({});
 const newTopicErrors = ref({});
 const creatingTopicSectionId = ref(null);
+const reorderingSections = ref(false);
+const reorderingTopicSectionId = ref(null);
 
 const form = ref({
   title: "",
   description: "",
+  coverUrl: "",
+  category: "",
+  tagsInput: "",
   finalAssessmentId: "",
   availabilityMode: "unlimited",
   availabilityDays: "",
@@ -844,6 +917,14 @@ const sanitizeOptionalNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const parseTags = (value) => {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+};
+
 const toLocalDateTimeInput = (iso) => {
   if (!iso) return "";
   const date = new Date(iso);
@@ -869,12 +950,13 @@ const syncSectionDrafts = (sections = []) => {
       nextTopicDrafts[topic.id] = {
         title: topic.title || "",
         orderIndex: String(topic.orderIndex || ""),
+        isRequired: topic.isRequired !== false,
         hasMaterial: Boolean(topic.hasMaterial),
         content: topic.content || "",
         assessmentId: topic.assessmentId ? String(topic.assessmentId) : "",
       };
     }
-    nextNewTopics[section.id] = newTopics.value[section.id] || { title: "", orderIndex: "", hasMaterial: false, content: "", assessmentId: "" };
+    nextNewTopics[section.id] = newTopics.value[section.id] || { title: "", orderIndex: "", isRequired: true, hasMaterial: false, content: "", assessmentId: "" };
   }
   sectionDrafts.value = nextDrafts;
   sectionErrors.value = {};
@@ -922,6 +1004,9 @@ const applyCourseToForm = (courseItem) => {
   form.value = {
     title: courseItem.title || "",
     description: courseItem.description || "",
+    coverUrl: courseItem.coverUrl || "",
+    category: courseItem.category || "",
+    tagsInput: Array.isArray(courseItem.tags) ? courseItem.tags.join(", ") : "",
     finalAssessmentId: courseItem.finalAssessmentId ? String(courseItem.finalAssessmentId) : "",
     availabilityMode: courseItem.availabilityMode || "unlimited",
     availabilityDays: courseItem.availabilityDays ? String(courseItem.availabilityDays) : "",
@@ -936,6 +1021,9 @@ const loadCourse = async () => {
     form.value = {
       title: "",
       description: "",
+      coverUrl: "",
+      category: "",
+      tagsInput: "",
       finalAssessmentId: "",
       availabilityMode: "unlimited",
       availabilityDays: "",
@@ -1005,6 +1093,9 @@ const saveCourse = async () => {
   const payload = {
     title: form.value.title.trim(),
     description: form.value.description.trim(),
+    coverUrl: form.value.coverUrl.trim() || null,
+    category: form.value.category.trim() || null,
+    tags: parseTags(form.value.tagsInput),
     finalAssessmentId: sanitizeOptionalNumber(form.value.finalAssessmentId),
     availabilityMode: form.value.availabilityMode || "unlimited",
     availabilityDays: form.value.availabilityMode === "relative_days" ? sanitizeOptionalNumber(form.value.availabilityDays) : null,
@@ -1223,6 +1314,7 @@ const addTopic = async (sectionId) => {
     const payload = {
       title: draft.title.trim(),
       orderIndex: sanitizeOptionalNumber(draft.orderIndex),
+      isRequired: Boolean(draft.isRequired),
       hasMaterial: Boolean(draft.hasMaterial),
       content: draft.hasMaterial ? (draft.content || "").trim() || null : null,
       assessmentId: sanitizeOptionalNumber(draft.assessmentId),
@@ -1230,7 +1322,7 @@ const addTopic = async (sectionId) => {
     const response = await createCourseTopic(sectionId, payload);
     course.value = response.course;
     syncSectionDrafts(response.course.sections || []);
-    newTopics.value[sectionId] = { title: "", orderIndex: "", hasMaterial: false, content: "", assessmentId: "" };
+    newTopics.value[sectionId] = { title: "", orderIndex: "", isRequired: true, hasMaterial: false, content: "", assessmentId: "" };
     newTopicErrors.value = { ...newTopicErrors.value, [sectionId]: null };
     showToast("Подтема добавлена", "success");
   } catch (error) {
@@ -1252,6 +1344,7 @@ const saveTopic = async (topicId) => {
     const payload = {
       title: draft.title.trim(),
       orderIndex: sanitizeOptionalNumber(draft.orderIndex),
+      isRequired: Boolean(draft.isRequired),
       hasMaterial: Boolean(draft.hasMaterial),
       content: draft.hasMaterial ? (draft.content || "").trim() || null : null,
       assessmentId: sanitizeOptionalNumber(draft.assessmentId),
@@ -1265,6 +1358,42 @@ const saveTopic = async (topicId) => {
     showToast(getErrorMessage(error, "Не удалось обновить подтему"), "error");
   } finally {
     updatingTopicId.value = null;
+  }
+};
+
+const handleSectionsReorder = async () => {
+  if (!course.value || !isEditMode.value) return;
+  const sectionIds = (course.value.sections || []).map((section) => Number(section.id)).filter((id) => Number.isInteger(id) && id > 0);
+  if (sectionIds.length <= 1) return;
+
+  reorderingSections.value = true;
+  try {
+    const response = await reorderCourseSections(courseId.value, sectionIds);
+    course.value = response.course;
+    syncSectionDrafts(response.course.sections || []);
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось сохранить порядок тем"), "error");
+    await loadCourse();
+  } finally {
+    reorderingSections.value = false;
+  }
+};
+
+const handleTopicsReorder = async (section) => {
+  if (!course.value || !isEditMode.value || !section?.id) return;
+  const topicIds = (section.topics || []).map((topic) => Number(topic.id)).filter((id) => Number.isInteger(id) && id > 0);
+  if (topicIds.length <= 1) return;
+
+  reorderingTopicSectionId.value = Number(section.id);
+  try {
+    const response = await reorderCourseTopics(courseId.value, Number(section.id), topicIds);
+    course.value = response.course;
+    syncSectionDrafts(response.course.sections || []);
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось сохранить порядок подтем"), "error");
+    await loadCourse();
+  } finally {
+    reorderingTopicSectionId.value = null;
   }
 };
 
@@ -1782,6 +1911,23 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
+.drag-handle {
+  border: 1px dashed var(--divider);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
 .section-edit-form {
   padding: 12px 14px;
   border-top: 1px solid var(--divider);
@@ -1862,6 +2008,12 @@ onMounted(async () => {
   border: 1px solid var(--divider);
   border-radius: 4px;
   padding: 1px 5px;
+}
+
+.topic-badge-optional {
+  color: #92400e;
+  border-color: #f59e0b66;
+  background: #fffbeb;
 }
 
 .topic-actions {

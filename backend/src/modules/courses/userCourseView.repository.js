@@ -83,7 +83,7 @@ function resolveSectionLockReason({ isClosedForUser, isLockedBySequence }) {
   };
 }
 
-function resolveTopicLockReason({ isClosedForUser, isLockedBySectionSequence, previousTopic }) {
+function resolveTopicLockReason({ isClosedForUser, isLockedBySectionSequence, isTopicRequired, previousRequiredTopic }) {
   if (isClosedForUser) {
     return {
       lockReasonType: "course_closed",
@@ -98,7 +98,7 @@ function resolveTopicLockReason({ isClosedForUser, isLockedBySectionSequence, pr
     };
   }
 
-  if (previousTopic && previousTopic.progress.status !== "completed") {
+  if (isTopicRequired && previousRequiredTopic && previousRequiredTopic.progress.status !== "completed") {
     return {
       lockReasonType: "topic_sequence_blocked",
       lockReasonText: "Сначала завершите предыдущую подтему",
@@ -126,7 +126,7 @@ async function listPublishedCoursesForUser(userId, userPositionId, userBranchId)
 
   const idList = [...allowedIds].join(",");
   const [rows] = await pool.execute(
-    `SELECT c.id, c.title, c.description, c.availability_mode, c.availability_days, c.availability_from, c.availability_to,
+    `SELECT c.id, c.title, c.description, c.cover_url, c.category, c.tags, c.availability_mode, c.availability_days, c.availability_from, c.availability_to,
             c.status, c.version, c.final_assessment_id,
             c.created_by, c.updated_by, c.published_at, c.archived_at, c.created_at, c.updated_at,
             cup.status AS user_status, cup.progress_percent,
@@ -207,7 +207,7 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
   if (!allowedIds.has(Number(courseId)) && !closedRows.length) return null;
 
   const [courseRows] = await pool.execute(
-    `SELECT c.id, c.title, c.description, c.availability_mode, c.availability_days, c.availability_from, c.availability_to,
+    `SELECT c.id, c.title, c.description, c.cover_url, c.category, c.tags, c.availability_mode, c.availability_days, c.availability_from, c.availability_to,
             c.status, c.version, c.final_assessment_id,
             c.created_by, c.updated_by, c.published_at, c.archived_at, c.created_at, c.updated_at,
             cup.status AS user_status, cup.progress_percent,
@@ -240,7 +240,7 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
 
   const [topicRows] = await pool.execute(
     `SELECT ct.id, ct.section_id, ct.course_id, ct.title, ct.order_index,
-            ct.has_material, ct.content, ct.assessment_id, ct.created_at, ct.updated_at,
+            ct.is_required, ct.has_material, ct.content, ct.assessment_id, ct.created_at, ct.updated_at,
             ctup.status AS user_topic_status, ctup.material_viewed,
             ctup.best_score_percent AS topic_best_score, ctup.attempt_count AS topic_attempt_count,
             ctup.last_attempt_id AS topic_last_attempt_id, ctup.started_at AS topic_started_at, ctup.completed_at AS topic_completed_at
@@ -278,13 +278,18 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
       isLockedBySequence,
     });
 
-    const topics = (topicsBySectionId[section.id] || []).map((topic, topicIndex) => {
-      const prevTopic = (topicsBySectionId[section.id] || [])[topicIndex - 1];
+    const sectionTopics = topicsBySectionId[section.id] || [];
+    let previousRequiredTopic = null;
+    const topics = sectionTopics.map((topic) => {
       const topicLockReason = resolveTopicLockReason({
         isClosedForUser,
         isLockedBySectionSequence: isLockedBySequence,
-        previousTopic: prevTopic,
+        isTopicRequired: topic.isRequired,
+        previousRequiredTopic,
       });
+      if (topic.isRequired) {
+        previousRequiredTopic = topic;
+      }
       return {
         ...topic,
         progress: {
@@ -296,7 +301,8 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
       };
     });
 
-    const allTopicsCompleted = topics.length === 0 || topics.every((item) => item.progress.status === "completed");
+    const requiredTopics = topics.filter((item) => item.isRequired);
+    const allTopicsCompleted = requiredTopics.length === 0 || requiredTopics.every((item) => item.progress.status === "completed");
     return {
       ...section,
       progress: {

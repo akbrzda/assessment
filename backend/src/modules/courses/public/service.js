@@ -90,7 +90,7 @@ async function startTopic({ courseId, topicId, userId }) {
 
     const prevCompleted = await progressRepo.isPreviousTopicCompleted(
       { sectionId: topic.sectionId, orderIndex: topic.orderIndex, userId },
-      { connection },
+      { connection, currentIsRequired: topic.isRequired },
     );
     if (!prevCompleted) {
       const error = new Error("Необходимо завершить предыдущую подтему перед началом этой");
@@ -148,7 +148,7 @@ async function completeTopic({ courseId, topicId, userId }) {
     await assertCourseNotClosed({ courseId, userId, connection });
     const prevCompleted = await progressRepo.isPreviousTopicCompleted(
       { sectionId: topic.sectionId, orderIndex: topic.orderIndex, userId },
-      { connection },
+      { connection, currentIsRequired: topic.isRequired },
     );
     if (!prevCompleted) {
       const error = new Error("Необходимо завершить предыдущую подтему перед этой");

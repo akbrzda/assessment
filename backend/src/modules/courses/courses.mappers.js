@@ -7,10 +7,25 @@ function toIsoUtc(value) {
 
 function mapCourseRow(row) {
   if (!row) return null;
+  let tags = [];
+  if (Array.isArray(row.tags)) {
+    tags = row.tags.map((item) => String(item).trim()).filter(Boolean);
+  } else if (typeof row.tags === "string" && row.tags.trim()) {
+    try {
+      const parsed = JSON.parse(row.tags);
+      tags = Array.isArray(parsed) ? parsed.map((item) => String(item).trim()).filter(Boolean) : [];
+    } catch {
+      tags = [];
+    }
+  }
+
   return {
     id: Number(row.id),
     title: row.title,
     description: row.description || "",
+    coverUrl: row.cover_url || null,
+    category: row.category || null,
+    tags,
     status: row.status,
     availabilityMode: row.availability_mode || "unlimited",
     availabilityDays: row.availability_days != null ? Number(row.availability_days) : null,
@@ -49,6 +64,7 @@ function mapTopicRow(row) {
     courseId: Number(row.course_id),
     title: row.title,
     orderIndex: Number(row.order_index),
+    isRequired: row.is_required == null ? true : Boolean(row.is_required),
     hasMaterial: Boolean(row.has_material),
     content: row.content || null,
     assessmentId: row.assessment_id ? Number(row.assessment_id) : null,

@@ -11,6 +11,8 @@ const {
   updateSectionSchema,
   createTopicSchema,
   updateTopicSchema,
+  reorderSectionsSchema,
+  reorderTopicsSchema,
 } = require("./validators");
 
 function parseId(value) {
@@ -157,6 +159,33 @@ async function createTopic(req, res, next) {
     if (!value) return;
     const result = await contentService.createTopic(sectionId, value, req.user.id, req);
     res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function reorderSections(req, res, next) {
+  try {
+    const courseId = parseId(req.params.id);
+    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
+    const value = validate(reorderSectionsSchema, req.body, res);
+    if (!value) return;
+    const result = await contentService.reorderSections(courseId, value.sectionIds, req.user.id, req);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function reorderTopics(req, res, next) {
+  try {
+    const courseId = parseId(req.params.id);
+    const sectionId = parseId(req.params.sectionId);
+    if (!courseId || !sectionId) return res.status(400).json({ error: "Некорректные параметры" });
+    const value = validate(reorderTopicsSchema, req.body, res);
+    if (!value) return;
+    const result = await contentService.reorderTopics(courseId, sectionId, value.topicIds, req.user.id, req);
+    res.json(result);
   } catch (error) {
     next(error);
   }
@@ -397,6 +426,8 @@ module.exports = {
   updateSection,
   deleteSection,
   createTopic,
+  reorderSections,
+  reorderTopics,
   updateTopic,
   deleteTopic,
   getTargets,

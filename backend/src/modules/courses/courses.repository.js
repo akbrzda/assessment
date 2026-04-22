@@ -7,7 +7,7 @@ async function findById(courseId, options = {}) {
   const executor = options.connection || pool;
   const lock = options.forUpdate ? " FOR UPDATE" : "";
   const [rows] = await executor.execute(
-    `SELECT id, title, description, availability_mode, availability_days, availability_from, availability_to, status, version, final_assessment_id,
+    `SELECT id, title, description, cover_url, category, tags, availability_mode, availability_days, availability_from, availability_to, status, version, final_assessment_id,
             created_by, updated_by, published_at, archived_at, created_at, updated_at
        FROM courses WHERE id = ?${lock}`,
     [courseId],
@@ -31,7 +31,7 @@ async function listCoursesForAdmin({ status, search } = {}) {
 
   const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
   const [rows] = await pool.execute(
-    `SELECT c.id, c.title, c.description, c.availability_mode, c.availability_days, c.availability_from, c.availability_to, c.status, c.version, c.final_assessment_id,
+    `SELECT c.id, c.title, c.description, c.cover_url, c.category, c.tags, c.availability_mode, c.availability_days, c.availability_from, c.availability_to, c.status, c.version, c.final_assessment_id,
             c.created_by, c.updated_by, c.published_at, c.archived_at, c.created_at, c.updated_at,
             (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id) AS sections_count
        FROM courses c ${where}
@@ -88,7 +88,7 @@ async function findSectionById(sectionId, options = {}) {
 async function listTopicsBySectionId(sectionId, options = {}) {
   const executor = options.connection || pool;
   const [rows] = await executor.execute(
-    `SELECT id, section_id, course_id, title, order_index, has_material, content, assessment_id, created_at, updated_at
+    `SELECT id, section_id, course_id, title, order_index, is_required, has_material, content, assessment_id, created_at, updated_at
        FROM course_topics WHERE section_id = ? ORDER BY order_index ASC`,
     [sectionId],
   );
@@ -98,7 +98,7 @@ async function listTopicsBySectionId(sectionId, options = {}) {
 async function listTopicsByCourseId(courseId, options = {}) {
   const executor = options.connection || pool;
   const [rows] = await executor.execute(
-    `SELECT id, section_id, course_id, title, order_index, has_material, content, assessment_id, created_at, updated_at
+    `SELECT id, section_id, course_id, title, order_index, is_required, has_material, content, assessment_id, created_at, updated_at
        FROM course_topics WHERE course_id = ? ORDER BY section_id ASC, order_index ASC`,
     [courseId],
   );
@@ -110,7 +110,7 @@ async function findTopicById(topicId, options = {}) {
   const lock = options.forUpdate ? " FOR UPDATE" : "";
   const [rows] = await executor.execute(
     `SELECT ct.id, ct.section_id, ct.course_id, ct.title, ct.order_index,
-            ct.has_material, ct.content, ct.assessment_id, ct.created_at, ct.updated_at,
+            ct.is_required, ct.has_material, ct.content, ct.assessment_id, ct.created_at, ct.updated_at,
             c.status AS course_status
        FROM course_topics ct
        JOIN courses c ON c.id = ct.course_id

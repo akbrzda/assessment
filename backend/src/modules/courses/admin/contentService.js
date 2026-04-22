@@ -158,6 +158,92 @@ async function createTopic(sectionId, payload, userId, req) {
   }
 }
 
+async function reorderSections(courseId, sectionIds, userId, req) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const course = await coursesRepo.findById(courseId, { connection, forUpdate: true });
+    if (!course) {
+      const error = new Error("Курс не найден");
+      error.status = 404;
+      throw error;
+    }
+
+    const sections = await coursesRepo.listSectionsByCourseId(courseId, { connection, forUpdate: true });
+    const dbIds = sections.map((section) => Number(section.id)).sort((a, b) => a - b);
+    const requestedIds = sectionIds.map(Number).sort((a, b) => a - b);
+    if (dbIds.length !== requestedIds.length || dbIds.some((id, index) => id !== requestedIds[index])) {
+      const error = new Error("Передан некорректный состав тем курса для сортировки");
+      error.status = 422;
+      throw error;
+    }
+
+    await mutationsRepo.reorderSections(courseId, sectionIds, connection);
+    await mutationsRepo.touchCourse(courseId, userId, course.status === "published", connection);
+    await connection.commit();
+
+    const updatedCourse = await coursesRepo.getCourseByIdForAdmin(courseId);
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      scope: "admin_panel",
+      action: "course.section.reordered",
+      entity: "course",
+      entityId: courseId,
+      metadata: { courseId },
+    });
+    return { course: updatedCourse };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function reorderTopics(courseId, sectionId, topicIds, userId, req) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const section = await coursesRepo.findSectionById(sectionId, { connection, forUpdate: true });
+    if (!section || section.courseId !== Number(courseId)) {
+      const error = new Error("Тема курса не найдена");
+      error.status = 404;
+      throw error;
+    }
+
+    const topics = await coursesRepo.listTopicsBySectionId(sectionId, { connection });
+    const dbIds = topics.map((topic) => Number(topic.id)).sort((a, b) => a - b);
+    const requestedIds = topicIds.map(Number).sort((a, b) => a - b);
+    if (dbIds.length !== requestedIds.length || dbIds.some((id, index) => id !== requestedIds[index])) {
+      const error = new Error("Передан некорректный состав подтем для сортировки");
+      error.status = 422;
+      throw error;
+    }
+
+    await mutationsRepo.reorderTopics(sectionId, topicIds, connection);
+    await mutationsRepo.touchCourse(section.courseId, userId, section.courseStatus === "published", connection);
+    await connection.commit();
+
+    const updatedCourse = await coursesRepo.getCourseByIdForAdmin(section.courseId);
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      scope: "admin_panel",
+      action: "course.topic.reordered",
+      entity: "course_section",
+      entityId: sectionId,
+      metadata: { sectionId, courseId: section.courseId },
+    });
+    return { course: updatedCourse };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 async function updateTopic(topicId, payload, userId, req) {
   const connection = await pool.getConnection();
   try {
@@ -247,6 +333,8 @@ module.exports = {
   updateSection,
   deleteSection,
   createTopic,
+  reorderSections,
+  reorderTopics,
   updateTopic,
   deleteTopic,
 };

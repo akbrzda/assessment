@@ -27,6 +27,9 @@ function withAvailabilityValidation(schema) {
 const createCourseSchema = Joi.object({
   title: Joi.string().trim().min(3).max(255).required(),
   description: Joi.string().allow("", null).default(""),
+  coverUrl: Joi.string().uri().max(1024).allow("", null).default(null),
+  category: Joi.string().trim().max(128).allow("", null).default(null),
+  tags: Joi.array().items(Joi.string().trim().min(1).max(64)).max(20).default([]),
   finalAssessmentId: Joi.number().integer().positive().allow(null).default(null),
   ...availabilitySchema,
 });
@@ -34,6 +37,9 @@ const createCourseSchema = Joi.object({
 const updateCourseSchema = Joi.object({
   title: Joi.string().trim().min(3).max(255),
   description: Joi.string().allow("", null),
+  coverUrl: Joi.string().uri().max(1024).allow("", null),
+  category: Joi.string().trim().max(128).allow("", null),
+  tags: Joi.array().items(Joi.string().trim().min(1).max(64)).max(20),
   finalAssessmentId: Joi.number().integer().positive().allow(null),
   status: Joi.string().valid("draft", "published", "archived"),
   ...availabilitySchema,
@@ -60,6 +66,7 @@ const updateSectionSchema = Joi.object({
 const createTopicSchema = Joi.object({
   title: Joi.string().trim().min(2).max(255).required(),
   orderIndex: Joi.number().integer().min(1),
+  isRequired: Joi.boolean().default(true),
   hasMaterial: Joi.boolean().default(false),
   content: Joi.string().allow("", null).default(null),
   assessmentId: Joi.number().integer().positive().allow(null).default(null),
@@ -73,10 +80,19 @@ const createTopicSchema = Joi.object({
 const updateTopicSchema = Joi.object({
   title: Joi.string().trim().min(2).max(255),
   orderIndex: Joi.number().integer().min(1),
+  isRequired: Joi.boolean(),
   hasMaterial: Joi.boolean(),
   content: Joi.string().allow("", null),
   assessmentId: Joi.number().integer().positive().allow(null),
 }).min(1);
+
+const reorderSectionsSchema = Joi.object({
+  sectionIds: Joi.array().items(Joi.number().integer().positive()).min(1).unique().required(),
+});
+
+const reorderTopicsSchema = Joi.object({
+  topicIds: Joi.array().items(Joi.number().integer().positive()).min(1).unique().required(),
+});
 
 module.exports = {
   createCourseSchema: withAvailabilityValidation(createCourseSchema),
@@ -85,4 +101,6 @@ module.exports = {
   updateSectionSchema,
   createTopicSchema,
   updateTopicSchema,
+  reorderSectionsSchema,
+  reorderTopicsSchema,
 };

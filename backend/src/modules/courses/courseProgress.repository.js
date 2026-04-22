@@ -33,7 +33,7 @@ async function findTopicWithSection(topicId, options = {}) {
   const executor = options.connection;
   const lock = options.forUpdate ? " FOR UPDATE" : "";
   const [rows] = await executor.execute(
-    `SELECT ct.id, ct.section_id, ct.course_id, ct.assessment_id, ct.has_material, ct.content, ct.order_index,
+    `SELECT ct.id, ct.section_id, ct.course_id, ct.assessment_id, ct.is_required, ct.has_material, ct.content, ct.order_index,
             cs.assessment_id AS section_assessment_id, c.status AS course_status
        FROM course_topics ct
        JOIN course_sections cs ON cs.id = ct.section_id
@@ -48,6 +48,7 @@ async function findTopicWithSection(topicId, options = {}) {
     sectionId: Number(row.section_id),
     courseId: Number(row.course_id),
     assessmentId: row.assessment_id ? Number(row.assessment_id) : null,
+    isRequired: Boolean(row.is_required),
     hasMaterial: Boolean(row.has_material),
     content: row.content || "",
     orderIndex: Number(row.order_index || 0),
@@ -61,12 +62,17 @@ async function findTopicWithSection(topicId, options = {}) {
  * Если предыдущей темы нет — возвращает true (доступ разрешён).
  */
 async function isPreviousTopicCompleted({ sectionId, orderIndex, userId }, options = {}) {
+  const currentIsRequired = options.currentIsRequired !== undefined ? Boolean(options.currentIsRequired) : true;
+  if (!currentIsRequired) {
+    return true;
+  }
+
   const executor = options.connection || pool;
   const [rows] = await executor.execute(
     `SELECT ctup.status
        FROM course_topics ct
        LEFT JOIN course_topic_user_progress ctup ON ctup.topic_id = ct.id AND ctup.user_id = ?
-      WHERE ct.section_id = ? AND ct.order_index < ?
+      WHERE ct.section_id = ? AND ct.is_required = 1 AND ct.order_index < ?
       ORDER BY ct.order_index DESC
       LIMIT 1`,
     [userId, sectionId, orderIndex],
@@ -85,7 +91,7 @@ async function areAllTopicsCompletedBySection({ sectionId, userId }, options = {
             COUNT(CASE WHEN ctup.status = 'completed' THEN 1 END) AS completed
        FROM course_topics ct
        LEFT JOIN course_topic_user_progress ctup ON ctup.topic_id = ct.id AND ctup.user_id = ?
-      WHERE ct.section_id = ?`,
+      WHERE ct.section_id = ? AND ct.is_required = 1`,
     [userId, sectionId],
   );
   const total = Number(row?.total || 0);
@@ -422,7 +428,7 @@ async function getAdminUserDetailedProgress(courseId, userId) {
 
   const [topicRows] = await pool.execute(
     `SELECT ct.id AS topic_id, ct.section_id, ct.title AS topic_title, ct.order_index,
-            ct.has_material, ct.assessment_id AS topic_assessment_id,
+            ct.is_required, ct.has_material, ct.assessment_id AS topic_assessment_id,
             ctup.status AS topic_status, ctup.material_viewed,
             ctup.best_score_percent AS topic_score, ctup.attempt_count AS topic_attempts,
             ctup.completed_at AS topic_completed_at
@@ -441,6 +447,7 @@ async function getAdminUserDetailedProgress(courseId, userId) {
       topicId: Number(t.topic_id),
       title: t.topic_title,
       orderIndex: Number(t.order_index),
+      isRequired: Boolean(t.is_required),
       hasMaterial: Boolean(t.has_material),
       hasAssessment: Boolean(t.topic_assessment_id),
       status: t.topic_status || "not_started",

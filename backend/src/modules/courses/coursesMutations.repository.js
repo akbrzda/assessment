@@ -6,14 +6,20 @@
 
 // --- Курс -------------------------------------------------------------------
 
-async function insertCourse({ title, description, finalAssessmentId, availabilityMode, availabilityDays, availabilityFrom, availabilityTo, userId }, connection) {
+async function insertCourse(
+  { title, description, coverUrl, category, tags, finalAssessmentId, availabilityMode, availabilityDays, availabilityFrom, availabilityTo, userId },
+  connection,
+) {
   const [result] = await connection.execute(
     `INSERT INTO courses
-      (title, description, availability_mode, availability_days, availability_from, availability_to, status, version, final_assessment_id, created_by, updated_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'draft', 0, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
+      (title, description, cover_url, category, tags, availability_mode, availability_days, availability_from, availability_to, status, version, final_assessment_id, created_by, updated_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 0, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
     [
       title,
       description || "",
+      coverUrl || null,
+      category || null,
+      JSON.stringify(Array.isArray(tags) ? tags : []),
       availabilityMode || "unlimited",
       availabilityDays || null,
       availabilityFrom || null,
@@ -37,6 +43,18 @@ async function updateCourseFields(courseId, fields, userId, connection) {
   if (fields.description !== undefined) {
     cols.push("description = ?");
     params.push(fields.description || "");
+  }
+  if (fields.coverUrl !== undefined) {
+    cols.push("cover_url = ?");
+    params.push(fields.coverUrl || null);
+  }
+  if (fields.category !== undefined) {
+    cols.push("category = ?");
+    params.push(fields.category || null);
+  }
+  if (fields.tags !== undefined) {
+    cols.push("tags = ?");
+    params.push(JSON.stringify(Array.isArray(fields.tags) ? fields.tags : []));
   }
   if (fields.finalAssessmentId !== undefined) {
     cols.push("final_assessment_id = ?");
@@ -225,12 +243,12 @@ async function shiftTopicsUp2(sectionId, fromIndex, toIndex, connection) {
   ]);
 }
 
-async function insertTopic(sectionId, courseId, { title, orderIndex, hasMaterial, content, assessmentId }, connection) {
+async function insertTopic(sectionId, courseId, { title, orderIndex, isRequired, hasMaterial, content, assessmentId }, connection) {
   const [result] = await connection.execute(
     `INSERT INTO course_topics
-      (section_id, course_id, title, order_index, has_material, content, assessment_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
-    [sectionId, courseId, title, orderIndex, hasMaterial ? 1 : 0, content || null, assessmentId || null],
+      (section_id, course_id, title, order_index, is_required, has_material, content, assessment_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
+    [sectionId, courseId, title, orderIndex, isRequired === false ? 0 : 1, hasMaterial ? 1 : 0, content || null, assessmentId || null],
   );
   return result.insertId;
 }
@@ -259,6 +277,10 @@ async function updateTopicFields(topicId, fields, connection) {
     cols.push("order_index = ?");
     params.push(fields.orderIndex);
   }
+  if (fields.isRequired !== undefined) {
+    cols.push("is_required = ?");
+    params.push(fields.isRequired ? 1 : 0);
+  }
 
   if (!cols.length) return;
   cols.push("updated_at = UTC_TIMESTAMP()");
@@ -275,6 +297,20 @@ async function compactTopicOrder(sectionId, afterIndex, connection) {
     sectionId,
     afterIndex,
   ]);
+}
+
+async function reorderSections(courseId, sectionIds, connection) {
+  await connection.execute("UPDATE course_sections SET order_index = order_index + 1000 WHERE course_id = ?", [courseId]);
+  for (let index = 0; index < sectionIds.length; index += 1) {
+    await connection.execute("UPDATE course_sections SET order_index = ? WHERE id = ? AND course_id = ?", [index + 1, sectionIds[index], courseId]);
+  }
+}
+
+async function reorderTopics(sectionId, topicIds, connection) {
+  await connection.execute("UPDATE course_topics SET order_index = order_index + 1000 WHERE section_id = ?", [sectionId]);
+  for (let index = 0; index < topicIds.length; index += 1) {
+    await connection.execute("UPDATE course_topics SET order_index = ? WHERE id = ? AND section_id = ?", [index + 1, topicIds[index], sectionId]);
+  }
 }
 
 module.exports = {
@@ -301,4 +337,6 @@ module.exports = {
   updateTopicFields,
   deleteTopicById,
   compactTopicOrder,
+  reorderSections,
+  reorderTopics,
 };

@@ -17,10 +17,12 @@ router.post("/:id/publish", controller.publishCourse);
 router.post("/:id/archive", controller.archiveCourse);
 
 router.post("/:id/sections", controller.createSection);
+router.patch("/:id/sections/reorder", controller.reorderSections);
 router.patch("/sections/:sectionId", controller.updateSection);
 router.delete("/sections/:sectionId", controller.deleteSection);
 
 router.post("/sections/:sectionId/topics", controller.createTopic);
+router.patch("/:id/sections/:sectionId/topics/reorder", controller.reorderTopics);
 router.patch("/topics/:topicId", controller.updateTopic);
 router.delete("/topics/:topicId", controller.deleteTopic);
 

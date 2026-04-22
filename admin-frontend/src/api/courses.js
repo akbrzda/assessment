@@ -87,6 +87,13 @@ export const updateCourseSection = async (sectionId, payload) => {
   }, /get:\/admin\/courses/i);
 };
 
+export const reorderCourseSections = async (courseId, sectionIds) => {
+  return mutateWithInvalidation(async () => {
+    const response = await axios.patch(`/admin/courses/${courseId}/sections/reorder`, { sectionIds });
+    return response.data;
+  }, /get:\/admin\/courses/i);
+};
+
 export const deleteCourseSection = async (sectionId) => {
   return mutateWithInvalidation(async () => {
     const response = await axios.delete(`/admin/courses/sections/${sectionId}`);
@@ -106,6 +113,13 @@ export const createCourseTopic = async (sectionId, payload) => {
 export const updateCourseTopic = async (topicId, payload) => {
   return mutateWithInvalidation(async () => {
     const response = await axios.patch(`/admin/courses/topics/${topicId}`, payload);
+    return response.data;
+  }, /get:\/admin\/courses/i);
+};
+
+export const reorderCourseTopics = async (courseId, sectionId, topicIds) => {
+  return mutateWithInvalidation(async () => {
+    const response = await axios.patch(`/admin/courses/${courseId}/sections/${sectionId}/topics/reorder`, { topicIds });
     return response.data;
   }, /get:\/admin\/courses/i);
 };
