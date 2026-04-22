@@ -1,19 +1,27 @@
 <template>
-  <article class="subtopic-item" :class="`state-${resolvedState}`">
-    <div class="subtopic-main">
-      <div class="subtopic-order">Подтема {{ index + 1 }}</div>
-      <h4 class="subtopic-title">{{ topic.title }}</h4>
-      <p v-if="descriptionText" class="subtopic-description">{{ descriptionText }}</p>
+  <article class="subtopic-row" :class="`state-${resolvedState}`">
+    <div class="row-marker" aria-hidden="true">
+      <span class="marker-dot">{{ markerSymbol }}</span>
+      <span class="marker-line"></span>
     </div>
 
-    <div class="subtopic-actions">
-      <StatusBadge :status="badgeStatus" :text="badgeText" />
-      <button v-if="canOpen" class="btn btn-primary" type="button" @click="$emit('open', topic)">
-        Открыть
-      </button>
-      <button v-else class="btn btn-secondary" type="button" @click="$emit('lock-click', topic)">
-        Причина блокировки
-      </button>
+    <div class="row-card">
+      <div class="row-card__thumb">{{ index + 1 }}</div>
+
+      <div class="row-card__content">
+        <h4 class="row-title">{{ topic.title }}</h4>
+        <p v-if="descriptionText" class="row-description">{{ descriptionText }}</p>
+      </div>
+
+      <div class="row-card__actions">
+        <StatusBadge :status="badgeStatus" :text="badgeText" />
+        <button v-if="canOpen" class="btn btn-primary row-btn" type="button" @click="$emit('open', topic)">
+          Открыть
+        </button>
+        <button v-else class="btn btn-secondary row-btn" type="button" @click="$emit('lock-click', topic)">
+          Причина
+        </button>
+      </div>
     </div>
   </article>
 </template>
@@ -65,12 +73,25 @@ export default {
         case "completed":
           return "Завершена";
         case "completed_locked":
-          return "Завершена, но заблокирована";
+          return "Пройдена, но закрыта";
         case "locked":
-          return "Заблокирована";
+          return "Закрыта";
         default:
           return "Не начата";
       }
+    });
+
+    const markerSymbol = computed(() => {
+      if (resolvedState.value === "locked" || resolvedState.value === "completed_locked") {
+        return "🔒";
+      }
+      if (resolvedState.value === "completed") {
+        return "✓";
+      }
+      if (resolvedState.value === "in_progress") {
+        return "▶";
+      }
+      return "•";
     });
 
     const descriptionText = computed(() => {
@@ -94,6 +115,7 @@ export default {
       canOpen,
       badgeStatus,
       badgeText,
+      markerSymbol,
       descriptionText,
     };
   },
@@ -101,60 +123,121 @@ export default {
 </script>
 
 <style scoped>
-.subtopic-item {
+.subtopic-row {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 10px;
+}
+
+.row-marker {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.marker-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #dbe2f8;
+  color: #1d4ed8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+
+.marker-line {
+  width: 2px;
+  flex: 1;
+  margin-top: 6px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #d1d5db 0,
+    #d1d5db 5px,
+    transparent 5px,
+    transparent 10px
+  );
+}
+
+.subtopic-row:last-child .marker-line {
+  display: none;
+}
+
+.row-card {
   border: 1px solid var(--divider, #e2e8f0);
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: 14px;
+  padding: 10px;
   background: var(--bg-primary, #ffffff);
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  gap: 10px;
+  align-items: center;
 }
 
-.subtopic-main {
-  min-width: 0;
+.row-card__thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #dbeafe, #bfdbfe);
+  color: #1e3a8a;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.subtopic-order {
-  font-size: 12px;
-  color: var(--text-secondary, #64748b);
-}
-
-.subtopic-title {
-  margin: 4px 0;
-  font-size: 16px;
-}
-
-.subtopic-description {
+.row-title {
   margin: 0;
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.row-description {
+  margin-top: 3px;
   font-size: 13px;
   color: var(--text-secondary, #64748b);
 }
 
-.subtopic-actions {
+.row-card__actions {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
 }
 
-.state-completed {
-  border-color: rgba(34, 197, 94, 0.35);
+.row-btn {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 13px;
 }
 
-.state-completed_locked,
-.state-locked {
-  border-color: rgba(245, 158, 11, 0.35);
-  background: rgba(245, 158, 11, 0.05);
+.state-completed .marker-dot,
+.state-completed .row-card__thumb {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.state-completed_locked .marker-dot,
+.state-locked .marker-dot,
+.state-completed_locked .row-card__thumb,
+.state-locked .row-card__thumb {
+  background: #e5e7eb;
+  color: #6b7280;
 }
 
 @media (max-width: 640px) {
-  .subtopic-item {
-    flex-direction: column;
+  .row-card {
+    grid-template-columns: 46px 1fr;
   }
 
-  .subtopic-actions {
+  .row-card__actions {
+    grid-column: 2 / 3;
     align-items: stretch;
+  }
+
+  .row-btn {
+    width: 100%;
   }
 }
 </style>

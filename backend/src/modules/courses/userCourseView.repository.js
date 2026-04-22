@@ -243,7 +243,7 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
             ct.has_material, ct.content, ct.assessment_id, ct.created_at, ct.updated_at,
             ctup.status AS user_topic_status, ctup.material_viewed,
             ctup.best_score_percent AS topic_best_score, ctup.attempt_count AS topic_attempt_count,
-            ctup.last_attempt_id AS topic_last_attempt_id, ctup.completed_at AS topic_completed_at
+            ctup.last_attempt_id AS topic_last_attempt_id, ctup.started_at AS topic_started_at, ctup.completed_at AS topic_completed_at
        FROM course_topics ct
        LEFT JOIN course_topic_user_progress ctup ON ctup.topic_id = ct.id AND ctup.user_id = ?
       WHERE ct.course_id = ? ORDER BY ct.section_id ASC, ct.order_index ASC`,
@@ -262,6 +262,7 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
         bestScorePercent: topicRow.topic_best_score != null ? Number(topicRow.topic_best_score) : null,
         attemptCount: topicRow.topic_attempt_count != null ? Number(topicRow.topic_attempt_count) : 0,
         lastAttemptId: topicRow.topic_last_attempt_id != null ? Number(topicRow.topic_last_attempt_id) : null,
+        startedAt: toIsoUtc(topicRow.topic_started_at),
         completedAt: toIsoUtc(topicRow.topic_completed_at),
       },
     });

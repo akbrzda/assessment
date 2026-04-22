@@ -37,6 +37,18 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/courses/:courseId/topics/:sectionId/subtopics/:topicId",
+    name: "course-subtopic",
+    component: () => import("../views/SubtopicView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/courses/:courseId/status/:statusType",
+    name: "course-status-page",
+    component: () => import("../views/CourseStatusPageView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/assessment/:id",
     name: "assessment-process",
     component: () => import("../views/AssessmentProcessView.vue"),

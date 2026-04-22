@@ -45,6 +45,22 @@ import { apiClient } from "../services/apiClient";
 import BottomSheet from "../components/courses/BottomSheet.vue";
 import SubtopicItem from "../components/courses/SubtopicItem.vue";
 
+function mapLockReasonToStatus(lockReasonType) {
+  if (!lockReasonType) {
+    return "sequence_blocked";
+  }
+  if (lockReasonType === "course_closed") {
+    return "course_closed";
+  }
+  if (lockReasonType === "expired") {
+    return "course_expired";
+  }
+  if (lockReasonType === "attempts_exhausted") {
+    return "attempts_exhausted";
+  }
+  return "sequence_blocked";
+}
+
 export default {
   name: "TopicView",
   components: {
@@ -83,16 +99,22 @@ export default {
     }
 
     function openSubtopic(topic) {
-      router.push({
-        path: `/courses/${courseId.value}`,
-        query: {
-          sectionId: String(sectionId.value),
-          topicId: String(topic.id),
-        },
-      });
+      if (topic?.progress?.locked) {
+        const statusType = mapLockReasonToStatus(topic?.progress?.lockReasonType);
+        router.push(`/courses/${courseId.value}/status/${statusType}`);
+        return;
+      }
+
+      router.push(`/courses/${courseId.value}/topics/${sectionId.value}/subtopics/${topic.id}`);
     }
 
     function openLockReason(topic) {
+      if (topic?.progress?.lockReasonType) {
+        const statusType = mapLockReasonToStatus(topic.progress.lockReasonType);
+        router.push(`/courses/${courseId.value}/status/${statusType}`);
+        return;
+      }
+
       lockSheet.value = {
         visible: true,
         title: "Подтема недоступна",

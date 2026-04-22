@@ -33,7 +33,7 @@ async function findTopicWithSection(topicId, options = {}) {
   const executor = options.connection;
   const lock = options.forUpdate ? " FOR UPDATE" : "";
   const [rows] = await executor.execute(
-    `SELECT ct.id, ct.section_id, ct.course_id, ct.assessment_id, ct.has_material, ct.order_index,
+    `SELECT ct.id, ct.section_id, ct.course_id, ct.assessment_id, ct.has_material, ct.content, ct.order_index,
             cs.assessment_id AS section_assessment_id, c.status AS course_status
        FROM course_topics ct
        JOIN course_sections cs ON cs.id = ct.section_id
@@ -49,6 +49,7 @@ async function findTopicWithSection(topicId, options = {}) {
     courseId: Number(row.course_id),
     assessmentId: row.assessment_id ? Number(row.assessment_id) : null,
     hasMaterial: Boolean(row.has_material),
+    content: row.content || "",
     orderIndex: Number(row.order_index || 0),
     sectionAssessmentId: row.section_assessment_id ? Number(row.section_assessment_id) : null,
     courseStatus: row.course_status,

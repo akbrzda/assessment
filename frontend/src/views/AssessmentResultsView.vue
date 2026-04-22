@@ -219,7 +219,7 @@ export default {
     async function completeCourseStepIfNeeded(assessmentId, attemptId) {
       const context = readCompletionContext(assessmentId);
       if (!context || !Number.isFinite(attemptId) || attemptId <= 0) {
-        return;
+        return null;
       }
 
       try {
@@ -227,31 +227,33 @@ export default {
           await apiClient.completeCourseModuleAttempt(Number(context.moduleId), attemptId);
           relatedCourseId.value = Number(context.courseId);
           clearCompletionContext();
-          return;
+          return context;
         }
 
         if (context.type === "section") {
           await apiClient.completeCourseSectionAttempt(Number(context.sectionId), attemptId);
           relatedCourseId.value = Number(context.courseId);
           clearCompletionContext();
-          return;
+          return context;
         }
 
         if (context.type === "topic") {
           await apiClient.completeCourseTopicAttempt(Number(context.topicId), attemptId);
           relatedCourseId.value = Number(context.courseId);
           clearCompletionContext();
-          return;
+          return context;
         }
 
         if (context.type === "final") {
           await apiClient.completeCourseFinalAssessmentAttempt(Number(context.courseId), attemptId);
           relatedCourseId.value = Number(context.courseId);
           clearCompletionContext();
+          return context;
         }
       } catch (error) {
         console.warn("Не удалось синхронизировать прогресс курса", error);
       }
+      return null;
     }
 
     async function loadResults() {
@@ -289,7 +291,7 @@ export default {
           return;
         }
 
-        await completeCourseStepIfNeeded(id, attemptId);
+        const completionContext = await completeCourseStepIfNeeded(id, attemptId);
 
         const statusMap = { active: "open", pending: "pending", closed: "closed" };
         const mappedStatus = summaryItem.value ? statusMap[summaryItem.value.status] || summaryItem.value.status : "closed";
@@ -329,6 +331,11 @@ export default {
           badgesEarned: [],
           isEarlyExit: earlyExit,
         };
+
+        if (completionContext?.type === "final" && result.value.passed && relatedCourseId.value) {
+          router.replace(`/courses/${relatedCourseId.value}/status/final_assessment_passed`);
+          return;
+        }
 
         const isFirstVisit = route.query.fromAssessment === "true";
         if (isFirstVisit) {

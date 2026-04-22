@@ -765,9 +765,11 @@ export default {
         const passed = completionResponse?.attempt?.passed ? "1" : "0";
         const attemptNumber = Number(completionResponse?.attempt?.attemptNumber || 1);
         const targetCourseId = Number(completionContext.courseId);
+        const returnPath = typeof completionContext.returnPath === "string" ? completionContext.returnPath : "";
         clearCourseCompletionContext();
+        const targetPath = returnPath || `/courses/${targetCourseId}`;
         router.push({
-          path: `/courses/${targetCourseId}`,
+          path: targetPath,
           query: {
             resultType: completionContext.type,
             score: String(score),
