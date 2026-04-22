@@ -24,6 +24,23 @@
   - admin: `DraftSaveIndicator`, `AnalyticsSummaryCards`
   - frontend: `CourseCard`, `ProgressBar`, `StatusBadge`, `LockBadge`, `BottomSheet`
 
+## Sprint 2 — Пользовательский flow (часть 1, закрыт)
+
+- Расширен `GET /courses`: добавлено поле `topicsCount` (вместе с `testsCount`).
+- Расширен `GET /courses/:id`: добавлены `lockReasonType` и `lockReasonText` для тем/подтем.
+- Добавлен endpoint `GET /courses/:courseId/sections/:sectionId` для страницы темы.
+- Добавлена страница `TopicView.vue` со списком подтем.
+- Добавлен компонент `SubtopicItem.vue` со статусами:
+  - `not_started`
+  - `in_progress`
+  - `completed`
+  - `completed_locked`
+  - `locked`
+- Обновлён `CourseDetailsView.vue`: добавлен переход на отдельную страницу темы курса.
+- Для списка курсов во вкладке «Курсы» добавлены явные состояния `loading/empty/error` и кнопка повторной загрузки.
+- Добавлен `StickyFooterCTA` на странице курса для сценариев «Начать прохождение» и «Продолжить курс».
+- Расширен набор QA-кейсов Sprint 2 в `docs/courses_sprint2_qa_testcases.md`.
+
 ## Примечание по `course_change_log`
 
 Отдельная таблица `course_change_log` не добавлялась, так как логирование изменений покрывается существующим `auditService`.

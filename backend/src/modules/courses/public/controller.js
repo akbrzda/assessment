@@ -1,6 +1,7 @@
 const coursesService = require("./service");
 const {
   assertCourseId,
+  assertCourseSectionParams,
   assertCourseTopicParams,
   assertFinalAttemptParams,
   assertModuleAttemptParams,
@@ -38,6 +39,24 @@ async function getCourse(req, res, next) {
     }
 
     res.json({ course });
+  } catch (error) {
+    handleControllerError(error, res, next);
+  }
+}
+
+async function getCourseSection(req, res, next) {
+  try {
+    const params = assertCourseSectionParams({
+      courseId: req.params.courseId,
+      sectionId: req.params.sectionId,
+    });
+    const { id, positionId, branchId } = req.currentUser;
+    const payload = await coursesService.getCourseSection(params.courseId, params.sectionId, id, { positionId, branchId });
+    if (!payload?.section) {
+      return res.status(404).json({ error: "Тема курса не найдена или недоступна" });
+    }
+
+    res.json(payload);
   } catch (error) {
     handleControllerError(error, res, next);
   }
@@ -181,6 +200,7 @@ async function completeFinalAttempt(req, res, next) {
 module.exports = {
   listCourses,
   getCourse,
+  getCourseSection,
   startCourse,
   startTopic,
   completeTopic,

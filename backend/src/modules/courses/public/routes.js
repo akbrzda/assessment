@@ -20,6 +20,7 @@ router.get("/:courseId/final-assessment/access", coursesController.getFinalAsses
 router.post("/:courseId/final-assessment/attempts/:attemptId/complete", requireCourseFinalAssessmentAccess, coursesController.completeFinalAttempt);
 
 router.get("/", coursesController.listCourses);
+router.get("/:courseId/sections/:sectionId", coursesController.getCourseSection);
 router.get("/:id", coursesController.getCourse);
 router.post("/:id/start", coursesController.startCourse);
 router.get("/:id/progress", coursesController.getCourseProgress);

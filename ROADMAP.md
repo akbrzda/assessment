@@ -11,6 +11,11 @@
 - Реализованы пользовательские endpoint-ы `POST /courses/:courseId/topics/:topicId/start|complete`.
 - Реализованы UI-компоненты Sprint 1 для admin/user frontend.
 - Подготовлены QA-кейсы Sprint 2 для списка курсов и страницы курса.
+- Выполнен пакет Sprint 2 (часть 1): `topicsCount` в `GET /courses`, причины блокировки `lockReasonType/lockReasonText` в `GET /courses/:id`.
+- Добавлен endpoint `GET /courses/:courseId/sections/:sectionId` для загрузки темы курса с подтемами.
+- Добавлены `TopicView.vue` и `SubtopicItem.vue`; переход из `CourseDetailsView` на страницу темы подключён.
+- Для списка курсов реализован явный error-state с retry во вкладке «Курсы».
+- В `CourseDetailsView` подключён `StickyFooterCTA`; QA-кейсы Sprint 2 расширены для темы курса и sticky-действий.
 
 ---
 
@@ -86,9 +91,9 @@
 | Admin: аналитика курсов               | ✅ Добавлена базовая воронка + заглушки summary-карточек                           |
 | Admin: лог изменений                  | ❌ Не реализован                                                                   |
 | Admin: черновик изменений (UI)        | ✅ Добавлен индикатор состояния сохранения черновика                                |
-| Frontend: страница курса              | ✅ Частично — `CourseDetailsView.vue` (старая терминология: sections/topics)       |
+| Frontend: страница курса              | ✅ Частично — `CourseDetailsView.vue` (переход на отдельную страницу темы добавлен) |
 | Frontend: список курсов (вкладки)     | ✅ Реализован — вкладки «Курсы/Аттестации», по умолчанию активны «Курсы»            |
-| Frontend: страница темы               | ❌ Не реализован                                                                   |
+| Frontend: страница темы               | ✅ Частично — `TopicView.vue` + `SubtopicItem.vue`                                 |
 | Frontend: страница подтемы с таймером | ❌ Не реализован                                                                   |
 | Frontend: тест темы                   | ❌ Не реализован                                                                   |
 | Frontend: status pages                | ❌ Не реализован                                                                   |
@@ -715,6 +720,8 @@
 ## Sprint 2: Пользовательский flow (часть 1)
 
 **Цель**: Список курсов + страница курса + страница темы
+
+**Статус**: Завершён
 
 **Задачи**:
 

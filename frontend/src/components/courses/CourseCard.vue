@@ -22,6 +22,10 @@
         <span class="value">{{ course.testsCount }}</span>
       </div>
       <div class="info-item">
+        <span class="label">Подтем:</span>
+        <span class="value">{{ course.topicsCount }}</span>
+      </div>
+      <div class="info-item">
         <span class="label">Прогресс:</span>
         <span class="value">{{ normalizedProgress }}%</span>
       </div>

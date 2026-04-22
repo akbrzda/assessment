@@ -62,6 +62,55 @@ function mapUserProgress(row, fallbackRequiredTotal) {
   };
 }
 
+function resolveSectionLockReason({ isClosedForUser, isLockedBySequence }) {
+  if (isClosedForUser) {
+    return {
+      lockReasonType: "course_closed",
+      lockReasonText: "Курс закрыт администратором",
+    };
+  }
+
+  if (isLockedBySequence) {
+    return {
+      lockReasonType: "sequence_blocked",
+      lockReasonText: "Сначала завершите предыдущую обязательную тему курса",
+    };
+  }
+
+  return {
+    lockReasonType: null,
+    lockReasonText: null,
+  };
+}
+
+function resolveTopicLockReason({ isClosedForUser, isLockedBySectionSequence, previousTopic }) {
+  if (isClosedForUser) {
+    return {
+      lockReasonType: "course_closed",
+      lockReasonText: "Курс закрыт администратором",
+    };
+  }
+
+  if (isLockedBySectionSequence) {
+    return {
+      lockReasonType: "section_sequence_blocked",
+      lockReasonText: "Сначала завершите предыдущую обязательную тему курса",
+    };
+  }
+
+  if (previousTopic && previousTopic.progress.status !== "completed") {
+    return {
+      lockReasonType: "topic_sequence_blocked",
+      lockReasonText: "Сначала завершите предыдущую подтему",
+    };
+  }
+
+  return {
+    lockReasonType: null,
+    lockReasonText: null,
+  };
+}
+
 async function listPublishedCoursesForUser(userId, userPositionId, userBranchId) {
   const allowedIds = await listAssignedCourseIds(userId, userPositionId, userBranchId);
   const [closedRows] = await pool.execute(
@@ -87,6 +136,7 @@ async function listPublishedCoursesForUser(userId, userPositionId, userBranchId)
             cua.assigned_at AS manual_assigned_at, cua.deadline_at AS manual_deadline_at,
             (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id) AS sections_count,
             (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id AND cs.is_required = 1) AS required_sections_count,
+            (SELECT COUNT(*) FROM course_topics ct WHERE ct.course_id = c.id) AS topics_count,
             (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id AND cs.assessment_id IS NOT NULL) +
             (SELECT COUNT(*) FROM course_topics ct WHERE ct.course_id = c.id AND ct.assessment_id IS NOT NULL) AS tests_count
        FROM courses c
@@ -101,6 +151,7 @@ async function listPublishedCoursesForUser(userId, userPositionId, userBranchId)
     ...mapCourseRow(row),
     sectionsCount: Number(row.sections_count || 0),
     requiredSectionsCount: Number(row.required_sections_count || 0),
+    topicsCount: Number(row.topics_count || 0),
     testsCount: Number(row.tests_count || 0),
     progress: mapUserProgress(row, row.required_sections_count),
   }));
@@ -221,14 +272,25 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
     const section = mapSectionRow(sectionRow);
     const prevRequired = sectionRows.slice(0, sectionIndex).filter((item) => Boolean(item.is_required));
     const isLockedBySequence = prevRequired.some((item) => (item.user_section_status || "not_started") !== "passed");
+    const sectionLockReason = resolveSectionLockReason({
+      isClosedForUser,
+      isLockedBySequence,
+    });
 
     const topics = (topicsBySectionId[section.id] || []).map((topic, topicIndex) => {
       const prevTopic = (topicsBySectionId[section.id] || [])[topicIndex - 1];
+      const topicLockReason = resolveTopicLockReason({
+        isClosedForUser,
+        isLockedBySectionSequence: isLockedBySequence,
+        previousTopic: prevTopic,
+      });
       return {
         ...topic,
         progress: {
           ...topic.progress,
-          locked: isClosedForUser || isLockedBySequence || (!!prevTopic && prevTopic.progress.status !== "completed"),
+          locked: Boolean(topicLockReason.lockReasonType),
+          lockReasonType: topicLockReason.lockReasonType,
+          lockReasonText: topicLockReason.lockReasonText,
         },
       };
     });
@@ -243,7 +305,9 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
         lastAttemptId: sectionRow.section_last_attempt_id != null ? Number(sectionRow.section_last_attempt_id) : null,
         startedAt: toIsoUtc(sectionRow.section_started_at),
         completedAt: toIsoUtc(sectionRow.section_completed_at),
-        locked: isClosedForUser || isLockedBySequence,
+        locked: Boolean(sectionLockReason.lockReasonType),
+        lockReasonType: sectionLockReason.lockReasonType,
+        lockReasonText: sectionLockReason.lockReasonText,
         allTopicsCompleted,
         sectionTestAvailable: !isClosedForUser && !isLockedBySequence && allTopicsCompleted && !!section.assessmentId,
       },
@@ -269,9 +333,27 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
   };
 }
 
+async function getCourseSectionForUser(courseId, sectionId, userId, userContext = {}) {
+  const course = await getCourseForUser(courseId, userId, userContext);
+  if (!course) return null;
+
+  const section = course.sections.find((item) => item.id === Number(sectionId)) || null;
+  if (!section) return null;
+
+  return {
+    section,
+    course: {
+      id: course.id,
+      title: course.title,
+      progress: course.progress,
+    },
+  };
+}
+
 module.exports = {
   listPublishedCoursesForUser,
   getCourseProgressForUser,
   getCourseSnapshot,
   getCourseForUser,
+  getCourseSectionForUser,
 };

@@ -29,6 +29,10 @@ async function getCourse(courseId, userId, userContext = {}) {
   return coursesRepository.getCourseForUser(courseId, userId, userContext);
 }
 
+async function getCourseSection(courseId, sectionId, userId, userContext = {}) {
+  return coursesRepository.getCourseSectionForUser(courseId, sectionId, userId, userContext);
+}
+
 async function startCourse(courseId, userId, { positionId = null, branchId = null } = {}) {
   // Проверка доступа: курс должен быть назначен пользователю
   const allowedIds = await listAssignedCourseIds(userId, positionId, branchId);
@@ -333,6 +337,7 @@ async function completeFinalAttempt({ courseId, attemptId, userId }) {
 module.exports = {
   listCourses,
   getCourse,
+  getCourseSection,
   startCourse,
   startTopic,
   completeTopic,

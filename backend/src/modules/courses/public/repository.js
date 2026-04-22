@@ -9,6 +9,10 @@ async function getCourseForUser(courseId, userId, userContext = {}) {
   return userViewRepo.getCourseForUser(courseId, userId, userContext);
 }
 
+async function getCourseSectionForUser(courseId, sectionId, userId, userContext = {}) {
+  return userViewRepo.getCourseSectionForUser(courseId, sectionId, userId, userContext);
+}
+
 async function findCourseById(courseId) {
   return coursesRepo.findById(courseId);
 }
@@ -24,6 +28,7 @@ async function canAccessFinalAssessment(params) {
 module.exports = {
   listPublishedCoursesForUser,
   getCourseForUser,
+  getCourseSectionForUser,
   findCourseById,
   getCourseProgressForUser,
   canAccessFinalAssessment,

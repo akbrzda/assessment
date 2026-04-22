@@ -36,12 +36,7 @@
             <span class="body-small">{{ course.progress.completedSectionsCount || 0 }} / {{ course.progress.totalSectionsCount || 0 }}</span>
           </div>
 
-          <button v-if="course.progress.status === 'not_started'" class="btn btn-primary btn-full" :disabled="isStarting || course.progress.status === 'closed'" @click="startCourseFlow">
-            {{ isStarting ? "Запускаем..." : "Начать прохождение" }}
-          </button>
-          <button v-else class="btn btn-secondary btn-full" :disabled="course.progress.status === 'closed'" @click="scrollToSections">
-            Продолжить курс
-          </button>
+          <p class="body-small text-secondary">Основное действие вынесено в нижнюю фиксированную кнопку.</p>
         </div>
 
         <div id="sections-list" class="mb-12">
@@ -60,9 +55,12 @@
 
               <h4 class="title-small mb-4">{{ section.title }}</h4>
               <p v-if="section.description" class="body-small text-secondary mb-8">{{ section.description }}</p>
+              <div class="mb-12">
+                <button class="btn btn-secondary btn-full" @click="openSectionPage(section)">Открыть тему</button>
+              </div>
 
               <div v-if="section.progress.locked" class="mb-12">
-                <LockBadge text="Тема заблокирована" @click="openSectionLockReason" />
+                <LockBadge text="Тема заблокирована" @click="openSectionLockReason(section)" />
               </div>
 
               <div v-else class="topics-list mb-12">
@@ -188,6 +186,12 @@
       </div>
 
       <BottomSheet v-model="lockSheet.visible" :title="lockSheet.title" :description="lockSheet.description" />
+      <StickyFooterCTA
+        :hidden="!course"
+        :label="stickyActionLabel"
+        :disabled="stickyActionDisabled"
+        @action="handleStickyAction"
+      />
     </div>
   </div>
 </template>
@@ -201,6 +205,7 @@ import { useUserStore } from "../stores/user";
 import { calculateReadingSeconds, formatReadingTime } from "../utils/readingTime";
 import BottomSheet from "../components/courses/BottomSheet.vue";
 import LockBadge from "../components/courses/LockBadge.vue";
+import StickyFooterCTA from "../components/courses/StickyFooterCTA.vue";
 
 const COURSE_COMPLETION_STORAGE_KEY = "courseCompletionContext";
 const COURSE_AUTO_FINAL_OPENED_KEY = "courseAutoFinalOpened";
@@ -210,6 +215,7 @@ export default {
   components: {
     BottomSheet,
     LockBadge,
+    StickyFooterCTA,
   },
   setup() {
     const route = useRoute();
@@ -471,12 +477,17 @@ export default {
       }
     }
 
-    function openSectionLockReason() {
+    function openSectionLockReason(section = null) {
       lockSheet.value = {
         visible: true,
         title: "Тема недоступна",
-        description: "Сначала завершите предыдущую обязательную тему курса. После этого доступ откроется автоматически.",
+        description: section?.progress?.lockReasonText || "Сначала завершите предыдущую обязательную тему курса. После этого доступ откроется автоматически.",
       };
+    }
+
+    function openSectionPage(section) {
+      if (!section?.id) return;
+      router.push(`/courses/${courseId.value}/topics/${section.id}`);
     }
 
     function getFinalActionText() {
@@ -653,6 +664,29 @@ export default {
       return "Бессрочно";
     }
 
+    const stickyActionLabel = computed(() => {
+      if (!course.value) return "Продолжить";
+      if (isStarting.value) return "Запускаем...";
+      if (course.value.progress?.status === "closed") return "Курс закрыт";
+      if (course.value.progress?.status === "not_started") return "Начать прохождение";
+      return "Продолжить курс";
+    });
+
+    const stickyActionDisabled = computed(() => {
+      if (!course.value) return true;
+      if (isStarting.value) return true;
+      return course.value.progress?.status === "closed";
+    });
+
+    async function handleStickyAction() {
+      if (!course.value || stickyActionDisabled.value) return;
+      if (course.value.progress?.status === "not_started") {
+        await startCourseFlow();
+        return;
+      }
+      scrollToSections();
+    }
+
     function closeAttemptResultModal() {
       attemptResultModal.value.visible = false;
     }
@@ -688,9 +722,26 @@ export default {
       router.replace({ path: route.path, query: nextQuery });
     }
 
+    function getPreferredTopicFromRoute() {
+      const sectionId = Number(route.query.sectionId || 0);
+      const topicId = Number(route.query.topicId || 0);
+      if (!sectionId || !topicId) {
+        return null;
+      }
+      return { sectionId, topicId };
+    }
+
     onMounted(() => {
-      loadCourse();
+      loadCourse(getPreferredTopicFromRoute());
     });
+
+    watch(
+      () => [route.query.sectionId, route.query.topicId],
+      ([nextSectionId, nextTopicId], [prevSectionId, prevTopicId]) => {
+        if (nextSectionId === prevSectionId && nextTopicId === prevTopicId) return;
+        loadCourse(getPreferredTopicFromRoute());
+      },
+    );
 
     watch(
       () => ({
@@ -724,11 +775,15 @@ export default {
       getSectionStatusText,
       getCourseStatusText,
       getCourseValidityLabel,
+      stickyActionLabel,
+      stickyActionDisabled,
+      handleStickyAction,
       getTopicStatusIcon,
       getTopicTestButtonText,
       getSectionTestButtonText,
       getFinalReasonText,
       openSectionLockReason,
+      openSectionPage,
       getFinalActionText,
       getActiveTopic,
       getActiveTopicIndex,

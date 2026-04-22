@@ -149,6 +149,9 @@ export const apiClient = {
   getCourseById(id) {
     return request(`/courses/${id}`);
   },
+  getCourseSection(courseId, sectionId) {
+    return request(`/courses/${courseId}/sections/${sectionId}`);
+  },
   startCourse(id) {
     return request(`/courses/${id}/start`, {
       method: "POST",

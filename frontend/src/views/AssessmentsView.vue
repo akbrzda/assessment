@@ -109,6 +109,12 @@
           <p class="body-small text-secondary">Загрузка курсов...</p>
         </div>
 
+        <div v-else-if="coursesError" class="card error-state">
+          <h3 class="title-small mb-8">Не удалось загрузить курсы</h3>
+          <p class="body-small text-secondary mb-12">{{ coursesError }}</p>
+          <button class="btn btn-primary btn-full" type="button" @click="retryCourses">Повторить</button>
+        </div>
+
         <div v-else-if="courses.length" class="assessments-list">
           <CourseCard v-for="course in courses" :key="course.id" :course="course" @open="openCourse" />
         </div>
@@ -152,6 +158,7 @@ export default {
     const activeMode = ref("courses");
     const isLoading = ref(false);
     const isCoursesLoading = ref(false);
+    const coursesError = ref("");
 
     const filters = [
       { key: "all", label: "Все" },
@@ -386,6 +393,7 @@ export default {
         title: item.title || "Курс",
         description: item.description || "",
         sectionsCount: Number(item.sectionsCount || 0),
+        topicsCount: Number(item.topicsCount || 0),
         requiredSectionsCount: Number(item.requiredSectionsCount || 0),
         testsCount: Number(item.testsCount || 0),
         availabilityMode: item.availabilityMode || "unlimited",
@@ -422,15 +430,21 @@ export default {
 
     async function loadCourses() {
       isCoursesLoading.value = true;
+      coursesError.value = "";
       try {
         const { courses: response } = await apiClient.listCourses();
         courses.value = (response || []).map((item) => normalizeCourse(item)).filter(Boolean);
       } catch (error) {
         console.error("Не удалось загрузить список курсов", error);
         courses.value = [];
+        coursesError.value = error.message || "Попробуйте повторить позже";
       } finally {
         isCoursesLoading.value = false;
       }
+    }
+
+    function retryCourses() {
+      loadCourses();
     }
 
     onMounted(() => {
@@ -446,6 +460,7 @@ export default {
       filters,
       isLoading,
       isCoursesLoading,
+      coursesError,
       filteredAssessments,
       setMode,
       setFilter,
@@ -463,6 +478,7 @@ export default {
       viewResults,
       openTheory,
       openCourse,
+      retryCourses,
     };
   },
 };
@@ -526,6 +542,10 @@ export default {
 }
 
 .loading-state {
+  text-align: center;
+}
+
+.error-state {
   text-align: center;
 }
 
