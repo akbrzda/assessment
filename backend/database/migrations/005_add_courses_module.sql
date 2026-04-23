@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS courses (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   description TEXT,
-  status ENUM('draft','published','archived') NOT NULL DEFAULT 'draft',
+  status ENUM('published','archived') NOT NULL DEFAULT 'published',
   final_assessment_id INT UNSIGNED,
   created_by INT UNSIGNED,
   updated_by INT UNSIGNED,

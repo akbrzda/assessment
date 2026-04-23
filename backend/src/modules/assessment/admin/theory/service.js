@@ -11,25 +11,17 @@ async function getTheory(assessmentId) {
   return theory;
 }
 
-async function saveDraft(assessmentId, payload) {
-  return theoryRepository.saveDraftVersion({
+async function publish(assessmentId, payload) {
+  return theoryRepository.publishTheoryVersion({
     assessmentId,
+    mode: payload.mode,
     requiredBlocks: payload.requiredBlocks,
     optionalBlocks: payload.optionalBlocks || [],
     metadata: payload.metadata ?? null,
   });
 }
 
-async function publish(assessmentId, payload) {
-  return theoryRepository.publishDraftVersion({
-    assessmentId,
-    mode: payload.mode,
-  });
-}
-
 module.exports = {
   getTheory,
-  saveDraft,
   publish,
 };
-

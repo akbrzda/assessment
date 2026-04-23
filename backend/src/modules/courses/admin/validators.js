@@ -41,7 +41,7 @@ const updateCourseSchema = Joi.object({
   category: Joi.string().trim().max(128).allow("", null),
   tags: Joi.array().items(Joi.string().trim().min(1).max(64)).max(20),
   finalAssessmentId: Joi.number().integer().positive().allow(null),
-  status: Joi.string().valid("draft", "published", "archived"),
+  status: Joi.string().valid("published", "archived"),
   ...availabilitySchema,
 }).min(1);
 
@@ -94,57 +94,6 @@ const reorderTopicsSchema = Joi.object({
   topicIds: Joi.array().items(Joi.number().integer().positive()).min(1).unique().required(),
 });
 
-const draftTopicSchema = Joi.object({
-  title: Joi.string().trim().min(2).max(255).required(),
-  orderIndex: Joi.number().integer().min(1).allow(null).default(null),
-  isRequired: Joi.boolean().default(true),
-  hasMaterial: Joi.boolean().default(false),
-  content: Joi.string().allow("", null).default(null),
-  assessmentId: Joi.number().integer().positive().allow(null).default(null),
-});
-
-const draftSectionSchema = Joi.object({
-  title: Joi.string().trim().min(2).max(255).required(),
-  description: Joi.string().allow("", null).default(""),
-  orderIndex: Joi.number().integer().min(1).allow(null).default(null),
-  assessmentId: Joi.number().integer().positive().allow(null).default(null),
-  isRequired: Joi.boolean().default(true),
-  estimatedMinutes: Joi.number().integer().min(1).max(1440).allow(null).default(null),
-  topics: Joi.array().items(draftTopicSchema).default([]),
-});
-
-const draftPayloadSchema = Joi.object({
-  course: Joi.object({
-    title: Joi.string().trim().min(3).max(255).required(),
-    description: Joi.string().allow("", null).default(""),
-    coverUrl: Joi.string().uri().max(1024).allow("", null).default(null),
-    category: Joi.string().trim().max(128).allow("", null).default(null),
-    tags: Joi.array().items(Joi.string().trim().min(1).max(64)).max(20).default([]),
-    finalAssessmentId: Joi.number().integer().positive().allow(null).default(null),
-    ...availabilitySchema,
-  }).required(),
-  sections: Joi.array().items(draftSectionSchema).default([]),
-}).custom((value, helpers) => {
-  const course = value?.course || {};
-  if (course.availabilityMode === "relative_days" && !course.availabilityDays) {
-    return helpers.error("any.invalid", { message: "Для режима срока в днях нужно указать количество дней" });
-  }
-  if (course.availabilityMode === "fixed_dates") {
-    if (!course.availabilityFrom || !course.availabilityTo) {
-      return helpers.error("any.invalid", { message: "Для фиксированных дат нужно указать начало и окончание действия курса" });
-    }
-    if (new Date(course.availabilityFrom).getTime() > new Date(course.availabilityTo).getTime()) {
-      return helpers.error("any.invalid", { message: "Дата начала действия курса не может быть позже даты окончания" });
-    }
-  }
-  return value;
-});
-
-const upsertDraftSchema = Joi.object({
-  payload: draftPayloadSchema.optional(),
-  versionLabel: Joi.string().trim().max(64).allow("", null).default(null),
-});
-
 module.exports = {
   createCourseSchema: withAvailabilityValidation(createCourseSchema),
   updateCourseSchema: withAvailabilityValidation(updateCourseSchema),
@@ -154,5 +103,4 @@ module.exports = {
   updateTopicSchema,
   reorderSectionsSchema,
   reorderTopicsSchema,
-  upsertDraftSchema,
 };

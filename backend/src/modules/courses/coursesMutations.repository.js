@@ -12,8 +12,8 @@ async function insertCourse(
 ) {
   const [result] = await connection.execute(
     `INSERT INTO courses
-      (title, description, cover_url, category, tags, availability_mode, availability_days, availability_from, availability_to, status, version, final_assessment_id, created_by, updated_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 0, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
+      (title, description, cover_url, category, tags, availability_mode, availability_days, availability_from, availability_to, status, version, published_at, final_assessment_id, created_by, updated_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', 1, UTC_TIMESTAMP(), ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
     [
       title,
       description || "",

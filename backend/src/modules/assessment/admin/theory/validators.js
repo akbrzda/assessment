@@ -21,14 +21,11 @@ const blockSchema = Joi.object({
   metadata: Joi.object().unknown(true).optional(),
 });
 
-const saveDraftSchema = Joi.object({
+const publishSchema = Joi.object({
+  mode: Joi.string().valid("current", "new").required(),
   requiredBlocks: Joi.array().items(blockSchema).min(1).required(),
   optionalBlocks: Joi.array().items(blockSchema).default([]),
   metadata: Joi.object().unknown(true).optional(),
-});
-
-const publishSchema = Joi.object({
-  mode: Joi.string().valid("current", "new").required(),
 });
 
 function parseAssessmentId(rawId) {
@@ -40,17 +37,6 @@ function parseAssessmentId(rawId) {
   }
 
   return assessmentId;
-}
-
-function validateDraftPayload(payload) {
-  const { error, value } = saveDraftSchema.validate(payload, { abortEarly: false });
-  if (error) {
-    const validationError = new Error(error.details.map((detail) => detail.message).join(", "));
-    validationError.status = 422;
-    throw validationError;
-  }
-
-  return value;
 }
 
 function validatePublishPayload(payload) {
@@ -66,6 +52,5 @@ function validatePublishPayload(payload) {
 
 module.exports = {
   parseAssessmentId,
-  validateDraftPayload,
   validatePublishPayload,
 };

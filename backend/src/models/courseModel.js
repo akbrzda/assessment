@@ -666,8 +666,8 @@ async function getCourseByIdForAdmin(courseId) {
 async function createCourse({ title, description, finalAssessmentId, userId }) {
   const [result] = await pool.execute(
     `INSERT INTO courses
-      (title, description, status, version, final_assessment_id, created_by, updated_by, created_at, updated_at)
-     VALUES (?, ?, 'draft', 0, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
+      (title, description, status, version, published_at, final_assessment_id, created_by, updated_by, created_at, updated_at)
+     VALUES (?, ?, 'published', 1, UTC_TIMESTAMP(), ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
     [title, description || "", finalAssessmentId || null, userId || null, userId || null],
   );
 

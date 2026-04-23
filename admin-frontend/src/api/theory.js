@@ -5,12 +5,7 @@ export const getAdminTheory = async (assessmentId) => {
   return response.data;
 };
 
-export const saveTheoryDraft = async (assessmentId, payload) => {
-  const response = await axios.put(`/admin/assessments/${assessmentId}/theory/draft`, payload);
-  return response.data;
-};
-
-export const publishTheory = async (assessmentId, mode) => {
-  const response = await axios.post(`/admin/assessments/${assessmentId}/theory/publish`, { mode });
+export const publishTheory = async (assessmentId, payload) => {
+  const response = await axios.post(`/admin/assessments/${assessmentId}/theory/publish`, payload);
   return response.data;
 };

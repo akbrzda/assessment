@@ -3,36 +3,17 @@
     <div class="page-header">
       <Button variant="secondary" icon="arrow-left" @click="goBack">К списку курсов</Button>
       <div class="page-header-actions" v-if="isEditMode && course">
-        <DraftSaveIndicator :state="draftSaveState" :saved-at="draftSavedAt" />
         <Badge :variant="getStatusVariant(course.status)" rounded>
           {{ getStatusLabel(course.status) }}
         </Badge>
         <Button
-          v-if="course.status === 'draft' || (course.status === 'published' && hasDraftChanges)"
+          v-if="course.status === 'published'"
           variant="success"
           icon="send"
           :loading="publishing"
           @click="handlePublish"
         >
-          {{ course.status === "draft" ? "Опубликовать" : "Опубликовать изменения" }}
-        </Button>
-        <Button
-          v-if="course.status === 'published' && !hasDraftChanges"
-          variant="secondary"
-          icon="pencil"
-          :loading="openingDraft"
-          @click="handleOpenDraft"
-        >
-          Открыть черновик
-        </Button>
-        <Button
-          v-if="course.status === 'published' && hasDraftChanges"
-          variant="danger"
-          icon="x"
-          :loading="discardingDraft"
-          @click="handleDiscardDraft"
-        >
-          Отменить черновик
+          Применить изменения
         </Button>
         <Button v-if="course.status === 'published'" variant="secondary" icon="archive" :loading="archiving" @click="handleArchive">
           Закрыть курс
@@ -81,8 +62,8 @@
           <Input v-model="form.title" label="Название курса" placeholder="Например: Стандарты обслуживания" :error="errors.title" required />
           <div class="status-summary">
             <span class="status-summary-label">Статус публикации</span>
-            <Badge :variant="course ? getStatusVariant(course.status) : 'warning'" rounded>
-              {{ course ? getStatusLabel(course.status) : "Черновик" }}
+            <Badge :variant="course ? getStatusVariant(course.status) : 'default'" rounded>
+              {{ course ? getStatusLabel(course.status) : "Не опубликован" }}
             </Badge>
           </div>
           <Textarea
@@ -233,10 +214,10 @@
             <!-- Форма редактирования раздела -->
             <div v-if="sectionEditingId === section.id" class="section-edit-form">
               <div class="section-edit-grid">
-                <Input v-model="sectionDrafts[section.id].title" label="Название темы курса" :error="sectionErrors[section.id]?.title" required />
-                <Input v-model="sectionDrafts[section.id].orderIndex" type="number" min="1" label="Порядок" />
+                <Input v-model="sectionForms[section.id].title" label="Название темы курса" :error="sectionErrors[section.id]?.title" required />
+                <Input v-model="sectionForms[section.id].orderIndex" type="number" min="1" label="Порядок" />
                 <Select
-                  v-model="sectionDrafts[section.id].assessmentId"
+                  v-model="sectionForms[section.id].assessmentId"
                   label="Проверочный тест темы курса"
                   :options="assessmentOptions"
                   placeholder="Выберите тест"
@@ -246,20 +227,20 @@
                   <Button
                     size="sm"
                     variant="ghost"
-                    :disabled="!sectionDrafts[section.id].assessmentId"
-                    @click="openAssessmentEditor({ type: 'section', id: section.id }, sectionDrafts[section.id].assessmentId)"
+                    :disabled="!sectionForms[section.id].assessmentId"
+                    @click="openAssessmentEditor({ type: 'section', id: section.id }, sectionForms[section.id].assessmentId)"
                   >
                     Редактировать тест
                   </Button>
                 </div>
-                <Input v-model="sectionDrafts[section.id].estimatedMinutes" type="number" min="1" max="1440" label="Время (мин.)" />
+                <Input v-model="sectionForms[section.id].estimatedMinutes" type="number" min="1" max="1440" label="Время (мин.)" />
                 <div class="field-checkbox">
                   <label class="switch-label">
-                    <input v-model="sectionDrafts[section.id].isRequired" type="checkbox" />
+                    <input v-model="sectionForms[section.id].isRequired" type="checkbox" />
                     <span>Обязательная тема курса</span>
                   </label>
                 </div>
-                <Textarea v-model="sectionDrafts[section.id].description" class="grid-span-full" label="Описание" :rows="2" />
+                <Textarea v-model="sectionForms[section.id].description" class="grid-span-full" label="Описание" :rows="2" />
               </div>
               <div class="section-edit-actions">
                 <Button size="sm" icon="save" :loading="updatingSectionId === section.id" @click="saveSection(section.id)"
@@ -329,10 +310,10 @@
                   <!-- Форма редактирования темы -->
                   <div v-if="topicEditingId === topic.id" class="topic-edit-form">
                     <div class="topic-edit-grid">
-                      <Input v-model="topicDrafts[topic.id].title" label="Название подтемы" :error="topicErrors[topic.id]?.title" required />
-                      <Input v-model="topicDrafts[topic.id].orderIndex" type="number" min="1" label="Порядок" />
+                      <Input v-model="topicForms[topic.id].title" label="Название подтемы" :error="topicErrors[topic.id]?.title" required />
+                      <Input v-model="topicForms[topic.id].orderIndex" type="number" min="1" label="Порядок" />
                       <Select
-                        v-model="topicDrafts[topic.id].assessmentId"
+                        v-model="topicForms[topic.id].assessmentId"
                         label="Тест подтемы"
                         :options="assessmentOptions"
                         placeholder="Без теста"
@@ -342,27 +323,27 @@
                         <Button
                           size="sm"
                           variant="ghost"
-                          :disabled="!topicDrafts[topic.id].assessmentId"
-                          @click="openAssessmentEditor({ type: 'topic', id: topic.id }, topicDrafts[topic.id].assessmentId)"
+                          :disabled="!topicForms[topic.id].assessmentId"
+                          @click="openAssessmentEditor({ type: 'topic', id: topic.id }, topicForms[topic.id].assessmentId)"
                         >
                           Редактировать тест
                         </Button>
                       </div>
                       <div class="field-checkbox">
                         <label class="switch-label">
-                          <input v-model="topicDrafts[topic.id].isRequired" type="checkbox" />
+                          <input v-model="topicForms[topic.id].isRequired" type="checkbox" />
                           <span>Обязательная подтема</span>
                         </label>
                       </div>
                       <div class="field-checkbox">
                         <label class="switch-label">
-                          <input v-model="topicDrafts[topic.id].hasMaterial" type="checkbox" />
+                          <input v-model="topicForms[topic.id].hasMaterial" type="checkbox" />
                           <span>Есть материал</span>
                         </label>
                       </div>
                       <Textarea
-                        v-if="topicDrafts[topic.id].hasMaterial"
-                        v-model="topicDrafts[topic.id].content"
+                        v-if="topicForms[topic.id].hasMaterial"
+                        v-model="topicForms[topic.id].content"
                         class="grid-span-full"
                         label="Контент подтемы"
                         :rows="5"
@@ -555,24 +536,14 @@
         <div class="spacer"></div>
         <Button v-if="currentStep < wizardSteps.length" @click="goToNextStep" :disabled="!canProceed">Далее</Button>
         <Button
-          v-else-if="course?.status === 'draft'"
+          v-else-if="course?.status === 'published'"
           variant="success"
           icon="send"
           :loading="publishing"
           @click="handlePublish"
           :disabled="publicationErrorsForDisplay.length > 0"
         >
-          Опубликовать курс
-        </Button>
-        <Button
-          v-else-if="course?.status === 'published' && hasDraftChanges"
-          variant="success"
-          icon="send"
-          :loading="publishing"
-          @click="handlePublish"
-          :disabled="publicationErrorsForDisplay.length > 0"
-        >
-          Опубликовать изменения
+          Применить изменения
         </Button>
         <Button v-else-if="course?.status === 'published'" variant="secondary" icon="archive" :loading="archiving" @click="handleArchive">Закрыть курс</Button>
       </div>
@@ -804,12 +775,11 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import draggable from "vuedraggable";
 import { Badge, Button, Card, Input, Modal, Preloader, Select, Textarea } from "../components/ui";
 import AssessmentForm from "../components/AssessmentForm.vue";
-import DraftSaveIndicator from "../components/courses/DraftSaveIndicator.vue";
 import {
   archiveCourse,
   createCourse,
@@ -823,10 +793,6 @@ import {
   deleteCourseTopic,
   getCourseById,
   getCoursePreview,
-  getCourseDraft,
-  saveCourseDraft,
-  deleteCourseDraft,
-  publishCourseDraft,
   publishCourse,
   uploadCourseCover,
   updateCourse,
@@ -855,18 +821,11 @@ const saving = ref(false);
 const publishing = ref(false);
 const archiving = ref(false);
 const uploadingCover = ref(false);
-const openingDraft = ref(false);
-const discardingDraft = ref(false);
 const selectedCoverFile = ref(null);
-const draftSaveState = ref("saved");
-const draftSavedAt = ref(null);
-const draftMeta = ref(null);
 const previewWarnings = ref([]);
-const autoSaveEnabled = ref(false);
 const tempIdCounter = ref(-1);
-let autoSaveTimer = null;
 
-const sectionDrafts = ref({});
+const sectionForms = ref({});
 const sectionErrors = ref({});
 const sectionEditingId = ref(null);
 const updatingSectionId = ref(null);
@@ -875,7 +834,7 @@ const creatingSection = ref(false);
 const newSection = ref({ title: "", orderIndex: "", assessmentId: "", isRequired: true, estimatedMinutes: "", description: "" });
 const newSectionErrors = ref({ title: "" });
 
-const topicDrafts = ref({});
+const topicForms = ref({});
 const topicErrors = ref({});
 const topicEditingId = ref(null);
 const updatingTopicId = ref(null);
@@ -935,8 +894,6 @@ const isEditMode = computed(() => {
 });
 
 const courseId = computed(() => Number(route.params.id));
-const isPublishedCourse = computed(() => course.value?.status === "published");
-const hasDraftChanges = computed(() => Boolean(draftMeta.value));
 
 const publicationErrors = computed(() => {
   return course.value?.publication?.errors || [];
@@ -987,7 +944,6 @@ const previewStats = computed(() => {
 
 const getStatusLabel = (status) => {
   const labels = {
-    draft: "Черновик",
     published: "Опубликован",
     archived: "Закрыт",
   };
@@ -996,7 +952,6 @@ const getStatusLabel = (status) => {
 
 const getStatusVariant = (status) => {
   const variants = {
-    draft: "warning",
     published: "success",
     archived: "default",
   };
@@ -1048,12 +1003,12 @@ const toLocalDateTimeInput = (iso) => {
   return shifted.toISOString().slice(0, 16);
 };
 
-const syncSectionDrafts = (sections = []) => {
-  const nextDrafts = {};
-  const nextTopicDrafts = {};
+const syncSectionForms = (sections = []) => {
+  const nextForms = {};
+  const nextTopicForms = {};
   const nextNewTopics = {};
   for (const section of sections) {
-    nextDrafts[section.id] = {
+    nextForms[section.id] = {
       title: section.title || "",
       description: section.description || "",
       orderIndex: String(section.orderIndex || ""),
@@ -1062,7 +1017,7 @@ const syncSectionDrafts = (sections = []) => {
       estimatedMinutes: section.estimatedMinutes ? String(section.estimatedMinutes) : "",
     };
     for (const topic of section.topics || []) {
-      nextTopicDrafts[topic.id] = {
+      nextTopicForms[topic.id] = {
         title: topic.title || "",
         orderIndex: String(topic.orderIndex || ""),
         isRequired: topic.isRequired !== false,
@@ -1073,9 +1028,9 @@ const syncSectionDrafts = (sections = []) => {
     }
     nextNewTopics[section.id] = newTopics.value[section.id] || { title: "", orderIndex: "", isRequired: true, hasMaterial: false, content: "", assessmentId: "" };
   }
-  sectionDrafts.value = nextDrafts;
+  sectionForms.value = nextForms;
   sectionErrors.value = {};
-  topicDrafts.value = nextTopicDrafts;
+  topicForms.value = nextTopicForms;
   topicErrors.value = {};
   newTopics.value = nextNewTopics;
 };
@@ -1131,10 +1086,8 @@ const applyCourseToForm = (courseItem) => {
 };
 
 const loadCourse = async () => {
-  autoSaveEnabled.value = false;
   if (!isEditMode.value) {
     course.value = null;
-    draftMeta.value = null;
     previewWarnings.value = [];
     form.value = {
       title: "",
@@ -1148,8 +1101,6 @@ const loadCourse = async () => {
       availabilityFrom: "",
       availabilityTo: "",
     };
-    await nextTick();
-    autoSaveEnabled.value = true;
     return;
   }
 
@@ -1162,20 +1113,7 @@ const loadCourse = async () => {
     ]);
     course.value = courseResponse.course;
     applyCourseToForm(courseResponse.course);
-    syncSectionDrafts(courseResponse.course.sections || []);
-    draftMeta.value = null;
-
-    if (courseResponse.course?.status === "published") {
-      const draftResponse = await getCourseDraft(courseId.value);
-      if (draftResponse?.draft?.payload) {
-        draftMeta.value = {
-          id: draftResponse.draft.id,
-          updatedAt: draftResponse.draft.updatedAt,
-          versionLabel: draftResponse.draft.versionLabel || null,
-        };
-        applyDraftPayload(draftResponse.draft.payload);
-      }
-    }
+    syncSectionForms(courseResponse.course.sections || []);
 
     selectedPositionIds.value = (targetsResponse.positions || []).map((p) => p.id);
     selectedBranchIds.value = (targetsResponse.branches || []).map((b) => b.id);
@@ -1186,8 +1124,6 @@ const loadCourse = async () => {
     router.push("/courses");
   } finally {
     loading.value = false;
-    await nextTick();
-    autoSaveEnabled.value = true;
   }
 };
 
@@ -1235,118 +1171,6 @@ const normalizeLocalStructure = () => {
   });
 };
 
-const buildDraftPayload = () => {
-  const sections = (course.value?.sections || []).map((section, sectionIndex) => ({
-    title: String(section.title || "").trim(),
-    description: String(section.description || ""),
-    orderIndex: sectionIndex + 1,
-    assessmentId: sanitizeOptionalNumber(section.assessmentId),
-    isRequired: section.isRequired !== false,
-    estimatedMinutes: sanitizeOptionalNumber(section.estimatedMinutes),
-    topics: (section.topics || []).map((topic, topicIndex) => ({
-      title: String(topic.title || "").trim(),
-      orderIndex: topicIndex + 1,
-      isRequired: topic.isRequired !== false,
-      hasMaterial: Boolean(topic.hasMaterial),
-      content: topic.hasMaterial ? String(topic.content || "") : null,
-      assessmentId: sanitizeOptionalNumber(topic.assessmentId),
-    })),
-  }));
-
-  return {
-    course: {
-      title: String(form.value.title || "").trim(),
-      description: String(form.value.description || ""),
-      coverUrl: form.value.coverUrl?.trim() || null,
-      category: form.value.category?.trim() || null,
-      tags: parseTags(form.value.tagsInput),
-      finalAssessmentId: sanitizeOptionalNumber(form.value.finalAssessmentId),
-      availabilityMode: form.value.availabilityMode || "unlimited",
-      availabilityDays: form.value.availabilityMode === "relative_days" ? sanitizeOptionalNumber(form.value.availabilityDays) : null,
-      availabilityFrom: form.value.availabilityMode === "fixed_dates" && form.value.availabilityFrom ? new Date(form.value.availabilityFrom).toISOString() : null,
-      availabilityTo: form.value.availabilityMode === "fixed_dates" && form.value.availabilityTo ? new Date(form.value.availabilityTo).toISOString() : null,
-    },
-    sections,
-  };
-};
-
-const applyDraftPayload = (payload) => {
-  if (!payload?.course) return;
-  const draftCourse = payload.course;
-  form.value = {
-    title: draftCourse.title || "",
-    description: draftCourse.description || "",
-    coverUrl: draftCourse.coverUrl || "",
-    category: draftCourse.category || "",
-    tagsInput: Array.isArray(draftCourse.tags) ? draftCourse.tags.join(", ") : "",
-    finalAssessmentId: draftCourse.finalAssessmentId ? String(draftCourse.finalAssessmentId) : "",
-    availabilityMode: draftCourse.availabilityMode || "unlimited",
-    availabilityDays: draftCourse.availabilityDays ? String(draftCourse.availabilityDays) : "",
-    availabilityFrom: toLocalDateTimeInput(draftCourse.availabilityFrom),
-    availabilityTo: toLocalDateTimeInput(draftCourse.availabilityTo),
-  };
-
-  const draftSections = Array.isArray(payload.sections) ? payload.sections : [];
-  if (course.value) {
-    course.value.sections = draftSections.map((section, sectionIndex) => ({
-      id: getNextTempId(),
-      title: section.title || "",
-      description: section.description || "",
-      orderIndex: Number(section.orderIndex || sectionIndex + 1),
-      assessmentId: sanitizeOptionalNumber(section.assessmentId),
-      isRequired: section.isRequired !== false,
-      estimatedMinutes: sanitizeOptionalNumber(section.estimatedMinutes),
-      topics: (Array.isArray(section.topics) ? section.topics : []).map((topic, topicIndex) => ({
-        id: getNextTempId(),
-        title: topic.title || "",
-        orderIndex: Number(topic.orderIndex || topicIndex + 1),
-        isRequired: topic.isRequired !== false,
-        hasMaterial: Boolean(topic.hasMaterial),
-        content: topic.hasMaterial ? topic.content || "" : "",
-        assessmentId: sanitizeOptionalNumber(topic.assessmentId),
-      })),
-    }));
-    normalizeLocalStructure();
-    syncSectionDrafts(course.value.sections || []);
-  }
-};
-
-const persistDraft = async ({ silent = false } = {}) => {
-  if (!isEditMode.value || !isPublishedCourse.value) return true;
-  draftSaveState.value = "saving";
-  try {
-    const response = await saveCourseDraft(courseId.value, { payload: buildDraftPayload() });
-    draftMeta.value = response?.draft || null;
-    draftSaveState.value = "saved";
-    draftSavedAt.value = new Date().toISOString();
-    if (currentStep.value === 4) {
-      await loadPreview();
-    }
-    if (!silent) {
-      showToast("Черновик сохранен", "success");
-    }
-    return true;
-  } catch (error) {
-    draftSaveState.value = "error";
-    showToast(getErrorMessage(error, "Не удалось сохранить черновик"), "error");
-    return false;
-  }
-};
-
-const scheduleAutoSaveDraft = () => {
-  if (!isEditMode.value || !isPublishedCourse.value || !autoSaveEnabled.value) {
-    return;
-  }
-  if (autoSaveTimer) {
-    clearTimeout(autoSaveTimer);
-  }
-  draftSaveState.value = "saving";
-  autoSaveTimer = setTimeout(async () => {
-    autoSaveTimer = null;
-    await persistDraft({ silent: true });
-  }, 2000);
-};
-
 const loadPreview = async () => {
   if (!isEditMode.value || !course.value) {
     previewWarnings.value = [];
@@ -1355,6 +1179,9 @@ const loadPreview = async () => {
   try {
     const response = await getCoursePreview(courseId.value);
     previewWarnings.value = Array.isArray(response?.warnings) ? response.warnings : [];
+    if (course.value) {
+      course.value.publication = response?.publication || { valid: true, errors: [] };
+    }
   } catch {
     previewWarnings.value = [];
   }
@@ -1372,10 +1199,6 @@ const handleCoverUpload = async () => {
   }
   if (!selectedCoverFile.value) {
     showToast("Выберите файл обложки", "error");
-    return;
-  }
-  if (isPublishedCourse.value) {
-    showToast("Для опубликованного курса измените обложку через черновик и ссылку на шаге 1", "error");
     return;
   }
 
@@ -1415,35 +1238,23 @@ const saveCourse = async () => {
   };
 
   saving.value = true;
-  draftSaveState.value = "saving";
   try {
     if (isEditMode.value) {
-      if (isPublishedCourse.value) {
-        if (course.value) {
-          course.value = { ...course.value, ...payload };
-        }
-        const saved = await persistDraft({ silent: false });
-        if (!saved) return false;
-      } else {
-        const response = await updateCourse(courseId.value, payload);
-        course.value = {
-          ...course.value,
-          ...response.course,
-        };
-        showToast("Курс обновлен", "success");
-        await loadCourse();
-      }
+      const response = await updateCourse(courseId.value, payload);
+      course.value = {
+        ...course.value,
+        ...response.course,
+      };
+      showToast("Курс обновлен", "success");
+      await loadCourse();
     } else {
       const response = await createCourse(payload);
       showToast("Курс создан", "success");
       await router.replace(`/courses/${response.course.id}/edit`);
       await loadCourse();
     }
-    draftSaveState.value = "saved";
-    draftSavedAt.value = new Date().toISOString();
     return true;
   } catch (error) {
-    draftSaveState.value = "error";
     showToast(getErrorMessage(error, "Не удалось сохранить курс"), "error");
     return false;
   } finally {
@@ -1512,11 +1323,11 @@ const handleAssessmentEditorSubmit = async ({ assessmentId } = {}) => {
     return;
   }
 
-  if (target.type === "section" && target.id && sectionDrafts.value[target.id]) {
-    sectionDrafts.value[target.id].assessmentId = nextId;
+  if (target.type === "section" && target.id && sectionForms.value[target.id]) {
+    sectionForms.value[target.id].assessmentId = nextId;
     await saveSection(target.id);
-  } else if (target.type === "topic" && target.id && topicDrafts.value[target.id]) {
-    topicDrafts.value[target.id].assessmentId = nextId;
+  } else if (target.type === "topic" && target.id && topicForms.value[target.id]) {
+    topicForms.value[target.id].assessmentId = nextId;
     await saveTopic(target.id);
   } else if (target.type === "newSection") {
     newSection.value.assessmentId = nextId;
@@ -1560,27 +1371,9 @@ const addSection = async () => {
       isRequired: Boolean(newSection.value.isRequired),
       estimatedMinutes: sanitizeOptionalNumber(newSection.value.estimatedMinutes),
     };
-    if (isPublishedCourse.value) {
-      const nextSections = [...(course.value?.sections || [])];
-      nextSections.push({
-        id: getNextTempId(),
-        title: payload.title,
-        description: payload.description,
-        orderIndex: payload.orderIndex || nextSections.length + 1,
-        assessmentId: payload.assessmentId,
-        isRequired: payload.isRequired,
-        estimatedMinutes: payload.estimatedMinutes,
-        topics: [],
-      });
-      course.value.sections = nextSections;
-      normalizeLocalStructure();
-      syncSectionDrafts(course.value.sections || []);
-      await persistDraft({ silent: true });
-    } else {
-      const response = await createCourseSection(courseId.value, payload);
-      course.value = response.course;
-      syncSectionDrafts(response.course.sections || []);
-    }
+    const response = await createCourseSection(courseId.value, payload);
+    course.value = response.course;
+    syncSectionForms(response.course.sections || []);
     resetNewSection();
     showToast("Тема курса добавлена", "success");
   } catch (error) {
@@ -1591,34 +1384,25 @@ const addSection = async () => {
 };
 
 const saveSection = async (sectionId) => {
-  const draft = sectionDrafts.value[sectionId];
-  if (!draft) return;
-  if (!draft.title.trim()) {
+  const formState = sectionForms.value[sectionId];
+  if (!formState) return;
+  if (!formState.title.trim()) {
     sectionErrors.value = { ...sectionErrors.value, [sectionId]: { title: "Укажите название" } };
     return;
   }
   updatingSectionId.value = sectionId;
   try {
     const payload = {
-      title: draft.title.trim(),
-      description: (draft.description || "").trim(),
-      orderIndex: sanitizeOptionalNumber(draft.orderIndex),
-      assessmentId: sanitizeOptionalNumber(draft.assessmentId),
-      isRequired: Boolean(draft.isRequired),
-      estimatedMinutes: sanitizeOptionalNumber(draft.estimatedMinutes),
+      title: formState.title.trim(),
+      description: (formState.description || "").trim(),
+      orderIndex: sanitizeOptionalNumber(formState.orderIndex),
+      assessmentId: sanitizeOptionalNumber(formState.assessmentId),
+      isRequired: Boolean(formState.isRequired),
+      estimatedMinutes: sanitizeOptionalNumber(formState.estimatedMinutes),
     };
-    if (isPublishedCourse.value) {
-      const section = (course.value?.sections || []).find((item) => Number(item.id) === Number(sectionId));
-      if (!section) return;
-      Object.assign(section, payload);
-      normalizeLocalStructure();
-      syncSectionDrafts(course.value.sections || []);
-      await persistDraft({ silent: true });
-    } else {
-      const response = await updateCourseSection(sectionId, payload);
-      course.value = response.course;
-      syncSectionDrafts(response.course.sections || []);
-    }
+    const response = await updateCourseSection(sectionId, payload);
+    course.value = response.course;
+    syncSectionForms(response.course.sections || []);
     sectionEditingId.value = null;
     showToast("Тема курса обновлена", "success");
   } catch (error) {
@@ -1632,16 +1416,9 @@ const removeSection = async (sectionId, title) => {
   if (!window.confirm(`Удалить тему курса "${title}" и все её подтемы?`)) return;
   deletingSectionId.value = sectionId;
   try {
-    if (isPublishedCourse.value) {
-      course.value.sections = (course.value?.sections || []).filter((section) => Number(section.id) !== Number(sectionId));
-      normalizeLocalStructure();
-      syncSectionDrafts(course.value.sections || []);
-      await persistDraft({ silent: true });
-    } else {
-      const response = await deleteCourseSection(sectionId);
-      course.value = response.course;
-      syncSectionDrafts(response.course.sections || []);
-    }
+    const response = await deleteCourseSection(sectionId);
+    course.value = response.course;
+    syncSectionForms(response.course.sections || []);
     if (sectionEditingId.value === sectionId) sectionEditingId.value = null;
     showToast("Тема курса удалена", "success");
   } catch (error) {
@@ -1652,47 +1429,29 @@ const removeSection = async (sectionId, title) => {
 };
 
 const addTopic = async (sectionId) => {
-  const draft = newTopics.value[sectionId];
-  if (!draft) return;
-  if (!draft.title.trim()) {
+  const formState = newTopics.value[sectionId];
+  if (!formState) return;
+  if (!formState.title.trim()) {
     newTopicErrors.value = { ...newTopicErrors.value, [sectionId]: { title: "Укажите название подтемы" } };
     return;
   }
-  if (!draft.hasMaterial && !sanitizeOptionalNumber(draft.assessmentId)) {
+  if (!formState.hasMaterial && !sanitizeOptionalNumber(formState.assessmentId)) {
     showToast("Подтема должна содержать материал или тест", "error");
     return;
   }
   creatingTopicSectionId.value = sectionId;
   try {
     const payload = {
-      title: draft.title.trim(),
-      orderIndex: sanitizeOptionalNumber(draft.orderIndex),
-      isRequired: Boolean(draft.isRequired),
-      hasMaterial: Boolean(draft.hasMaterial),
-      content: draft.hasMaterial ? (draft.content || "").trim() || null : null,
-      assessmentId: sanitizeOptionalNumber(draft.assessmentId),
+      title: formState.title.trim(),
+      orderIndex: sanitizeOptionalNumber(formState.orderIndex),
+      isRequired: Boolean(formState.isRequired),
+      hasMaterial: Boolean(formState.hasMaterial),
+      content: formState.hasMaterial ? (formState.content || "").trim() || null : null,
+      assessmentId: sanitizeOptionalNumber(formState.assessmentId),
     };
-    if (isPublishedCourse.value) {
-      const section = (course.value?.sections || []).find((item) => Number(item.id) === Number(sectionId));
-      if (!section) return;
-      section.topics = section.topics || [];
-      section.topics.push({
-        id: getNextTempId(),
-        title: payload.title,
-        orderIndex: payload.orderIndex || section.topics.length + 1,
-        isRequired: payload.isRequired,
-        hasMaterial: payload.hasMaterial,
-        content: payload.content || "",
-        assessmentId: payload.assessmentId,
-      });
-      normalizeLocalStructure();
-      syncSectionDrafts(course.value.sections || []);
-      await persistDraft({ silent: true });
-    } else {
-      const response = await createCourseTopic(sectionId, payload);
-      course.value = response.course;
-      syncSectionDrafts(response.course.sections || []);
-    }
+    const response = await createCourseTopic(sectionId, payload);
+    course.value = response.course;
+    syncSectionForms(response.course.sections || []);
     newTopics.value[sectionId] = { title: "", orderIndex: "", isRequired: true, hasMaterial: false, content: "", assessmentId: "" };
     newTopicErrors.value = { ...newTopicErrors.value, [sectionId]: null };
     showToast("Подтема добавлена", "success");
@@ -1704,41 +1463,25 @@ const addTopic = async (sectionId) => {
 };
 
 const saveTopic = async (topicId) => {
-  const draft = topicDrafts.value[topicId];
-  if (!draft) return;
-  if (!draft.title.trim()) {
+  const formState = topicForms.value[topicId];
+  if (!formState) return;
+  if (!formState.title.trim()) {
     topicErrors.value = { ...topicErrors.value, [topicId]: { title: "Укажите название" } };
     return;
   }
   updatingTopicId.value = topicId;
   try {
     const payload = {
-      title: draft.title.trim(),
-      orderIndex: sanitizeOptionalNumber(draft.orderIndex),
-      isRequired: Boolean(draft.isRequired),
-      hasMaterial: Boolean(draft.hasMaterial),
-      content: draft.hasMaterial ? (draft.content || "").trim() || null : null,
-      assessmentId: sanitizeOptionalNumber(draft.assessmentId),
+      title: formState.title.trim(),
+      orderIndex: sanitizeOptionalNumber(formState.orderIndex),
+      isRequired: Boolean(formState.isRequired),
+      hasMaterial: Boolean(formState.hasMaterial),
+      content: formState.hasMaterial ? (formState.content || "").trim() || null : null,
+      assessmentId: sanitizeOptionalNumber(formState.assessmentId),
     };
-    if (isPublishedCourse.value) {
-      let foundTopic = null;
-      for (const section of course.value?.sections || []) {
-        const topic = (section.topics || []).find((item) => Number(item.id) === Number(topicId));
-        if (topic) {
-          foundTopic = topic;
-          break;
-        }
-      }
-      if (!foundTopic) return;
-      Object.assign(foundTopic, payload);
-      normalizeLocalStructure();
-      syncSectionDrafts(course.value.sections || []);
-      await persistDraft({ silent: true });
-    } else {
-      const response = await updateCourseTopic(topicId, payload);
-      course.value = response.course;
-      syncSectionDrafts(response.course.sections || []);
-    }
+    const response = await updateCourseTopic(topicId, payload);
+    course.value = response.course;
+    syncSectionForms(response.course.sections || []);
     topicEditingId.value = null;
     showToast("Подтема обновлена", "success");
   } catch (error) {
@@ -1797,16 +1540,10 @@ const handleSectionsReorder = async () => {
 
   reorderingSections.value = true;
   try {
-    if (isPublishedCourse.value) {
-      normalizeLocalStructure();
-      syncSectionDrafts(course.value.sections || []);
-      await persistDraft({ silent: true });
-    } else {
-      if (sectionIds.length <= 1) return;
-      const response = await reorderCourseSections(courseId.value, sectionIds);
-      course.value = response.course;
-      syncSectionDrafts(response.course.sections || []);
-    }
+    if (sectionIds.length <= 1) return;
+    const response = await reorderCourseSections(courseId.value, sectionIds);
+    course.value = response.course;
+    syncSectionForms(response.course.sections || []);
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось сохранить порядок тем"), "error");
     await loadCourse();
@@ -1822,16 +1559,10 @@ const handleTopicsReorder = async (section) => {
 
   reorderingTopicSectionId.value = Number(section.id);
   try {
-    if (isPublishedCourse.value) {
-      normalizeLocalStructure();
-      syncSectionDrafts(course.value.sections || []);
-      await persistDraft({ silent: true });
-    } else {
-      if (topicIds.length <= 1) return;
-      const response = await reorderCourseTopics(courseId.value, Number(section.id), topicIds);
-      course.value = response.course;
-      syncSectionDrafts(response.course.sections || []);
-    }
+    if (topicIds.length <= 1) return;
+    const response = await reorderCourseTopics(courseId.value, Number(section.id), topicIds);
+    course.value = response.course;
+    syncSectionForms(response.course.sections || []);
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось сохранить порядок подтем"), "error");
     await loadCourse();
@@ -1844,18 +1575,9 @@ const removeTopic = async (topicId, title) => {
   if (!window.confirm(`Удалить подтему "${title}"?`)) return;
   deletingTopicId.value = topicId;
   try {
-    if (isPublishedCourse.value) {
-      for (const section of course.value?.sections || []) {
-        section.topics = (section.topics || []).filter((topic) => Number(topic.id) !== Number(topicId));
-      }
-      normalizeLocalStructure();
-      syncSectionDrafts(course.value.sections || []);
-      await persistDraft({ silent: true });
-    } else {
-      const response = await deleteCourseTopic(topicId);
-      course.value = response.course;
-      syncSectionDrafts(response.course.sections || []);
-    }
+    const response = await deleteCourseTopic(topicId);
+    course.value = response.course;
+    syncSectionForms(response.course.sections || []);
     if (topicEditingId.value === topicId) topicEditingId.value = null;
     showToast("Подтема удалена", "success");
   } catch (error) {
@@ -1872,17 +1594,8 @@ const handlePublish = async () => {
 
   publishing.value = true;
   try {
-    if (course.value.status === "published") {
-      if (!hasDraftChanges.value) {
-        showToast("Нет изменений для публикации", "error");
-        return;
-      }
-      await publishCourseDraft(course.value.id);
-      showToast("Изменения опубликованы", "success");
-    } else {
-      await publishCourse(course.value.id);
-      showToast("Курс опубликован", "success");
-    }
+    await publishCourse(course.value.id);
+    showToast("Курс опубликован", "success");
     await loadCourse();
   } catch (error) {
     const validationErrors = error?.response?.data?.validationErrors;
@@ -1895,42 +1608,6 @@ const handlePublish = async () => {
     showToast(getErrorMessage(error, "Не удалось опубликовать курс"), "error");
   } finally {
     publishing.value = false;
-  }
-};
-
-const handleOpenDraft = async () => {
-  if (!isPublishedCourse.value || !course.value) return;
-  openingDraft.value = true;
-  try {
-    const response = await saveCourseDraft(courseId.value, { payload: buildDraftPayload() });
-    draftMeta.value = response?.draft || null;
-    draftSavedAt.value = new Date().toISOString();
-    draftSaveState.value = "saved";
-    await loadPreview();
-    showToast("Черновик открыт", "success");
-  } catch (error) {
-    draftSaveState.value = "error";
-    showToast(getErrorMessage(error, "Не удалось открыть черновик"), "error");
-  } finally {
-    openingDraft.value = false;
-  }
-};
-
-const handleDiscardDraft = async () => {
-  if (!isPublishedCourse.value || !course.value) return;
-  if (!window.confirm("Отменить все неопубликованные изменения?")) {
-    return;
-  }
-  discardingDraft.value = true;
-  try {
-    await deleteCourseDraft(courseId.value);
-    draftMeta.value = null;
-    await loadCourse();
-    showToast("Черновик удален", "success");
-  } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось удалить черновик"), "error");
-  } finally {
-    discardingDraft.value = false;
   }
 };
 
@@ -2101,22 +1778,6 @@ const handleResetProgress = async (userId, name) => {
 };
 
 watch(
-  () => form.value,
-  () => {
-    scheduleAutoSaveDraft();
-  },
-  { deep: true },
-);
-
-watch(
-  () => course.value?.sections,
-  () => {
-    scheduleAutoSaveDraft();
-  },
-  { deep: true },
-);
-
-watch(
   () => currentStep.value,
   async (step) => {
     if (step === 4) {
@@ -2131,13 +1792,6 @@ onMounted(async () => {
   loading.value = false;
   if (isEditMode.value) {
     await loadParticipants();
-  }
-});
-
-onUnmounted(() => {
-  if (autoSaveTimer) {
-    clearTimeout(autoSaveTimer);
-    autoSaveTimer = null;
   }
 });
 </script>

@@ -298,7 +298,7 @@ CREATE TABLE IF NOT EXISTS assessment_theory_versions (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   assessment_id INT UNSIGNED NOT NULL,
   version_number INT UNSIGNED NOT NULL,
-  status ENUM('draft', 'published') NOT NULL DEFAULT 'draft',
+  status ENUM('published') NOT NULL DEFAULT 'published',
   completion_required TINYINT(1) NOT NULL DEFAULT 0,
   required_block_count INT UNSIGNED NOT NULL DEFAULT 0,
   optional_block_count INT UNSIGNED NOT NULL DEFAULT 0,

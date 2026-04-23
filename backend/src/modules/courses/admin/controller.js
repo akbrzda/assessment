@@ -16,7 +16,6 @@ const {
   updateTopicSchema,
   reorderSectionsSchema,
   reorderTopicsSchema,
-  upsertDraftSchema,
 } = require("./validators");
 
 const COURSE_COVERS_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/courses");
@@ -117,52 +116,6 @@ async function getCoursePreview(req, res, next) {
     if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
     const preview = await coursesService.getCoursePreview(courseId);
     res.json(preview);
-  } catch (error) {
-    next(error);
-  }
-}
-
-async function upsertCourseDraft(req, res, next) {
-  try {
-    const courseId = parseId(req.params.id);
-    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
-    const value = validate(upsertDraftSchema, req.body || {}, res);
-    if (!value) return;
-    const draft = await coursesService.upsertCourseDraft(courseId, value.payload, value.versionLabel, req.user.id, req);
-    res.json({ draft });
-  } catch (error) {
-    next(error);
-  }
-}
-
-async function getCourseDraft(req, res, next) {
-  try {
-    const courseId = parseId(req.params.id);
-    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
-    const draft = await coursesService.getCourseDraft(courseId);
-    res.json({ draft });
-  } catch (error) {
-    next(error);
-  }
-}
-
-async function deleteCourseDraft(req, res, next) {
-  try {
-    const courseId = parseId(req.params.id);
-    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
-    await coursesService.deleteCourseDraft(courseId, req);
-    res.status(204).send();
-  } catch (error) {
-    next(error);
-  }
-}
-
-async function publishCourseDraft(req, res, next) {
-  try {
-    const courseId = parseId(req.params.id);
-    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
-    const course = await coursesService.publishCourseDraft(courseId, req.user.id, req);
-    res.json({ course });
   } catch (error) {
     next(error);
   }
@@ -541,10 +494,6 @@ module.exports = {
   getCoursePreview,
   createCourse,
   updateCourse,
-  upsertCourseDraft,
-  getCourseDraft,
-  deleteCourseDraft,
-  publishCourseDraft,
   uploadCourseCover,
   deleteCourse,
   publishCourse,

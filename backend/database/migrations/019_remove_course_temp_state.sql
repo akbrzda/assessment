@@ -1,0 +1,19 @@
+-- Удаление таблицы временного состояния курсов
+-- Дата создания: 2026-04-23
+
+SET NAMES utf8mb4;
+SET time_zone = '+00:00';
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP PROCEDURE IF EXISTS _mig019;
+CREATE PROCEDURE _mig019()
+BEGIN
+  DECLARE CONTINUE HANDLER FOR 1051 BEGIN END;
+
+  DROP TABLE IF EXISTS course_drafts;
+END;
+
+CALL _mig019();
+DROP PROCEDURE IF EXISTS _mig019;
+
+SET FOREIGN_KEY_CHECKS = 1;

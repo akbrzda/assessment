@@ -4,16 +4,11 @@ async function getTheoryForAdmin(assessmentId) {
   return theoryModel.getTheoryForAdmin(assessmentId);
 }
 
-async function saveDraftVersion(payload) {
-  return theoryModel.saveDraftVersion(payload);
-}
-
-async function publishDraftVersion(payload) {
-  return theoryModel.publishDraftVersion(payload);
+async function publishTheoryVersion(payload) {
+  return theoryModel.publishTheoryVersion(payload);
 }
 
 module.exports = {
   getTheoryForAdmin,
-  saveDraftVersion,
-  publishDraftVersion,
+  publishTheoryVersion,
 };

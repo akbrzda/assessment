@@ -345,7 +345,7 @@ import Input from "./ui/Input.vue";
 import Select from "./ui/Select.vue";
 import Textarea from "./ui/Textarea.vue";
 import AssessmentTheoryBuilder from "./AssessmentTheoryBuilder.vue";
-import { getAdminTheory, saveTheoryDraft, publishTheory } from "../api/theory";
+import { getAdminTheory, publishTheory } from "../api/theory";
 import { createEmptyTheory, validateTheoryData, buildTheoryPayload, hasTheoryBlocks, mapVersionToTheoryData } from "../utils/theory";
 import { useToast } from "../composables/useToast";
 import { formatBranchLabel } from "../utils/branch";
@@ -444,8 +444,7 @@ const persistTheoryVersion = async (assessmentId) => {
     return;
   }
   const payload = buildTheoryPayload(theoryData.value);
-  await saveTheoryDraft(assessmentId, payload);
-  await publishTheory(assessmentId, "new");
+  await publishTheory(assessmentId, { mode: "new", ...payload });
 };
 
 const formatDateForInput = (value) => {
@@ -554,7 +553,7 @@ const loadTheoryForEdit = async (assessmentId) => {
   try {
     const response = await getAdminTheory(assessmentId);
     const theory = response?.theory || null;
-    const version = theory?.draftVersion || theory?.currentVersion || null;
+    const version = theory?.currentVersion || null;
     if (version && (version.requiredBlocks?.length || version.optionalBlocks?.length)) {
       theoryEnabled.value = true;
       theoryData.value = mapVersionToTheoryData(version);

@@ -387,24 +387,9 @@ async function getTheoryForAdmin(assessmentId) {
     currentVersion = await getVersionDetail(currentVersionId);
   }
 
-  const [draftRows] = await pool.execute(
-    `SELECT id
-       FROM assessment_theory_versions
-      WHERE assessment_id = ? AND status = 'draft'
-      ORDER BY updated_at DESC
-      LIMIT 1`,
-    [assessmentId]
-  );
-
-  let draftVersion = null;
-  if (draftRows.length) {
-    draftVersion = await getVersionDetail(draftRows[0].id);
-  }
-
   return {
     assessmentId,
     currentVersion,
-    draftVersion,
   };
 }
 
@@ -446,84 +431,7 @@ async function getVersionDetail(versionId) {
   };
 }
 
-async function saveDraftVersion({ assessmentId, requiredBlocks, optionalBlocks, metadata }) {
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-
-    const [assessmentRows] = await connection.execute("SELECT id FROM assessments WHERE id = ? FOR UPDATE", [assessmentId]);
-    if (!assessmentRows.length) {
-      const error = new Error("Аттестация не найдена");
-      error.status = 404;
-      throw error;
-    }
-
-    const combinedBlocks = [
-      ...requiredBlocks.map((block, idx) => ({ ...block, orderIndex: idx + 1, isRequired: 1 })),
-      ...optionalBlocks.map((block, idx) => ({ ...block, orderIndex: requiredBlocks.length + idx + 1, isRequired: 0 })),
-    ];
-
-    const [draftRows] = await connection.execute(
-      "SELECT id FROM assessment_theory_versions WHERE assessment_id = ? AND status = 'draft' LIMIT 1 FOR UPDATE",
-      [assessmentId]
-    );
-
-    let draftId = null;
-    if (draftRows.length) {
-      draftId = draftRows[0].id;
-      await connection.execute(
-        `UPDATE assessment_theory_versions
-            SET completion_required = ?, required_block_count = ?, optional_block_count = ?, metadata = ?, updated_at = UTC_TIMESTAMP()
-          WHERE id = ?`,
-        [requiredBlocks.length > 0 ? 1 : 0, requiredBlocks.length, optionalBlocks.length, serializeJson(metadata), draftId]
-      );
-      await connection.execute("DELETE FROM assessment_theory_blocks WHERE version_id = ?", [draftId]);
-    } else {
-      const [maxRows] = await connection.execute(
-        "SELECT COALESCE(MAX(version_number), 0) AS max_version FROM assessment_theory_versions WHERE assessment_id = ? FOR UPDATE",
-        [assessmentId]
-      );
-      const nextVersion = Number(maxRows[0].max_version || 0) + 1;
-      const [insertResult] = await connection.execute(
-        `INSERT INTO assessment_theory_versions
-           (assessment_id, version_number, status, completion_required, required_block_count, optional_block_count, metadata, created_at, updated_at)
-         VALUES (?, ?, 'draft', ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
-        [assessmentId, nextVersion, requiredBlocks.length > 0 ? 1 : 0, requiredBlocks.length, optionalBlocks.length, serializeJson(metadata)]
-      );
-      draftId = insertResult.insertId;
-    }
-
-    if (combinedBlocks.length) {
-      const values = combinedBlocks.map((block) => [
-        draftId,
-        block.orderIndex,
-        block.title,
-        block.type,
-        block.content || null,
-        block.videoUrl || null,
-        block.externalUrl || null,
-        serializeJson(block.metadata),
-        block.isRequired ? 1 : 0,
-      ]);
-      await connection.query(
-        `INSERT INTO assessment_theory_blocks
-           (version_id, order_index, title, block_type, content, video_url, external_url, metadata, is_required)
-         VALUES ?`,
-        [values]
-      );
-    }
-
-    await connection.commit();
-    return getVersionDetail(draftId);
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
-}
-
-async function publishDraftVersion({ assessmentId, mode }) {
+async function publishTheoryVersion({ assessmentId, mode, requiredBlocks, optionalBlocks, metadata }) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -549,76 +457,68 @@ async function publishDraftVersion({ assessmentId, mode }) {
       }
     }
 
-    const [draftRows] = await connection.execute(
-      "SELECT * FROM assessment_theory_versions WHERE assessment_id = ? AND status = 'draft' LIMIT 1 FOR UPDATE",
-      [assessmentId]
-    );
-
-    if (!draftRows.length) {
-      const error = new Error("Черновик теории не найден");
-      error.status = 404;
-      throw error;
-    }
-
-    const draftRow = draftRows[0];
-    const draftVersionId = draftRow.id;
-    const draftRequiredCount = Number(draftRow.required_block_count || 0);
-
-    const [draftBlockRows] = await connection.execute("SELECT * FROM assessment_theory_blocks WHERE version_id = ? ORDER BY order_index ASC", [
-      draftVersionId,
-    ]);
+    const safeRequiredBlocks = Array.isArray(requiredBlocks) ? requiredBlocks : [];
+    const safeOptionalBlocks = Array.isArray(optionalBlocks) ? optionalBlocks : [];
+    const combinedBlocks = [
+      ...safeRequiredBlocks.map((block, idx) => ({ ...block, orderIndex: idx + 1, isRequired: 1 })),
+      ...safeOptionalBlocks.map((block, idx) => ({ ...block, orderIndex: safeRequiredBlocks.length + idx + 1, isRequired: 0 })),
+    ];
 
     const allowOverwriteCurrent = mode === "current" && currentVersionId;
-    const requiredCurrentCount = currentVersionRow ? Number(currentVersionRow.required_block_count || 0) : 0;
-    const shouldCreateNew = !allowOverwriteCurrent || draftRequiredCount > requiredCurrentCount;
+    const shouldCreateNew = !allowOverwriteCurrent;
+    const completionRequired = safeRequiredBlocks.length > 0 ? 1 : 0;
+    const requiredCount = safeRequiredBlocks.length;
+    const optionalCount = safeOptionalBlocks.length;
+    const serializedMetadata = serializeJson(metadata);
+
+    let versionId = currentVersionId;
 
     if (shouldCreateNew) {
-      await connection.execute(
-        `UPDATE assessment_theory_versions
-            SET status = 'published', published_at = UTC_TIMESTAMP(), updated_at = UTC_TIMESTAMP()
-          WHERE id = ?`,
-        [draftVersionId]
+      const [maxRows] = await connection.execute(
+        "SELECT COALESCE(MAX(version_number), 0) AS max_version FROM assessment_theory_versions WHERE assessment_id = ? FOR UPDATE",
+        [assessmentId]
       );
-      await connection.execute("UPDATE assessments SET current_theory_version_id = ? WHERE id = ?", [draftVersionId, assessmentId]);
+      const nextVersion = Number(maxRows[0].max_version || 0) + 1;
+      const [insertResult] = await connection.execute(
+        `INSERT INTO assessment_theory_versions
+           (assessment_id, version_number, status, completion_required, required_block_count, optional_block_count, metadata, published_at, created_at, updated_at)
+         VALUES (?, ?, 'published', ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
+        [assessmentId, nextVersion, completionRequired, requiredCount, optionalCount, serializedMetadata]
+      );
+      versionId = Number(insertResult.insertId);
+      await connection.execute("UPDATE assessments SET current_theory_version_id = ? WHERE id = ?", [versionId, assessmentId]);
     } else {
       await connection.execute(
         `UPDATE assessment_theory_versions
             SET completion_required = ?, required_block_count = ?, optional_block_count = ?, metadata = ?, updated_at = UTC_TIMESTAMP(), published_at = UTC_TIMESTAMP()
           WHERE id = ?`,
-        [draftRow.completion_required, draftRow.required_block_count, draftRow.optional_block_count, draftRow.metadata, currentVersionId]
+        [completionRequired, requiredCount, optionalCount, serializedMetadata, currentVersionId]
       );
       await connection.execute("DELETE FROM assessment_theory_blocks WHERE version_id = ?", [currentVersionId]);
+    }
 
-      if (draftBlockRows.length) {
-        const values = draftBlockRows.map((block) => {
-          const safeMeta = serializeJson(parseJson(block.metadata));
-          return [
-            currentVersionId,
-            block.order_index,
-            block.title,
-            block.block_type,
-            block.content,
-            block.video_url,
-            block.external_url,
-            safeMeta,
-            block.is_required,
-          ];
-        });
-        await connection.query(
-          `INSERT INTO assessment_theory_blocks
-             (version_id, order_index, title, block_type, content, video_url, external_url, metadata, is_required)
-           VALUES ?`,
-          [values]
-        );
-      }
-
-      await connection.execute("DELETE FROM assessment_theory_blocks WHERE version_id = ?", [draftVersionId]);
-      await connection.execute("DELETE FROM assessment_theory_versions WHERE id = ?", [draftVersionId]);
+    if (combinedBlocks.length) {
+      const values = combinedBlocks.map((block) => [
+        versionId,
+        block.orderIndex,
+        block.title,
+        block.type,
+        block.content || null,
+        block.videoUrl || null,
+        block.externalUrl || null,
+        serializeJson(block.metadata),
+        block.isRequired ? 1 : 0,
+      ]);
+      await connection.query(
+        `INSERT INTO assessment_theory_blocks
+           (version_id, order_index, title, block_type, content, video_url, external_url, metadata, is_required)
+         VALUES ?`,
+        [values]
+      );
     }
 
     await connection.commit();
 
-    const versionId = shouldCreateNew ? draftVersionId : currentVersionId;
     const versionDetail = await getVersionDetail(versionId);
     return {
       version: versionDetail,
@@ -639,6 +539,5 @@ module.exports = {
   getCompletionForVersion,
   saveCompletion,
   getTheoryForAdmin,
-  saveDraftVersion,
-  publishDraftVersion,
+  publishTheoryVersion,
 };

@@ -37,7 +37,6 @@
               <tr v-for="course in courses" :key="course.id">
                 <td>
                   <div class="course-title">{{ course.title }}</div>
-                  <div v-if="course.hasDraft" class="course-draft-indicator">Есть неопубликованные изменения</div>
                   <div class="course-desc">{{ course.description || "Без описания" }}</div>
                 </td>
                 <td>
@@ -51,12 +50,6 @@
                 <td class="actions-cell">
                   <div class="actions-buttons">
                     <Button size="sm" variant="secondary" icon="pencil" @click="goToEdit(course.id)">Изменить</Button>
-                    <Button v-if="course.status === 'published' && course.hasDraft" size="sm" variant="secondary" icon="pencil" @click="goToEdit(course.id)">
-                      Открыть черновик
-                    </Button>
-                    <Button v-if="course.status === 'draft'" size="sm" variant="success" icon="send" @click="handlePublish(course)">
-                      Опубликовать
-                    </Button>
                     <Button v-if="course.status === 'published'" size="sm" variant="secondary" icon="archive" @click="handleArchive(course)">
                       Закрыть
                     </Button>
@@ -71,16 +64,15 @@
         </div>
 
         <div class="mobile-cards show-mobile">
-          <div v-for="course in courses" :key="course.id" class="course-card">
-            <div class="course-card-header">
-              <div>
-                <h3 class="course-card-title">{{ course.title }}</h3>
-                <p v-if="course.hasDraft" class="course-draft-indicator">Есть неопубликованные изменения</p>
+            <div v-for="course in courses" :key="course.id" class="course-card">
+              <div class="course-card-header">
+                <div>
+                  <h3 class="course-card-title">{{ course.title }}</h3>
                 <p class="course-card-desc">{{ course.description || "Без описания" }}</p>
-              </div>
-              <Badge :variant="getStatusVariant(course.status)" rounded size="sm">
-                {{ getStatusLabel(course.status) }}
-              </Badge>
+                </div>
+                <Badge :variant="getStatusVariant(course.status)" rounded size="sm">
+                  {{ getStatusLabel(course.status) }}
+                </Badge>
             </div>
 
             <div class="course-card-grid">
@@ -97,19 +89,6 @@
 
             <div class="course-card-actions">
               <Button size="sm" variant="secondary" icon="pencil" @click="goToEdit(course.id)" fullWidth>Изменить</Button>
-              <Button
-                v-if="course.status === 'published' && course.hasDraft"
-                size="sm"
-                variant="secondary"
-                icon="pencil"
-                @click="goToEdit(course.id)"
-                fullWidth
-              >
-                Открыть черновик
-              </Button>
-              <Button v-if="course.status === 'draft'" size="sm" variant="success" icon="send" @click="handlePublish(course)" fullWidth>
-                Опубликовать
-              </Button>
               <Button v-if="course.status === 'published'" size="sm" variant="secondary" icon="archive" @click="handleArchive(course)" fullWidth>
                 Закрыть
               </Button>
@@ -185,7 +164,7 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { Badge, Button, Card, Input, Preloader, Select } from "../components/ui";
 import AnalyticsSummaryCards from "../components/courses/AnalyticsSummaryCards.vue";
-import { archiveCourse, deleteCourse, getCourses, publishCourse, getCourseAnalyticsFunnel } from "../api/courses";
+import { archiveCourse, deleteCourse, getCourses, getCourseAnalyticsFunnel } from "../api/courses";
 import { useToast } from "../composables/useToast";
 
 const router = useRouter();
@@ -200,14 +179,12 @@ const filters = ref({
 });
 
 const statusFilterOptions = [
-  { value: "draft", label: "Черновик" },
   { value: "published", label: "Опубликован" },
   { value: "archived", label: "Закрыт" },
 ];
 
 const getStatusLabel = (status) => {
   const labels = {
-    draft: "Черновик",
     published: "Опубликован",
     archived: "Закрыт",
   };
@@ -216,7 +193,6 @@ const getStatusLabel = (status) => {
 
 const getStatusVariant = (status) => {
   const variants = {
-    draft: "warning",
     published: "success",
     archived: "default",
   };
@@ -287,25 +263,6 @@ const goToCreate = () => {
 
 const goToEdit = (id) => {
   router.push(`/courses/${id}/edit`);
-};
-
-const handlePublish = async (course) => {
-  if (!window.confirm(`Опубликовать курс "${course.title}"?`)) {
-    return;
-  }
-
-  try {
-    await publishCourse(course.id);
-    showToast("Курс опубликован", "success");
-    await loadCourses();
-  } catch (error) {
-    const validationErrors = error?.response?.data?.validationErrors;
-    if (Array.isArray(validationErrors) && validationErrors.length > 0) {
-      showToast(validationErrors.join("; "), "error", 7000);
-      return;
-    }
-    showToast(getErrorMessage(error, "Не удалось опубликовать курс"), "error");
-  }
 };
 
 const handleArchive = async (course) => {
@@ -404,12 +361,6 @@ onMounted(async () => {
 .course-desc {
   font-size: 13px;
   color: var(--text-secondary);
-  margin-top: 4px;
-}
-
-.course-draft-indicator {
-  font-size: 12px;
-  color: #92400e;
   margin-top: 4px;
 }
 

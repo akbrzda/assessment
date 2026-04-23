@@ -40,7 +40,6 @@ router.get("/admin", requireRole(["superadmin", "manager"]), assessmentControlle
 router.get("/admin/targets", requireRole(["superadmin", "manager"]), assessmentController.listTargets);
 router.post("/admin", requireRole(["superadmin", "manager"]), assessmentController.create);
 router.get("/admin/:id/theory", requireRole(["superadmin", "manager"]), assessmentController.getAdminTheory);
-router.put("/admin/:id/theory/draft", requireRole(["superadmin", "manager"]), assessmentController.saveAdminTheoryDraft);
 router.post("/admin/:id/theory/publish", requireRole(["superadmin", "manager"]), assessmentController.publishAdminTheory);
 router.get("/admin/:id", requireRole(["superadmin", "manager"]), assessmentController.getDetail);
 router.patch("/admin/:id", requireRole(["superadmin", "manager"]), assessmentController.update);

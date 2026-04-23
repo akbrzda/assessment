@@ -250,7 +250,24 @@ async function deleteUser(req, res, next) {
       return res.status(400).json({ error: "Нельзя удалить самого себя" });
     }
 
-    await userModel.deleteUser(userId);
+    try {
+      await userModel.deleteUser(userId);
+    } catch (deleteError) {
+      if (deleteError?.code === "ER_ROW_IS_REFERENCED_2") {
+        const sqlMessage = String(deleteError?.sqlMessage || "");
+        let reason = "Пользователь связан с другими данными и не может быть удален";
+
+        if (sqlMessage.includes("fk_assessments_created_by")) {
+          reason = "Нельзя удалить пользователя: он является автором аттестаций";
+        } else if (sqlMessage.includes("invitations")) {
+          reason = "Нельзя удалить пользователя: он связан с созданными приглашениями";
+        }
+
+        return res.status(409).json({ error: reason });
+      }
+
+      throw deleteError;
+    }
 
     await logAndSend({
       req,

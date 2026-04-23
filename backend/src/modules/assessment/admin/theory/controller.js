@@ -1,7 +1,6 @@
 const theoryService = require("./service");
 const {
   parseAssessmentId,
-  validateDraftPayload,
   validatePublishPayload,
 } = require("./validators");
 
@@ -11,18 +10,6 @@ async function getTheory(req, res, next) {
     const theory = await theoryService.getTheory(assessmentId);
 
     res.json({ theory });
-  } catch (error) {
-    next(error);
-  }
-}
-
-async function saveDraft(req, res, next) {
-  try {
-    const assessmentId = parseAssessmentId(req.params.id);
-    const payload = validateDraftPayload(req.body);
-    const draft = await theoryService.saveDraft(assessmentId, payload);
-
-    res.json({ draft });
   } catch (error) {
     next(error);
   }
@@ -45,7 +32,5 @@ async function publish(req, res, next) {
 
 module.exports = {
   getTheory,
-  saveDraft,
   publish,
 };
-

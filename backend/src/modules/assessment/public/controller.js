@@ -120,15 +120,6 @@ async function getAdminTheory(req, res, next) {
   }
 }
 
-async function saveAdminTheoryDraft(req, res, next) {
-  try {
-    ensureAssessmentId(req.params.id);
-    return await adminTheoryController.saveDraft(req, res, next);
-  } catch (error) {
-    next(error);
-  }
-}
-
 async function publishAdminTheory(req, res, next) {
   try {
     ensureAssessmentId(req.params.id);
@@ -187,7 +178,6 @@ module.exports = {
   listTargets,
   create,
   getAdminTheory,
-  saveAdminTheoryDraft,
   publishAdminTheory,
   getDetail,
   update,

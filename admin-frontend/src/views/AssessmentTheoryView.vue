@@ -5,20 +5,17 @@
         <Button variant="ghost" icon="arrow-left" @click="goBack"> Назад </Button>
         <div class="page-header-texts">
           <h1>Теория аттестации</h1>
-          <p>Настройте обязательные и дополнительные блоки, сохраните черновик и опубликуйте версию.</p>
+          <p>Настройте обязательные и дополнительные блоки и опубликуйте версию.</p>
         </div>
       </div>
       <div class="page-actions">
         <Button icon="refresh-ccw" variant="secondary" size="sm" :disabled="loading" @click="loadTheory"> Обновить </Button>
-        <Button icon="save" variant="secondary" size="sm" :loading="saving" :disabled="loading || publishing" @click="handleSaveDraft">
-          Сохранить черновик
-        </Button>
         <Button
           icon="bookmark-check"
           variant="primary"
           size="sm"
           :loading="publishing && publishMode === 'current'"
-          :disabled="loading || saving || publishing"
+          :disabled="loading || publishing"
           @click="() => handlePublish('current')"
         >
           Опубликовать текущую
@@ -28,7 +25,7 @@
           variant="success"
           size="sm"
           :loading="publishing && publishMode === 'new'"
-          :disabled="loading || saving || publishing"
+          :disabled="loading || publishing"
           @click="() => handlePublish('new')"
         >
           Новая версия
@@ -53,15 +50,6 @@
             </h3>
             <p class="version-meta">
               {{ currentVersionMeta }}
-            </p>
-          </div>
-          <div class="version-block">
-            <p class="version-label">Черновик</p>
-            <h3 class="version-value">
-              {{ draftVersionLabel }}
-            </h3>
-            <p class="version-meta">
-              {{ draftVersionMeta }}
             </p>
           </div>
           <div class="version-block">
@@ -223,10 +211,9 @@ import Button from "../components/ui/Button.vue";
 import Card from "../components/ui/Card.vue";
 import Input from "../components/ui/Input.vue";
 import Select from "../components/ui/Select.vue";
-import Textarea from "../components/ui/Textarea.vue";
 import FullscreenTextarea from "../components/ui/FullscreenTextarea.vue";
 import Preloader from "../components/ui/Preloader.vue";
-import { getAdminTheory, saveTheoryDraft, publishTheory } from "../api/theory";
+import { getAdminTheory, publishTheory } from "../api/theory";
 import { useToast } from "../composables/useToast";
 import { calculateReadingSeconds, formatReadingTime, sumReadingSeconds } from "../utils/readingTime";
 import { normalizeVideoUrl } from "../utils/videoUrl";
@@ -236,13 +223,11 @@ const route = useRoute();
 const { showToast } = useToast();
 
 const loading = ref(true);
-const saving = ref(false);
 const publishing = ref(false);
 const publishMode = ref(null);
 const error = ref(null);
 
 const currentVersion = ref(null);
-const draftVersion = ref(null);
 const requiredBlocks = ref([]);
 const optionalBlocks = ref([]);
 const optionalExpanded = ref(true);
@@ -271,39 +256,18 @@ const currentVersionMeta = computed(() => {
   return `Опубликована: ${published}`;
 });
 
-const draftVersionLabel = computed(() => {
-  if (!draftVersion.value) {
-    return "Не создан";
-  }
-  return `v${draftVersion.value.versionNumber}`;
-});
-
-const draftVersionMeta = computed(() => {
-  if (!draftVersion.value) {
-    return "Начните с любого блока и сохраните черновик";
-  }
-  const updated = draftVersion.value.updatedAt ? new Date(draftVersion.value.updatedAt).toLocaleString("ru-RU") : "—";
-  return `Обновлён: ${updated}`;
-});
-
 const formStatusLabel = computed(() => {
   if (!requiredBlocks.value.length) {
     return "Недостаточно блоков";
   }
-  if (draftVersion.value) {
-    return "Черновик готов";
-  }
-  return "Изменения не сохранены";
+  return "Готово к публикации";
 });
 
 const formStatusHint = computed(() => {
   if (!requiredBlocks.value.length) {
     return "Добавьте минимум один обязательный блок";
   }
-  if (draftVersion.value) {
-    return "Сохранённый черновик готов к публикации";
-  }
-  return "Сохраните изменения, чтобы опубликовать";
+  return "Данные будут применены сразу при публикации";
 });
 
 const requiredReadingSeconds = computed(() => sumReadingSeconds(requiredBlocks.value));
@@ -354,11 +318,7 @@ const loadTheory = async () => {
   try {
     const data = await getAdminTheory(assessmentId.value);
     currentVersion.value = data.theory?.currentVersion || null;
-    draftVersion.value = data.theory?.draftVersion || null;
-
-    if (draftVersion.value) {
-      applyVersion(draftVersion.value);
-    } else if (currentVersion.value) {
+    if (currentVersion.value) {
       applyVersion(currentVersion.value);
     } else {
       applyVersion(null);
@@ -461,31 +421,6 @@ const handleVideoUrlInput = (block, value) => {
   block.videoUrl = raw;
 };
 
-const persistDraft = async () => {
-  const payload = buildPayload();
-  const data = await saveTheoryDraft(assessmentId.value, payload);
-  draftVersion.value = data.draft;
-  applyVersion(data.draft);
-  return data.draft;
-};
-
-const handleSaveDraft = async () => {
-  if (!validateBlocks()) {
-    return;
-  }
-  saving.value = true;
-  try {
-    await persistDraft();
-    showToast("Черновик сохранён", "success");
-  } catch (err) {
-    console.error(err);
-    const message = err.response?.data?.error || "Не удалось сохранить черновик";
-    showToast(message, "error");
-  } finally {
-    saving.value = false;
-  }
-};
-
 const handlePublish = async (mode) => {
   if (!validateBlocks()) {
     return;
@@ -493,10 +428,13 @@ const handlePublish = async (mode) => {
   publishing.value = true;
   publishMode.value = mode;
   try {
-    await persistDraft();
-    const result = await publishTheory(assessmentId.value, mode === "current" ? "current" : "new");
+    const payload = buildPayload();
+    const result = await publishTheory(assessmentId.value, {
+      mode: mode === "current" ? "current" : "new",
+      ...payload,
+      metadata: currentVersion.value?.metadata || null,
+    });
     currentVersion.value = result.version;
-    draftVersion.value = null;
     applyVersion(result.version);
     showToast(result.createdNewVersion ? "Опубликована новая версия" : "Текущая версия обновлена", "success");
   } catch (err) {

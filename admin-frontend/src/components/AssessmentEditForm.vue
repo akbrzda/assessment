@@ -227,7 +227,7 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { updateAssessment } from "../api/assessments";
 import { getReferences, getUsers } from "../api/users";
-import { getAdminTheory, saveTheoryDraft, publishTheory } from "../api/theory";
+import { getAdminTheory, publishTheory } from "../api/theory";
 import Card from "./ui/Card.vue";
 import Input from "./ui/Input.vue";
 import Textarea from "./ui/Textarea.vue";
@@ -322,8 +322,7 @@ const persistTheoryVersion = async () => {
     return;
   }
   const payload = buildTheoryPayload(theoryData.value);
-  await saveTheoryDraft(props.assessment.id, payload);
-  await publishTheory(props.assessment.id, "new");
+  await publishTheory(props.assessment.id, { mode: "new", ...payload });
 };
 
 // Подсчёт пользователей, которые будут назначены
@@ -390,7 +389,7 @@ const loadTheory = async () => {
   try {
     const response = await getAdminTheory(props.assessment.id);
     const theory = response?.theory || null;
-    const version = theory?.draftVersion || theory?.currentVersion || null;
+    const version = theory?.currentVersion || null;
     if (version && (version.requiredBlocks?.length || version.optionalBlocks?.length)) {
       theoryEnabled.value = true;
       theoryData.value = mapVersionToTheoryData(version);

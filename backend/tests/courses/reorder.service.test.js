@@ -58,7 +58,7 @@ test("reorderSections: сохраняет порядок тем курса", asy
   const reorderedPayloads = [];
   const touchedPayloads = [];
   try {
-    coursesRepo.findById = async () => ({ id: 15, status: "draft" });
+    coursesRepo.findById = async () => ({ id: 15, status: "published" });
     coursesRepo.listSectionsByCourseId = async () => [{ id: 1 }, { id: 2 }, { id: 3 }];
     coursesRepo.getCourseByIdForAdmin = async () => ({ id: 15, sections: [{ id: 2 }, { id: 1 }, { id: 3 }] });
     mutationsRepo.reorderSections = async (courseId, sectionIds) => {
@@ -71,21 +71,21 @@ test("reorderSections: сохраняет порядок тем курса", asy
     const result = await contentService.reorderSections(15, [2, 1, 3], 77, createRequestStub(77));
     assert.equal(result.course.id, 15);
     assert.deepEqual(reorderedPayloads, [{ courseId: 15, sectionIds: [2, 1, 3] }]);
-    assert.deepEqual(touchedPayloads, [{ courseId: 15, userId: 77, shouldRevalidatePublished: false }]);
+    assert.deepEqual(touchedPayloads, [{ courseId: 15, userId: 77, shouldRevalidatePublished: true }]);
   } finally {
     restore();
   }
 });
 
-test("reorderSections: отклоняет редактирование опубликованного курса", async () => {
+test("reorderSections: отклоняет редактирование закрытого курса", async () => {
   const restore = withPatchedDependencies();
   try {
-    coursesRepo.findById = async () => ({ id: 15, status: "published" });
+    coursesRepo.findById = async () => ({ id: 15, status: "archived" });
     coursesRepo.listSectionsByCourseId = async () => [{ id: 1 }, { id: 2 }];
 
     await assert.rejects(
       () => contentService.reorderSections(15, [2, 1], 77, createRequestStub(77)),
-      (error) => error && error.status === 409 && /черновик изменений/i.test(error.message),
+      (error) => error && error.status === 409 && /закрытый курс нельзя редактировать/i.test(error.message),
     );
   } finally {
     restore();
@@ -95,7 +95,7 @@ test("reorderSections: отклоняет редактирование опуб�
 test("reorderSections: отклоняет запрос при несовпадающем составе тем", async () => {
   const restore = withPatchedDependencies();
   try {
-    coursesRepo.findById = async () => ({ id: 20, status: "draft" });
+    coursesRepo.findById = async () => ({ id: 20, status: "published" });
     coursesRepo.listSectionsByCourseId = async () => [{ id: 10 }, { id: 11 }];
     mutationsRepo.reorderSections = async () => {
       throw new Error("Не должно вызываться при невалидном составе");
@@ -115,7 +115,7 @@ test("reorderTopics: сохраняет порядок подтем в теме 
   const reorderedPayloads = [];
   const touchedPayloads = [];
   try {
-    coursesRepo.findSectionById = async () => ({ id: 5, courseId: 42, courseStatus: "draft" });
+    coursesRepo.findSectionById = async () => ({ id: 5, courseId: 42, courseStatus: "published" });
     coursesRepo.listTopicsBySectionId = async () => [{ id: 201 }, { id: 202 }];
     coursesRepo.getCourseByIdForAdmin = async () => ({ id: 42, sections: [{ id: 5, topics: [{ id: 202 }, { id: 201 }] }] });
     mutationsRepo.reorderTopics = async (sectionId, topicIds) => {
@@ -128,7 +128,7 @@ test("reorderTopics: сохраняет порядок подтем в теме 
     const result = await contentService.reorderTopics(42, 5, [202, 201], 13, createRequestStub(13));
     assert.equal(result.course.id, 42);
     assert.deepEqual(reorderedPayloads, [{ sectionId: 5, topicIds: [202, 201] }]);
-    assert.deepEqual(touchedPayloads, [{ courseId: 42, userId: 13, shouldRevalidatePublished: false }]);
+    assert.deepEqual(touchedPayloads, [{ courseId: 42, userId: 13, shouldRevalidatePublished: true }]);
   } finally {
     restore();
   }

@@ -4,8 +4,8 @@ const mutationsRepo = require("../coursesMutations.repository");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
 
 function ensureCourseEditable(courseStatus) {
-  if (courseStatus === "published") {
-    const error = new Error("Опубликованный курс нельзя редактировать напрямую. Используйте черновик изменений.");
+  if (courseStatus === "archived") {
+    const error = new Error("Закрытый курс нельзя редактировать.");
     error.status = 409;
     throw error;
   }
@@ -146,7 +146,7 @@ async function createTopic(sectionId, payload, userId, req) {
     const orderIndex = payload.orderIndex ?? (await mutationsRepo.getNextTopicOrder(sectionId, connection));
     if (payload.orderIndex) await mutationsRepo.shiftTopicsUp(sectionId, orderIndex, connection);
     const topicId = await mutationsRepo.insertTopic(sectionId, section.courseId, { ...payload, orderIndex }, connection);
-    await mutationsRepo.touchCourse(section.courseId, userId, false, connection);
+    await mutationsRepo.touchCourse(section.courseId, userId, section.courseStatus === "published", connection);
     await connection.commit();
 
     const topics = await coursesRepo.listTopicsBySectionId(sectionId);
@@ -285,7 +285,7 @@ async function updateTopic(topicId, payload, userId, req) {
       }
     }
     await mutationsRepo.updateTopicFields(topicId, payload, connection);
-    await mutationsRepo.touchCourse(topic.courseId, userId, false, connection);
+    await mutationsRepo.touchCourse(topic.courseId, userId, topic.courseStatus === "published", connection);
     await connection.commit();
 
     const topics = await coursesRepo.listTopicsBySectionId(topic.sectionId);
@@ -322,7 +322,7 @@ async function deleteTopic(topicId, userId, req) {
     ensureCourseEditable(topic.courseStatus);
     await mutationsRepo.deleteTopicById(topicId, connection);
     await mutationsRepo.compactTopicOrder(topic.sectionId, topic.orderIndex, connection);
-    await mutationsRepo.touchCourse(topic.courseId, userId, false, connection);
+    await mutationsRepo.touchCourse(topic.courseId, userId, topic.courseStatus === "published", connection);
     await connection.commit();
 
     const updatedCourse = await coursesRepo.getCourseByIdForAdmin(topic.courseId);

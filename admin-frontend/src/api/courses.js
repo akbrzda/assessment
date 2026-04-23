@@ -22,33 +22,6 @@ export const getCoursePreview = async (id) => {
   return response.data;
 };
 
-export const saveCourseDraft = async (id, payload) => {
-  return mutateWithInvalidation(async () => {
-    const response = await axios.post(`/admin/courses/${id}/draft`, payload);
-    return response.data;
-  }, /get:\/admin\/courses/i);
-};
-
-export const getCourseDraft = async (id) => {
-  const response = await axios.get(`/admin/courses/${id}/draft`, {
-    cacheMaxAge: 10000,
-  });
-  return response.data;
-};
-
-export const deleteCourseDraft = async (id) => {
-  return mutateWithInvalidation(async () => {
-    await axios.delete(`/admin/courses/${id}/draft`);
-  }, /get:\/admin\/courses/i);
-};
-
-export const publishCourseDraft = async (id) => {
-  return mutateWithInvalidation(async () => {
-    const response = await axios.post(`/admin/courses/${id}/publish-draft`);
-    return response.data;
-  }, /get:\/admin\/courses/i);
-};
-
 export const createCourse = async (payload) => {
   return mutateWithInvalidation(async () => {
     const response = await axios.post("/admin/courses", payload);
