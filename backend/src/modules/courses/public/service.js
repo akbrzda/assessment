@@ -21,6 +21,15 @@ function calculateReadingSeconds(text = "") {
   return Math.max(TOPIC_MIN_READING_SECONDS, Math.ceil((words / TOPIC_WORDS_PER_MINUTE) * 60));
 }
 
+async function assertCourseNotClosed({ courseId, userId }) {
+  const progress = await coursesRepository.getCourseProgressForUser(courseId, userId);
+  if (progress?.status === "closed") {
+    const error = new Error("Курс закрыт администратором");
+    error.status = 409;
+    throw error;
+  }
+}
+
 async function listCourses(userId, positionId, branchId) {
   return coursesRepository.listPublishedCoursesForUser(userId, positionId, branchId);
 }
