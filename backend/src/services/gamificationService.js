@@ -4,22 +4,6 @@ const logger = require("../utils/logger");
 const { buildAuditEntry, logAuditEvent } = require("./auditService");
 const rulesEngine = require("./gamificationRulesEngine");
 
-const BADGES = {
-  PERFECT: "perfect_run",
-  SPEED: "speedster",
-  COMPETENCE: "competence_90",
-  STREAK: "streak_master",
-  ALL_COMPLETED: "all_tests_completed",
-};
-
-const STREAK_MILESTONES = [
-  { value: 3, bonus: 25 },
-  { value: 5, bonus: 40 },
-  { value: 10, bonus: 75 },
-];
-
-const COMPETENCE_THRESHOLD = 90;
-
 function formatNumber(value) {
   return Number.isFinite(value) ? Number(value) : 0;
 }
@@ -122,7 +106,7 @@ async function processAnswerEvent({ userId, attemptId, assessmentId, questionId,
 
     if (totalEarned) {
       const newPoints = Math.max(0, (await gamificationModel.getUserContext(userId, connection)).points + totalEarned);
-      // Без изменения уровня на ответах (уровень пересчитается при завершении попытки или суммарно)
+      // РЈСЂРѕРІРµРЅСЊ РЅРµ РјРµРЅСЏРµС‚СЃСЏ РЅР° РѕС‚РІРµС‚Р°С…, С‚РѕР»СЊРєРѕ РїСЂРё Р·Р°РІРµСЂС€РµРЅРёРё РїРѕРїС‹С‚РєРё РёР»Рё Р°РіСЂРµРіРёСЂРѕРІР°РЅРЅРѕРј РїРµСЂРµСЃС‡РµС‚Рµ.
       await gamificationModel.updateUserProgress(userId, { points: newPoints }, connection);
     }
 
@@ -134,7 +118,7 @@ async function processAnswerEvent({ userId, attemptId, assessmentId, questionId,
           attemptId,
           eventType: e.type,
           pointsDelta: Math.round(e.points),
-          description: e.description || (answerCorrect ? "Верный ответ" : "Неверный ответ"),
+          description: e.description || (answerCorrect ? "Р’РµСЂРЅС‹Р№ РѕС‚РІРµС‚" : "РќРµРІРµСЂРЅС‹Р№ РѕС‚РІРµС‚"),
           branchId: user.branchId,
           positionId: user.positionId,
         },
@@ -162,7 +146,7 @@ async function processAnswerEvent({ userId, attemptId, assessmentId, questionId,
 
     await connection.commit();
 
-    // Аудит (асинхронно)
+    // Р В РЎвЂ™Р РЋРЎвЂњР В РўвЂР В РЎвЂР РЋРІР‚С™ (Р В Р’В°Р РЋР С“Р В РЎвЂР В Р вЂ¦Р РЋРІР‚В¦Р РЋР вЂљР В РЎвЂўР В Р вЂ¦Р В Р вЂ¦Р В РЎвЂў)
     const entry = buildAuditEntry({
       scope: "system",
       action: "gamification.answer.reward",
@@ -236,7 +220,7 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
     const badgesToAward = new Set();
     const now = new Date();
 
-    // Рассчёт через движок правил (если включён), иначе старая логика
+    // Р В Р’В Р В Р’В°Р РЋР С“Р РЋР С“Р РЋРІР‚РЋР РЋРІР‚ВР РЋРІР‚С™ Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В· Р В РўвЂР В Р вЂ Р В РЎвЂР В Р’В¶Р В РЎвЂўР В РЎвЂќ Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В РЎвЂР В Р’В» (Р В Р’ВµР РЋР С“Р В Р’В»Р В РЎвЂ Р В Р вЂ Р В РЎвЂќР В Р’В»Р РЋР вЂ№Р РЋРІР‚РЋР РЋРІР‚ВР В Р вЂ¦), Р В РЎвЂР В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’Вµ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР В Р’В°Р РЋР РЏ Р В Р’В»Р В РЎвЂўР В РЎвЂ“Р В РЎвЂР В РЎвЂќР В Р’В°
     const hasTimeLimit = assessment.timeLimitMinutes != null && Number(assessment.timeLimitMinutes) > 0;
     const timeSpentSeconds = formatNumber(attempt.timeSpentSeconds);
     const totalSeconds = hasTimeLimit ? Number(assessment.timeLimitMinutes) * 60 : 0;
@@ -258,73 +242,20 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
       combine: "additive",
     });
 
-    let totalEarned = 0;
-    if (engineResult.usedRules) {
-      events = engineResult.events.map((e) => buildEvent(e.type, e.points, e.description));
-      totalEarned = events.reduce((sum, e) => sum + (e.points || 0), 0);
-      for (const code of engineResult.badges) {
-        badgesToAward.add(code);
-      }
-    } else {
-      // Fallback к текущей логике
-      totalEarned = Math.max(0, Math.round(formatNumber(attempt.scorePercent)));
-      if (totalEarned > 0) {
-        events.push(buildEvent("base", totalEarned, `Результат ${formatNumber(attempt.scorePercent)}%`));
-      }
-
-      if (attempt.totalQuestions && attempt.totalQuestions > 0 && attempt.correctAnswers === attempt.totalQuestions) {
-        const perfectBonus = 40;
-        totalEarned += perfectBonus;
-        events.push(buildEvent("perfect_bonus", perfectBonus, "Прохождение без ошибок"));
-        badgesToAward.add(BADGES.PERFECT);
-      }
-
-      if (formatNumber(attempt.scorePercent) >= COMPETENCE_THRESHOLD) {
-        const competenceBonus = 20;
-        totalEarned += competenceBonus;
-        events.push(buildEvent("competence_bonus", competenceBonus, "Высокий результат (90%+)"));
-        badgesToAward.add(BADGES.COMPETENCE);
-      }
-
-      if (passed && hasTimeLimit && timeSpentSeconds > 0 && totalSeconds > 0) {
-        const ratio = timeSpentSeconds / totalSeconds;
-        let speedBonus = 0;
-        if (ratio <= 0.5) {
-          speedBonus = 25;
-          badgesToAward.add(BADGES.SPEED);
-        } else if (ratio <= 0.7) {
-          speedBonus = 15;
-        } else if (ratio <= 0.85) {
-          speedBonus = 10;
-        }
-        if (speedBonus > 0) {
-          totalEarned += speedBonus;
-          events.push(buildEvent("speed_bonus", speedBonus, "Быстрое прохождение теста"));
-        }
-      }
+    if (!engineResult.usedRules) {
+      await connection.rollback();
+      return { skipped: true, reason: "no_matching_rules" };
     }
 
-    let currentStreak = passed ? (stats.currentStreak || 0) + 1 : 0;
-    let longestStreak = stats.longestStreak || 0;
-    let lastStreakAward = passed ? stats.lastStreakAward || 0 : 0;
-
-    if (passed) {
-      if (currentStreak > longestStreak) {
-        longestStreak = currentStreak;
-      }
-      if (!engineResult.usedRules) {
-        for (const milestone of STREAK_MILESTONES) {
-          if (currentStreak >= milestone.value && milestone.value > lastStreakAward) {
-            totalEarned += milestone.bonus;
-            events.push(buildEvent("streak_bonus", milestone.bonus, `Серия ${currentStreak} успешных тестов`));
-            lastStreakAward = milestone.value;
-            if (milestone.value >= 5) {
-              badgesToAward.add(BADGES.STREAK);
-            }
-          }
-        }
-      }
+    events = engineResult.events.map((e) => buildEvent(e.type, e.points, e.description));
+    const totalEarned = events.reduce((sum, e) => sum + (e.points || 0), 0);
+    for (const code of engineResult.badges) {
+      badgesToAward.add(code);
     }
+
+    const currentStreak = passed ? (stats.currentStreak || 0) + 1 : 0;
+    const longestStreak = currentStreak > (stats.longestStreak || 0) ? currentStreak : stats.longestStreak || 0;
+    const lastStreakAward = passed ? stats.lastStreakAward || 0 : 0;
 
     const statsUpdate = {
       currentStreak,
@@ -367,11 +298,7 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
     if (passed) {
       const assignmentState = await hasUnfinishedAssignments(connection, userId);
       if (assignmentState.totalAssigned > 0 && assignmentState.unfinished === 0) {
-        if (engineResult.usedRules) {
-          badgesToAward.add("all_tests_completed");
-        } else {
-          badgesToAward.add(BADGES.ALL_COMPLETED);
-        }
+        badgesToAward.add("all_tests_completed");
       }
     }
 
@@ -431,16 +358,16 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
     };
 
     logContext.lines.push(
-      `🎮 <b>Геймификация</b>`,
-      `Пользователь: ${user.firstName} ${user.lastName} (ID: ${userId})`,
-      `Очки: +${totalEarned} → ${newPoints}`,
-      `Результат: ${formatNumber(attempt.scorePercent)}% (${passed ? "успешно" : "неуспешно"})`
+      `<b>Р“РµР№РјРёС„РёРєР°С†РёСЏ</b>`,
+      `РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ: ${user.firstName} ${user.lastName} (ID: ${userId})`,
+      `РћС‡РєРё: +${totalEarned} -> ${newPoints}`,
+      `Р РµР·СѓР»СЊС‚Р°С‚: ${formatNumber(attempt.scorePercent)}% (${passed ? "СѓСЃРїРµС€РЅРѕ" : "РЅРµСѓСЃРїРµС€РЅРѕ"})`
     );
     if (previousLevel !== newLevel) {
-      logContext.lines.push(`Уровень: ${previousLevel} → ${newLevel}`);
+      logContext.lines.push(`Уровень: ${previousLevel} -> ${newLevel}`);
     }
     if (awardedBadges.length) {
-      logContext.lines.push(`Бейджи: ${awardedBadges.map((badge) => `${badge.icon || "🎖"} ${badge.name}`).join(", ")}`);
+      logContext.lines.push(`Бейджи: ${awardedBadges.map((badge) => `${badge.icon || "*"} ${badge.name}`).join(", ")}`);
     }
     if (logContext.lines.length) {
       logContext.message = logContext.lines.join("\n");

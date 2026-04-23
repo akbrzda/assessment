@@ -3,6 +3,14 @@ const coursesRepo = require("../courses.repository");
 const mutationsRepo = require("../coursesMutations.repository");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
 
+function ensureCourseEditable(courseStatus) {
+  if (courseStatus === "published") {
+    const error = new Error("Опубликованный курс нельзя редактировать напрямую. Используйте черновик изменений.");
+    error.status = 409;
+    throw error;
+  }
+}
+
 // ─── Разделы ────────────────────────────────────────────────────────────────
 
 async function createSection(courseId, payload, userId, req) {
@@ -15,6 +23,7 @@ async function createSection(courseId, payload, userId, req) {
       error.status = 404;
       throw error;
     }
+    ensureCourseEditable(course.status);
     const orderIndex = payload.orderIndex ?? (await mutationsRepo.getNextSectionOrder(courseId, connection));
     if (payload.orderIndex) await mutationsRepo.shiftSectionsUp(courseId, orderIndex, connection);
     const sectionId = await mutationsRepo.insertSection(courseId, { ...payload, orderIndex }, connection);
@@ -52,6 +61,7 @@ async function updateSection(sectionId, payload, userId, req) {
       error.status = 404;
       throw error;
     }
+    ensureCourseEditable(section.courseStatus);
     if (payload.orderIndex !== undefined && Number(payload.orderIndex) !== section.orderIndex) {
       const target = Number(payload.orderIndex);
       if (target > section.orderIndex) {
@@ -95,6 +105,7 @@ async function deleteSection(sectionId, userId, req) {
       error.status = 404;
       throw error;
     }
+    ensureCourseEditable(section.courseStatus);
     await mutationsRepo.deleteSectionById(sectionId, connection);
     await mutationsRepo.compactSectionOrder(section.courseId, section.orderIndex, connection);
     await mutationsRepo.touchCourse(section.courseId, userId, section.courseStatus === "published", connection);
@@ -131,6 +142,7 @@ async function createTopic(sectionId, payload, userId, req) {
       error.status = 404;
       throw error;
     }
+    ensureCourseEditable(section.courseStatus);
     const orderIndex = payload.orderIndex ?? (await mutationsRepo.getNextTopicOrder(sectionId, connection));
     if (payload.orderIndex) await mutationsRepo.shiftTopicsUp(sectionId, orderIndex, connection);
     const topicId = await mutationsRepo.insertTopic(sectionId, section.courseId, { ...payload, orderIndex }, connection);
@@ -168,6 +180,7 @@ async function reorderSections(courseId, sectionIds, userId, req) {
       error.status = 404;
       throw error;
     }
+    ensureCourseEditable(course.status);
 
     const sections = await coursesRepo.listSectionsByCourseId(courseId, { connection, forUpdate: true });
     const dbIds = sections.map((section) => Number(section.id)).sort((a, b) => a - b);
@@ -211,6 +224,7 @@ async function reorderTopics(courseId, sectionId, topicIds, userId, req) {
       error.status = 404;
       throw error;
     }
+    ensureCourseEditable(section.courseStatus);
 
     const topics = await coursesRepo.listTopicsBySectionId(sectionId, { connection });
     const dbIds = topics.map((topic) => Number(topic.id)).sort((a, b) => a - b);
@@ -254,6 +268,7 @@ async function updateTopic(topicId, payload, userId, req) {
       error.status = 404;
       throw error;
     }
+    ensureCourseEditable(topic.courseStatus);
     const resolvedHasMaterial = payload.hasMaterial !== undefined ? payload.hasMaterial : topic.hasMaterial;
     const resolvedAssessmentId = payload.assessmentId !== undefined ? payload.assessmentId || null : topic.assessmentId;
     if (!resolvedHasMaterial && !resolvedAssessmentId) {
@@ -304,6 +319,7 @@ async function deleteTopic(topicId, userId, req) {
       error.status = 404;
       throw error;
     }
+    ensureCourseEditable(topic.courseStatus);
     await mutationsRepo.deleteTopicById(topicId, connection);
     await mutationsRepo.compactTopicOrder(topic.sectionId, topic.orderIndex, connection);
     await mutationsRepo.touchCourse(topic.courseId, userId, false, connection);

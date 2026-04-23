@@ -1,11 +1,11 @@
 const { pool } = require("../config/database");
 
-function normalizeDate(value, fallback) {
+function normalizeDate(value, defaultValue) {
   if (!value) {
-    return fallback || null;
+    return defaultValue || null;
   }
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? fallback || null : new Date(date.toISOString().slice(0, 19));
+  return Number.isNaN(date.getTime()) ? defaultValue || null : new Date(date.toISOString().slice(0, 19));
 }
 
 function buildUserFilters({ branchId, positionId, managerBranchId }) {

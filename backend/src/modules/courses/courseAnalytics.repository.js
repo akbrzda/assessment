@@ -9,13 +9,17 @@ async function ensureCourseAnalyticsSchema() {
 
   schemaValidationPromise = pool
     .query(
-      `SELECT table_name
+      `SELECT table_name AS tableName
          FROM information_schema.tables
         WHERE table_schema = DATABASE()
           AND table_name IN ('course_sections', 'course_section_user_progress')`,
     )
     .then(([rows]) => {
-      const existingTables = new Set(rows.map((row) => row.table_name));
+      const existingTables = new Set(
+        rows
+          .map((row) => String(row.tableName || row.table_name || row.TABLE_NAME || "").trim().toLowerCase())
+          .filter(Boolean),
+      );
       const missingTables = [];
       if (!existingTables.has("course_sections")) missingTables.push("course_sections");
       if (!existingTables.has("course_section_user_progress")) missingTables.push("course_section_user_progress");

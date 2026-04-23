@@ -54,12 +54,10 @@ jobs:
           INVITE_EXPIRATION_DAYS=${{ secrets.BACKEND_INVITE_EXPIRATION_DAYS }}
           SUPERADMIN_IDS=${{ secrets.BACKEND_SUPERADMIN_IDS }}
 
-          REDIS_URL=${{ secrets.BACKEND_REDIS_URL }}
-          REDIS_HOST=${{ secrets.BACKEND_REDIS_HOST }}
-          REDIS_PORT=${{ secrets.BACKEND_REDIS_PORT }}
-          REDIS_DB=${{ secrets.BACKEND_REDIS_DB }}
-          REDIS_USERNAME=${{ secrets.BACKEND_REDIS_USERNAME }}
-          REDIS_PASSWORD=${{ secrets.BACKEND_REDIS_PASSWORD }}
+          REDIS_HOST=${{ secrets.REDIS_HOST }}
+          REDIS_PORT=${{ secrets.REDIS_PORT }}
+          REDIS_DB=${{ secrets.REDIS_DB }}
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
           EOF
 
       - name: Setup SSH
@@ -111,6 +109,16 @@ jobs:
           script: |
             cd /var/www/backend.theorica.ru
             npm run migrate
+
+      - name: Verify required database tables
+        uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /var/www/backend.theorica.ru
+            npm run schema:check:courses
 
       - name: Restart application with PM2
         uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f

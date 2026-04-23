@@ -33,12 +33,17 @@ async function listCoursesForAdmin({ status, search } = {}) {
   const [rows] = await pool.execute(
     `SELECT c.id, c.title, c.description, c.cover_url, c.category, c.tags, c.availability_mode, c.availability_days, c.availability_from, c.availability_to, c.status, c.version, c.final_assessment_id,
             c.created_by, c.updated_by, c.published_at, c.archived_at, c.created_at, c.updated_at,
-            (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id) AS sections_count
+            (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id) AS sections_count,
+            EXISTS(SELECT 1 FROM course_drafts cd WHERE cd.course_id = c.id) AS has_draft
        FROM courses c ${where}
       ORDER BY c.updated_at DESC, c.id DESC`,
     params,
   );
-  return rows.map((row) => ({ ...mapCourseRow(row), sectionsCount: Number(row.sections_count || 0) }));
+  return rows.map((row) => ({
+    ...mapCourseRow(row),
+    sectionsCount: Number(row.sections_count || 0),
+    hasDraft: Boolean(Number(row.has_draft || 0)),
+  }));
 }
 
 async function getCourseByIdForAdmin(courseId) {

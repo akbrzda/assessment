@@ -18,7 +18,7 @@ function parsePairs(raw) {
     }
 
     if (Array.isArray(parsed) && parsed.every((item) => Number.isInteger(Number(item)))) {
-      return { kind: 'legacy_ids', pairs: [] };
+      return { kind: 'ids_only', pairs: [] };
     }
 
     return { kind: 'unknown', pairs: [] };
@@ -42,7 +42,7 @@ async function main() {
 
     const affectedAttemptIds = new Set();
     let updatedAnswers = 0;
-    let skippedLegacy = 0;
+    let skippedIdsOnly = 0;
     let skippedUnknown = 0;
 
     if (applyChanges) {
@@ -51,8 +51,8 @@ async function main() {
 
     for (const row of rows) {
       const parsed = parsePairs(row.selected_option_ids);
-      if (parsed.kind === 'legacy_ids') {
-        skippedLegacy += 1;
+      if (parsed.kind === 'ids_only') {
+        skippedIdsOnly += 1;
         continue;
       }
       if (parsed.kind !== 'pairs') {
@@ -108,7 +108,7 @@ async function main() {
       mode: applyChanges ? 'apply' : 'dry-run',
       scannedMatchingAnswers: rows.length,
       updatableAnswers: updatedAnswers,
-      skippedLegacyAnswers: skippedLegacy,
+      skippedIdsOnlyAnswers: skippedIdsOnly,
       skippedUnknownAnswers: skippedUnknown,
       affectedAttempts: affectedAttemptIds.size,
       recalculatedAttempts,

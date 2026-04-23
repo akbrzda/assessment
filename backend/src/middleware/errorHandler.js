@@ -8,6 +8,9 @@ function errorHandler(err, req, res, next) {
   if (err.code && status !== 500) {
     payload.code = err.code;
   }
+  if (err.meta?.validationErrors && Array.isArray(err.meta.validationErrors) && status !== 500) {
+    payload.validationErrors = err.meta.validationErrors;
+  }
   res.status(status).json(payload);
 }
 

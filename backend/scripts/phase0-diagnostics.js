@@ -19,7 +19,7 @@ async function loadDbDiagnostics() {
   const [matchingAttemptsRows] = await pool.query(
     `SELECT aa.id AS attempt_id, aa.assessment_id, a.title,
             SUM(CASE WHEN q.question_type = 'matching' THEN 1 ELSE 0 END) AS matching_answers,
-            SUM(CASE WHEN q.question_type = 'matching' AND ans.selected_option_ids REGEXP '^\\\\[[0-9, ]+\\\\]$' THEN 1 ELSE 0 END) AS probable_legacy_answers
+            SUM(CASE WHEN q.question_type = 'matching' AND ans.selected_option_ids REGEXP '^\\\\[[0-9, ]+\\\\]$' THEN 1 ELSE 0 END) AS probable_ids_only_answers
      FROM assessment_attempts aa
      JOIN assessments a ON a.id = aa.assessment_id
      JOIN assessment_answers ans ON ans.attempt_id = aa.id
@@ -69,7 +69,7 @@ function loadRouteDiagnostics() {
 }
 
 function buildSummary({ db, route }) {
-  const probableLegacy = db.attemptsWithMatchingAnswers.filter((row) => Number(row.probable_legacy_answers || 0) > 0).length;
+  const probableIdsOnly = db.attemptsWithMatchingAnswers.filter((row) => Number(row.probable_ids_only_answers || 0) > 0).length;
   return {
     generatedAtUtc: new Date().toISOString(),
     env: {
@@ -82,7 +82,7 @@ function buildSummary({ db, route }) {
     checks: {
       matchingAssessmentsCount: db.matchingAssessments.length,
       attemptsWithMatchingAnswersCount: db.attemptsWithMatchingAnswers.length,
-      attemptsWithProbableLegacyMatchingFormatCount: probableLegacy,
+      attemptsWithProbableIdsOnlyMatchingFormatCount: probableIdsOnly,
       staleInProgressAttemptsCount: db.staleInProgressAttempts.length,
       activeAssessmentsWithInProgressAttemptsCount: db.assessmentsWithActiveInProgressAttempts.length,
       registrationRouteExists: route.registrationRouteExists,

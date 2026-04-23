@@ -39,7 +39,7 @@ async function ensureMigrationsTable(connection) {
   `);
 }
 
-async function seedJournalIfFirstTime(connection, files) {
+async function seedJournalIfFirstTime(connection) {
   const [[{ cnt }]] = await connection.query("SELECT COUNT(*) AS cnt FROM migrations");
   if (Number(cnt) > 0) return false;
 
@@ -49,14 +49,10 @@ async function seedJournalIfFirstTime(connection, files) {
   );
   if (!Number(tableExists)) return false;
 
-  // База существующая, журнал пустой — первичная инициализация
-  console.info("[migrate] Обнаружена существующая схема без журнала — инициализация журнала миграций...");
-  for (const file of files) {
-    await connection.query("INSERT IGNORE INTO migrations (name) VALUES (?)", [file]);
-    console.info(`[migrate]   зафиксирована как применённая: ${file}`);
-  }
-  console.info("[migrate] Журнал инициализирован. Новые миграции будут применяться при следующем запуске.");
-  return true;
+  // База существующая, журнал пустой — безопаснее выполнить миграции реально,
+  // а не помечать их применёнными вслепую.
+  console.info("[migrate] Обнаружена существующая схема без журнала — выполняем миграции последовательно.");
+  return false;
 }
 
 async function runMigrations() {
@@ -81,7 +77,7 @@ async function runMigrations() {
   try {
     await ensureMigrationsTable(connection);
 
-    const seeded = await seedJournalIfFirstTime(connection, files);
+    const seeded = await seedJournalIfFirstTime(connection);
     if (seeded) return;
 
     const [rows] = await connection.query("SELECT name FROM migrations ORDER BY id ASC");

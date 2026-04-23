@@ -7,7 +7,33 @@
         <Badge :variant="getStatusVariant(course.status)" rounded>
           {{ getStatusLabel(course.status) }}
         </Badge>
-        <Button v-if="course.status === 'draft'" variant="success" icon="send" :loading="publishing" @click="handlePublish"> Опубликовать </Button>
+        <Button
+          v-if="course.status === 'draft' || (course.status === 'published' && hasDraftChanges)"
+          variant="success"
+          icon="send"
+          :loading="publishing"
+          @click="handlePublish"
+        >
+          {{ course.status === "draft" ? "Опубликовать" : "Опубликовать изменения" }}
+        </Button>
+        <Button
+          v-if="course.status === 'published' && !hasDraftChanges"
+          variant="secondary"
+          icon="pencil"
+          :loading="openingDraft"
+          @click="handleOpenDraft"
+        >
+          Открыть черновик
+        </Button>
+        <Button
+          v-if="course.status === 'published' && hasDraftChanges"
+          variant="danger"
+          icon="x"
+          :loading="discardingDraft"
+          @click="handleDiscardDraft"
+        >
+          Отменить черновик
+        </Button>
         <Button v-if="course.status === 'published'" variant="secondary" icon="archive" :loading="archiving" @click="handleArchive">
           Закрыть курс
         </Button>
@@ -513,6 +539,15 @@
             </li>
           </ul>
         </div>
+
+        <div v-if="previewWarnings.length > 0" class="publication-warnings">
+          <h3>Предупреждения о влиянии изменений</h3>
+          <ul>
+            <li v-for="(warning, index) in previewWarnings" :key="`preview-warning-${index}`">
+              {{ warning }}
+            </li>
+          </ul>
+        </div>
       </Card>
 
       <div class="wizard-navigation">
@@ -529,9 +564,17 @@
         >
           Опубликовать курс
         </Button>
-        <Button v-else-if="course?.status === 'published'" variant="secondary" icon="archive" :loading="archiving" @click="handleArchive">
-          Закрыть курс
+        <Button
+          v-else-if="course?.status === 'published' && hasDraftChanges"
+          variant="success"
+          icon="send"
+          :loading="publishing"
+          @click="handlePublish"
+          :disabled="publicationErrorsForDisplay.length > 0"
+        >
+          Опубликовать изменения
         </Button>
+        <Button v-else-if="course?.status === 'published'" variant="secondary" icon="archive" :loading="archiving" @click="handleArchive">Закрыть курс</Button>
       </div>
 
       <!-- Блок назначения курса -->
@@ -761,7 +804,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import draggable from "vuedraggable";
 import { Badge, Button, Card, Input, Modal, Preloader, Select, Textarea } from "../components/ui";
@@ -779,6 +822,11 @@ import {
   reorderCourseTopics,
   deleteCourseTopic,
   getCourseById,
+  getCoursePreview,
+  getCourseDraft,
+  saveCourseDraft,
+  deleteCourseDraft,
+  publishCourseDraft,
   publishCourse,
   uploadCourseCover,
   updateCourse,
@@ -807,9 +855,16 @@ const saving = ref(false);
 const publishing = ref(false);
 const archiving = ref(false);
 const uploadingCover = ref(false);
+const openingDraft = ref(false);
+const discardingDraft = ref(false);
 const selectedCoverFile = ref(null);
 const draftSaveState = ref("saved");
 const draftSavedAt = ref(null);
+const draftMeta = ref(null);
+const previewWarnings = ref([]);
+const autoSaveEnabled = ref(false);
+const tempIdCounter = ref(-1);
+let autoSaveTimer = null;
 
 const sectionDrafts = ref({});
 const sectionErrors = ref({});
@@ -880,6 +935,8 @@ const isEditMode = computed(() => {
 });
 
 const courseId = computed(() => Number(route.params.id));
+const isPublishedCourse = computed(() => course.value?.status === "published");
+const hasDraftChanges = computed(() => Boolean(draftMeta.value));
 
 const publicationErrors = computed(() => {
   return course.value?.publication?.errors || [];
@@ -978,6 +1035,11 @@ const parseTags = (value) => {
     .slice(0, 20);
 };
 
+const getNextTempId = () => {
+  tempIdCounter.value -= 1;
+  return tempIdCounter.value;
+};
+
 const toLocalDateTimeInput = (iso) => {
   if (!iso) return "";
   const date = new Date(iso);
@@ -1069,8 +1131,11 @@ const applyCourseToForm = (courseItem) => {
 };
 
 const loadCourse = async () => {
+  autoSaveEnabled.value = false;
   if (!isEditMode.value) {
     course.value = null;
+    draftMeta.value = null;
+    previewWarnings.value = [];
     form.value = {
       title: "",
       description: "",
@@ -1083,6 +1148,8 @@ const loadCourse = async () => {
       availabilityFrom: "",
       availabilityTo: "",
     };
+    await nextTick();
+    autoSaveEnabled.value = true;
     return;
   }
 
@@ -1096,14 +1163,31 @@ const loadCourse = async () => {
     course.value = courseResponse.course;
     applyCourseToForm(courseResponse.course);
     syncSectionDrafts(courseResponse.course.sections || []);
+    draftMeta.value = null;
+
+    if (courseResponse.course?.status === "published") {
+      const draftResponse = await getCourseDraft(courseId.value);
+      if (draftResponse?.draft?.payload) {
+        draftMeta.value = {
+          id: draftResponse.draft.id,
+          updatedAt: draftResponse.draft.updatedAt,
+          versionLabel: draftResponse.draft.versionLabel || null,
+        };
+        applyDraftPayload(draftResponse.draft.payload);
+      }
+    }
+
     selectedPositionIds.value = (targetsResponse.positions || []).map((p) => p.id);
     selectedBranchIds.value = (targetsResponse.branches || []).map((b) => b.id);
     assignments.value = assignmentsResponse.assignments || [];
+    await loadPreview();
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось загрузить курс"), "error");
     router.push("/courses");
   } finally {
     loading.value = false;
+    await nextTick();
+    autoSaveEnabled.value = true;
   }
 };
 
@@ -1138,6 +1222,144 @@ const validateCourse = () => {
   return true;
 };
 
+const normalizeLocalStructure = () => {
+  if (!course.value?.sections) return;
+  course.value.sections.forEach((section, sectionIndex) => {
+    section.orderIndex = sectionIndex + 1;
+    if (!Array.isArray(section.topics)) {
+      section.topics = [];
+    }
+    section.topics.forEach((topic, topicIndex) => {
+      topic.orderIndex = topicIndex + 1;
+    });
+  });
+};
+
+const buildDraftPayload = () => {
+  const sections = (course.value?.sections || []).map((section, sectionIndex) => ({
+    title: String(section.title || "").trim(),
+    description: String(section.description || ""),
+    orderIndex: sectionIndex + 1,
+    assessmentId: sanitizeOptionalNumber(section.assessmentId),
+    isRequired: section.isRequired !== false,
+    estimatedMinutes: sanitizeOptionalNumber(section.estimatedMinutes),
+    topics: (section.topics || []).map((topic, topicIndex) => ({
+      title: String(topic.title || "").trim(),
+      orderIndex: topicIndex + 1,
+      isRequired: topic.isRequired !== false,
+      hasMaterial: Boolean(topic.hasMaterial),
+      content: topic.hasMaterial ? String(topic.content || "") : null,
+      assessmentId: sanitizeOptionalNumber(topic.assessmentId),
+    })),
+  }));
+
+  return {
+    course: {
+      title: String(form.value.title || "").trim(),
+      description: String(form.value.description || ""),
+      coverUrl: form.value.coverUrl?.trim() || null,
+      category: form.value.category?.trim() || null,
+      tags: parseTags(form.value.tagsInput),
+      finalAssessmentId: sanitizeOptionalNumber(form.value.finalAssessmentId),
+      availabilityMode: form.value.availabilityMode || "unlimited",
+      availabilityDays: form.value.availabilityMode === "relative_days" ? sanitizeOptionalNumber(form.value.availabilityDays) : null,
+      availabilityFrom: form.value.availabilityMode === "fixed_dates" && form.value.availabilityFrom ? new Date(form.value.availabilityFrom).toISOString() : null,
+      availabilityTo: form.value.availabilityMode === "fixed_dates" && form.value.availabilityTo ? new Date(form.value.availabilityTo).toISOString() : null,
+    },
+    sections,
+  };
+};
+
+const applyDraftPayload = (payload) => {
+  if (!payload?.course) return;
+  const draftCourse = payload.course;
+  form.value = {
+    title: draftCourse.title || "",
+    description: draftCourse.description || "",
+    coverUrl: draftCourse.coverUrl || "",
+    category: draftCourse.category || "",
+    tagsInput: Array.isArray(draftCourse.tags) ? draftCourse.tags.join(", ") : "",
+    finalAssessmentId: draftCourse.finalAssessmentId ? String(draftCourse.finalAssessmentId) : "",
+    availabilityMode: draftCourse.availabilityMode || "unlimited",
+    availabilityDays: draftCourse.availabilityDays ? String(draftCourse.availabilityDays) : "",
+    availabilityFrom: toLocalDateTimeInput(draftCourse.availabilityFrom),
+    availabilityTo: toLocalDateTimeInput(draftCourse.availabilityTo),
+  };
+
+  const draftSections = Array.isArray(payload.sections) ? payload.sections : [];
+  if (course.value) {
+    course.value.sections = draftSections.map((section, sectionIndex) => ({
+      id: getNextTempId(),
+      title: section.title || "",
+      description: section.description || "",
+      orderIndex: Number(section.orderIndex || sectionIndex + 1),
+      assessmentId: sanitizeOptionalNumber(section.assessmentId),
+      isRequired: section.isRequired !== false,
+      estimatedMinutes: sanitizeOptionalNumber(section.estimatedMinutes),
+      topics: (Array.isArray(section.topics) ? section.topics : []).map((topic, topicIndex) => ({
+        id: getNextTempId(),
+        title: topic.title || "",
+        orderIndex: Number(topic.orderIndex || topicIndex + 1),
+        isRequired: topic.isRequired !== false,
+        hasMaterial: Boolean(topic.hasMaterial),
+        content: topic.hasMaterial ? topic.content || "" : "",
+        assessmentId: sanitizeOptionalNumber(topic.assessmentId),
+      })),
+    }));
+    normalizeLocalStructure();
+    syncSectionDrafts(course.value.sections || []);
+  }
+};
+
+const persistDraft = async ({ silent = false } = {}) => {
+  if (!isEditMode.value || !isPublishedCourse.value) return true;
+  draftSaveState.value = "saving";
+  try {
+    const response = await saveCourseDraft(courseId.value, { payload: buildDraftPayload() });
+    draftMeta.value = response?.draft || null;
+    draftSaveState.value = "saved";
+    draftSavedAt.value = new Date().toISOString();
+    if (currentStep.value === 4) {
+      await loadPreview();
+    }
+    if (!silent) {
+      showToast("Черновик сохранен", "success");
+    }
+    return true;
+  } catch (error) {
+    draftSaveState.value = "error";
+    showToast(getErrorMessage(error, "Не удалось сохранить черновик"), "error");
+    return false;
+  }
+};
+
+const scheduleAutoSaveDraft = () => {
+  if (!isEditMode.value || !isPublishedCourse.value || !autoSaveEnabled.value) {
+    return;
+  }
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+  }
+  draftSaveState.value = "saving";
+  autoSaveTimer = setTimeout(async () => {
+    autoSaveTimer = null;
+    await persistDraft({ silent: true });
+  }, 2000);
+};
+
+const loadPreview = async () => {
+  if (!isEditMode.value || !course.value) {
+    previewWarnings.value = [];
+    return;
+  }
+  try {
+    const response = await getCoursePreview(courseId.value);
+    previewWarnings.value = Array.isArray(response?.warnings) ? response.warnings : [];
+  } catch {
+    previewWarnings.value = [];
+  }
+};
+
 const handleCoverFileChange = (event) => {
   const file = event?.target?.files?.[0] || null;
   selectedCoverFile.value = file;
@@ -1150,6 +1372,10 @@ const handleCoverUpload = async () => {
   }
   if (!selectedCoverFile.value) {
     showToast("Выберите файл обложки", "error");
+    return;
+  }
+  if (isPublishedCourse.value) {
+    showToast("Для опубликованного курса измените обложку через черновик и ссылку на шаге 1", "error");
     return;
   }
 
@@ -1192,13 +1418,21 @@ const saveCourse = async () => {
   draftSaveState.value = "saving";
   try {
     if (isEditMode.value) {
-      const response = await updateCourse(courseId.value, payload);
-      course.value = {
-        ...course.value,
-        ...response.course,
-      };
-      showToast("Курс обновлен", "success");
-      await loadCourse();
+      if (isPublishedCourse.value) {
+        if (course.value) {
+          course.value = { ...course.value, ...payload };
+        }
+        const saved = await persistDraft({ silent: false });
+        if (!saved) return false;
+      } else {
+        const response = await updateCourse(courseId.value, payload);
+        course.value = {
+          ...course.value,
+          ...response.course,
+        };
+        showToast("Курс обновлен", "success");
+        await loadCourse();
+      }
     } else {
       const response = await createCourse(payload);
       showToast("Курс создан", "success");
@@ -1326,9 +1560,27 @@ const addSection = async () => {
       isRequired: Boolean(newSection.value.isRequired),
       estimatedMinutes: sanitizeOptionalNumber(newSection.value.estimatedMinutes),
     };
-    const response = await createCourseSection(courseId.value, payload);
-    course.value = response.course;
-    syncSectionDrafts(response.course.sections || []);
+    if (isPublishedCourse.value) {
+      const nextSections = [...(course.value?.sections || [])];
+      nextSections.push({
+        id: getNextTempId(),
+        title: payload.title,
+        description: payload.description,
+        orderIndex: payload.orderIndex || nextSections.length + 1,
+        assessmentId: payload.assessmentId,
+        isRequired: payload.isRequired,
+        estimatedMinutes: payload.estimatedMinutes,
+        topics: [],
+      });
+      course.value.sections = nextSections;
+      normalizeLocalStructure();
+      syncSectionDrafts(course.value.sections || []);
+      await persistDraft({ silent: true });
+    } else {
+      const response = await createCourseSection(courseId.value, payload);
+      course.value = response.course;
+      syncSectionDrafts(response.course.sections || []);
+    }
     resetNewSection();
     showToast("Тема курса добавлена", "success");
   } catch (error) {
@@ -1355,9 +1607,18 @@ const saveSection = async (sectionId) => {
       isRequired: Boolean(draft.isRequired),
       estimatedMinutes: sanitizeOptionalNumber(draft.estimatedMinutes),
     };
-    const response = await updateCourseSection(sectionId, payload);
-    course.value = response.course;
-    syncSectionDrafts(response.course.sections || []);
+    if (isPublishedCourse.value) {
+      const section = (course.value?.sections || []).find((item) => Number(item.id) === Number(sectionId));
+      if (!section) return;
+      Object.assign(section, payload);
+      normalizeLocalStructure();
+      syncSectionDrafts(course.value.sections || []);
+      await persistDraft({ silent: true });
+    } else {
+      const response = await updateCourseSection(sectionId, payload);
+      course.value = response.course;
+      syncSectionDrafts(response.course.sections || []);
+    }
     sectionEditingId.value = null;
     showToast("Тема курса обновлена", "success");
   } catch (error) {
@@ -1371,9 +1632,16 @@ const removeSection = async (sectionId, title) => {
   if (!window.confirm(`Удалить тему курса "${title}" и все её подтемы?`)) return;
   deletingSectionId.value = sectionId;
   try {
-    const response = await deleteCourseSection(sectionId);
-    course.value = response.course;
-    syncSectionDrafts(response.course.sections || []);
+    if (isPublishedCourse.value) {
+      course.value.sections = (course.value?.sections || []).filter((section) => Number(section.id) !== Number(sectionId));
+      normalizeLocalStructure();
+      syncSectionDrafts(course.value.sections || []);
+      await persistDraft({ silent: true });
+    } else {
+      const response = await deleteCourseSection(sectionId);
+      course.value = response.course;
+      syncSectionDrafts(response.course.sections || []);
+    }
     if (sectionEditingId.value === sectionId) sectionEditingId.value = null;
     showToast("Тема курса удалена", "success");
   } catch (error) {
@@ -1404,9 +1672,27 @@ const addTopic = async (sectionId) => {
       content: draft.hasMaterial ? (draft.content || "").trim() || null : null,
       assessmentId: sanitizeOptionalNumber(draft.assessmentId),
     };
-    const response = await createCourseTopic(sectionId, payload);
-    course.value = response.course;
-    syncSectionDrafts(response.course.sections || []);
+    if (isPublishedCourse.value) {
+      const section = (course.value?.sections || []).find((item) => Number(item.id) === Number(sectionId));
+      if (!section) return;
+      section.topics = section.topics || [];
+      section.topics.push({
+        id: getNextTempId(),
+        title: payload.title,
+        orderIndex: payload.orderIndex || section.topics.length + 1,
+        isRequired: payload.isRequired,
+        hasMaterial: payload.hasMaterial,
+        content: payload.content || "",
+        assessmentId: payload.assessmentId,
+      });
+      normalizeLocalStructure();
+      syncSectionDrafts(course.value.sections || []);
+      await persistDraft({ silent: true });
+    } else {
+      const response = await createCourseTopic(sectionId, payload);
+      course.value = response.course;
+      syncSectionDrafts(response.course.sections || []);
+    }
     newTopics.value[sectionId] = { title: "", orderIndex: "", isRequired: true, hasMaterial: false, content: "", assessmentId: "" };
     newTopicErrors.value = { ...newTopicErrors.value, [sectionId]: null };
     showToast("Подтема добавлена", "success");
@@ -1434,9 +1720,25 @@ const saveTopic = async (topicId) => {
       content: draft.hasMaterial ? (draft.content || "").trim() || null : null,
       assessmentId: sanitizeOptionalNumber(draft.assessmentId),
     };
-    const response = await updateCourseTopic(topicId, payload);
-    course.value = response.course;
-    syncSectionDrafts(response.course.sections || []);
+    if (isPublishedCourse.value) {
+      let foundTopic = null;
+      for (const section of course.value?.sections || []) {
+        const topic = (section.topics || []).find((item) => Number(item.id) === Number(topicId));
+        if (topic) {
+          foundTopic = topic;
+          break;
+        }
+      }
+      if (!foundTopic) return;
+      Object.assign(foundTopic, payload);
+      normalizeLocalStructure();
+      syncSectionDrafts(course.value.sections || []);
+      await persistDraft({ silent: true });
+    } else {
+      const response = await updateCourseTopic(topicId, payload);
+      course.value = response.course;
+      syncSectionDrafts(response.course.sections || []);
+    }
     topicEditingId.value = null;
     showToast("Подтема обновлена", "success");
   } catch (error) {
@@ -1491,13 +1793,20 @@ const moveTopicByOffset = async (sectionId, topicId, offset) => {
 const handleSectionsReorder = async () => {
   if (!course.value || !isEditMode.value) return;
   const sectionIds = (course.value.sections || []).map((section) => Number(section.id)).filter((id) => Number.isInteger(id) && id > 0);
-  if (sectionIds.length <= 1) return;
+  if ((course.value.sections || []).length <= 1) return;
 
   reorderingSections.value = true;
   try {
-    const response = await reorderCourseSections(courseId.value, sectionIds);
-    course.value = response.course;
-    syncSectionDrafts(response.course.sections || []);
+    if (isPublishedCourse.value) {
+      normalizeLocalStructure();
+      syncSectionDrafts(course.value.sections || []);
+      await persistDraft({ silent: true });
+    } else {
+      if (sectionIds.length <= 1) return;
+      const response = await reorderCourseSections(courseId.value, sectionIds);
+      course.value = response.course;
+      syncSectionDrafts(response.course.sections || []);
+    }
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось сохранить порядок тем"), "error");
     await loadCourse();
@@ -1509,13 +1818,20 @@ const handleSectionsReorder = async () => {
 const handleTopicsReorder = async (section) => {
   if (!course.value || !isEditMode.value || !section?.id) return;
   const topicIds = (section.topics || []).map((topic) => Number(topic.id)).filter((id) => Number.isInteger(id) && id > 0);
-  if (topicIds.length <= 1) return;
+  if ((section.topics || []).length <= 1) return;
 
   reorderingTopicSectionId.value = Number(section.id);
   try {
-    const response = await reorderCourseTopics(courseId.value, Number(section.id), topicIds);
-    course.value = response.course;
-    syncSectionDrafts(response.course.sections || []);
+    if (isPublishedCourse.value) {
+      normalizeLocalStructure();
+      syncSectionDrafts(course.value.sections || []);
+      await persistDraft({ silent: true });
+    } else {
+      if (topicIds.length <= 1) return;
+      const response = await reorderCourseTopics(courseId.value, Number(section.id), topicIds);
+      course.value = response.course;
+      syncSectionDrafts(response.course.sections || []);
+    }
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось сохранить порядок подтем"), "error");
     await loadCourse();
@@ -1528,9 +1844,18 @@ const removeTopic = async (topicId, title) => {
   if (!window.confirm(`Удалить подтему "${title}"?`)) return;
   deletingTopicId.value = topicId;
   try {
-    const response = await deleteCourseTopic(topicId);
-    course.value = response.course;
-    syncSectionDrafts(response.course.sections || []);
+    if (isPublishedCourse.value) {
+      for (const section of course.value?.sections || []) {
+        section.topics = (section.topics || []).filter((topic) => Number(topic.id) !== Number(topicId));
+      }
+      normalizeLocalStructure();
+      syncSectionDrafts(course.value.sections || []);
+      await persistDraft({ silent: true });
+    } else {
+      const response = await deleteCourseTopic(topicId);
+      course.value = response.course;
+      syncSectionDrafts(response.course.sections || []);
+    }
     if (topicEditingId.value === topicId) topicEditingId.value = null;
     showToast("Подтема удалена", "success");
   } catch (error) {
@@ -1547,8 +1872,17 @@ const handlePublish = async () => {
 
   publishing.value = true;
   try {
-    await publishCourse(course.value.id);
-    showToast("Курс опубликован", "success");
+    if (course.value.status === "published") {
+      if (!hasDraftChanges.value) {
+        showToast("Нет изменений для публикации", "error");
+        return;
+      }
+      await publishCourseDraft(course.value.id);
+      showToast("Изменения опубликованы", "success");
+    } else {
+      await publishCourse(course.value.id);
+      showToast("Курс опубликован", "success");
+    }
     await loadCourse();
   } catch (error) {
     const validationErrors = error?.response?.data?.validationErrors;
@@ -1561,6 +1895,42 @@ const handlePublish = async () => {
     showToast(getErrorMessage(error, "Не удалось опубликовать курс"), "error");
   } finally {
     publishing.value = false;
+  }
+};
+
+const handleOpenDraft = async () => {
+  if (!isPublishedCourse.value || !course.value) return;
+  openingDraft.value = true;
+  try {
+    const response = await saveCourseDraft(courseId.value, { payload: buildDraftPayload() });
+    draftMeta.value = response?.draft || null;
+    draftSavedAt.value = new Date().toISOString();
+    draftSaveState.value = "saved";
+    await loadPreview();
+    showToast("Черновик открыт", "success");
+  } catch (error) {
+    draftSaveState.value = "error";
+    showToast(getErrorMessage(error, "Не удалось открыть черновик"), "error");
+  } finally {
+    openingDraft.value = false;
+  }
+};
+
+const handleDiscardDraft = async () => {
+  if (!isPublishedCourse.value || !course.value) return;
+  if (!window.confirm("Отменить все неопубликованные изменения?")) {
+    return;
+  }
+  discardingDraft.value = true;
+  try {
+    await deleteCourseDraft(courseId.value);
+    draftMeta.value = null;
+    await loadCourse();
+    showToast("Черновик удален", "success");
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось удалить черновик"), "error");
+  } finally {
+    discardingDraft.value = false;
   }
 };
 
@@ -1730,12 +2100,44 @@ const handleResetProgress = async (userId, name) => {
   }
 };
 
+watch(
+  () => form.value,
+  () => {
+    scheduleAutoSaveDraft();
+  },
+  { deep: true },
+);
+
+watch(
+  () => course.value?.sections,
+  () => {
+    scheduleAutoSaveDraft();
+  },
+  { deep: true },
+);
+
+watch(
+  () => currentStep.value,
+  async (step) => {
+    if (step === 4) {
+      await loadPreview();
+    }
+  },
+);
+
 onMounted(async () => {
   loading.value = true;
   await Promise.all([loadAssessments(), loadPositions(), loadBranches(), loadCourse()]);
   loading.value = false;
   if (isEditMode.value) {
     await loadParticipants();
+  }
+});
+
+onUnmounted(() => {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
   }
 });
 </script>
@@ -1953,6 +2355,25 @@ onMounted(async () => {
 }
 
 .publication-errors ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+}
+
+.publication-warnings {
+  border: 1px solid #f59e0b66;
+  border-radius: 12px;
+  background: #f59e0b12;
+  padding: 12px;
+  margin-top: 12px;
+}
+
+.publication-warnings h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.publication-warnings ul {
   margin: 0;
   padding-left: 18px;
   color: var(--text-secondary);

@@ -1,120 +1,105 @@
 const logger = require("../utils/logger");
 const { getRedisClient } = require("./redisService");
 
-/**
- * Гибридный кеш: Redis (если доступен) + in-memory fallback
- */
 class CacheService {
-  constructor() {
-    this.cache = new Map();
-    this.ttls = new Map();
-  }
-
   get redis() {
     return getRedisClient();
   }
 
-  async set(key, value, ttl = 300) {
-    const payload = JSON.stringify(value);
+  isRedisReady() {
+    return Boolean(this.redis && this.redis.status === "ready");
+  }
 
-    if (this.redis && this.redis.status === "ready") {
-      try {
-        if (ttl > 0) {
-          await this.redis.set(key, payload, "EX", ttl);
-        } else {
-          await this.redis.set(key, payload);
-        }
-      } catch (error) {
-        logger.warn("Ошибка Redis set(%s): %s", key, error.message);
-      }
+  async set(key, value, ttl = 300) {
+    if (!this.isRedisReady()) {
+      return false;
     }
 
-    this.cache.set(key, value);
-    if (ttl > 0) {
-      this.ttls.set(key, Date.now() + ttl * 1000);
-      setTimeout(() => this.delete(key), ttl * 1000);
+    const payload = JSON.stringify(value);
+
+    try {
+      if (ttl > 0) {
+        await this.redis.set(key, payload, "EX", ttl);
+      } else {
+        await this.redis.set(key, payload);
+      }
+      return true;
+    } catch (error) {
+      logger.warn("Ошибка Redis set(%s): %s", key, error.message);
+      return false;
     }
   }
 
   async get(key) {
-    if (this.redis && this.redis.status === "ready") {
-      try {
-        const raw = await this.redis.get(key);
-        if (raw != null) {
-          return JSON.parse(raw);
-        }
-      } catch (error) {
-        logger.warn("Ошибка Redis get(%s): %s", key, error.message);
-      }
-    }
-
-    if (this.ttls.has(key) && Date.now() > this.ttls.get(key)) {
-      this.delete(key);
+    if (!this.isRedisReady()) {
       return undefined;
     }
 
-    return this.cache.get(key);
+    try {
+      const raw = await this.redis.get(key);
+      if (raw == null) {
+        return undefined;
+      }
+      return JSON.parse(raw);
+    } catch (error) {
+      logger.warn("Ошибка Redis get(%s): %s", key, error.message);
+      return undefined;
+    }
   }
 
   async delete(key) {
-    if (this.redis && this.redis.status === "ready") {
-      try {
-        await this.redis.del(key);
-      } catch (error) {
-        logger.warn("Ошибка Redis del(%s): %s", key, error.message);
-      }
+    if (!this.isRedisReady()) {
+      return false;
     }
 
-    this.cache.delete(key);
-    this.ttls.delete(key);
+    try {
+      await this.redis.del(key);
+      return true;
+    } catch (error) {
+      logger.warn("Ошибка Redis del(%s): %s", key, error.message);
+      return false;
+    }
   }
 
   async clear() {
-    if (this.redis && this.redis.status === "ready") {
-      try {
-        await this.redis.flushdb();
-      } catch (error) {
-        logger.warn("Ошибка Redis flushdb: %s", error.message);
-      }
+    if (!this.isRedisReady()) {
+      return false;
     }
 
-    this.cache.clear();
-    this.ttls.clear();
+    try {
+      await this.redis.flushdb();
+      return true;
+    } catch (error) {
+      logger.warn("Ошибка Redis flushdb: %s", error.message);
+      return false;
+    }
   }
 
   async invalidate(pattern) {
+    if (!this.isRedisReady()) {
+      return 0;
+    }
+
     const regex = typeof pattern === "string" ? new RegExp(pattern) : pattern;
 
-    let deleted = 0;
-    for (const key of this.cache.keys()) {
-      if (regex.test(key)) {
-        this.cache.delete(key);
-        this.ttls.delete(key);
-        deleted += 1;
+    try {
+      const keys = await this.redis.keys("http:GET:*");
+      const toDelete = keys.filter((key) => regex.test(key));
+      if (toDelete.length === 0) {
+        return 0;
       }
-    }
 
-    if (this.redis && this.redis.status === "ready") {
-      try {
-        const keys = await this.redis.keys("http:GET:*");
-        const toDelete = keys.filter((key) => regex.test(key));
-        if (toDelete.length > 0) {
-          await this.redis.del(...toDelete);
-          deleted += toDelete.length;
-        }
-      } catch (error) {
-        logger.warn("Ошибка Redis invalidate: %s", error.message);
-      }
+      await this.redis.del(...toDelete);
+      return toDelete.length;
+    } catch (error) {
+      logger.warn("Ошибка Redis invalidate: %s", error.message);
+      return 0;
     }
-
-    return deleted;
   }
 
   getStats() {
     return {
-      memorySize: this.cache.size,
-      memoryKeys: Array.from(this.cache.keys()),
-      redisReady: Boolean(this.redis && this.redis.status === "ready"),
+      redisReady: this.isRedisReady(),
     };
   }
 }

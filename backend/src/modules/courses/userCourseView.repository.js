@@ -17,43 +17,43 @@ function addDays(baseDate, days) {
 }
 
 function resolveAssignmentAndDeadline(row) {
-  const fallbackAssignedAt = parseDate(row.user_assigned_at) || parseDate(row.manual_assigned_at) || parseDate(row.published_at) || new Date();
+  const assignedAtBase = parseDate(row.user_assigned_at) || parseDate(row.manual_assigned_at) || parseDate(row.published_at) || new Date();
   const persistedDeadline = parseDate(row.user_deadline_at) || parseDate(row.manual_deadline_at);
 
   if (persistedDeadline) {
     return {
-      assignedAt: fallbackAssignedAt,
+      assignedAt: assignedAtBase,
       deadlineAt: persistedDeadline,
     };
   }
 
   if (row.availability_mode === "relative_days") {
     return {
-      assignedAt: fallbackAssignedAt,
-      deadlineAt: addDays(fallbackAssignedAt, row.availability_days),
+      assignedAt: assignedAtBase,
+      deadlineAt: addDays(assignedAtBase, row.availability_days),
     };
   }
 
   if (row.availability_mode === "fixed_dates") {
     return {
-      assignedAt: fallbackAssignedAt,
+      assignedAt: assignedAtBase,
       deadlineAt: parseDate(row.availability_to),
     };
   }
 
   return {
-    assignedAt: fallbackAssignedAt,
+    assignedAt: assignedAtBase,
     deadlineAt: null,
   };
 }
 
-function mapUserProgress(row, fallbackRequiredTotal) {
+function mapUserProgress(row, requiredTotalDefault) {
   const assignment = resolveAssignmentAndDeadline(row);
   return {
     status: row.user_status || "not_started",
     progressPercent: row.progress_percent != null ? Number(row.progress_percent) : 0,
     completedSectionsCount: row.completed_modules_count != null ? Number(row.completed_modules_count) : 0,
-    totalSectionsCount: row.total_modules_count != null ? Number(row.total_modules_count) : Number(fallbackRequiredTotal || 0),
+    totalSectionsCount: row.total_modules_count != null ? Number(row.total_modules_count) : Number(requiredTotalDefault || 0),
     startedAt: toIsoUtc(row.user_started_at),
     completedAt: toIsoUtc(row.user_completed_at),
     lastActivityAt: toIsoUtc(row.user_last_activity_at),

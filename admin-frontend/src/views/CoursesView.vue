@@ -37,6 +37,7 @@
               <tr v-for="course in courses" :key="course.id">
                 <td>
                   <div class="course-title">{{ course.title }}</div>
+                  <div v-if="course.hasDraft" class="course-draft-indicator">Есть неопубликованные изменения</div>
                   <div class="course-desc">{{ course.description || "Без описания" }}</div>
                 </td>
                 <td>
@@ -50,6 +51,9 @@
                 <td class="actions-cell">
                   <div class="actions-buttons">
                     <Button size="sm" variant="secondary" icon="pencil" @click="goToEdit(course.id)">Изменить</Button>
+                    <Button v-if="course.status === 'published' && course.hasDraft" size="sm" variant="secondary" icon="pencil" @click="goToEdit(course.id)">
+                      Открыть черновик
+                    </Button>
                     <Button v-if="course.status === 'draft'" size="sm" variant="success" icon="send" @click="handlePublish(course)">
                       Опубликовать
                     </Button>
@@ -71,6 +75,7 @@
             <div class="course-card-header">
               <div>
                 <h3 class="course-card-title">{{ course.title }}</h3>
+                <p v-if="course.hasDraft" class="course-draft-indicator">Есть неопубликованные изменения</p>
                 <p class="course-card-desc">{{ course.description || "Без описания" }}</p>
               </div>
               <Badge :variant="getStatusVariant(course.status)" rounded size="sm">
@@ -92,6 +97,16 @@
 
             <div class="course-card-actions">
               <Button size="sm" variant="secondary" icon="pencil" @click="goToEdit(course.id)" fullWidth>Изменить</Button>
+              <Button
+                v-if="course.status === 'published' && course.hasDraft"
+                size="sm"
+                variant="secondary"
+                icon="pencil"
+                @click="goToEdit(course.id)"
+                fullWidth
+              >
+                Открыть черновик
+              </Button>
               <Button v-if="course.status === 'draft'" size="sm" variant="success" icon="send" @click="handlePublish(course)" fullWidth>
                 Опубликовать
               </Button>
@@ -389,6 +404,12 @@ onMounted(async () => {
 .course-desc {
   font-size: 13px;
   color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.course-draft-indicator {
+  font-size: 12px;
+  color: #92400e;
   margin-top: 4px;
 }
 

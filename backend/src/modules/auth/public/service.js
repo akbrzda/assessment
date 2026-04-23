@@ -9,9 +9,9 @@ function buildError(message, status) {
   return error;
 }
 
-function resolveInviteCode(context, fallbackInviteCode = null) {
-  if (fallbackInviteCode) {
-    return normalizeInviteCode(fallbackInviteCode);
+function resolveInviteCode(context, inviteCodeFromPayload = null) {
+  if (inviteCodeFromPayload) {
+    return normalizeInviteCode(inviteCodeFromPayload);
   }
 
   const inviteCodeHeader = context.inviteCodeHeader;
