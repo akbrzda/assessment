@@ -29,6 +29,18 @@ export const updateCourse = async (id, payload) => {
   }, /get:\/admin\/courses/i);
 };
 
+export const uploadCourseCover = async (id, file) => {
+  const formData = new FormData();
+  formData.append("cover", file);
+
+  return mutateWithInvalidation(async () => {
+    const response = await axios.post(`/admin/courses/${id}/upload-cover`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }, /get:\/admin\/courses/i);
+};
+
 export const deleteCourse = async (id) => {
   return mutateWithInvalidation(async () => {
     const response = await axios.delete(`/admin/courses/${id}`);

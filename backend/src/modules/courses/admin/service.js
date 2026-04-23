@@ -2,6 +2,8 @@ const { pool } = require("../../../config/database");
 const coursesRepo = require("../courses.repository");
 const mutationsRepo = require("../coursesMutations.repository");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
+const fs = require("fs");
+const path = require("path");
 
 // - урс -
 
@@ -68,6 +70,53 @@ async function updateCourse(courseId, payload, userId, req) {
       entity: "course",
       entityId: courseId,
       metadata: { title: course.title, status: course.status, previousStatus: existing.status },
+    });
+    return course;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function uploadCourseCover(courseId, file, userId, req) {
+  if (!file?.filename) {
+    const error = new Error("Файл обложки не загружен");
+    error.status = 400;
+    throw error;
+  }
+
+  const existing = await coursesRepo.findById(courseId);
+  if (!existing) {
+    const error = new Error("Курс не найден");
+    error.status = 404;
+    throw error;
+  }
+
+  const coverUrl = `/uploads/courses/${file.filename}`;
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    await mutationsRepo.updateCourseFields(courseId, { coverUrl }, userId, connection);
+    await connection.commit();
+
+    if (typeof existing.coverUrl === "string" && existing.coverUrl.startsWith("/uploads/courses/")) {
+      const previousFilePath = path.join(__dirname, "../../../../../uploads/courses", path.basename(existing.coverUrl));
+      if (fs.existsSync(previousFilePath)) {
+        fs.unlinkSync(previousFilePath);
+      }
+    }
+
+    const course = await coursesRepo.findById(courseId);
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      scope: "admin_panel",
+      action: "course.cover.uploaded",
+      entity: "course",
+      entityId: courseId,
+      metadata: { title: course?.title || existing.title, coverUrl },
     });
     return course;
   } catch (error) {
@@ -193,6 +242,7 @@ module.exports = {
   getCourse,
   createCourse,
   updateCourse,
+  uploadCourseCover,
   deleteCourse,
   publishCourse,
   archiveCourse,

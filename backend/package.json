@@ -13,8 +13,8 @@
     "test:smoke:admin": "node --test tests/admin-smoke.test.js",
     "test:assessment": "node --test tests/assessment.score-answer.test.js",
     "test:phase4": "node --test tests/phase4.integration.test.js",
-    "test:courses": "node --test tests/courses/topics.completion.test.js tests/courses/sections.completion.test.js tests/courses/progress.calculation.test.js tests/courses/assignments.filter.test.js tests/courses/course.e2e.test.js tests/courses/analytics.repository.test.js",
-    "test": "node --test tests/admin-smoke.test.js tests/assessment.score-answer.test.js tests/phase4.integration.test.js tests/courses/topics.completion.test.js tests/courses/sections.completion.test.js tests/courses/progress.calculation.test.js tests/courses/assignments.filter.test.js tests/courses/course.e2e.test.js tests/courses/analytics.repository.test.js"
+    "test:courses": "node --test tests/courses/topics.completion.test.js tests/courses/sections.completion.test.js tests/courses/progress.calculation.test.js tests/courses/assignments.filter.test.js tests/courses/course.e2e.test.js tests/courses/analytics.repository.test.js tests/courses/reorder.service.test.js",
+    "test": "node --test tests/admin-smoke.test.js tests/assessment.score-answer.test.js tests/phase4.integration.test.js tests/courses/topics.completion.test.js tests/courses/sections.completion.test.js tests/courses/progress.calculation.test.js tests/courses/assignments.filter.test.js tests/courses/course.e2e.test.js tests/courses/analytics.repository.test.js tests/courses/reorder.service.test.js"
   },
   "keywords": [],
   "author": "",

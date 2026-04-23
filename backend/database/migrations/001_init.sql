@@ -624,8 +624,37 @@ ON DUPLICATE KEY UPDATE
 -- Добавление поля timezone в таблицу users
 -- Дата создания: 2025-12-26
 
-ALTER TABLE users 
-ADD COLUMN IF NOT EXISTS timezone VARCHAR(64) DEFAULT 'UTC' AFTER password;
+SET @db_name = DATABASE();
+
+SET @timezone_column_exists = (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = @db_name
+    AND table_name = 'users'
+    AND column_name = 'timezone'
+);
+SET @sql_stmt = IF(
+  @timezone_column_exists = 0,
+  'ALTER TABLE users ADD COLUMN timezone VARCHAR(64) DEFAULT ''UTC'' AFTER password',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_stmt;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Добавление индекса для ускорения поиска
-CREATE INDEX IF NOT EXISTS idx_timezone ON users(timezone);
+SET @timezone_index_exists = (
+  SELECT COUNT(1)
+  FROM information_schema.statistics
+  WHERE table_schema = @db_name
+    AND table_name = 'users'
+    AND index_name = 'idx_timezone'
+);
+SET @sql_stmt = IF(
+  @timezone_index_exists = 0,
+  'CREATE INDEX idx_timezone ON users(timezone)',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql_stmt;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

@@ -12,6 +12,7 @@ router.get("/", controller.listCourses);
 router.post("/", controller.createCourse);
 router.get("/:id", controller.getCourse);
 router.patch("/:id", controller.updateCourse);
+router.post("/:id/upload-cover", controller.uploadCourseCover);
 router.delete("/:id", controller.deleteCourse);
 router.post("/:id/publish", controller.publishCourse);
 router.post("/:id/archive", controller.archiveCourse);

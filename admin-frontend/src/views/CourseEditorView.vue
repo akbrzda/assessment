@@ -66,12 +66,26 @@
             placeholder="Кратко опишите цель и содержание курса"
             :rows="4"
           />
-          <Input
-            v-model="form.coverUrl"
-            class="grid-span-full"
-            label="Ссылка на обложку"
-            placeholder="https://cdn.example.com/course-cover.jpg"
-          />
+          <div class="cover-upload grid-span-full">
+            <Input
+              v-model="form.coverUrl"
+              label="Ссылка на обложку"
+              placeholder="https://cdn.example.com/course-cover.jpg"
+            />
+            <div class="cover-upload-controls">
+              <input type="file" accept="image/*" @change="handleCoverFileChange" />
+              <Button
+                size="sm"
+                variant="secondary"
+                :loading="uploadingCover"
+                :disabled="!isEditMode || !selectedCoverFile"
+                @click="handleCoverUpload"
+              >
+                Загрузить файл
+              </Button>
+            </div>
+            <p class="cover-upload-hint">Для загрузки файла курс должен быть сначала сохранён.</p>
+          </div>
           <Input
             v-model="form.category"
             label="Категория"
@@ -157,6 +171,24 @@
                 >
                   ↕
                 </button>
+                <button
+                  v-if="(course.sections || []).length > 1"
+                  type="button"
+                  class="reorder-fallback-btn"
+                  :disabled="!canMoveSection(section.id, -1)"
+                  @click="moveSectionByOffset(section.id, -1)"
+                >
+                  ↑
+                </button>
+                <button
+                  v-if="(course.sections || []).length > 1"
+                  type="button"
+                  class="reorder-fallback-btn"
+                  :disabled="!canMoveSection(section.id, 1)"
+                  @click="moveSectionByOffset(section.id, 1)"
+                >
+                  ↓
+                </button>
                 <Button size="sm" variant="ghost" :icon="sectionEditingId === section.id ? 'x' : 'pencil'" @click="toggleSectionEdit(section.id)">
                   {{ sectionEditingId === section.id ? "Закрыть" : "Редактировать" }}
                 </Button>
@@ -239,6 +271,24 @@
                         title="Перетащите для изменения порядка"
                       >
                         ↕
+                      </button>
+                      <button
+                        v-if="(section.topics || []).length > 1"
+                        type="button"
+                        class="reorder-fallback-btn"
+                        :disabled="!canMoveTopic(section.id, topic.id, -1)"
+                        @click="moveTopicByOffset(section.id, topic.id, -1)"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        v-if="(section.topics || []).length > 1"
+                        type="button"
+                        class="reorder-fallback-btn"
+                        :disabled="!canMoveTopic(section.id, topic.id, 1)"
+                        @click="moveTopicByOffset(section.id, topic.id, 1)"
+                      >
+                        ↓
                       </button>
                       <Button size="sm" variant="ghost" :icon="topicEditingId === topic.id ? 'x' : 'pencil'" @click="toggleTopicEdit(topic.id)" />
                       <Button
@@ -730,6 +780,7 @@ import {
   deleteCourseTopic,
   getCourseById,
   publishCourse,
+  uploadCourseCover,
   updateCourse,
   getCourseTargets,
   updateCourseTargets,
@@ -755,6 +806,8 @@ const loading = ref(false);
 const saving = ref(false);
 const publishing = ref(false);
 const archiving = ref(false);
+const uploadingCover = ref(false);
+const selectedCoverFile = ref(null);
 const draftSaveState = ref("saved");
 const draftSavedAt = ref(null);
 
@@ -1085,6 +1138,38 @@ const validateCourse = () => {
   return true;
 };
 
+const handleCoverFileChange = (event) => {
+  const file = event?.target?.files?.[0] || null;
+  selectedCoverFile.value = file;
+};
+
+const handleCoverUpload = async () => {
+  if (!isEditMode.value || !courseId.value) {
+    showToast("Сначала сохраните курс, затем загрузите обложку", "error");
+    return;
+  }
+  if (!selectedCoverFile.value) {
+    showToast("Выберите файл обложки", "error");
+    return;
+  }
+
+  uploadingCover.value = true;
+  try {
+    const response = await uploadCourseCover(courseId.value, selectedCoverFile.value);
+    const nextCoverUrl = response?.coverUrl || response?.course?.coverUrl || null;
+    if (nextCoverUrl) {
+      form.value.coverUrl = nextCoverUrl;
+    }
+    selectedCoverFile.value = null;
+    await loadCourse();
+    showToast("Обложка курса загружена", "success");
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось загрузить обложку"), "error");
+  } finally {
+    uploadingCover.value = false;
+  }
+};
+
 const saveCourse = async () => {
   if (!validateCourse()) {
     return false;
@@ -1359,6 +1444,48 @@ const saveTopic = async (topicId) => {
   } finally {
     updatingTopicId.value = null;
   }
+};
+
+const canMoveSection = (sectionId, offset) => {
+  const sections = course.value?.sections || [];
+  const index = sections.findIndex((section) => Number(section.id) === Number(sectionId));
+  if (index === -1) return false;
+  const targetIndex = index + Number(offset);
+  return targetIndex >= 0 && targetIndex < sections.length && !reorderingSections.value;
+};
+
+const moveSectionByOffset = async (sectionId, offset) => {
+  if (!canMoveSection(sectionId, offset)) return;
+  const sections = course.value?.sections || [];
+  const fromIndex = sections.findIndex((section) => Number(section.id) === Number(sectionId));
+  const toIndex = fromIndex + Number(offset);
+  const [movedSection] = sections.splice(fromIndex, 1);
+  sections.splice(toIndex, 0, movedSection);
+  await handleSectionsReorder();
+};
+
+const canMoveTopic = (sectionId, topicId, offset) => {
+  if (reorderingTopicSectionId.value) return false;
+  const sections = course.value?.sections || [];
+  const section = sections.find((item) => Number(item.id) === Number(sectionId));
+  if (!section || !Array.isArray(section.topics)) return false;
+  const index = section.topics.findIndex((topic) => Number(topic.id) === Number(topicId));
+  if (index === -1) return false;
+  const targetIndex = index + Number(offset);
+  return targetIndex >= 0 && targetIndex < section.topics.length;
+};
+
+const moveTopicByOffset = async (sectionId, topicId, offset) => {
+  if (!canMoveTopic(sectionId, topicId, offset)) return;
+  const sections = course.value?.sections || [];
+  const section = sections.find((item) => Number(item.id) === Number(sectionId));
+  if (!section || !Array.isArray(section.topics)) return;
+
+  const fromIndex = section.topics.findIndex((topic) => Number(topic.id) === Number(topicId));
+  const toIndex = fromIndex + Number(offset);
+  const [movedTopic] = section.topics.splice(fromIndex, 1);
+  section.topics.splice(toIndex, 0, movedTopic);
+  await handleTopicsReorder(section);
 };
 
 const handleSectionsReorder = async () => {
@@ -1703,6 +1830,24 @@ onMounted(async () => {
   font-weight: 600;
 }
 
+.cover-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cover-upload-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cover-upload-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .wizard-navigation {
   display: flex;
   align-items: center;
@@ -1926,6 +2071,24 @@ onMounted(async () => {
 
 .drag-handle:active {
   cursor: grabbing;
+}
+
+.reorder-fallback-btn {
+  display: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.reorder-fallback-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .section-edit-form {
@@ -2387,6 +2550,21 @@ onMounted(async () => {
 
   .page-header-actions {
     justify-content: flex-end;
+  }
+
+  .cover-upload-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .drag-handle {
+    display: none;
+  }
+
+  .reorder-fallback-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 </style>

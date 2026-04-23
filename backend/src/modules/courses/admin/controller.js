@@ -4,6 +4,9 @@ const assignmentsRepo = require("../courseAssignments.repository");
 const progressRepo = require("../courseProgress.repository");
 const analyticsRepo = require("../courseAnalytics.repository");
 const { pool } = require("../../../config/database");
+const fs = require("fs");
+const multer = require("multer");
+const path = require("path");
 const {
   createCourseSchema,
   updateCourseSchema,
@@ -14,6 +17,36 @@ const {
   reorderSectionsSchema,
   reorderTopicsSchema,
 } = require("./validators");
+
+const COURSE_COVERS_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/courses");
+
+const courseCoverStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    if (!fs.existsSync(COURSE_COVERS_UPLOAD_DIR)) {
+      fs.mkdirSync(COURSE_COVERS_UPLOAD_DIR, { recursive: true });
+    }
+    cb(null, COURSE_COVERS_UPLOAD_DIR);
+  },
+  filename: (req, file, cb) => {
+    const extension = path.extname(file.originalname || "").toLowerCase();
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `course-cover-${uniqueSuffix}${extension}`);
+  },
+});
+
+const uploadCourseCoverFile = multer({
+  storage: courseCoverStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|webp|gif/;
+    const extension = allowedTypes.test(path.extname(file.originalname || "").toLowerCase());
+    const mimeType = allowedTypes.test(file.mimetype || "");
+    if (extension && mimeType) {
+      return cb(null, true);
+    }
+    cb(new Error("Разрешены только изображения: jpeg, jpg, png, webp, gif"));
+  },
+}).single("cover");
 
 function parseId(value) {
   const n = Number(value);
@@ -75,6 +108,36 @@ async function updateCourse(req, res, next) {
   } catch (error) {
     next(error);
   }
+}
+
+async function uploadCourseCover(req, res, next) {
+  uploadCourseCoverFile(req, res, async (uploadError) => {
+    if (uploadError) {
+      return res.status(400).json({ error: uploadError.message });
+    }
+
+    const courseId = parseId(req.params.id);
+    if (!courseId) {
+      if (req.file?.path && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(400).json({ error: "Некорректный идентификатор курса" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "Файл обложки не загружен" });
+    }
+
+    try {
+      const course = await coursesService.uploadCourseCover(courseId, req.file, req.user.id, req);
+      res.json({ course, coverUrl: course.coverUrl });
+    } catch (error) {
+      if (req.file?.path && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      next(error);
+    }
+  });
 }
 
 async function deleteCourse(req, res, next) {
@@ -419,6 +482,7 @@ module.exports = {
   getCourse,
   createCourse,
   updateCourse,
+  uploadCourseCover,
   deleteCourse,
   publishCourse,
   archiveCourse,
