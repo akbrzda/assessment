@@ -131,6 +131,7 @@ export default {
 };
 </script>
 
+<style scoped>
 .detail-item {
   display: flex;
   justify-content: space-between;
