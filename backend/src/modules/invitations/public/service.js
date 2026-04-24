@@ -1,4 +1,3 @@
-const config = require("../../../config/env");
 const { generateInviteCode } = require("../../../utils/tokenGenerator");
 const invitationsRepository = require("./repository");
 
@@ -26,9 +25,6 @@ async function createInvitation(payload, actor) {
     throw buildError("Manager role not configured", 500);
   }
 
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + config.inviteExpirationDays);
-
   const code = await ensureUniqueCode();
   const invitationId = await invitationsRepository.createInvitation({
     code,
@@ -36,7 +32,6 @@ async function createInvitation(payload, actor) {
     branchId: payload.branchId,
     firstName: payload.firstName,
     lastName: payload.lastName,
-    expiresAt,
     createdBy: actor.id,
   });
 
@@ -47,21 +42,10 @@ async function listInvitations(actor) {
   return invitationsRepository.listByCreator(actor.id);
 }
 
-async function extendInvitation(invitationId, days, actor) {
-  const invitation = await invitationsRepository.findById(invitationId);
-  if (!invitation || invitation.created_by !== actor.id) {
-    throw buildError("Invitation not found", 404);
-  }
-
-  if (invitation.used_by) {
-    throw buildError("Invitation already used", 400);
-  }
-
-  const expiresAt = new Date(invitation.expires_at);
-  expiresAt.setDate(expiresAt.getDate() + days);
-  await invitationsRepository.updateExpiration(invitationId, expiresAt);
-
-  return invitationsRepository.findById(invitationId);
+async function extendInvitation() {
+  const error = new Error("Продление приглашений отключено");
+  error.status = 400;
+  throw error;
 }
 
 async function removeInvitation(invitationId, actor) {
@@ -103,5 +87,3 @@ module.exports = {
   removeInvitation,
   updateInvitation,
 };
-
-

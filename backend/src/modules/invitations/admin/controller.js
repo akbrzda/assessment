@@ -1,10 +1,5 @@
 const invitationsService = require("./service");
-const {
-  parseInvitationId,
-  validateCreatePayload,
-  validateUpdatePayload,
-  validateExtendPayload,
-} = require("./validators");
+const { parseInvitationId, validateCreatePayload, validateUpdatePayload } = require("./validators");
 
 function handleKnownError(error, res, next) {
   if (error.status) {
@@ -38,32 +33,15 @@ async function updateInvitation(req, res, next) {
   try {
     const invitationId = parseInvitationId(req.params.id);
     const payload = validateUpdatePayload(req.body);
-    const result = await invitationsService.updateInvitation(
-      invitationId,
-      payload,
-      req.user,
-      req
-    );
+    const result = await invitationsService.updateInvitation(invitationId, payload, req.user, req);
     res.json(result);
   } catch (error) {
     handleKnownError(error, res, next);
   }
 }
 
-async function extendInvitation(req, res, next) {
-  try {
-    const invitationId = parseInvitationId(req.params.id);
-    const payload = validateExtendPayload(req.body);
-    const result = await invitationsService.extendInvitation(
-      invitationId,
-      payload.days,
-      req.user,
-      req
-    );
-    res.json(result);
-  } catch (error) {
-    handleKnownError(error, res, next);
-  }
+async function extendInvitation(req, res) {
+  res.status(400).json({ error: "Продление приглашений отключено" });
 }
 
 async function deleteInvitation(req, res, next) {

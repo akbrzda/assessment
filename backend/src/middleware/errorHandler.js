@@ -6,6 +6,7 @@ const TRANSIENT_DB_ERROR_CODES = new Set([
   "PROTOCOL_CONNECTION_LOST",
   "ECONNRESET",
   "ECONNREFUSED",
+  "EADDRNOTAVAIL",
 ]);
 
 function isTransientDbError(err) {

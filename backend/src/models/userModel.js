@@ -39,7 +39,7 @@ async function findByTelegramId(telegramId) {
      LEFT JOIN positions p ON p.id = u.position_id
      WHERE u.telegram_id = ?
      LIMIT 1`,
-    [telegramId]
+    [telegramId],
   );
   return mapUserRow(rows[0]);
 }
@@ -48,7 +48,7 @@ async function createUser({ telegramId, firstName, lastName, avatarUrl, position
   const [result] = await pool.execute(
     `INSERT INTO users (telegram_id, first_name, last_name, avatar_url, position_id, branch_id, role_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [telegramId, firstName, lastName, avatarUrl, positionId, branchId, roleId]
+    [telegramId, firstName, lastName, avatarUrl, positionId, branchId, roleId],
   );
   return result.insertId;
 }
@@ -70,7 +70,7 @@ async function getDashboardData(userId) {
      LEFT JOIN positions p ON p.id = u.position_id
      WHERE u.id = ?
      LIMIT 1`,
-    [userId]
+    [userId],
   );
   return mapUserRow(rows[0]);
 }
@@ -86,7 +86,7 @@ async function listUsers() {
      LEFT JOIN roles r ON r.id = u.role_id
      LEFT JOIN branches b ON b.id = u.branch_id
      LEFT JOIN positions p ON p.id = u.position_id
-     ORDER BY u.created_at DESC`
+     ORDER BY u.created_at DESC`,
   );
   return rows.map(mapUserRow);
 }
@@ -104,7 +104,7 @@ async function findById(userId) {
      LEFT JOIN positions p ON p.id = u.position_id
      WHERE u.id = ?
      LIMIT 1`,
-    [userId]
+    [userId],
   );
   return mapUserRow(rows[0]);
 }
@@ -175,7 +175,7 @@ async function findByIds(ids) {
      LEFT JOIN branches b ON b.id = u.branch_id
      LEFT JOIN positions p ON p.id = u.position_id
      WHERE u.id IN (${placeholders})`,
-    ids
+    ids,
   );
   return rows.map(mapUserRow);
 }
@@ -185,15 +185,35 @@ async function updateTimezone(userId, timezone) {
 }
 
 async function completeOnboarding(userId) {
-  await pool.execute(
-    "UPDATE users SET onboarding_completed_at = COALESCE(onboarding_completed_at, NOW()), updated_at = NOW() WHERE id = ?",
-    [userId],
+  await pool.execute("UPDATE users SET onboarding_completed_at = COALESCE(onboarding_completed_at, NOW()), updated_at = NOW() WHERE id = ?", [
+    userId,
+  ]);
+}
+
+// Создание pending-профиля без telegram_id (для flow приглашений)
+async function createPendingUser({ firstName, lastName, positionId, branchId, roleId }) {
+  const [result] = await pool.execute(
+    `INSERT INTO users (telegram_id, first_name, last_name, position_id, branch_id, role_id)
+     VALUES (NULL, ?, ?, ?, ?, ?)`,
+    [firstName, lastName, positionId, branchId, roleId],
   );
+  return result.insertId;
+}
+
+// Активация pending-профиля: привязать telegram_id и аватар
+async function activatePendingUser(userId, { telegramId, avatarUrl }) {
+  await pool.execute(`UPDATE users SET telegram_id = ?, avatar_url = ?, updated_at = NOW() WHERE id = ? AND telegram_id IS NULL`, [
+    telegramId,
+    avatarUrl || null,
+    userId,
+  ]);
 }
 
 module.exports = {
   findByTelegramId,
   createUser,
+  createPendingUser,
+  activatePendingUser,
   updateProfile,
   getDashboardData,
   listUsers,

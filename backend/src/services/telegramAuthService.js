@@ -1,6 +1,6 @@
-const crypto = require('crypto');
-const logger = require('../utils/logger');
-const config = require('../config/env');
+const crypto = require("crypto");
+const logger = require("../utils/logger");
+const config = require("../config/env");
 
 function validateInitData(initDataString) {
   if (!initDataString) {
@@ -8,30 +8,24 @@ function validateInitData(initDataString) {
   }
 
   const params = new URLSearchParams(initDataString);
-  const receivedHash = params.get('hash');
+  const receivedHash = params.get("hash");
   if (!receivedHash) {
     return null;
   }
 
-  params.delete('hash');
+  params.delete("hash");
 
   const dataCheckString = Array.from(params.entries())
     .sort(([aKey], [bKey]) => aKey.localeCompare(bKey))
     .map(([key, value]) => `${key}=${value}`)
-    .join('\n');
+    .join("\n");
 
-  const secretKey = crypto
-    .createHmac('sha256', 'WebAppData')
-    .update(config.botToken)
-    .digest();
+  const secretKey = crypto.createHmac("sha256", "WebAppData").update(config.botToken).digest();
 
-  const computedHash = crypto
-    .createHmac('sha256', secretKey)
-    .update(dataCheckString)
-    .digest('hex');
+  const computedHash = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
 
-  const hashBuffer = Buffer.from(computedHash, 'hex');
-  const receivedBuffer = Buffer.from(receivedHash, 'hex');
+  const hashBuffer = Buffer.from(computedHash, "hex");
+  const receivedBuffer = Buffer.from(receivedHash, "hex");
 
   if (hashBuffer.length !== receivedBuffer.length) {
     return null;
@@ -39,7 +33,7 @@ function validateInitData(initDataString) {
 
   const isValid = crypto.timingSafeEqual(hashBuffer, receivedBuffer);
   if (!isValid) {
-    logger.warn('Invalid initData hash.');
+    logger.warn("Invalid initData hash.");
     return null;
   }
 
@@ -52,7 +46,7 @@ function validateInitData(initDataString) {
     try {
       payload.user = JSON.parse(payload.user);
     } catch (error) {
-      logger.warn('Failed to parse user from initData: %s', error.message);
+      logger.warn("Failed to parse user from initData: %s", error.message);
     }
   }
 
@@ -62,10 +56,10 @@ function validateInitData(initDataString) {
     return null;
   }
 
-  const maxAgeSeconds = 5 * 60;
+  const maxAgeSeconds = 24 * 60 * 60;
   const nowSeconds = Math.floor(Date.now() / 1000);
   if (nowSeconds - authDate > maxAgeSeconds) {
-    logger.warn("initData отклонен: auth_date старше 5 минут");
+    logger.warn("initData отклонен: auth_date старше 24 часов");
     return null;
   }
 
@@ -73,5 +67,5 @@ function validateInitData(initDataString) {
 }
 
 module.exports = {
-  validateInitData
+  validateInitData,
 };

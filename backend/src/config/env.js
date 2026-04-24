@@ -40,8 +40,7 @@ function parseList(value) {
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
   telegramInitDataBypass:
-    (process.env.TELEGRAM_INITDATA_BYPASS || "").toLowerCase() === "true" &&
-    (process.env.NODE_ENV || "development") !== "production",
+    (process.env.TELEGRAM_INITDATA_BYPASS || "").toLowerCase() === "true" && (process.env.NODE_ENV || "development") !== "production",
   telegramBypassUser: {
     id: String(process.env.TELEGRAM_BYPASS_USER_ID || "999000001"),
     firstName: process.env.TELEGRAM_BYPASS_FIRST_NAME || "Dev",
@@ -60,7 +59,6 @@ module.exports = {
   botToken: process.env.BOT_TOKEN,
   jwtSecret: process.env.JWT_SECRET,
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
-  inviteExpirationDays: Number(process.env.INVITE_EXPIRATION_DAYS || 7),
   allowedOrigins: parseList(process.env.ALLOWED_ORIGINS),
   superAdminIds: parseList(process.env.SUPERADMIN_IDS),
   redis: {

@@ -11,7 +11,21 @@ function startAttemptMaintenance() {
         logger.info("Автозавершение попыток: завершено %d записей", completedCount);
       }
     } catch (error) {
-      logger.error("Ошибка автозавершения попыток: %s", error.message);
+      // Временные сетевые ошибки — логируем и продолжаем
+      if (
+        error.code === "ETIMEDOUT" ||
+        error.code === "ECONNRESET" ||
+        error.code === "PROTOCOL_CONNECTION_LOST" ||
+        error.code === "EADDRNOTAVAIL"
+      ) {
+        logger.warn(
+          "Автозавершение попыток: временный сбой соединения (%s), следующая попытка через %ds",
+          error.code,
+          ATTEMPT_MAINTENANCE_INTERVAL_MS / 1000,
+        );
+      } else {
+        logger.error("Ошибка автозавершения попыток: %s", error.message);
+      }
     }
   };
 

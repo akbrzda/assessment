@@ -71,10 +71,15 @@ async function completeOnboarding(userId) {
   return userModel.completeOnboarding(userId);
 }
 
+async function activatePendingUser(userId, payload) {
+  return userModel.activatePendingUser(userId, payload);
+}
+
 module.exports = {
   getDashboardData,
   findUserByTelegramId,
   createUser,
+  activatePendingUser,
   assignUserToMatchingAssessments,
   findActiveInvitationByCode,
   markInvitationUsed,

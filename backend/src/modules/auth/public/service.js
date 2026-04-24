@@ -52,9 +52,11 @@ async function getStatus(context) {
           roleName: invitation.role_name,
           branchId: invitation.branch_id,
           branchName: invitation.branch_name,
+          positionId: invitation.position_id,
+          positionName: invitation.position_name,
+          phone: invitation.phone,
           firstName: invitation.first_name,
           lastName: invitation.last_name,
-          expiresAt: invitation.expires_at,
         }
       : null,
   };
@@ -75,36 +77,92 @@ async function register(context, payload) {
   const existingUser = await authRepository.findUserByTelegramId(telegramId);
 
   if (existingUser) {
-    throw buildError("User already registered", 400);
+    throw buildError("Вы уже зарегистрированы в системе", 400);
   }
-
-  let targetRoleId;
-  let targetBranchId = payload.branchId;
-  let targetPositionId = payload.positionId ? Number(payload.positionId) : null;
-  let invitation = null;
-  let managerPosition = null;
 
   const inviteCode = resolveInviteCode(context, payload.inviteCode);
+
   if (inviteCode) {
-    invitation = await authRepository.findActiveInvitationByCode(inviteCode);
+    // Поток приглашения сотрудника
+    const invitation = await authRepository.findActiveInvitationByCode(inviteCode);
     if (!invitation) {
-      throw buildError("Invitation code is invalid or expired", 400);
+      throw buildError("Приглашение недействительно или истекло", 400);
     }
 
-    targetRoleId = invitation.role_id;
-    if (invitation.branch_id) {
-      targetBranchId = invitation.branch_id;
+    // Если у приглашения есть заранее созданный pending-профиль — активируем его
+    if (invitation.invited_user_id) {
+      await authRepository.activatePendingUser(invitation.invited_user_id, { telegramId, avatarUrl });
+      await authRepository.assignUserToMatchingAssessments({
+        userId: invitation.invited_user_id,
+        branchId: invitation.branch_id ? Number(invitation.branch_id) : null,
+        positionId: invitation.position_id ? Number(invitation.position_id) : null,
+      });
+      await authRepository.markInvitationUsed(invitation.id, invitation.invited_user_id);
+      const user = await authRepository.getDashboardData(invitation.invited_user_id);
+
+      const auditEntry = buildAuditEntry({
+        scope: "miniapp",
+        action: "user.registered",
+        entity: "user",
+        entityId: user.id,
+        actor: { id: user.id, role: user.roleName, name: `${user.firstName} ${user.lastName}` },
+        metadata: { branch: user.branchName, role: user.roleName, telegramId, invitedBy: invitation.created_by },
+      });
+      await logAuditEvent(auditEntry);
+
+      return { registered: true, user };
     }
 
-    managerPosition = await authRepository.getPositionByName("Управляющий");
-    if (!managerPosition) {
-      throw buildError("Manager position not configured", 500);
+    // Fallback: старый поток — создаём нового пользователя
+    const targetRoleId = invitation.role_id;
+    const targetBranchId = invitation.branch_id || payload.branchId;
+    let targetPositionId = invitation.position_id || (payload.positionId ? Number(payload.positionId) : null);
+
+    if (!targetPositionId) {
+      const defaultPosition = await authRepository.getPositionByName("Управляющий");
+      if (!defaultPosition) {
+        throw buildError("Manager position not configured", 500);
+      }
+      targetPositionId = defaultPosition.id;
     }
 
-    targetPositionId = managerPosition.id;
+    const userId = await authRepository.createUser({
+      telegramId,
+      firstName: invitation.first_name,
+      lastName: invitation.last_name,
+      avatarUrl,
+      positionId: Number(targetPositionId),
+      branchId: targetBranchId,
+      roleId: targetRoleId,
+    });
+
+    await authRepository.assignUserToMatchingAssessments({
+      userId,
+      branchId: targetBranchId ? Number(targetBranchId) : null,
+      positionId: targetPositionId ? Number(targetPositionId) : null,
+    });
+    await authRepository.markInvitationUsed(invitation.id, userId);
+    const user = await authRepository.getDashboardData(userId);
+
+    const auditEntry = buildAuditEntry({
+      scope: "miniapp",
+      action: "user.registered",
+      entity: "user",
+      entityId: user.id,
+      actor: { id: user.id, role: user.roleName, name: `${user.firstName} ${user.lastName}` },
+      metadata: { branch: user.branchName, role: user.roleName, telegramId, invitedBy: invitation.created_by },
+    });
+    await logAuditEvent(auditEntry);
+
+    return { registered: true, user };
   }
 
-  if (!invitation && !targetPositionId) {
+  // Поток без приглашения (самостоятельная регистрация)
+  let targetRoleId;
+  const targetBranchId = payload.branchId;
+  const targetPositionId = payload.positionId ? Number(payload.positionId) : null;
+
+  if (!targetPositionId) {
     throw buildError("Position is required for registration without invitation", 422);
   }
 
@@ -159,10 +217,6 @@ async function register(context, payload) {
     positionId: targetPositionId ? Number(targetPositionId) : null,
   });
 
-  if (invitation) {
-    await authRepository.markInvitationUsed(invitation.id, userId);
-  }
-
   const user = await authRepository.getDashboardData(userId);
 
   const auditEntry = buildAuditEntry({
@@ -170,24 +224,12 @@ async function register(context, payload) {
     action: "user.registered",
     entity: "user",
     entityId: user.id,
-    actor: {
-      id: user.id,
-      role: user.roleName,
-      name: `${user.firstName} ${user.lastName}`,
-    },
-    metadata: {
-      branch: user.branchName,
-      role: user.roleName,
-      telegramId,
-      invitedBy: invitation ? invitation.created_by : null,
-    },
+    actor: { id: user.id, role: user.roleName, name: `${user.firstName} ${user.lastName}` },
+    metadata: { branch: user.branchName, role: user.roleName, telegramId, invitedBy: null },
   });
   await logAuditEvent(auditEntry);
 
-  return {
-    registered: true,
-    user,
-  };
+  return { registered: true, user };
 }
 
 async function getProfile(currentUser) {
@@ -249,11 +291,7 @@ async function completeOnboarding(currentUser) {
 }
 
 async function getReferences() {
-  const [branches, positions, roles] = await Promise.all([
-    authRepository.getBranches(),
-    authRepository.getPositions(),
-    authRepository.getRoles(),
-  ]);
+  const [branches, positions, roles] = await Promise.all([authRepository.getBranches(), authRepository.getPositions(), authRepository.getRoles()]);
 
   return { branches, positions, roles };
 }

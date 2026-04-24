@@ -7,8 +7,17 @@
         <p class="body-medium text-secondary">Подтвердите участие в системе аттестаций</p>
       </div>
 
+      <!-- Ошибка: уже зарегистрирован -->
+      <div v-if="alreadyRegisteredError" class="card empty-state">
+        <div class="empty-icon">
+          <XCircle />
+        </div>
+        <h3 class="title-small mb-8">Вы уже зарегистрированы</h3>
+        <p class="body-small text-secondary">Эта ссылка-приглашение вам недоступна, так как вы уже зарегистрированы в системе под другим аккаунтом.</p>
+      </div>
+
       <!-- Invitation Info -->
-      <div v-if="invitation" class="card invitation-card">
+      <div v-else-if="invitation" class="card invitation-card">
         <div class="invitation-header mb-16">
           <div class="invitation-icon">
             <Hand />
@@ -18,29 +27,31 @@
 
         <div class="invitation-details">
           <div class="detail-item">
-            <span class="detail-label">Имя:</span>
-            <span class="detail-value">{{ invitation.firstName }} {{ invitation.lastName }}</span>
+            <span class="detail-label">ФИО:</span>
+            <span class="detail-value">{{ invitation.lastName }} {{ invitation.firstName }}</span>
+          </div>
+
+          <div v-if="invitation.phone" class="detail-item">
+            <span class="detail-label">Телефон:</span>
+            <span class="detail-value">{{ invitation.phone }}</span>
+          </div>
+
+          <div v-if="invitation.positionName" class="detail-item">
+            <span class="detail-label">Должность:</span>
+            <span class="detail-value">{{ invitation.positionName }}</span>
           </div>
 
           <div class="detail-item">
             <span class="detail-label">Филиал:</span>
             <span class="detail-value">{{ invitation.branchName }}</span>
           </div>
-
-          <div class="detail-item">
-            <span class="detail-label">Роль:</span>
-            <span class="detail-value">{{ invitation.roleName }}</span>
-          </div>
-
-          <div class="detail-item">
-            <span class="detail-label">Действительно до:</span>
-            <span class="detail-value">{{ formattedExpiryDate }}</span>
-          </div>
         </div>
+
+        <p class="body-small text-secondary mb-16">Проверьте данные. Если всё верно — нажмите кнопку для подтверждения.</p>
 
         <div class="invitation-actions">
           <button class="btn btn-primary btn-full" @click="acceptInvitation" :disabled="isLoading">
-            {{ isLoading ? "Принимаем..." : "Принять приглашение" }}
+            {{ isLoading ? "Принимаем..." : "Подтвердить и войти" }}
           </button>
         </div>
       </div>
@@ -52,14 +63,13 @@
         </div>
         <h3 class="title-small mb-8">Приглашение недоступно</h3>
         <p class="body-small text-secondary">Приглашение не найдено или истекло. Попросите администратора отправить новую ссылку.</p>
-
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { Hand, XCircle } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
@@ -76,21 +86,9 @@ export default {
     const userStore = useUserStore();
     const telegramStore = useTelegramStore();
 
+    const alreadyRegisteredError = ref(false);
     const invitation = computed(() => userStore.invitation);
     const isLoading = computed(() => userStore.isLoading);
-
-    const formattedExpiryDate = computed(() => {
-      if (!invitation.value?.expiresAt) {
-        return "—";
-      }
-      return new Date(invitation.value.expiresAt).toLocaleString("ru-RU", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    });
 
     async function acceptInvitation() {
       if (!invitation.value) {
@@ -104,7 +102,12 @@ export default {
           telegramStore.hapticFeedback("notification", "success");
           router.replace({ name: "dashboard" });
         } else {
-          telegramStore.showAlert(result.error || "Ошибка принятия приглашения");
+          const errorMsg = result.error || "Ошибка принятия приглашения";
+          if (errorMsg.includes("уже зарегистрирован") || errorMsg.includes("already registered")) {
+            alreadyRegisteredError.value = true;
+          } else {
+            telegramStore.showAlert(errorMsg);
+          }
           telegramStore.hapticFeedback("notification", "error");
         }
       } catch (error) {
@@ -116,47 +119,17 @@ export default {
 
     onMounted(async () => {
       // Страница отображает информацию о приглашении или сообщение об отсутствии
-      // Логика перенаправления обрабатывается роутером
     });
 
     return {
       invitation,
       isLoading,
-      formattedExpiryDate,
+      alreadyRegisteredError,
       acceptInvitation,
     };
   },
 };
 </script>
-
-<style scoped>
-.invitation-card {
-  max-width: 500px;
-  margin: 0 auto;
-  padding: 32px 24px;
-  text-align: center;
-}
-
-.invitation-header {
-  text-align: center;
-}
-
-.invitation-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 16px;
-}
-
-.invitation-icon svg {
-  width: 48px;
-  height: 48px;
-}
-
-.invitation-details {
-  margin: 24px 0;
-  text-align: left;
-}
 
 .detail-item {
   display: flex;

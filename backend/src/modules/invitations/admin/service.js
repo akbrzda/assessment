@@ -1,7 +1,7 @@
-const config = require("../../../config/env");
 const { generateInviteCode } = require("../../../utils/tokenGenerator");
 const { createLog } = require("../../../services/adminLogService");
 const invitationsRepository = require("./repository");
+const userModel = require("../../../models/userModel");
 
 function buildError(message, status) {
   const error = new Error(message);
@@ -82,23 +82,40 @@ async function listInvitations(actor) {
 async function createInvitation(payload, actor, req) {
   await ensureManagerBranchAccess(actor, payload.branchId);
 
-  const managerRole = await invitationsRepository.findManagerRole();
-  if (!managerRole) {
-    throw buildError("Manager role not configured", 500);
+  const employeeRole = await invitationsRepository.findEmployeeRole();
+  if (!employeeRole) {
+    throw buildError("Employee role not configured", 500);
   }
 
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + config.inviteExpirationDays);
+  // Проверяем должность, если указана
+  if (payload.positionId) {
+    const position = await invitationsRepository.findPositionById(payload.positionId);
+    if (!position) {
+      throw buildError("Должность не найдена", 422);
+    }
+  }
 
   const code = await ensureUniqueCode();
+
+  // Создаём pending-профиль сотрудника заранее
+  const invitedUserId = await userModel.createPendingUser({
+    firstName: payload.firstName,
+    lastName: payload.lastName,
+    positionId: payload.positionId || null,
+    branchId: payload.branchId,
+    roleId: employeeRole.id,
+  });
+
   const invitationId = await invitationsRepository.createInvitation({
     code,
-    roleId: managerRole.id,
+    roleId: employeeRole.id,
     branchId: payload.branchId,
     firstName: payload.firstName,
     lastName: payload.lastName,
-    expiresAt,
+    phone: payload.phone || null,
+    positionId: payload.positionId || null,
     createdBy: actor.id,
+    invitedUserId,
   });
 
   await createLog(
@@ -107,7 +124,7 @@ async function createInvitation(payload, actor, req) {
     `Создано приглашение для ${payload.firstName} ${payload.lastName} (код: ${code})`,
     "invitation",
     invitationId,
-    req
+    req,
   );
 
   const invitation = await invitationsRepository.findById(invitationId);
@@ -128,7 +145,19 @@ async function updateInvitation(invitationId, payload, actor, req) {
     firstName: payload.firstName,
     lastName: payload.lastName,
     branchId: payload.branchId,
+    phone: payload.phone || null,
+    positionId: payload.positionId || null,
   });
+
+  // Синхронизируем данные pending-профиля, если он существует
+  if (invitation.invited_user_id) {
+    await invitationsRepository.updatePendingUserProfile(invitation.invited_user_id, {
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+      branchId: payload.branchId,
+      positionId: payload.positionId || null,
+    });
+  }
 
   await createLog(
     actor.id,
@@ -136,37 +165,15 @@ async function updateInvitation(invitationId, payload, actor, req) {
     `Обновлено приглашение: ${payload.firstName} ${payload.lastName} (код: ${invitation.code})`,
     "invitation",
     invitationId,
-    req
+    req,
   );
 
   const updated = await invitationsRepository.findById(invitationId);
   return { invitation: updated, message: "Приглашение обновлено успешно" };
 }
 
-async function extendInvitation(invitationId, days, actor, req) {
-  const invitation = await invitationsRepository.findById(invitationId);
-  if (!invitation) {
-    throw buildError("Invitation not found", 404);
-  }
-
-  await ensureAccess(actor, invitation);
-  ensureUnused(invitation, "extend");
-
-  const expiresAt = new Date(invitation.expires_at);
-  expiresAt.setDate(expiresAt.getDate() + days);
-  await invitationsRepository.updateExpiration(invitationId, expiresAt);
-
-  await createLog(
-    actor.id,
-    "UPDATE",
-    `Продлено приглашение на ${days} дней (код: ${invitation.code})`,
-    "invitation",
-    invitationId,
-    req
-  );
-
-  const updated = await invitationsRepository.findById(invitationId);
-  return { invitation: updated, message: "Приглашение продлено успешно" };
+async function extendInvitation() {
+  throw buildError("Продление приглашений отключено", 400);
 }
 
 async function deleteInvitation(invitationId, actor, req) {
@@ -186,7 +193,7 @@ async function deleteInvitation(invitationId, actor, req) {
     `Удалено приглашение: ${invitation.first_name} ${invitation.last_name} (код: ${invitation.code})`,
     "invitation",
     invitationId,
-    req
+    req,
   );
 }
 

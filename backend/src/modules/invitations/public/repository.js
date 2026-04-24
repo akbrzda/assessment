@@ -21,10 +21,6 @@ async function listByCreator(userId) {
   return invitationModel.listInvitationsByCreator(userId);
 }
 
-async function updateExpiration(invitationId, expiresAt) {
-  return invitationModel.updateExpiration(invitationId, expiresAt);
-}
-
 async function deleteInvitation(invitationId) {
   return invitationModel.deleteInvitation(invitationId);
 }
@@ -39,8 +35,6 @@ module.exports = {
   createInvitation,
   findById,
   listByCreator,
-  updateExpiration,
   deleteInvitation,
   updateInvitation,
 };
-

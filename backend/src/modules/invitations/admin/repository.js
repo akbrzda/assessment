@@ -26,16 +26,20 @@ async function findManagerRole() {
   return referenceModel.getRoleByName("manager");
 }
 
+async function findEmployeeRole() {
+  return referenceModel.getRoleByName("employee");
+}
+
+async function findPositionById(positionId) {
+  return referenceModel.getPositionById(positionId);
+}
+
 async function createInvitation(payload) {
   return invitationModel.createInvitation(payload);
 }
 
 async function updateInvitation(invitationId, payload) {
   return invitationModel.updateInvitation(invitationId, payload);
-}
-
-async function updateExpiration(invitationId, expiresAt) {
-  return invitationModel.updateExpiration(invitationId, expiresAt);
 }
 
 async function removeInvitation(invitationId) {
@@ -47,6 +51,14 @@ async function findUserBranchId(userId) {
   return rows[0]?.branch_id || null;
 }
 
+async function updatePendingUserProfile(userId, { firstName, lastName, branchId, positionId }) {
+  await pool.execute(
+    `UPDATE users SET first_name = ?, last_name = ?, branch_id = ?, position_id = COALESCE(?, position_id), updated_at = NOW()
+     WHERE id = ? AND telegram_id IS NULL`,
+    [firstName, lastName, branchId, positionId || null, userId],
+  );
+}
+
 module.exports = {
   findAll,
   findByCreator,
@@ -54,9 +66,11 @@ module.exports = {
   findById,
   findActiveByCode,
   findManagerRole,
+  findEmployeeRole,
+  findPositionById,
   createInvitation,
   updateInvitation,
-  updateExpiration,
   removeInvitation,
   findUserBranchId,
+  updatePendingUserProfile,
 };

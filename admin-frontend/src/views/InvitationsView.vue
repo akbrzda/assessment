@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="page-header">
       <div>
-        <p class="page-stats">Всего {{ stats.total }} • Активно {{ stats.active }} • Использовано {{ stats.used }} • Истекло {{ stats.expired }}</p>
+        <p class="page-stats">Всего {{ stats.total }} • Активно {{ stats.active }} • Использовано {{ stats.used }}</p>
       </div>
       <Button icon="plus" @click="openCreateModal">
         <span class="hide-mobile">Создать приглашение</span>
@@ -40,7 +40,6 @@
                 <th>Филиал</th>
                 <th>Статус</th>
                 <th>Создано</th>
-                <th>Срок действия</th>
                 <th>Код</th>
                 <th class="actions-col">Действия</th>
               </tr>
@@ -59,7 +58,6 @@
                   <div v-if="invitation.status === 'used' && invitation.usedByName" class="used-by">Принял: {{ invitation.usedByName }}</div>
                 </td>
                 <td class="date-cell">{{ formatDate(invitation.createdAt) }}</td>
-                <td class="date-cell">{{ formatDate(invitation.expiresAt) }}</td>
                 <td>
                   <div class="code-cell">
                     <code class="invitation-code" :title="generateInviteLink(invitation.code)">{{ invitation.code }}</code>
@@ -82,14 +80,6 @@
                       class="action-btn action-btn-edit"
                       title="Редактировать"
                       icon="pencil"
-                    >
-                    </Button>
-                    <Button
-                      v-if="invitation.status === 'active'"
-                      @click="openExtendModal(invitation)"
-                      class="action-btn action-btn-extend"
-                      title="Продлить"
-                      icon="clock-3"
                     >
                     </Button>
                     <Button
@@ -130,10 +120,6 @@
                 <span class="invitation-card-value">{{ formatDate(invitation.createdAt) }}</span>
               </div>
               <div class="invitation-card-row">
-                <span class="invitation-card-label">Истекает:</span>
-                <span class="invitation-card-value">{{ formatDate(invitation.expiresAt) }}</span>
-              </div>
-              <div class="invitation-card-row">
                 <span class="invitation-card-label">Код:</span>
                 <code class="invitation-card-code">{{ invitation.code }}</code>
               </div>
@@ -150,16 +136,6 @@
               </Button>
               <Button v-if="invitation.status === 'active'" size="sm" variant="secondary" icon="pencil" @click="openEditModal(invitation)" fullWidth>
                 Редактировать
-              </Button>
-              <Button
-                v-if="invitation.status === 'active'"
-                size="sm"
-                variant="secondary"
-                icon="clock-3"
-                @click="openExtendModal(invitation)"
-                fullWidth
-              >
-                Продлить
               </Button>
               <Button v-if="invitation.status !== 'used'" size="sm" variant="danger" icon="trash" @click="confirmDelete(invitation)" fullWidth>
                 Удалить
@@ -186,9 +162,6 @@
         <Input v-model="form.lastName" label="Фамилия" placeholder="Введите фамилию" required />
         <Select v-model.number="form.branchId" label="Филиал" :options="branchSelectOptions" placeholder="Выберите филиал" required />
       </div>
-      <p v-if="!editingInvitation" class="modal-hint">
-        Срок действия приглашения: {{ defaultExpirationDays }} дней (переменная <code>INVITE_EXPIRATION_DAYS</code> в файле <code>.env</code>)
-      </p>
       <template #footer>
         <Button variant="secondary" @click="closeFormModal">Отмена</Button>
         <Button :loading="saving" @click="submitForm">Сохранить</Button>
@@ -196,36 +169,13 @@
     </Modal>
 
     <!-- Extend Modal -->
-    <Modal v-if="showExtendModal" title="Продлить приглашение" @close="closeExtendModal" size="sm">
-      <div class="extend-modal">
-        <p class="modal-description">
-          Приглашение <strong>{{ editingInvitation?.code }}</strong> истекает {{ formatDate(editingInvitation?.expiresAt) }}. Укажите количество
-          дополнительных дней.
-        </p>
-        <Input
-          v-model.number="extendDays"
-          type="number"
-          label="Продлить на (дней)"
-          :placeholder="String(defaultExpirationDays)"
-          min="1"
-          max="30"
-          required
-        />
-        <p class="modal-hint">
-          По умолчанию: {{ defaultExpirationDays }} дней (переменная <code>INVITE_EXPIRATION_DAYS</code> в файле <code>.env</code>)
-        </p>
-      </div>
-      <template #footer>
-        <Button variant="secondary" @click="closeExtendModal">Отмена</Button>
-        <Button :loading="saving" @click="submitExtend">Продлить</Button>
-      </template>
-    </Modal>
+    <Modal v-if="false" title="" @close="closeExtendModal" size="sm"></Modal>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from "vue";
-import { listInvitations, createInvitation, updateInvitation, extendInvitation, deleteInvitation } from "../api/invitations";
+import { listInvitations, createInvitation, updateInvitation, deleteInvitation } from "../api/invitations";
 import { getReferences } from "../api/users";
 import Preloader from "../components/ui/Preloader.vue";
 import Modal from "../components/ui/Modal.vue";
@@ -234,7 +184,7 @@ import Button from "../components/ui/Button.vue";
 import Badge from "../components/ui/Badge.vue";
 import Input from "../components/ui/Input.vue";
 import Select from "../components/ui/Select.vue";
-import { INVITE_EXPIRATION_DAYS, BOT_USERNAME } from "@/env";
+import { BOT_USERNAME } from "@/env";
 import { useToast } from "../composables/useToast";
 import { formatBranchLabel } from "../utils/branch";
 import { useAuthStore } from "../stores/auth";
@@ -244,10 +194,8 @@ const saving = ref(false);
 
 const references = ref({ branches: [] });
 const invitations = ref([]);
-const DEFAULT_EXPIRATION_FROM_ENV = Number(INVITE_EXPIRATION_DAYS || 7);
 const BOT_USERNAME_FROM_ENV = BOT_USERNAME || "your_bot";
 
-const defaultExpirationDays = ref(DEFAULT_EXPIRATION_FROM_ENV);
 const botUsername = ref(BOT_USERNAME_FROM_ENV);
 
 const filters = ref({
@@ -262,7 +210,6 @@ const pagination = ref({
 });
 
 const showFormModal = ref(false);
-const showExtendModal = ref(false);
 const editingInvitation = ref(null);
 
 const form = ref({
@@ -271,7 +218,6 @@ const form = ref({
   branchId: "",
 });
 
-const extendDays = ref(7);
 const { showToast } = useToast();
 const authStore = useAuthStore();
 
@@ -285,10 +231,10 @@ const availableBranches = computed(() => {
 });
 
 const stats = computed(() => {
-  const counters = { total: 0, active: 0, used: 0, expired: 0 };
+  const counters = { total: 0, active: 0, used: 0 };
   invitations.value.forEach((item) => {
     counters.total += 1;
-    counters[item.status] += 1;
+    counters[item.status] = (counters[item.status] || 0) + 1;
   });
   return counters;
 });
@@ -296,7 +242,6 @@ const stats = computed(() => {
 const statusOptions = computed(() => [
   { value: "active", label: "Активные" },
   { value: "used", label: "Использованные" },
-  { value: "expired", label: "Истёкшие" },
 ]);
 
 const branchOptions = computed(() => [
@@ -318,7 +263,7 @@ const processedInvitations = computed(() =>
   invitations.value.map((item) => ({
     ...item,
     searchable: [item.firstName, item.lastName, item.branchName, item.code].filter(Boolean).join(" ").toLowerCase(),
-  }))
+  })),
 );
 
 const filteredInvitations = computed(() => {
@@ -342,7 +287,7 @@ watch(
   () => [filters.value.search, filters.value.status, filters.value.branch],
   () => {
     pagination.value.page = 1;
-  }
+  },
 );
 
 const loadData = async () => {
@@ -353,8 +298,6 @@ const loadData = async () => {
     references.value = referencesData || { branches: [] };
     invitations.value = (invitationsResponse.data?.invitations || []).map(normalizeInvitation);
 
-    // Значения по умолчанию берём из переменных окружения сборки
-    defaultExpirationDays.value = DEFAULT_EXPIRATION_FROM_ENV;
     botUsername.value = BOT_USERNAME_FROM_ENV;
   } catch (error) {
     console.error("Ошибка загрузки приглашений", error);
@@ -365,9 +308,8 @@ const loadData = async () => {
 };
 
 const normalizeInvitation = (item) => {
-  const expiresAt = item.expires_at ? new Date(item.expires_at) : null;
   const usedAt = item.used_at ? new Date(item.used_at) : null;
-  const status = item.used_by ? "used" : expiresAt && expiresAt.getTime() < Date.now() ? "expired" : "active";
+  const status = item.used_by ? "used" : "active";
 
   return {
     id: item.id,
@@ -377,7 +319,6 @@ const normalizeInvitation = (item) => {
     branchId: item.branch_id,
     branchName: formatBranchLabel({ name: item.branch_name || "", city: item.branch_city || "" }) || item.branch_name,
     createdAt: item.created_at ? new Date(item.created_at) : null,
-    expiresAt,
     usedAt,
     usedBy: item.used_by,
     usedByName: item.used_by_name,
@@ -460,36 +401,7 @@ const updateList = (rawInvitation) => {
   }
 };
 
-const openExtendModal = (invitation) => {
-  editingInvitation.value = invitation;
-  extendDays.value = defaultExpirationDays.value; // Используем значение из настроек
-  showExtendModal.value = true;
-};
-
-const closeExtendModal = () => {
-  showExtendModal.value = false;
-  saving.value = false;
-};
-
-const submitExtend = async () => {
-  if (extendDays.value < 1 || extendDays.value > 30) {
-    showToast("Количество дней должно быть от 1 до 30", "warning");
-    return;
-  }
-
-  saving.value = true;
-  try {
-    const { data } = await extendInvitation(editingInvitation.value.id, { days: extendDays.value });
-    updateList(data?.invitation);
-    showToast("Срок действия приглашения продлён", "success");
-    closeExtendModal();
-  } catch (error) {
-    console.error("Ошибка продления приглашения", error);
-    showToast(error.response?.data?.error || "Не удалось продлить приглашение", "error");
-  } finally {
-    saving.value = false;
-  }
-};
+const closeExtendModal = () => {};
 
 const confirmDelete = async (invitation) => {
   if (invitation.status === "used") {
@@ -515,7 +427,6 @@ const statusLabel = (status) => {
   const labels = {
     active: "Активно",
     used: "Использовано",
-    expired: "Истекло",
   };
   return labels[status] || status;
 };
@@ -524,7 +435,6 @@ const getStatusVariant = (status) => {
   const variants = {
     active: "success",
     used: "primary",
-    expired: "danger",
   };
   return variants[status] || "default";
 };
@@ -580,7 +490,7 @@ const sendToTelegram = (invitation) => {
 
   // Открываем Telegram Web с предзаполненным сообщением
   const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(
-    `Приглашение для ${invitation.firstName} ${invitation.lastName} (${invitation.branchName})`
+    `Приглашение для ${invitation.firstName} ${invitation.lastName} (${invitation.branchName})`,
   )}`;
   window.open(telegramUrl, "_blank");
 };

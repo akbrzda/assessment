@@ -4,16 +4,16 @@ const createSchema = Joi.object({
   firstName: Joi.string().trim().min(2).max(64).required(),
   lastName: Joi.string().trim().min(2).max(64).required(),
   branchId: Joi.number().integer().positive().required(),
+  positionId: Joi.number().integer().positive().required(),
+  phone: Joi.string().trim().max(20).optional().allow("", null),
 });
 
 const updateSchema = Joi.object({
   firstName: Joi.string().trim().min(2).max(64).required(),
   lastName: Joi.string().trim().min(2).max(64).required(),
   branchId: Joi.number().integer().positive().required(),
-});
-
-const extendSchema = Joi.object({
-  days: Joi.number().integer().min(1).max(30).required(),
+  positionId: Joi.number().integer().positive().optional(),
+  phone: Joi.string().trim().max(20).optional().allow("", null),
 });
 
 function buildValidationError(error) {
@@ -49,17 +49,8 @@ function validateUpdatePayload(payload) {
   return value;
 }
 
-function validateExtendPayload(payload) {
-  const { error, value } = extendSchema.validate(payload, { abortEarly: false });
-  if (error) {
-    throw buildValidationError(error);
-  }
-  return value;
-}
-
 module.exports = {
   parseInvitationId,
   validateCreatePayload,
   validateUpdatePayload,
-  validateExtendPayload,
 };

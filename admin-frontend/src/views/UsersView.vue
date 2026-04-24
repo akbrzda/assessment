@@ -7,6 +7,10 @@
       </div>
       <div class="header-actions">
         <Button icon="file-chart-column" variant="ghost" size="sm" @click="handleExportExcel" class="hide-mobile">Экспорт Excel</Button>
+        <Button v-if="authStore.isSuperAdmin || authStore.isManager" icon="user-plus" variant="secondary" @click="openInviteModal">
+          <span class="hide-mobile">Пригласить сотрудника</span>
+          <span class="show-mobile">Пригласить</span>
+        </Button>
         <Button v-if="authStore.isSuperAdmin" icon="plus" @click="openCreateModal">
           <span class="hide-mobile">Добавить пользователя</span>
           <span class="show-mobile">Добавить</span>
@@ -38,23 +42,17 @@
     <Card class="users-card" padding="none">
       <div class="bulk-actions">
         <span class="bulk-selected">Выбрано: {{ selectedUserIds.length }}</span>
-        <Select v-model="bulkActionType" :options="[
-          { value: 'role', label: 'Назначить роль' },
-          { value: 'branch', label: 'Перевести в филиал' },
-          { value: 'export', label: 'Экспортировать CSV' },
-        ]" placeholder="Массовое действие" />
         <Select
-          v-if="bulkActionType === 'role'"
-          v-model="bulkRoleId"
-          :options="roleOptions"
-          placeholder="Выберите роль"
+          v-model="bulkActionType"
+          :options="[
+            { value: 'role', label: 'Назначить роль' },
+            { value: 'branch', label: 'Перевести в филиал' },
+            { value: 'export', label: 'Экспортировать CSV' },
+          ]"
+          placeholder="Массовое действие"
         />
-        <Select
-          v-if="bulkActionType === 'branch'"
-          v-model="bulkBranchId"
-          :options="branchOptions"
-          placeholder="Выберите филиал"
-        />
+        <Select v-if="bulkActionType === 'role'" v-model="bulkRoleId" :options="roleOptions" placeholder="Выберите роль" />
+        <Select v-if="bulkActionType === 'branch'" v-model="bulkBranchId" :options="branchOptions" placeholder="Выберите филиал" />
         <Button size="sm" :loading="actionLoading" @click="runBulkAction">Применить</Button>
       </div>
 
@@ -88,11 +86,7 @@
             <tbody>
               <tr v-for="user in users" :key="user.id">
                 <td>
-                  <input
-                    type="checkbox"
-                    :checked="selectedUserIds.includes(user.id)"
-                    @change="toggleUserSelection(user.id)"
-                  />
+                  <input type="checkbox" :checked="selectedUserIds.includes(user.id)" @change="toggleUserSelection(user.id)" />
                 </td>
                 <td class="id-cell">{{ user.id }}</td>
                 <td class="name-cell clickable" @click="openProfileModal(user)">
@@ -190,9 +184,31 @@
     <!-- Create modal -->
     <Modal :show="showCreateModal" title="Создать пользователя" @close="closeModals">
       <UserForm v-model="formData" :references="references" />
+      <p class="create-hint">Логин будет автоматически сформирован из фамилии и первой буквы имени. Пароль будет сгенерирован автоматически.</p>
       <div class="modal-actions">
         <Button variant="secondary" @click="closeModals">Отмена</Button>
         <Button :loading="actionLoading" @click="handleCreate">Создать</Button>
+      </div>
+    </Modal>
+
+    <!-- Credentials modal after create -->
+    <Modal :show="Boolean(createdCredentials)" title="Учётные данные созданы" @close="createdCredentials = null">
+      <div v-if="createdCredentials" class="credentials-card">
+        <p class="credentials-name">{{ createdCredentials.name }}</p>
+        <div class="credentials-row">
+          <span class="credentials-label">Логин:</span>
+          <code class="credentials-value">{{ createdCredentials.login }}</code>
+          <Button size="sm" variant="ghost" icon="Copy" @click="copyText(createdCredentials.login)">Копировать</Button>
+        </div>
+        <div class="credentials-row">
+          <span class="credentials-label">Пароль:</span>
+          <code class="credentials-value">{{ createdCredentials.password }}</code>
+          <Button size="sm" variant="ghost" icon="Copy" @click="copyText(createdCredentials.password)">Копировать</Button>
+        </div>
+        <p class="credentials-hint">Сохраните и передайте эти данные пользователю. Пароль больше не будет показан.</p>
+      </div>
+      <div class="modal-actions">
+        <Button @click="createdCredentials = null">Закрыть</Button>
       </div>
     </Modal>
 
@@ -425,6 +441,50 @@
         <Button variant="danger" :loading="actionLoading" @click="handleResetProgress">Сбросить прогресс</Button>
       </div>
     </Modal>
+
+    <!-- Invite employee modal -->
+    <Modal :show="showInviteModal" title="Пригласить сотрудника" @close="closeInviteModal">
+      <div v-if="inviteLink" class="invite-success">
+        <p class="invite-success-text">Приглашение создано. Отправьте ссылку сотруднику:</p>
+        <div class="invite-link-row">
+          <Input v-model="inviteLink" readonly label="Ссылка-приглашение" />
+          <Button size="sm" icon="Copy" variant="secondary" @click="copyInviteLink">Скопировать</Button>
+        </div>
+        <p class="invite-hint">После перехода по ссылке сотрудник увидит заполненные данные и подтвердит приглашение.</p>
+        <div class="modal-actions">
+          <Button @click="closeInviteModal">Готово</Button>
+        </div>
+      </div>
+      <div v-else>
+        <div class="form-container">
+          <div class="form-row">
+            <Input v-model="inviteForm.lastName" label="Фамилия" placeholder="Иванов" required :error="inviteErrors.lastName" />
+            <Input v-model="inviteForm.firstName" label="Имя" placeholder="Иван" required :error="inviteErrors.firstName" />
+          </div>
+          <Input v-model="inviteForm.phone" label="Номер телефона" placeholder="+7 (999) 000-00-00" :error="inviteErrors.phone" />
+          <Select
+            v-model.number="inviteForm.positionId"
+            label="Должность"
+            :options="positionOptions"
+            placeholder="Выберите должность"
+            required
+            :error="inviteErrors.positionId"
+          />
+          <Select
+            v-model.number="inviteForm.branchId"
+            label="Филиал (Город)"
+            :options="branchOptions"
+            placeholder="Выберите филиал"
+            required
+            :error="inviteErrors.branchId"
+          />
+        </div>
+        <div class="modal-actions">
+          <Button variant="secondary" @click="closeInviteModal">Отмена</Button>
+          <Button :loading="actionLoading" @click="handleInviteCreate">Создать приглашение</Button>
+        </div>
+      </div>
+    </Modal>
   </div>
 </template>
 
@@ -444,6 +504,7 @@ import {
   bulkTransferUsersToBranch,
   bulkExportUsers,
 } from "../api/users";
+import { createInvitation } from "../api/invitations";
 import Card from "../components/ui/Card.vue";
 import Button from "../components/ui/Button.vue";
 import Input from "../components/ui/Input.vue";
@@ -486,6 +547,11 @@ const showResetPasswordModal = ref(false);
 const showDeleteModal = ref(false);
 const showProfileModal = ref(false);
 const showResetProgressModal = ref(false);
+const showInviteModal = ref(false);
+
+const inviteForm = ref({ firstName: "", lastName: "", phone: "", positionId: "", branchId: "" });
+const inviteErrors = ref({});
+const inviteLink = ref("");
 
 const selectedUser = ref(null);
 const selectedAssessment = ref(null);
@@ -800,8 +866,57 @@ const formatScore = (score) => {
   return Math.round(numericScore);
 };
 
+// Транслитерация кириллицы в латиницу для логина
+const TRANSLITERATE_MAP = {
+  а: "a",
+  б: "b",
+  в: "v",
+  г: "g",
+  д: "d",
+  е: "e",
+  ё: "yo",
+  ж: "zh",
+  з: "z",
+  и: "i",
+  й: "j",
+  к: "k",
+  л: "l",
+  м: "m",
+  н: "n",
+  о: "o",
+  п: "p",
+  р: "r",
+  с: "s",
+  т: "t",
+  у: "u",
+  ф: "f",
+  х: "kh",
+  ц: "ts",
+  ч: "ch",
+  ш: "sh",
+  щ: "sch",
+  ъ: "",
+  ы: "y",
+  ь: "",
+  э: "e",
+  ю: "yu",
+  я: "ya",
+};
+
+const transliterate = (text) => [...text.toLowerCase()].map((ch) => TRANSLITERATE_MAP[ch] ?? ch).join("");
+
+const generateLogin = (lastName, firstName) => {
+  if (!lastName && !firstName) return "";
+  const last = transliterate(lastName.trim()).replace(/[^a-z0-9]/g, "");
+  const firstLetter = firstName ? transliterate(firstName.trim().charAt(0)).replace(/[^a-z0-9]/g, "") : "";
+  return firstLetter ? `${last}_${firstLetter}` : last;
+};
+
+const createdCredentials = ref(null);
+
 const openCreateModal = () => {
   formData.value = defaultForm();
+  createdCredentials.value = null;
   showCreateModal.value = true;
 };
 
@@ -850,6 +965,7 @@ const closeModals = () => {
   generatedPassword.value = "";
   passwordGenerating.value = false;
   passwordApplying.value = false;
+  // createdCredentials сбрасывается только при закрытии credentials-модала
 };
 
 const validateForm = () => {
@@ -867,20 +983,33 @@ const validateForm = () => {
 const handleCreate = async () => {
   if (!validateForm()) return;
 
+  // Автогенерация логина из фамилии и первой буквы имени
+  const autoLogin = formData.value.login?.trim() || generateLogin(formData.value.lastName, formData.value.firstName);
+
+  // Автогенерация пароля, если не задан вручную
+  const autoPassword = formData.value.password?.trim() || generatePasswordFromForm();
+
   actionLoading.value = true;
   try {
-    await createUser({
+    const { data } = await createUser({
       firstName: formData.value.firstName.trim(),
       lastName: formData.value.lastName.trim(),
       branchId: Number(formData.value.branchId),
       positionId: Number(formData.value.positionId),
       roleId: Number(formData.value.roleId),
-      login: formData.value.login ? formData.value.login.trim() : undefined,
-      password: formData.value.password || undefined,
+      login: autoLogin || undefined,
+      password: autoPassword,
     });
 
     await loadUsers();
     closeModals();
+
+    // Показываем сгенерированные учётные данные
+    createdCredentials.value = {
+      name: `${formData.value.lastName.trim()} ${formData.value.firstName.trim()}`,
+      login: autoLogin,
+      password: autoPassword,
+    };
     showToast("Пользователь создан", "success");
   } catch (error) {
     console.error("Ошибка создания пользователя", error);
@@ -1210,6 +1339,76 @@ const applyGeneratedPassword = async () => {
     showToast(error.response?.data?.error || "Не удалось обновить пароль", "error");
   } finally {
     passwordApplying.value = false;
+  }
+};
+
+const openInviteModal = () => {
+  inviteForm.value = { firstName: "", lastName: "", phone: "", positionId: "", branchId: "" };
+  inviteErrors.value = {};
+  inviteLink.value = "";
+  showInviteModal.value = true;
+};
+
+const closeInviteModal = () => {
+  showInviteModal.value = false;
+  inviteLink.value = "";
+  inviteErrors.value = {};
+};
+
+const validateInviteForm = () => {
+  const errors = {};
+  if (!inviteForm.value.firstName.trim()) errors.firstName = "Введите имя";
+  if (!inviteForm.value.lastName.trim()) errors.lastName = "Введите фамилию";
+  if (!inviteForm.value.positionId) errors.positionId = "Выберите должность";
+  if (!inviteForm.value.branchId) errors.branchId = "Выберите филиал";
+  inviteErrors.value = errors;
+  return Object.keys(errors).length === 0;
+};
+
+const handleInviteCreate = async () => {
+  if (!validateInviteForm()) return;
+
+  actionLoading.value = true;
+  try {
+    const { data } = await createInvitation({
+      firstName: inviteForm.value.firstName.trim(),
+      lastName: inviteForm.value.lastName.trim(),
+      phone: inviteForm.value.phone.trim() || undefined,
+      positionId: Number(inviteForm.value.positionId),
+      branchId: Number(inviteForm.value.branchId),
+    });
+    const code = data?.invitation?.code;
+    if (code) {
+      const botUsername = BOT_USERNAME || "";
+      inviteLink.value = botUsername ? `https://t.me/${botUsername}?startapp=${code}` : `Код приглашения: ${code}`;
+    }
+    await loadUsers();
+    showToast("Приглашение создано", "success");
+  } catch (error) {
+    console.error("Ошибка создания приглашения", error);
+    showToast(error.response?.data?.error || "Не удалось создать приглашение", "error");
+  } finally {
+    actionLoading.value = false;
+  }
+};
+
+const copyInviteLink = async () => {
+  if (!inviteLink.value) return;
+  try {
+    await navigator.clipboard.writeText(inviteLink.value);
+    showToast("Ссылка скопирована", "success");
+  } catch {
+    showToast("Не удалось скопировать ссылку", "error");
+  }
+};
+
+const copyText = async (text) => {
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("Скопировано", "success");
+  } catch {
+    showToast("Не удалось скопировать", "error");
   }
 };
 
@@ -2051,5 +2250,94 @@ onMounted(async () => {
   .bulk-actions {
     grid-template-columns: 1fr;
   }
+}
+
+.form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.invite-success {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.invite-success-text {
+  font-size: 15px;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.invite-link-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.invite-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.credentials-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.credentials-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.credentials-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.credentials-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  min-width: 60px;
+}
+
+.credentials-value {
+  flex: 1;
+  font-family: monospace;
+  font-size: 15px;
+  font-weight: 600;
+  background: var(--surface-card, #f4f4f5);
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: var(--text-primary);
+}
+
+.credentials-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  background: #fef3c7;
+  border-left: 3px solid #f59e0b;
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+.create-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 12px 0 0;
 }
 </style>
