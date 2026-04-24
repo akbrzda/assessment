@@ -1,132 +1,69 @@
 <template>
   <div class="page-container">
     <div class="container">
-      <div class="page-header mb-16">
-        <h1 class="title-large">Обучение</h1>
+      <div class="page-header">
+        <h1 class="courses-page-title">Курсы</h1>
+        <button class="header-search-btn" type="button" @click="focusSearch" aria-label="Поиск">
+          <Search :size="22" />
+        </button>
       </div>
 
-      <div class="mode-switch mb-12">
-        <button class="mode-tab" :class="{ active: activeMode === 'courses' }" @click="setMode('courses')">Курсы</button>
-        <button class="mode-tab" :class="{ active: activeMode === 'assessments' }" @click="setMode('assessments')">Аттестации</button>
+      <div class="search-row mb-12">
+        <div class="search-wrapper">
+          <Search class="search-icon-inner" :size="15" />
+          <input ref="searchInputRef" v-model="courseSearch" type="text" class="search-input" placeholder="Поиск курсов" />
+        </div>
       </div>
 
-      <template v-if="activeMode === 'assessments'">
-        <div class="filter-tabs mb-12">
-          <button
-            v-for="filter in filters"
-            :key="filter.key"
-            class="filter-tab"
-            :class="{ active: activeFilter === filter.key }"
-            @click="setFilter(filter.key)"
-          >
-            {{ filter.label }}
-          </button>
-        </div>
+      <div class="filter-tabs mb-16">
+        <button
+          v-for="tab in courseTabs"
+          :key="tab.key"
+          class="filter-tab"
+          :class="{ active: courseFilter === tab.key }"
+          type="button"
+          @click="courseFilter = tab.key"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
 
-        <div v-if="isLoading" class="loading-state card">
-          <p class="body-small text-secondary">Загрузка материалов...</p>
-        </div>
+      <div v-if="isCoursesLoading" class="loading-state">
+        <p class="body-small text-secondary">Загрузка курсов...</p>
+      </div>
 
-        <div v-else-if="filteredAssessments.length" class="assessments-list">
-          <div v-for="assessment in filteredAssessments" :key="assessment.id" class="card assessment-card" @click="handleAssessmentClick(assessment)">
-            <div class="assessment-header">
-              <div>
-                <h3 class="title-small mb-8">{{ assessment.title }}</h3>
-                <p v-if="assessment.requiresTheory" class="theory-hint" :class="{ done: assessment.theoryCompleted }">
-                  {{ assessment.theoryCompleted ? "Теория пройдена" : "Нужно пройти теорию" }}
-                </p>
+      <div v-else-if="coursesError" class="error-state">
+        <h3 class="title-small mb-8">Не удалось загрузить курсы</h3>
+        <p class="body-small text-secondary mb-12">{{ coursesError }}</p>
+        <button class="btn btn-primary btn-full" type="button" @click="retryCourses">Повторить</button>
+      </div>
+
+      <div v-else-if="filteredCourses.length" class="courses-list">
+        <button v-for="(course, index) in filteredCourses" :key="course.id" class="course-card" type="button" @click="openCourse(course.id)">
+          <div class="course-icon" :style="getCourseIconStyle(index)">
+            <component :is="getCourseIcon(course)" :size="24" class="course-icon-symbol" />
+          </div>
+          <div class="course-body">
+            <h3 class="course-title">{{ course.title }}</h3>
+            <p class="course-meta">{{ course.sectionsCount }} {{ getSectionsLabel(course.sectionsCount) }}</p>
+            <div class="course-progress">
+              <div class="progress-track">
+                <div
+                  class="progress-fill"
+                  :class="{ 'progress-fill--active': course.progress.progressPercent > 0 }"
+                  :style="{ width: `${Math.min(Math.max(course.progress.progressPercent || 0, 0), 100)}%` }"
+                ></div>
               </div>
-              <span class="badge" :class="getStatusClass(assessment.status)">
-                {{ getStatusText(assessment.status) }}
-              </span>
-            </div>
-
-            <div class="assessment-info mb-12">
-              <div class="info-item">
-                <span class="label">Срок:</span>
-                <span class="value">{{ formatDateRange(assessment.startDate, assessment.endDate) }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Порог:</span>
-                <span class="value">{{ assessment.threshold }}%</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Попытки:</span>
-                <span class="value">{{ formatAttemptsLabel(assessment.attemptsUsed, assessment.maxAttempts) }}</span>
-              </div>
-            </div>
-
-            <div v-if="assessment.bestResult" class="best-result mb-12">
-              <div class="info-item">
-                <span class="label">Лучший результат:</span>
-                <span class="value" :class="assessment.bestResult.passed ? 'success' : 'error'"> {{ assessment.bestResult.score }}% </span>
-              </div>
-            </div>
-
-            <div class="assessment-actions">
-              <button
-                v-if="
-                  assessment.status === 'open' &&
-                  hasAttemptsLeft(assessment.attemptsUsed, assessment.maxAttempts) &&
-                  (!assessment.bestResult || assessment.bestResult.score < 100)
-                "
-                class="btn btn-primary btn-full"
-                @click.stop="startAssessment(assessment)"
-              >
-                {{ getStartButtonText(assessment) }}
-              </button>
-
-              <button
-                v-else-if="
-                  assessment.status === 'completed' ||
-                  !hasAttemptsLeft(assessment.attemptsUsed, assessment.maxAttempts) ||
-                  (assessment.bestResult && assessment.bestResult.score === 100)
-                "
-                class="btn btn-secondary btn-full"
-                @click.stop="viewResults(assessment.id)"
-              >
-                Посмотреть результаты
-              </button>
-
-              <button v-else class="btn btn-primary btn-full" disabled>
-                {{ getActionButtonText(assessment.status) }}
-              </button>
+              <span class="course-percent">{{ Math.round(course.progress.progressPercent || 0) }}%</span>
             </div>
           </div>
-        </div>
+        </button>
+      </div>
 
-        <div v-else class="empty-state">
-          <div class="empty-icon">
-            <FileText />
-          </div>
-          <h3 class="title-small mb-8">{{ getEmptyStateTitle() }}</h3>
-          <p class="body-small text-secondary">{{ getEmptyStateDescription() }}</p>
-        </div>
-      </template>
-
-      <template v-else>
-        <div v-if="isCoursesLoading" class="loading-state card">
-          <p class="body-small text-secondary">Загрузка курсов...</p>
-        </div>
-
-        <div v-else-if="coursesError" class="card error-state">
-          <h3 class="title-small mb-8">Не удалось загрузить курсы</h3>
-          <p class="body-small text-secondary mb-12">{{ coursesError }}</p>
-          <button class="btn btn-primary btn-full" type="button" @click="retryCourses">Повторить</button>
-        </div>
-
-        <div v-else-if="courses.length" class="assessments-list">
-          <CourseCard v-for="course in courses" :key="course.id" :course="course" @open="openCourse" />
-        </div>
-
-        <div v-else class="empty-state">
-          <div class="empty-icon">
-            <BookOpen />
-          </div>
-          <h3 class="title-small mb-8">Курсы пока недоступны</h3>
-          <p class="body-small text-secondary">Когда курсы будут назначены, они появятся здесь.</p>
-        </div>
-      </template>
+      <div v-else class="empty-state">
+        <BookOpen :size="48" color="var(--text-secondary)" />
+        <p class="body-small text-secondary mt-12">Курсы пока недоступны</p>
+      </div>
     </div>
   </div>
 </template>
@@ -134,167 +71,82 @@
 <script>
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { BookOpen, FileText } from "lucide-vue-next";
+import { BookOpen, Clock3, Search, Trophy } from "lucide-vue-next";
 import { useTelegramStore } from "../stores/telegram";
-import { useUserStore } from "../stores/user";
 import { apiClient } from "../services/apiClient";
-import CourseCard from "../components/courses/CourseCard.vue";
 
 export default {
   name: "AssessmentsView",
   components: {
     BookOpen,
-    FileText,
-    CourseCard,
+    Clock3,
+    Search,
+    Trophy,
   },
   setup() {
     const router = useRouter();
     const telegramStore = useTelegramStore();
-    const userStore = useUserStore();
 
-    const assessments = ref([]);
     const courses = ref([]);
-    const activeFilter = ref("all");
-    const activeMode = ref("courses");
-    const isLoading = ref(false);
+    const courseSearch = ref("");
+    const courseFilter = ref("all");
     const isCoursesLoading = ref(false);
     const coursesError = ref("");
+    const searchInputRef = ref(null);
 
-    const filters = [
-      { key: "all", label: "Все" },
-      { key: "open", label: "Открытые" },
-      { key: "completed", label: "Пройденные" },
-      { key: "closed", label: "Закрытые" },
+    const courseTabs = [
+      { key: "all", label: "Все курсы" },
+      { key: "my", label: "Мои курсы" },
+      { key: "completed", label: "Завершенные" },
     ];
 
-    const filteredAssessments = computed(() => {
-      if (activeFilter.value === "all") return assessments.value;
+    const iconSchemes = [
+      { background: "#EDE9FD" },
+      { background: "#DDFBE7" },
+      { background: "#FFF3E0" },
+      { background: "#E3F0FC" },
+      { background: "#FEE8ED" },
+    ];
 
-      return assessments.value.filter((assessment) => {
-        switch (activeFilter.value) {
-          case "open":
-            return assessment.status === "open";
-          case "completed":
-            return assessment.status === "completed" || assessment.bestResult;
-          case "closed":
-            return assessment.status === "closed";
-          default:
-            return true;
-        }
-      });
+    const filteredCourses = computed(() => {
+      const query = courseSearch.value.trim().toLowerCase();
+
+      return courses.value
+        .filter((course) => {
+          if (courseFilter.value === "completed") {
+            return course.progress.status === "completed" || Number(course.progress.progressPercent || 0) >= 100;
+          }
+          if (courseFilter.value === "my") {
+            return course.progress.status !== "completed";
+          }
+          return true;
+        })
+        .filter((course) => {
+          if (!query) return true;
+          return `${course.title} ${course.description}`.toLowerCase().includes(query);
+        });
     });
 
-    function setMode(mode) {
-      activeMode.value = mode;
-      telegramStore.hapticFeedback("selection");
+    function focusSearch() {
+      searchInputRef.value?.focus();
     }
 
-    function setFilter(filter) {
-      activeFilter.value = filter;
-      telegramStore.hapticFeedback("selection");
+    function getCourseIconStyle(index) {
+      return iconSchemes[index % iconSchemes.length];
     }
 
-    function getStatusClass(status) {
-      switch (status) {
-        case "open":
-          return "badge-primary";
-        case "completed":
-          return "badge-success";
-        case "pending":
-          return "badge-neutral";
-        case "closed":
-          return "badge-neutral";
-        default:
-          return "badge-neutral";
-      }
+    function getSectionsLabel(count) {
+      const n = Number(count) || 0;
+      if (n === 1) return "тема";
+      if (n >= 2 && n <= 4) return "темы";
+      return "тем";
     }
 
-    function getStatusText(status) {
-      switch (status) {
-        case "open":
-          return "Открыта";
-        case "completed":
-          return "Завершена";
-        case "pending":
-          return "Ожидает";
-        case "closed":
-          return "Закрыта";
-        default:
-          return "Неизвестно";
-      }
-    }
-
-    function isUnlimitedAttempts(maxAttempts) {
-      return Number(maxAttempts) === 0;
-    }
-
-    function hasAttemptsLeft(attemptsUsed, maxAttempts) {
-      if (isUnlimitedAttempts(maxAttempts)) {
-        return true;
-      }
-      return Number(attemptsUsed || 0) < Number(maxAttempts || 0);
-    }
-
-    function formatAttemptsLabel(attemptsUsed, maxAttempts) {
-      if (isUnlimitedAttempts(maxAttempts)) {
-        return `${Number(attemptsUsed || 0)} из `;
-      }
-      return `${Number(attemptsUsed || 0)} из ${Number(maxAttempts || 0)}`;
-    }
-
-    function getActionButtonText(status) {
-      switch (status) {
-        case "pending":
-          return "Ожидает открытия";
-        case "closed":
-          return "Завершена";
-        default:
-          return "Недоступна";
-      }
-    }
-
-    function getEmptyStateTitle() {
-      switch (activeFilter.value) {
-        case "open":
-          return "Нет открытых аттестаций";
-        case "completed":
-          return "Нет пройденных аттестаций";
-        case "closed":
-          return "Нет закрытых аттестаций";
-        default:
-          return "Нет аттестаций";
-      }
-    }
-
-    function getEmptyStateDescription() {
-      switch (activeFilter.value) {
-        case "open":
-          return "Активные аттестации появятся здесь";
-        case "completed":
-          return "Пройденные аттестации появятся здесь";
-        case "closed":
-          return "Завершенные аттестации появятся здесь";
-        default:
-          return "Аттестации появятся здесь";
-      }
-    }
-
-    function formatDateRange(startDate, endDate) {
-      const start = new Intl.DateTimeFormat("ru-RU", {
-        day: "numeric",
-        month: "short",
-      }).format(new Date(startDate));
-
-      const end = new Intl.DateTimeFormat("ru-RU", {
-        day: "numeric",
-        month: "short",
-      }).format(new Date(endDate));
-
-      return `${start} - ${end}`;
-    }
-
-    function handleAssessmentClick() {
-      telegramStore.hapticFeedback("impact", "light");
+    function getCourseIcon(course) {
+      const percent = Number(course?.progress?.progressPercent || 0);
+      if (percent >= 100) return Trophy;
+      if (percent >= 50) return Clock3;
+      return BookOpen;
     }
 
     function openCourse(id) {
@@ -302,130 +154,20 @@ export default {
       router.push(`/courses/${id}`);
     }
 
-    function startAssessment(assessment) {
-      if (!assessment) {
-        return;
-      }
-      if (assessment.requiresTheory) {
-        openTheory(assessment.id);
-        return;
-      }
-      telegramStore.hapticFeedback("impact", "medium");
-      router.push(`/assessment/${assessment.id}`);
-    }
-
-    function viewResults(id) {
-      telegramStore.hapticFeedback("impact", "light");
-      router.push(`/assessment-results/${id}`);
-    }
-
-    function openTheory(id) {
-      telegramStore.hapticFeedback("impact", "light");
-      router.push(`/assessment/${id}/theory`);
-    }
-
-    function getStartButtonText(assessment) {
-      if (!assessment) return "Начать";
-      if (assessment.requiresTheory && !assessment.theoryCompleted) {
-        return "Пройти теорию";
-      }
-      return assessment.attemptsUsed > 0 ? "Пройти ещё раз" : "Начать";
-    }
-
-    function normalizeAssessment(item) {
-      if (!item) {
-        return null;
-      }
-
-      const threshold = Number.isFinite(item.passScorePercent) ? Math.round(item.passScorePercent) : 0;
-      const bestScore = Number.isFinite(item.bestScorePercent) ? Math.round(item.bestScorePercent) : null;
-      const attemptsUsed = Number.isFinite(item.lastAttemptNumber) ? Number(item.lastAttemptNumber) : 0;
-      const maxAttempts = Number.isFinite(item.maxAttempts) ? Number(item.maxAttempts) : 1;
-      const requiresTheory = Boolean(item.theory?.completionRequired);
-      const theoryCompleted = requiresTheory ? Boolean(item.theory?.completedAt) : false;
-
-      const statusMap = {
-        active: "open",
-        pending: "pending",
-        closed: "closed",
-      };
-      let status = statusMap[item.status] || "pending";
-
-      if (bestScore != null || item.lastAttemptStatus === "completed") {
-        const hasAttemptsLeft = maxAttempts === 0 ? true : attemptsUsed < maxAttempts;
-        const isPerfectScore = bestScore === 100;
-        if (item.status === "active" && hasAttemptsLeft && !isPerfectScore) {
-          status = "open";
-        } else {
-          status = "completed";
-        }
-      }
-
-      return {
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        status,
-        startDate: item.openAt,
-        endDate: item.closeAt,
-        threshold,
-        maxAttempts,
-        attemptsUsed,
-        requiresTheory,
-        theoryCompleted,
-        bestResult:
-          bestScore != null
-            ? {
-                score: bestScore,
-                passed: threshold ? bestScore >= threshold : true,
-              }
-            : null,
-      };
-    }
-
     function normalizeCourse(item) {
-      if (!item) {
-        return null;
-      }
-
+      if (!item) return null;
       return {
         id: Number(item.id),
         title: item.title || "Курс",
         description: item.description || "",
         sectionsCount: Number(item.sectionsCount || 0),
-        topicsCount: Number(item.topicsCount || 0),
-        requiredSectionsCount: Number(item.requiredSectionsCount || 0),
-        testsCount: Number(item.testsCount || 0),
-        availabilityMode: item.availabilityMode || "unlimited",
-        availabilityDays: Number(item.availabilityDays || 0),
-        availabilityFrom: item.availabilityFrom || null,
-        availabilityTo: item.availabilityTo || null,
         progress: {
           status: item.progress?.status || "not_started",
           progressPercent: Number(item.progress?.progressPercent || 0),
           completedSectionsCount: Number(item.progress?.completedSectionsCount || 0),
           totalSectionsCount: Number(item.progress?.totalSectionsCount || 0),
-          assignedAt: item.progress?.assignedAt || null,
-          deadlineAt: item.progress?.deadlineAt || null,
         },
       };
-    }
-
-    async function loadAssessments() {
-      if (!userStore.isInitialized) {
-        await userStore.ensureStatus();
-      }
-
-      isLoading.value = true;
-      try {
-        const { assessments: response } = await apiClient.listUserAssessments();
-        assessments.value = (response || []).map((item) => normalizeAssessment(item)).filter(Boolean);
-      } catch (error) {
-        console.error("Не удалось загрузить список аттестаций", error);
-        assessments.value = [];
-      } finally {
-        isLoading.value = false;
-      }
     }
 
     async function loadCourses() {
@@ -448,35 +190,22 @@ export default {
     }
 
     onMounted(() => {
-      loadAssessments();
       loadCourses();
     });
 
     return {
-      activeMode,
-      assessments,
       courses,
-      activeFilter,
-      filters,
-      isLoading,
+      courseSearch,
+      courseFilter,
+      courseTabs,
+      filteredCourses,
       isCoursesLoading,
       coursesError,
-      filteredAssessments,
-      setMode,
-      setFilter,
-      getStatusClass,
-      getStatusText,
-      hasAttemptsLeft,
-      formatAttemptsLabel,
-      getActionButtonText,
-      getStartButtonText,
-      getEmptyStateTitle,
-      getEmptyStateDescription,
-      formatDateRange,
-      handleAssessmentClick,
-      startAssessment,
-      viewResults,
-      openTheory,
+      searchInputRef,
+      focusSearch,
+      getCourseIconStyle,
+      getSectionsLabel,
+      getCourseIcon,
       openCourse,
       retryCourses,
     };
@@ -485,168 +214,223 @@ export default {
 </script>
 
 <style scoped>
+/* Шапка страницы */
+.page-container .container {
+  padding-top: 16px;
+}
+
 .page-header {
-  padding-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
 }
 
-.mode-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding: 4px;
-  background-color: var(--bg-secondary);
-  border-radius: 10px;
-}
-
-.mode-tab {
-  border: none;
-  background: none;
-  padding: 10px 12px;
-  border-radius: 8px;
-  color: var(--text-secondary);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.mode-tab.active {
+.courses-page-title {
+  font-size: 28px;
+  font-weight: 700;
   color: var(--text-primary);
-  background: var(--bg-primary);
-  box-shadow: 0 1px 3px var(--card-shadow);
 }
 
+.header-search-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+/* Поиск */
+.search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon-inner {
+  position: absolute;
+  left: 12px;
+  color: var(--text-secondary);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 11px 14px 11px 36px;
+  background: var(--bg-secondary);
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+/* Фильтры */
 .filter-tabs {
   display: flex;
-  gap: 8px;
-  padding: 4px;
-  background-color: var(--bg-secondary);
+  gap: 4px;
+  background: var(--bg-secondary);
   border-radius: 10px;
+  padding: 3px;
 }
 
 .filter-tab {
   flex: 1;
-  padding: 8px 12px;
+  padding: 7px 10px;
   border: none;
   background: none;
   color: var(--text-secondary);
   font-size: 14px;
   font-weight: 500;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
+  white-space: nowrap;
 }
 
 .filter-tab.active {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  box-shadow: 0 1px 3px var(--card-shadow);
+  background-color: #5046e0;
+  color: #ffffff;
+  font-weight: 600;
 }
 
+/* Список курсов */
+.courses-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.course-card {
+  width: 100%;
+  border: 1px solid var(--divider);
+  border-radius: 16px;
+  background: var(--bg-secondary);
+  padding: 14px 14px;
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.course-card:active {
+  transform: scale(0.98);
+}
+
+.course-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.course-icon-symbol {
+  color: #5046e0;
+}
+
+.course-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.course-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.course-meta {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.course-progress {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.progress-track {
+  height: 4px;
+  background: var(--divider);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--divider);
+  transition: width 0.3s ease;
+}
+
+.progress-fill--active {
+  background: #34c759;
+}
+
+.course-percent {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 28px;
+  text-align: right;
+}
+
+/* Состояния */
 .loading-state {
   text-align: center;
+  padding: 40px 0;
 }
 
 .error-state {
   text-align: center;
-}
-
-.assessments-list {
-  display: flex;
-  flex-direction: column;
-}
-
-.assessment-card {
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-
-.assessment-card:hover {
-  transform: translateY(-2px);
-}
-
-.assessment-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
-}
-
-.theory-hint {
-  font-size: 12px;
-  color: var(--warning, #ff9500);
-  margin: 0;
-}
-
-.theory-hint.done {
-  color: var(--success);
-}
-
-.assessment-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.info-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.label {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.value {
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.value.success {
-  color: var(--success);
-}
-
-.value.error {
-  color: var(--error);
-}
-
-.best-result {
-  padding: 8px 12px;
-  background-color: var(--bg-primary);
-  border-radius: 8px;
+  padding: 40px 0;
 }
 
 .empty-state {
   text-align: center;
-  padding: 60px 20px;
-}
-
-.empty-icon {
-  display: inline-flex;
+  padding: 60px 0;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  margin-bottom: 20px;
 }
 
-.empty-icon svg {
-  width: 64px;
-  height: 64px;
+.mt-12 {
+  margin-top: 12px;
+}
+
+.mb-12 {
+  margin-bottom: 12px;
+}
+
+.mb-16 {
+  margin-bottom: 16px;
 }
 
 .text-secondary {
   color: var(--text-secondary);
-}
-
-@media (max-width: 480px) {
-  .filter-tab {
-    padding: 6px 8px;
-    font-size: 13px;
-  }
-
-  .assessment-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
 }
 </style>

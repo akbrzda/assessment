@@ -1,319 +1,385 @@
 <template>
-  <div class="page-container">
-    <div class="container">
-      <!-- Welcome Section -->
-      <div class="welcome-section mb-24">
+  <div class="page-container dashboard-page">
+    <div class="container dashboard-container">
+      <section class="welcome-section">
         <div class="welcome-header">
-          <h1 class="title-large">Привет, {{ userStore.user?.firstName }} 👋</h1>
-          <button v-if="debugConsoleReady" class="btn-icon debug-btn" @click="toggleDebugConsole" title="Консоль отладки">🔧</button>
-        </div>
-      </div>
-
-      <div v-if="showOnboarding" class="onboarding-card mb-12">
-        <p class="onboarding-title">{{ onboardingSlides[onboardingStep].title }}</p>
-        <p class="onboarding-text">{{ onboardingSlides[onboardingStep].description }}</p>
-        <div class="onboarding-actions">
-          <button v-if="onboardingStep > 0" class="btn btn-secondary" @click="prevOnboardingStep">Назад</button>
-          <button class="btn btn-primary" @click="nextOnboardingStep">
-            {{ onboardingStep === onboardingSlides.length - 1 ? "Понятно" : "Далее" }}
+          <div>
+            <h1 class="welcome-title">{{ greetingText }}, {{ userStore.user?.firstName || "коллега" }}! 👋</h1>
+            <p class="welcome-subtitle">Продолжайте обучение и достигайте новых целей</p>
+          </div>
+          <button class="notification-btn" type="button" aria-label="Уведомления">
+            <Bell :size="26" />
           </button>
         </div>
-      </div>
+      </section>
 
-      <!-- Next Assessment Card -->
-      <div v-if="openAssessmentsCount > 1" class="open-assessments-banner mb-12">
-        <span class="open-assessments-icon">📋</span>
-        <span
-          >У вас <strong>{{ openAssessmentsCount }}</strong> открытых аттестаций</span
-        >
-      </div>
-      <div class="card card-large mb-12">
-        <div v-if="nextAssessment" class="assessment-card">
-          <h3 class="title-medium mb-8">{{ nextAssessment.title }}</h3>
-          <p class="body-small mb-12">{{ formatDateRange(nextAssessment.startDate, nextAssessment.endDate) }}</p>
-
-          <div class="assessment-status mb-16">
-            <span class="badge" :class="getStatusClass(nextAssessment.status)">
-              {{ getStatusText(nextAssessment.status) }}
-            </span>
-          </div>
-
-          <p v-if="nextAssessment.requiresTheory" class="theory-hint" :class="{ done: nextAssessment.theoryCompleted }">
-            {{ nextAssessment.theoryCompleted ? "Теория пройдена" : "Сначала изучите теорию" }}
-          </p>
-          <button
-            v-if="nextAssessment.requiresTheory && !nextAssessment.theoryCompleted"
-            class="btn btn-primary btn-full"
-            @click="openTheory(nextAssessment.id)"
-          >
-            Пройти теорию
-          </button>
-          <button v-else-if="nextAssessment.status === 'open'" class="btn btn-primary btn-full" @click="startAssessment(nextAssessment)">
-            {{ nextAssessment.attemptsUsed > 0 ? "Пройти ещё раз" : "Начать" }}
-          </button>
-          <button v-else class="btn btn-primary btn-full" disabled>
-            {{ nextAssessment.status === "pending" ? "Ожидает открытия" : "Завершена" }}
-          </button>
-        </div>
-
-        <div v-else class="no-assessment">
-          <div class="empty-icon mb-16">
-            <FileText />
-          </div>
-          <h3 class="title-small mb-8">Нет активных аттестаций</h3>
-          <p class="body-small text-secondary">Новые аттестации появятся здесь</p>
-        </div>
-      </div>
-
-      <!-- Progress Section -->
-      <div class="card card-large mb-12">
-        <h3 class="title-small mb-16">Ваш прогресс</h3>
-
-        <div class="level-info mb-16">
-          <div class="flex flex-between mb-8">
-            <span class="body-medium">Текущий уровень: {{ userStore.user?.level }}</span>
-          </div>
-
-          <div class="progress-bar mb-8">
-            <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
-          </div>
-
-          <div class="progress-text">
-            <span class="body-small">{{ userStore.user?.points }} / {{ userStore.user?.nextLevelPoints }} очков до следующего уровня</span>
-          </div>
-        </div>
-
-        <div class="stats-grid">
-          <div class="stat-item">
-            <div class="stat-value">{{ userStats.completed }}</div>
-            <div class="stat-label">Пройдено</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-value">{{ userStats.average }}%</div>
-            <div class="stat-label">Средний балл</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-value">{{ userStats.badges }}</div>
-            <div class="stat-label">Бейджей</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Recent Activity -->
-      <div class="card">
-        <h3 class="title-small mb-16">Последняя активность</h3>
-
-        <div v-if="recentActivity.length" class="activity-list">
-          <div v-for="activity in recentActivity" :key="activity.id" class="activity-item">
-            <div class="activity-icon" :class="activity.result.success ? 'success' : 'error'">
-              <component :is="activity.icon" />
+      <!-- Скелетон при загрузке -->
+      <template v-if="isDataLoading">
+        <section class="dashboard-section">
+          <div class="sk-label"></div>
+          <div class="sk-continue-card">
+            <div class="sk-continue-content">
+              <div class="sk-line sk-line--title"></div>
+              <div class="sk-line sk-line--meta"></div>
+              <div class="sk-btn"></div>
             </div>
-            <div class="activity-content">
-              <div class="activity-title">{{ activity.title }}</div>
-              <div class="activity-date">{{ formatDate(activity.date) }}</div>
-            </div>
-            <div class="activity-result" v-if="activity.result">
-              <span class="badge" :class="activity.result.success ? 'badge-success' : 'badge-error'"> {{ activity.result.score }}% </span>
+            <div class="sk-continue-image"></div>
+          </div>
+        </section>
+
+        <section class="dashboard-section">
+          <div class="sk-label"></div>
+          <div class="stats-grid">
+            <div class="sk-stat-card" v-for="n in 3" :key="n">
+              <div class="sk-line sk-line--small"></div>
+              <div class="sk-line sk-line--value"></div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div v-else class="empty-state">
-          <p class="body-small text-secondary">Активность отсутствует</p>
-        </div>
-      </div>
+        <section class="dashboard-section">
+          <div class="sk-label"></div>
+          <div class="task-list">
+            <div class="sk-task-item" v-for="n in 3" :key="n">
+              <div class="sk-task-icon"></div>
+              <div class="sk-task-content">
+                <div class="sk-line sk-line--title"></div>
+                <div class="sk-line sk-line--meta"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </template>
+
+      <!-- Реальный контент -->
+      <template v-else>
+        <section class="dashboard-section">
+          <h2 class="section-title">Продолжить обучение</h2>
+          <article class="continue-card app-panel">
+            <div class="continue-content">
+              <h3 class="continue-title">{{ continueCourseTitle }}</h3>
+              <p class="continue-meta">{{ continueCourseMeta }}</p>
+              <button class="continue-btn" type="button" :disabled="isContinueDisabled" @click="handleContinueAction">Продолжить</button>
+            </div>
+            <div class="continue-image" :class="{ 'continue-image--placeholder': !continueCourseImageUrl }" aria-hidden="true">
+              <img
+                v-if="continueCourseImageUrl"
+                class="continue-image-photo"
+                :src="continueCourseImageUrl"
+                alt=""
+                loading="lazy"
+                @error="handleContinueImageError"
+              />
+              <BookOpen v-else :size="28" class="continue-image-icon" />
+            </div>
+          </article>
+        </section>
+
+        <section class="dashboard-section">
+          <div class="section-heading-row">
+            <h2 class="section-title">Мой прогресс</h2>
+            <router-link class="section-link" to="/assessments">Смотреть все</router-link>
+          </div>
+          <div class="stats-grid app-grid-3">
+            <article class="stat-card app-panel">
+              <p class="stat-label">Курсы</p>
+              <p class="stat-value">{{ dashboardStats.courses }}</p>
+            </article>
+            <article class="stat-card app-panel">
+              <p class="stat-label">Завершено тем</p>
+              <p class="stat-value">{{ dashboardStats.completedTopics }}</p>
+            </article>
+            <article class="stat-card app-panel">
+              <p class="stat-label">Сертификаты</p>
+              <p class="stat-value">{{ dashboardStats.certificates }}</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="dashboard-section">
+          <h2 class="section-title">Ближайшие задачи</h2>
+          <div class="task-list app-list-stack">
+            <button v-for="task in displayTasks" :key="task.id" class="task-item app-panel" type="button" @click="router.push('/assessments')">
+              <div
+                class="task-icon app-round-icon"
+                :class="task.icon === 'time' ? 'app-round-icon--success' : task.icon === 'message' ? 'app-round-icon--violet' : 'app-round-icon--warning'"
+              >
+                <Clock3 v-if="task.icon === 'time'" :size="24" />
+                <MessageSquareText v-else-if="task.icon === 'message'" :size="24" />
+                <ShieldCheck v-else :size="24" />
+              </div>
+              <div class="task-content">
+                <p class="task-title">{{ task.title }}</p>
+                <p class="task-subtitle">{{ task.subtitle }}</p>
+              </div>
+              <ChevronRight class="task-arrow" :size="28" />
+            </button>
+          </div>
+        </section>
+      </template>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
-import { CheckCircle, FileText, XCircle } from "lucide-vue-next";
+import { Bell, BookOpen, ChevronRight, Clock3, MessageSquareText, ShieldCheck } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
-import { useDebugConsole } from "../composables/useDebugConsole";
 import { apiClient } from "../services/apiClient";
+
+function normalizeAssessment(item) {
+  if (!item) {
+    return null;
+  }
+
+  const threshold = Number.isFinite(item.passScorePercent) ? Math.round(item.passScorePercent) : null;
+  const bestScore = Number.isFinite(item.bestScorePercent) ? Math.round(item.bestScorePercent) : null;
+  const lastScore = Number.isFinite(item.lastScorePercent) ? Math.round(item.lastScorePercent) : null;
+  const hasPassed = bestScore != null && threshold != null ? bestScore >= threshold : false;
+  const attemptsUsed = Number.isFinite(item.lastAttemptNumber) ? Number(item.lastAttemptNumber) : 0;
+  const maxAttempts = Number.isFinite(item.maxAttempts) ? Number(item.maxAttempts) : 1;
+
+  let status = "pending";
+  if (item.status === "active") {
+    status = "open";
+  } else if (item.status === "closed") {
+    status = "closed";
+  } else if (item.status === "pending") {
+    status = "pending";
+  }
+
+  if (hasPassed || item.lastAttemptStatus === "completed") {
+    const hasAttemptsLeft = maxAttempts === 0 ? true : attemptsUsed < maxAttempts;
+    const isPerfectScore = bestScore === 100;
+
+    if (item.status === "active" && hasAttemptsLeft && !isPerfectScore) {
+      status = "open";
+    } else {
+      status = "completed";
+    }
+  }
+
+  const requiresTheory = Boolean(item.theory?.completionRequired);
+  const theoryCompleted = requiresTheory ? Boolean(item.theory?.completedAt) : false;
+
+  return {
+    id: item.id,
+    title: item.title,
+    status,
+    startDate: item.openAt,
+    endDate: item.closeAt,
+    threshold: threshold ?? 0,
+    maxAttempts,
+    attemptsUsed,
+    lastAttemptStatus: item.lastAttemptStatus,
+    lastCompletedAt: item.lastCompletedAt,
+    lastStartedAt: item.lastStartedAt,
+    bestResult:
+      bestScore != null
+        ? {
+            score: bestScore,
+            passed: hasPassed,
+          }
+        : lastScore != null
+          ? {
+              score: lastScore,
+              passed: threshold != null ? lastScore >= threshold : false,
+            }
+          : null,
+    requiresTheory,
+    theoryCompleted,
+  };
+}
+
+function normalizeCourse(item) {
+  if (!item) {
+    return null;
+  }
+
+  return {
+    id: Number(item.id),
+    title: item.title || "Курс",
+    coverUrl: item.coverUrl || item.cover_url || item.imageUrl || item.image || null,
+    sectionsCount: Number(item.sectionsCount || 0),
+    progress: {
+      status: item.progress?.status || "not_started",
+      progressPercent: Number(item.progress?.progressPercent || 0),
+      completedSectionsCount: Number(item.progress?.completedSectionsCount || 0),
+      totalSectionsCount: Number(item.progress?.totalSectionsCount || 0),
+    },
+  };
+}
 
 export default {
   name: "DashboardView",
   components: {
-    CheckCircle,
-    FileText,
-    XCircle,
+    Bell,
+    BookOpen,
+    ChevronRight,
+    Clock3,
+    MessageSquareText,
+    ShieldCheck,
   },
   setup() {
     const router = useRouter();
     const userStore = useUserStore();
     const telegramStore = useTelegramStore();
-    const { initializeEruda, toggle, isErudaLoaded } = useDebugConsole();
 
     const nextAssessment = ref(null);
-    const openAssessmentsCount = ref(0);
-    const userStats = ref({
-      completed: 0,
-      average: 0,
-      badges: 0,
-    });
     const recentActivity = ref([]);
+    const courses = ref([]);
     const isDataLoading = ref(false);
-    const showOnboarding = ref(false);
-    const onboardingStep = ref(0);
-    const onboardingSlides = [
+    const isContinueImageBroken = ref(false);
+    const dashboardStats = ref({
+      courses: 0,
+      completedTopics: 0,
+      certificates: 0,
+    });
+
+    const fallbackTasks = [
       {
-        title: "Добро пожаловать",
-        description: "Здесь вы видите ближайшую аттестацию и текущий статус прохождения.",
+        id: "fallback-1",
+        icon: "time",
+        title: "Тайм-менеджмент",
+        subtitle: "Продолжить тему 1.2",
       },
       {
-        title: "Ваш прогресс",
-        description: "В блоке прогресса доступны очки, уровень и общая статистика по результатам.",
+        id: "fallback-2",
+        icon: "message",
+        title: "Пройти тест",
+        subtitle: "Эффективная коммуникация",
       },
       {
-        title: "История активности",
-        description: "Ниже отображаются последние попытки и результаты для быстрого контроля.",
+        id: "fallback-3",
+        icon: "shield",
+        title: "Лидерство и мотивация",
+        subtitle: "Доступна новая тема",
       },
     ];
 
-    const debugConsoleReady = computed(() => isErudaLoaded.value);
-
-    const progressPercentage = computed(() => {
-      const user = userStore.user;
-      if (!user) return 0;
-      return Math.min((user.points / user.nextLevelPoints) * 100, 100);
+    const greetingText = computed(() => {
+      const currentHour = new Date().getHours();
+      if (currentHour >= 5 && currentHour < 12) {
+        return "Доброе утро";
+      }
+      if (currentHour >= 12 && currentHour < 17) {
+        return "Добрый день";
+      }
+      if (currentHour >= 17 && currentHour < 23) {
+        return "Добрый вечер";
+      }
+      return "Доброй ночи";
     });
 
-    function getStatusClass(status) {
-      switch (status) {
-        case "open":
-          return "badge-primary";
-        case "pending":
-          return "badge-neutral";
-        case "closed":
-          return "badge-neutral";
-        default:
-          return "badge-neutral";
+    const continueCourse = computed(() => {
+      const activeCourse = courses.value.find((course) => {
+        const percent = Number(course?.progress?.progressPercent || 0);
+        return percent > 0 && percent < 100;
+      });
+
+      if (activeCourse) {
+        return activeCourse;
       }
-    }
 
-    function getStatusText(status) {
-      switch (status) {
-        case "open":
-          return "Открыта";
-        case "pending":
-          return "Ожидает";
-        case "closed":
-          return "Закрыта";
-        default:
-          return "Неизвестно";
+      return courses.value.find((course) => Number(course?.progress?.progressPercent || 0) < 100) || null;
+    });
+
+    const continueCourseTitle = computed(() => continueCourse.value?.title || nextAssessment.value?.title || "Эффективная коммуникация");
+
+    const continueCourseMeta = computed(() => {
+      if (continueCourse.value) {
+        const totalTopics = continueCourse.value.progress.totalSectionsCount || continueCourse.value.sectionsCount;
+        const completedTopics = continueCourse.value.progress.completedSectionsCount || 0;
+        const currentTopic = totalTopics > 0 ? Math.min(totalTopics, Math.max(1, completedTopics + 1)) : 1;
+        const score = Math.round(Math.min(Math.max(continueCourse.value.progress.progressPercent || 0, 0), 100));
+        return `Тема ${currentTopic} из ${totalTopics || 1} • ${score}%`;
       }
-    }
 
-    function formatDate(date) {
-      return new Intl.DateTimeFormat("ru-RU", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      }).format(new Date(date));
-    }
+      const score = nextAssessment.value?.bestResult?.score || 75;
+      return `Тема 2 из 4 • ${score}%`;
+    });
 
-    function formatDateRange(startDate, endDate) {
-      const start = new Intl.DateTimeFormat("ru-RU", {
-        day: "numeric",
-        month: "short",
-      }).format(new Date(startDate));
-
-      const end = new Intl.DateTimeFormat("ru-RU", {
-        day: "numeric",
-        month: "short",
-      }).format(new Date(endDate));
-
-      return `${start} - ${end}`;
-    }
-
-    async function startAssessment(assessment) {
-      if (!assessment) {
-        return;
+    const isContinueDisabled = computed(() => {
+      if (continueCourse.value) {
+        return false;
       }
-      // Всегда сначала открываем теорию, если она есть
-      if (assessment.requiresTheory) {
-        openTheory(assessment.id);
-        return;
+
+      return !nextAssessment.value || nextAssessment.value.status === "pending" || nextAssessment.value.status === "closed";
+    });
+
+    const continueCourseImageUrl = computed(() => {
+      if (!continueCourse.value?.coverUrl || isContinueImageBroken.value) {
+        return "";
       }
-      telegramStore.hapticFeedback("impact", "light");
-      router.push(`/assessment/${assessment.id}`);
-    }
+
+      return continueCourse.value.coverUrl;
+    });
+
+    watch(
+      () => continueCourse.value?.coverUrl,
+      () => {
+        isContinueImageBroken.value = false;
+      },
+    );
+
+    const displayTasks = computed(() => {
+      if (!recentActivity.value.length) {
+        return fallbackTasks;
+      }
+
+      const iconTypes = ["time", "message", "shield"];
+      return recentActivity.value.slice(0, 3).map((activity, index) => ({
+        id: activity.id,
+        icon: iconTypes[index % iconTypes.length],
+        title: activity.title,
+        subtitle: activity.result ? `Результат: ${activity.result.score}%` : "Продолжить обучение",
+      }));
+    });
 
     function openTheory(id) {
       telegramStore.hapticFeedback("impact", "light");
       router.push(`/assessment/${id}/theory`);
     }
 
-    function normalizeAssessment(item) {
-      if (!item) {
-        return null;
+    function startAssessment(assessment) {
+      if (!assessment) {
+        return;
       }
 
-      const threshold = Number.isFinite(item.passScorePercent) ? Math.round(item.passScorePercent) : null;
-      const bestScore = Number.isFinite(item.bestScorePercent) ? Math.round(item.bestScorePercent) : null;
-      const lastScore = Number.isFinite(item.lastScorePercent) ? Math.round(item.lastScorePercent) : null;
-      const hasPassed = bestScore != null && threshold != null ? bestScore >= threshold : false;
-      const attemptsUsed = Number.isFinite(item.lastAttemptNumber) ? Number(item.lastAttemptNumber) : 0;
-      const maxAttempts = Number.isFinite(item.maxAttempts) ? Number(item.maxAttempts) : 1;
-
-      let status = "pending";
-      if (item.status === "active") {
-        status = "open";
-      } else if (item.status === "closed") {
-        status = "closed";
-      } else if (item.status === "pending") {
-        status = "pending";
+      if (assessment.requiresTheory) {
+        openTheory(assessment.id);
+        return;
       }
 
-      // Статус "completed" только если нет возможности пройти снова
-      if (hasPassed || item.lastAttemptStatus === "completed") {
-        const hasAttemptsLeft = maxAttempts === 0 ? true : attemptsUsed < maxAttempts;
-        const isPerfectScore = bestScore === 100;
+      telegramStore.hapticFeedback("impact", "light");
+      router.push(`/assessment/${assessment.id}`);
+    }
 
-        // Если аттестация открыта (active) и есть попытки и результат не 100%, оставляем статус open
-        if (item.status === "active" && hasAttemptsLeft && !isPerfectScore) {
-          status = "open";
-        } else {
-          status = "completed";
-        }
+    function openCourse(courseId) {
+      if (!courseId) {
+        return;
+      }
+      telegramStore.hapticFeedback("impact", "light");
+      router.push(`/courses/${courseId}`);
+    }
+
+    function handleContinueAction() {
+      if (continueCourse.value?.id) {
+        openCourse(continueCourse.value.id);
+        return;
       }
 
-      const requiresTheory = Boolean(item.theory?.completionRequired);
-      const theoryCompleted = requiresTheory ? Boolean(item.theory?.completedAt) : false;
+      if (!nextAssessment.value || nextAssessment.value.status === "pending" || nextAssessment.value.status === "closed") {
+        return;
+      }
 
-      return {
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        status,
-        startDate: item.openAt,
-        endDate: item.closeAt,
-        threshold: threshold ?? 0,
-        maxAttempts,
-        attemptsUsed,
-        lastAttemptStatus: item.lastAttemptStatus,
-        lastCompletedAt: item.lastCompletedAt,
-        lastStartedAt: item.lastStartedAt,
-        bestResult:
-          bestScore != null
-            ? {
-                score: bestScore,
-                passed: hasPassed,
-              }
-            : lastScore != null
-              ? {
-                  score: lastScore,
-                  passed: threshold != null ? lastScore >= threshold : false,
-                }
-              : null,
-        requiresTheory,
-        theoryCompleted,
-      };
+      startAssessment(nextAssessment.value);
+    }
+
+    function handleContinueImageError() {
+      isContinueImageBroken.value = true;
     }
 
     async function loadDashboardData() {
@@ -321,39 +387,34 @@ export default {
         await userStore.ensureStatus();
       }
 
-      // Инициализируем debug console после загрузки пользователя
-      if (userStore.user?.telegramId) {
-        await initializeEruda(userStore.user.telegramId);
-      }
-
       isDataLoading.value = true;
       try {
-        const [, assessmentsResponse] = await Promise.all([userStore.loadOverview(), apiClient.listUserAssessments()]);
+        const [, assessmentsResponse, coursesResponse] = await Promise.all([
+          userStore.loadOverview(),
+          apiClient.listUserAssessments(),
+          apiClient.listCourses(),
+        ]);
 
-        const normalized = (assessmentsResponse?.assessments || []).map((item) => normalizeAssessment(item)).filter(Boolean);
+        const normalizedAssessments = (assessmentsResponse?.assessments || []).map((item) => normalizeAssessment(item)).filter(Boolean);
 
-        // Вычисляем ближайшую аттестацию
-        const upcoming = normalized
+        const upcoming = normalizedAssessments
           .filter((assessment) => assessment.status === "open" || assessment.status === "pending")
           .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
         nextAssessment.value = upcoming.length ? upcoming[0] : null;
-        openAssessmentsCount.value = upcoming.length;
 
-        const completedAssessments = normalized.filter((assessment) => assessment.bestResult != null);
-        const averageScore = completedAssessments.length
-          ? Math.round(completedAssessments.reduce((acc, assessment) => acc + (assessment.bestResult?.score || 0), 0) / completedAssessments.length)
-          : 0;
+        courses.value = (coursesResponse?.courses || []).map((item) => normalizeCourse(item)).filter(Boolean);
 
-        const earnedBadges = Array.isArray(userStore.overview?.badges) ? userStore.overview.badges.filter((badge) => badge.earned).length : 0;
+        const certificatesCount = Array.isArray(userStore.overview?.badges) ? userStore.overview.badges.filter((badge) => badge.earned).length : 0;
+        const completedTopics = courses.value.reduce((acc, course) => acc + Number(course.progress.completedSectionsCount || 0), 0);
 
-        userStats.value = {
-          completed: completedAssessments.length,
-          average: averageScore,
-          badges: earnedBadges,
+        dashboardStats.value = {
+          courses: courses.value.length,
+          completedTopics,
+          certificates: certificatesCount,
         };
 
-        recentActivity.value = normalized
+        recentActivity.value = normalizedAssessments
           .filter((assessment) => assessment.lastCompletedAt || assessment.lastStartedAt)
           .sort((a, b) => {
             const left = a.lastCompletedAt || a.lastStartedAt;
@@ -361,298 +422,487 @@ export default {
             return new Date(right).getTime() - new Date(left).getTime();
           })
           .slice(0, 5)
-          .map((assessment) => {
-            const timestamp = assessment.lastCompletedAt || assessment.lastStartedAt;
-            return {
-              id: `${assessment.id}-${timestamp}`,
-              icon: assessment.bestResult?.passed ? CheckCircle : assessment.bestResult ? XCircle : FileText,
-              title: assessment.title,
-              date: timestamp,
-              result: assessment.bestResult
-                ? {
-                    success: assessment.bestResult.passed,
-                    score: assessment.bestResult.score,
-                  }
-                : null,
-            };
-          });
+          .map((assessment) => ({
+            id: `${assessment.id}-${assessment.lastCompletedAt || assessment.lastStartedAt}`,
+            title: assessment.title,
+            result: assessment.bestResult
+              ? {
+                  success: assessment.bestResult.passed,
+                  score: assessment.bestResult.score,
+                }
+              : null,
+          }));
       } catch (error) {
         console.error("Не удалось загрузить данные дашборда", error);
+        courses.value = [];
         recentActivity.value = [];
+        dashboardStats.value = {
+          courses: 0,
+          completedTopics: 0,
+          certificates: 0,
+        };
       } finally {
         isDataLoading.value = false;
       }
     }
 
-    async function maybeShowOnboarding() {
-      showOnboarding.value = Boolean(userStore.user?.isFirstLogin);
-      onboardingStep.value = 0;
-    }
-
-    async function nextOnboardingStep() {
-      if (onboardingStep.value < onboardingSlides.length - 1) {
-        onboardingStep.value += 1;
-        return;
-      }
-
-      showOnboarding.value = false;
-      try {
-        const response = await apiClient.completeOnboarding();
-        if (userStore.user) {
-          userStore.user.onboardingCompletedAt = response?.onboardingCompletedAt || new Date().toISOString();
-          userStore.user.isFirstLogin = false;
-        }
-      } catch (error) {
-        console.error("Не удалось завершить онбординг", error);
-      }
-    }
-
-    function prevOnboardingStep() {
-      if (onboardingStep.value > 0) {
-        onboardingStep.value -= 1;
-      }
-    }
-
     onMounted(async () => {
       await loadDashboardData();
-      await maybeShowOnboarding();
     });
-
-    function toggleDebugConsole() {
-      toggle();
-    }
 
     return {
       userStore,
-      nextAssessment,
-      openAssessmentsCount,
-      userStats,
-      recentActivity,
-      progressPercentage,
       isDataLoading,
-      debugConsoleReady,
-      showOnboarding,
-      onboardingStep,
-      onboardingSlides,
-      getStatusClass,
-      getStatusText,
-      formatDate,
-      formatDateRange,
-      startAssessment,
-      openTheory,
-      toggleDebugConsole,
-      nextOnboardingStep,
-      prevOnboardingStep,
+      dashboardStats,
+      greetingText,
+      continueCourseTitle,
+      continueCourseMeta,
+      continueCourseImageUrl,
+      isContinueDisabled,
+      displayTasks,
+      handleContinueAction,
+      handleContinueImageError,
+      router,
     };
   },
 };
 </script>
 
 <style scoped>
+.dashboard-page {
+  background: #ffffff;
+}
+
+.dashboard-container {
+  padding: 14px 16px 24px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding-top: 18px;
+  }
+}
+
+.platform-mobile .dashboard-container {
+  padding-top: calc(12px + env(safe-area-inset-top));
+}
+
+/* ── Welcome ─────────────────────────────────────── */
+
 .welcome-section {
-  padding-top: 20px;
+  margin-bottom: 20px;
 }
 
 .welcome-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.debug-btn {
-  font-size: 18px;
-  padding: 8px;
-  flex-shrink: 0;
+.welcome-title {
+  margin: 0;
+  color: #111827;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 
-.welcome-icon {
-  width: 20px;
-  height: 20px;
-  vertical-align: middle;
+.welcome-subtitle {
+  margin-top: 6px;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
-.assessment-card {
-  text-align: center;
-}
-
-.theory-hint {
-  font-size: 13px;
-  color: var(--warning, #ff9500);
-  margin: 0 0 12px 0;
-}
-
-.theory-hint.done {
-  color: var(--success);
-}
-
-.no-assessment {
-  text-align: center;
-  padding: 20px 0;
-}
-
-.empty-icon {
+.notification-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 16px;
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
-.empty-icon svg {
-  width: 48px;
-  height: 48px;
+/* ── Dashboard sections ──────────────────────────── */
+
+.dashboard-section {
+  margin-bottom: 24px;
 }
 
-.level-info {
-  background-color: var(--bg-primary);
-  padding: 16px;
-  border-radius: 12px;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-
-.stat-item {
-  text-align: center;
-  padding: 12px 8px;
-  background-color: var(--bg-primary);
-  border-radius: 8px;
-}
-
-.stat-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--accent-blue);
-  margin-bottom: 4px;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.activity-item {
+.section-heading-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--divider);
+  justify-content: space-between;
+  margin-bottom: 10px;
 }
 
-.activity-item:last-child {
-  border-bottom: none;
+.section-title {
+  margin: 0 0 12px;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
-.activity-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background-color: var(--bg-primary);
+.section-link {
+  color: #6355f5;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ── Continue card ───────────────────────────────── */
+
+.continue-card {
+  padding: 14px;
   display: flex;
+  gap: 12px;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.continue-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.continue-title {
+  margin: 0;
+  color: #111827;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.continue-meta {
+  margin: 6px 0 12px;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.continue-btn {
+  border: none;
+  background: #6355f5;
+  color: #ffffff;
+  border-radius: 12px;
+  min-height: 44px;
+  min-width: 140px;
+  padding: 0 18px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.continue-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.continue-image {
+  width: 36%;
+  min-width: 100px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.continue-image-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.continue-image--placeholder {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.activity-icon svg {
-  width: 16px;
-  height: 16px;
-}
-.activity-icon.error {
-  background-color: rgba(255, 59, 48, 0.1);
+.continue-image-icon {
+  color: #6b7280;
 }
 
-.activity-icon.error svg {
-  color: var(--error);
+/* ── Stats grid ──────────────────────────────────── */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.activity-icon.success {
-  background-color: rgba(52, 199, 89, 0.1);
-  color: var(--success);
+.stat-card {
+  min-height: 90px;
+  padding: 12px;
 }
 
-.activity-icon.success svg {
-  color: var(--success);
-}
-.activity-content {
-  flex: 1;
-}
-
-.activity-title {
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.activity-date {
+.stat-label {
+  color: #9ca3af;
   font-size: 12px;
-  color: var(--text-secondary);
+  font-weight: 500;
+  margin: 0;
 }
 
-.empty-state {
-  padding: 20px 0;
-  text-align: center;
+.stat-value {
+  margin: 8px 0 0;
+  color: #111827;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 700;
 }
 
-.text-secondary {
-  color: var(--text-secondary);
+/* ── Task list ───────────────────────────────────── */
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-@media (max-width: 480px) {
-  .stats-grid {
-    gap: 12px;
+.task-item {
+  width: 100%;
+  min-height: 72px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-icon {
+  flex-shrink: 0;
+}
+
+.task-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-title {
+  margin: 0;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.task-subtitle {
+  margin: 3px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.task-arrow {
+  color: #d1d5db;
+  flex-shrink: 0;
+}
+
+/* ── Skeleton ───────────────────────────────────── */
+
+@keyframes sk-shimmer {
+  0% {
+    background-position: -300px 0;
+  }
+  100% {
+    background-position: 300px 0;
+  }
+}
+
+.sk-label,
+.sk-line,
+.sk-btn,
+.sk-continue-image,
+.sk-task-icon,
+.sk-stat-card {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 600px 100%;
+  animation: sk-shimmer 1.4s infinite linear;
+  border-radius: 8px;
+}
+
+.sk-label {
+  width: 120px;
+  height: 18px;
+  margin-bottom: 12px;
+  border-radius: 6px;
+}
+
+.sk-continue-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  min-height: 148px;
+}
+
+.sk-continue-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sk-continue-image {
+  width: 36%;
+  min-width: 100px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.sk-line {
+  border-radius: 6px;
+}
+
+.sk-line--title {
+  width: 75%;
+  height: 18px;
+}
+
+.sk-line--meta {
+  width: 55%;
+  height: 13px;
+}
+
+.sk-line--small {
+  width: 60%;
+  height: 12px;
+  margin-bottom: 8px;
+}
+
+.sk-line--value {
+  width: 40%;
+  height: 26px;
+}
+
+.sk-btn {
+  width: 120px;
+  height: 44px;
+  border-radius: 12px;
+  margin-top: 4px;
+}
+
+.sk-stat-card {
+  border-radius: 14px;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 12px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+  background-size: 600px 100%;
+}
+
+.sk-task-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  min-height: 72px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sk-task-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sk-task-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Mobile ──────────────────────────────────────── */
+
+@media (max-width: 520px) {
+  .welcome-title {
+    font-size: 22px;
   }
 
-  .stat-item {
-    padding: 10px 6px;
+  .welcome-subtitle {
+    font-size: 13px;
+    margin-top: 4px;
+  }
+
+  .section-title {
+    font-size: 17px;
+  }
+
+  .continue-card {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .continue-title {
+    font-size: 15px;
+  }
+
+  .continue-meta {
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+
+  .continue-btn {
+    min-width: 0;
+    width: 100%;
+    min-height: 40px;
+    font-size: 14px;
+    border-radius: 10px;
+  }
+
+  .continue-image {
+    width: 38%;
+    min-width: 90px;
+  }
+
+  .stat-card {
+    min-height: 82px;
+    padding: 10px;
+  }
+
+  .stat-label {
+    font-size: 11px;
   }
 
   .stat-value {
-    font-size: 18px;
+    font-size: 22px;
+    margin-top: 6px;
   }
-}
 
-.open-assessments-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--color-primary-light, #eff6ff);
-  border: 1px solid var(--color-primary-border, #bfdbfe);
-  border-radius: 12px;
-  padding: 12px 16px;
-  font-size: 14px;
-  color: var(--color-primary, #2563eb);
-}
+  .task-item {
+    min-height: 68px;
+    padding: 10px 12px;
+  }
 
-.open-assessments-icon {
-  font-size: 18px;
-}
+  .task-icon {
+    width: 44px;
+    height: 44px;
+  }
 
-.onboarding-card {
-  background: linear-gradient(135deg, #eff6ff 0%, #ecfeff 100%);
-  border: 1px solid #bfdbfe;
-  border-radius: 14px;
-  padding: 14px;
-}
+  .task-title {
+    font-size: 14px;
+  }
 
-.onboarding-title {
-  margin: 0 0 6px;
-  font-size: 15px;
-  font-weight: 700;
-  color: #1e3a8a;
-}
-
-.onboarding-text {
-  margin: 0;
-  color: #1e40af;
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.onboarding-actions {
-  margin-top: 12px;
-  display: flex;
-  gap: 8px;
+  .task-subtitle {
+    font-size: 12px;
+  }
 }
 </style>

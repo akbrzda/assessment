@@ -161,7 +161,6 @@
 
 <script>
 import { ref, computed, reactive, onMounted } from "vue";
-import { useRouter } from "vue-router";
 import { Pencil, X } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
@@ -174,7 +173,6 @@ export default {
     X,
   },
   setup() {
-    const router = useRouter();
     const userStore = useUserStore();
     const telegramStore = useTelegramStore();
 
@@ -375,7 +373,7 @@ export default {
 <style scoped>
 .profile-header {
   text-align: center;
-  padding-top: 20px;
+  padding-top: 6px;
 }
 
 .avatar-section {

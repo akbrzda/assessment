@@ -30,7 +30,7 @@
       <div class="metrics-grid">
         <Card class="metric-card" @click="navigateToAssessments">
           <div class="metric-content">
-            <div class="metric-icon metric-icon-blue"><Icon name="ClipboardList" size="32" aria-hidden="true" /></div>
+            <div class="metric-icon admin-metric-icon admin-metric-icon--blue"><Icon name="ClipboardList" size="32" aria-hidden="true" /></div>
             <div class="metric-info">
               <p class="metric-label">Активные аттестации</p>
               <p class="metric-value">{{ metrics.activeAssessments }}</p>
@@ -40,7 +40,7 @@
 
         <Card class="metric-card">
           <div class="metric-content">
-            <div class="metric-icon metric-icon-green"><Icon name="Users" size="32" aria-hidden="true" /></div>
+            <div class="metric-icon admin-metric-icon admin-metric-icon--green"><Icon name="Users" size="32" aria-hidden="true" /></div>
             <div class="metric-info">
               <p class="metric-label">Всего сотрудников</p>
               <p class="metric-value">{{ metrics.totalUsers }}</p>
@@ -50,7 +50,7 @@
 
         <Card class="metric-card">
           <div class="metric-content">
-            <div class="metric-icon metric-icon-purple"><Icon name="Building2" size="32" aria-hidden="true" /></div>
+            <div class="metric-icon admin-metric-icon admin-metric-icon--purple"><Icon name="Building2" size="32" aria-hidden="true" /></div>
             <div class="metric-info">
               <p class="metric-label">Филиалы</p>
               <p class="metric-value">{{ metrics.totalBranches }}</p>
@@ -60,7 +60,7 @@
 
         <Card class="metric-card">
           <div class="metric-content">
-            <div class="metric-icon metric-icon-orange"><Icon name="briefcase-business" size="32" aria-hidden="true" /></div>
+            <div class="metric-icon admin-metric-icon admin-metric-icon--orange"><Icon name="briefcase-business" size="32" aria-hidden="true" /></div>
             <div class="metric-info">
               <p class="metric-label">Должности</p>
               <p class="metric-value">{{ metrics.totalPositions }}</p>
@@ -70,8 +70,8 @@
       </div>
 
       <Card title="Дельта KPI к предыдущему периоду" icon="TrendingUp" class="kpi-delta-card">
-        <div class="kpi-delta-grid">
-          <div v-for="item in kpiDeltas" :key="item.key" class="kpi-delta-item">
+        <div class="kpi-delta-grid admin-card-grid admin-card-grid--min-180">
+          <div v-for="item in kpiDeltas" :key="item.key" class="kpi-delta-item admin-data-card">
             <p class="kpi-delta-label">{{ item.label }}</p>
             <p class="kpi-delta-value">{{ item.value }}</p>
             <p class="kpi-delta-change" :class="getDeltaClass(item.percent)">
@@ -82,8 +82,8 @@
       </Card>
 
       <Card title="Причины провалов" icon="AlertTriangle" class="failure-reasons-card">
-        <div class="failure-reasons-grid">
-          <div class="failure-reason-item">
+        <div class="failure-reasons-grid admin-card-grid">
+          <div class="failure-reason-item admin-data-card">
             <div class="failure-reason-head">
               <p class="failure-reason-label">Таймаут</p>
               <p class="failure-reason-value">{{ failureReasons.timeout.count }} ({{ failureReasons.timeout.percent.toFixed(1) }}%)</p>
@@ -92,7 +92,7 @@
               <div class="failure-reason-fill timeout" :style="{ width: `${failureReasons.timeout.percent}%` }"></div>
             </div>
           </div>
-          <div class="failure-reason-item">
+          <div class="failure-reason-item admin-data-card">
             <div class="failure-reason-head">
               <p class="failure-reason-label">Неверные ответы</p>
               <p class="failure-reason-value">{{ failureReasons.wrongAnswers.count }} ({{ failureReasons.wrongAnswers.percent.toFixed(1) }}%)</p>
@@ -227,20 +227,20 @@
 
       <div class="dashboard-row-full">
         <Card title="Наблюдаемость API" icon="Radar" class="observability-card">
-          <div class="observability-grid">
-            <div class="observability-item">
+          <div class="observability-grid admin-card-grid admin-card-grid--min-180">
+            <div class="observability-item admin-data-card">
               <p class="observability-label">API p95</p>
               <p class="observability-value">{{ Number(observability.api.p95LatencyMs || 0).toFixed(2) }} ms</p>
             </div>
-            <div class="observability-item">
+            <div class="observability-item admin-data-card">
               <p class="observability-label">Очередь геймификации</p>
               <p class="observability-value">{{ formatQueueDepth(observability.queue.depth) }}</p>
             </div>
-            <div class="observability-item">
+            <div class="observability-item admin-data-card">
               <p class="observability-label">Ошибки scoring</p>
               <p class="observability-value">{{ observability.scoring.errorsTotal || 0 }}</p>
             </div>
-            <div class="observability-item">
+            <div class="observability-item admin-data-card">
               <p class="observability-label">Redis</p>
               <p class="observability-value">{{ observability.redis.status || "unknown" }}</p>
             </div>
@@ -804,16 +804,10 @@ onBeforeUnmount(() => {
 }
 
 .kpi-delta-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
 }
 
 .kpi-delta-item {
-  border: 1px solid var(--divider);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--bg-secondary);
 }
 
 .kpi-delta-label {
@@ -848,16 +842,10 @@ onBeforeUnmount(() => {
 }
 
 .failure-reasons-grid {
-  display: grid;
-  grid-template-columns: 1fr;
   gap: 12px;
 }
 
 .failure-reason-item {
-  border: 1px solid var(--divider);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--bg-secondary);
 }
 
 .failure-reason-head {
@@ -909,16 +897,10 @@ onBeforeUnmount(() => {
 }
 
 .observability-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
 }
 
 .observability-item {
-  border: 1px solid var(--divider);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--bg-secondary);
 }
 
 .observability-label {
@@ -954,29 +936,10 @@ onBeforeUnmount(() => {
 
 .metric-icon {
   font-size: 40px;
-  width: 64px;
-  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16px;
   flex-shrink: 0;
-}
-
-.metric-icon-blue {
-  background-color: var(--accent-blue-soft);
-}
-
-.metric-icon-green {
-  background-color: var(--accent-green-soft);
-}
-
-.metric-icon-purple {
-  background-color: var(--accent-purple-soft);
-}
-
-.metric-icon-orange {
-  background-color: var(--accent-orange-soft);
 }
 
 .metric-info {

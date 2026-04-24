@@ -108,16 +108,6 @@ body {
   padding: 12px 0;
 }
 
-.platform-mobile .container {
-  padding-top: 96px;
-}
-
-@media (max-width: 768px) {
-  .container {
-    padding-top: 96px;
-  }
-}
-
 .page-container {
   min-height: 100vh;
   background-color: var(--bg-primary);
@@ -176,7 +166,7 @@ body {
 }
 
 .btn-primary:disabled {
-  background-color: var(--text-secondary);
+  opacity: 0.5;
   cursor: not-allowed;
   transform: none;
 }
@@ -481,6 +471,50 @@ body {
   display: none;
 }
 
+/* Shared app primitives (редизайн дашборда) */
+.app-panel {
+  background: var(--bg-primary);
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+}
+
+.app-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.app-list-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app-round-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.app-round-icon--success {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.app-round-icon--violet {
+  background: #ede9ff;
+  color: #6d28d9;
+}
+
+.app-round-icon--warning {
+  background: #fef3c7;
+  color: #d97706;
+}
+
 /* Responsive */
 /* Text colors for different themes */
 .text-primary {
@@ -616,12 +650,134 @@ button svg {
     padding: 0 12px 12px;
   }
 
-  .platform-mobile .container {
-    padding-top: 96px;
-  }
-
   .card {
     margin-left: -4px;
     margin-right: -4px;
   }
+}
+
+/* === Редизайн 2026: базовый визуальный слой === */
+:root,
+html {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --divider: #e5e7eb;
+  --accent-blue: #6355f5;
+  --success: #16a34a;
+  --error: #dc2626;
+  --warning: #d97706;
+  --card-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  --blur-bg: rgba(255, 255, 255, 0.92);
+}
+
+:root[data-theme="dark"],
+html[data-theme="dark"] {
+  --bg-primary: #111827;
+  --bg-secondary: #1f2937;
+  --text-primary: #f9fafb;
+  --text-secondary: #9ca3af;
+  --divider: #374151;
+  --accent-blue: #7c6fff;
+  --success: #4ade80;
+  --error: #f87171;
+  --warning: #fbbf24;
+  --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+  --blur-bg: rgba(17, 24, 39, 0.92);
+}
+
+body {
+  font-family: "Manrope", "Segoe UI", "Arial", sans-serif;
+}
+
+.container {
+  max-width: 860px;
+}
+
+.card {
+  background-color: var(--bg-primary);
+  border-radius: 16px;
+  border: 1px solid var(--divider);
+  box-shadow: var(--card-shadow);
+  padding: 16px;
+}
+
+.card:hover {
+  transform: none;
+}
+
+.card-large {
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.btn {
+  border-radius: 10px;
+  min-height: 40px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.btn-primary {
+  background: #6355f5;
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background: #5146e0;
+  transform: none;
+}
+
+.btn-secondary {
+  border-color: var(--divider);
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+  border-radius: 10px;
+  background: var(--bg-primary);
+  border-color: var(--divider);
+}
+
+.progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: #d8dceb;
+}
+
+.progress-fill {
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6c63ff, #5446f0);
+}
+
+.page-container {
+  background: var(--bg-primary);
+}
+
+.muted-card {
+  background: color-mix(in srgb, var(--bg-primary) 80%, #ffffff 20%);
+  border: 1px solid var(--divider);
+}
+
+.app-screen-title {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.list-arrow {
+  color: var(--text-secondary);
+  font-weight: 700;
 }

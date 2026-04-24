@@ -46,6 +46,7 @@ module.exports = {
     database: process.env.DB_NAME,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
+    connectTimeoutMs: Number(process.env.DB_CONNECT_TIMEOUT_MS || 10000),
   },
   botToken: process.env.BOT_TOKEN,
   jwtSecret: process.env.JWT_SECRET,

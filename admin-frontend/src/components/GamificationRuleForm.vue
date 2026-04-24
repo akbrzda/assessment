@@ -7,9 +7,7 @@
           {{ isEditing ? "Редактировать правило" : "Новое правило" }}
         </h3>
         <button @click="$emit('close')" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <Icon name="X" :size="24" aria-hidden="true" />
         </button>
       </div>
 
@@ -258,6 +256,7 @@
 import { ref, computed, watch } from "vue";
 import { useToast } from "@/composables/useToast";
 import gamificationRulesApi from "@/api/gamificationRules";
+import Icon from "./ui/Icon.vue";
 
 const props = defineProps({
   rule: {

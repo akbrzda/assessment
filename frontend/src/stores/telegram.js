@@ -5,6 +5,32 @@ import {
   setTelegramRuntimeState,
 } from "../services/telegramRuntimeState";
 
+const INIT_DATA_MAX_AGE_SECONDS = 5 * 60;
+
+function extractAuthDateFromInitData(initDataString) {
+  if (!initDataString) {
+    return null;
+  }
+
+  const params = new URLSearchParams(initDataString);
+  const authDate = Number(params.get("auth_date"));
+  if (!Number.isInteger(authDate) || authDate <= 0) {
+    return null;
+  }
+
+  return authDate;
+}
+
+function isInitDataFresh(initDataString) {
+  const authDate = extractAuthDateFromInitData(initDataString);
+  if (!authDate) {
+    return false;
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return nowSeconds - authDate <= INIT_DATA_MAX_AGE_SECONDS;
+}
+
 function extractInviteFromUrl() {
   if (typeof window === "undefined") {
     return null;
@@ -58,28 +84,29 @@ export const useTelegramStore = defineStore("telegram", () => {
     const webApp = window.Telegram.WebApp;
     tg.value = webApp;
 
-    // Восстанавливаем initData из sessionStorage, если он пустой
+    // Восстанавливаем initData из sessionStorage только если он еще актуален
     let currentInitData = webApp.initData || "";
     let currentInitDataUnsafe = webApp.initDataUnsafe || {};
 
     if (!currentInitData) {
-      // Пытаемся восстановить из sessionStorage
       const savedInitData = sessionStorage.getItem("tg_init_data");
       const savedInitDataUnsafe = sessionStorage.getItem("tg_init_data_unsafe");
 
-      if (savedInitData) {
+      if (savedInitData && isInitDataFresh(savedInitData)) {
         console.log("🔄 Восстанавливаем initData из sessionStorage");
         currentInitData = savedInitData;
-        webApp.initData = savedInitData;
 
         if (savedInitDataUnsafe) {
           try {
             currentInitDataUnsafe = JSON.parse(savedInitDataUnsafe);
-            webApp.initDataUnsafe = currentInitDataUnsafe;
           } catch (e) {
             console.error("Ошибка при парсинге сохранённого initDataUnsafe:", e);
           }
         }
+      } else if (savedInitData) {
+        console.warn("⚠️ Сохраненный initData устарел, очищаем sessionStorage");
+        sessionStorage.removeItem("tg_init_data");
+        sessionStorage.removeItem("tg_init_data_unsafe");
       } else {
         console.warn("⚠️ initData пустой и не найден в sessionStorage. Возможно, приложение открыто некорректно.");
       }

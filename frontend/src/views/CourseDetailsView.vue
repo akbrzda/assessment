@@ -1,109 +1,92 @@
 <template>
   <div class="page-container">
     <div class="container">
-      <div v-if="isLoading" class="card loading-state">
-        <p class="body-small text-secondary">Загрузка курса...</p>
-      </div>
+      <!-- Скелетон при загрузке -->
+      <template v-if="isLoading">
+        <div class="sk-title"></div>
+        <div class="sk-subtitle"></div>
+        <div class="sk-subtitle sk-subtitle--short"></div>
+
+        <div class="sk-progress-block">
+          <div class="sk-progress-row">
+            <div class="sk-line sk-line--label"></div>
+            <div class="sk-line sk-line--percent"></div>
+          </div>
+          <div class="sk-bar"></div>
+          <div class="sk-line sk-line--meta"></div>
+        </div>
+
+        <div class="sk-line sk-line--section-title"></div>
+
+        <div class="sections-list">
+          <div v-for="n in 4" :key="n" class="sk-section-card">
+            <div class="sk-circle"></div>
+            <div class="sk-line sk-line--section-name"></div>
+            <div class="sk-line sk-line--count"></div>
+          </div>
+        </div>
+      </template>
 
       <template v-else-if="course">
-        <section class="course-hero mb-12">
-          <div class="hero-cover" :style="heroStyle">
-            <div class="hero-top-actions">
-              <router-link to="/assessments" class="hero-circle-btn" aria-label="Назад">←</router-link>
-              <div class="hero-right-actions">
-                <button class="hero-circle-btn" type="button" @click="showCourseDownload">⇩</button>
-                <button class="hero-circle-btn" type="button" @click="showCourseDiscussion">💬</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="hero-summary card card-large">
-            <p class="hero-kicker">Программа обучения</p>
-            <h1 class="title-large mb-8">{{ course.title }}</h1>
-            <p class="body-medium text-secondary mb-12">{{ course.description || "Описание курса пока не добавлено" }}</p>
-            <button class="btn btn-secondary btn-full" type="button" @click="openCourseInfo">
-              Подробнее о программе
-            </button>
-          </div>
+        <section class="course-header">
+          <h1 class="course-title">{{ course.title }}</h1>
+          <p v-if="course.description" class="course-description">{{ course.description }}</p>
         </section>
 
-        <section class="course-progress card card-large mb-12">
-          <div class="course-progress__main">
-            <p class="course-progress__value">{{ Math.round(course.progress.progressPercent || 0) }}%</p>
-            <div class="progress-bar mb-8">
-              <div class="progress-fill" :style="{ width: `${Math.min(Math.max(course.progress.progressPercent || 0, 0), 100)}%` }"></div>
-            </div>
-            <p class="body-small text-secondary">
-              Пройдено тем курса: {{ course.progress.completedSectionsCount || 0 }} / {{ course.progress.totalSectionsCount || 0 }}
-            </p>
+        <section class="course-progress">
+          <div class="course-progress__row">
+            <span class="progress-label">Прогресс курса</span>
+            <span class="progress-percent">{{ Math.round(course.progress.progressPercent || 0) }}%</span>
           </div>
-
-          <div class="course-progress__side">
-            <button class="progress-action" type="button" @click="showCourseDownload">
-              <span class="progress-action__icon">⇩</span>
-              <span class="progress-action__label">Скачать</span>
-            </button>
-            <button class="progress-action" type="button" @click="showCourseDiscussion">
-              <span class="progress-action__icon">💬</span>
-              <span class="progress-action__label">Обсудить</span>
-            </button>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" :style="{ width: `${Math.min(Math.max(course.progress.progressPercent || 0, 0), 100)}%` }"></div>
           </div>
+          <p class="progress-hint">{{ course.progress.completedSectionsCount || 0 }} из {{ course.progress.totalSectionsCount || 0 }} тем</p>
         </section>
 
-        <section id="sections-list" class="mb-12">
-          <div class="sections-header mb-8">
-            <p class="body-medium">Путь прохождения</p>
-            <span class="body-small text-secondary">{{ getCourseValidityLabel(course) }}</span>
-          </div>
+        <section id="sections-list">
+          <h2 class="sections-list-title">Темы курса</h2>
 
           <div v-if="!course.sections.length" class="card empty-state">
             <p class="body-small text-secondary">В курсе пока нет тем.</p>
           </div>
 
-          <div v-else class="sections-timeline">
-            <article
+          <div v-else class="sections-list">
+            <button
               v-for="(section, sectionIndex) in course.sections"
               :key="section.id"
-              class="timeline-row"
+              class="section-card"
               :class="{
                 'is-locked': section.progress.locked,
                 'is-passed': section.progress.status === 'passed',
+                'is-active': !section.progress.locked && section.progress.status !== 'passed',
               }"
+              type="button"
+              @click="openSectionEntry(section)"
             >
-              <div class="timeline-marker">
-                <span class="marker-dot">{{ getSectionMarker(section) }}</span>
-                <span class="marker-line" aria-hidden="true"></span>
+              <div class="section-number">
+                <Check v-if="section.progress.status === 'passed'" :size="16" :stroke-width="2.5" />
+                <span v-else>{{ sectionIndex + 1 }}</span>
               </div>
-
-              <button class="timeline-card" type="button" @click="openSectionEntry(section)">
-                <div class="timeline-thumb">{{ sectionIndex + 1 }}</div>
-                <div class="timeline-content">
-                  <h3 class="timeline-title">{{ section.title }}</h3>
-                  <p class="timeline-subtitle">{{ getSectionSubtitle(section, sectionIndex) }}</p>
-                </div>
-                <span class="timeline-status">{{ getSectionStatusText(section.progress.status, section.progress.locked) }}</span>
-              </button>
-            </article>
+              <span class="section-title">{{ section.title }}</span>
+              <span class="section-right">
+                <Lock v-if="section.progress.locked" class="section-lock-icon" :size="18" />
+                <span v-else class="section-count">{{ getSectionTopicsProgress(section) }}</span>
+              </span>
+            </button>
           </div>
         </section>
 
-        <div class="card card-large">
-          <h3 class="title-small mb-8">Итоговая аттестация</h3>
-          <p class="body-small text-secondary mb-12">
-            Доступ откроется после прохождения обязательных тем курса: {{ course.finalAssessment.passedRequiredSections || 0 }} /
-            {{ course.finalAssessment.totalRequiredSections || 0 }}
-          </p>
-
-          <p v-if="!course.finalAssessment.available" class="body-small lock-text mb-12">
-            {{ getFinalReasonText(course.finalAssessment.reason) }}
-          </p>
-
-          <button
-            class="btn btn-primary btn-full"
-            :disabled="!course.finalAssessment.available || !course.finalAssessment.id"
-            @click="openFinalAssessment"
-          >
-            {{ getFinalActionText() }}
+        <div class="final-assessment-card" :class="{ 'is-available': course.finalAssessment.available }">
+          <div class="final-icon-wrap">
+            <GraduationCap class="final-icon" :size="26" />
+          </div>
+          <div class="final-text">
+            <span class="final-title">Итоговая аттестация</span>
+            <span class="final-hint">Доступна после прохождения всех тем курса</span>
+          </div>
+          <button class="btn-final" :disabled="!course.finalAssessment.available || !course.finalAssessment.id" @click="openFinalAssessment">
+            Перейти
           </button>
         </div>
       </template>
@@ -128,13 +111,6 @@
       </div>
 
       <BottomSheet v-model="lockSheet.visible" :title="lockSheet.title" :description="lockSheet.description" />
-
-      <StickyFooterCTA
-        :hidden="!course"
-        :label="stickyActionLabel"
-        :disabled="stickyActionDisabled"
-        @action="handleStickyAction"
-      />
     </div>
   </div>
 </template>
@@ -142,11 +118,11 @@
 <script>
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { Check, GraduationCap, Lock } from "lucide-vue-next";
 import { apiClient } from "../services/apiClient";
 import { useTelegramStore } from "../stores/telegram";
 import { useUserStore } from "../stores/user";
 import BottomSheet from "../components/courses/BottomSheet.vue";
-import StickyFooterCTA from "../components/courses/StickyFooterCTA.vue";
 
 const COURSE_COMPLETION_STORAGE_KEY = "courseCompletionContext";
 
@@ -170,7 +146,9 @@ export default {
   name: "CourseDetailsView",
   components: {
     BottomSheet,
-    StickyFooterCTA,
+    Check,
+    GraduationCap,
+    Lock,
   },
   setup() {
     const route = useRoute();
@@ -199,13 +177,6 @@ export default {
 
     const courseId = computed(() => Number(route.params.id));
 
-    const heroStyle = computed(() => {
-      const hue = ((course.value?.id || 1) * 53) % 360;
-      return {
-        background: `linear-gradient(140deg, hsl(${hue} 52% 36%), hsl(${(hue + 40) % 360} 44% 22%))`,
-      };
-    });
-
     const stickyActionLabel = computed(() => {
       if (!course.value) return "Продолжить";
       if (isStarting.value) return "Запускаем...";
@@ -221,24 +192,6 @@ export default {
       return false;
     });
 
-    function openCourseInfo() {
-      const infoText = [
-        `Статус: ${getCourseStatusText(course.value?.progress?.status)}`,
-        `Срок действия: ${getCourseValidityLabel(course.value)}`,
-        `Тем курса: ${course.value?.sections?.length || 0}`,
-      ].join("\n");
-
-      telegramStore.showAlert(infoText);
-    }
-
-    function showCourseDownload() {
-      telegramStore.showAlert("Скачивание материалов будет добавлено отдельным этапом. Сейчас доступно онлайн-прохождение курса.");
-    }
-
-    function showCourseDiscussion() {
-      telegramStore.showAlert("Обсуждение курса будет доступно после подключения чата. Пока используйте комментарии в рабочем чате.");
-    }
-
     function normalizeAssessmentSummary(item) {
       return {
         id: Number(item.id),
@@ -250,13 +203,6 @@ export default {
 
     function getAssessmentSummary(assessmentId) {
       return assessmentsMap.value.get(Number(assessmentId)) || null;
-    }
-
-    function getCourseStatusText(status) {
-      if (status === "completed") return "Завершен";
-      if (status === "in_progress") return "В процессе";
-      if (status === "closed") return "Закрыт";
-      return "Не начат";
     }
 
     function getCourseValidityLabel(currentCourse) {
@@ -290,18 +236,20 @@ export default {
       return `Тема ${index + 1} · ${topicsCount} подтем · ${suffix}`;
     }
 
-    function getSectionMarker(section) {
-      if (section.progress.locked) return "🔒";
-      if (section.progress.status === "passed") return "✓";
-      if (section.progress.status === "in_progress") return "▶";
-      return "•";
+    function getSectionTopicsProgress(section) {
+      const topics = section?.topics || [];
+      const total = topics.length;
+      if (!total) return null;
+      const completed = topics.filter((t) => t.progress?.status === "completed").length;
+      return `${completed}/${total}`;
     }
 
     function openSectionLockReason(section = null) {
       lockSheet.value = {
         visible: true,
         title: "Тема недоступна",
-        description: section?.progress?.lockReasonText || "Сначала завершите предыдущую обязательную тему курса. После этого доступ откроется автоматически.",
+        description:
+          section?.progress?.lockReasonText || "Сначала завершите предыдущую обязательную тему курса. После этого доступ откроется автоматически.",
       };
     }
 
@@ -594,25 +542,22 @@ export default {
     );
 
     return {
+      router,
       isLoading,
       isStarting,
       course,
       lockSheet,
-      heroStyle,
       stickyActionLabel,
       stickyActionDisabled,
       handleStickyAction,
       getCourseValidityLabel,
       getSectionStatusText,
       getSectionSubtitle,
-      getSectionMarker,
+      getSectionTopicsProgress,
       openSectionEntry,
       getFinalReasonText,
       getFinalActionText,
       openFinalAssessment,
-      openCourseInfo,
-      showCourseDownload,
-      showCourseDiscussion,
       attemptResultModal,
       closeAttemptResultModal,
     };
@@ -621,220 +566,236 @@ export default {
 </script>
 
 <style scoped>
-.loading-state,
-.empty-state {
-  text-align: center;
+/* ——— Заголовок курса ——— */
+.course-header {
+  margin-bottom: 20px;
+  padding-top: 16px;
 }
 
-.course-hero {
-  border-radius: 22px;
-  overflow: hidden;
-  background: var(--bg-secondary);
-  border: 1px solid var(--divider);
-}
-
-.hero-cover {
-  min-height: 220px;
-  padding: 12px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.hero-top-actions {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.hero-right-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.hero-circle-btn {
-  width: 42px;
-  height: 42px;
-  border: none;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.88);
-  color: #0f172a;
-  text-decoration: none;
-  font-size: 20px;
-  cursor: pointer;
-}
-
-.hero-summary {
-  border-radius: 20px 20px 0 0;
-  margin-bottom: 0;
-  border-bottom: none;
-}
-
-.hero-kicker {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-}
-
-.course-progress {
-  display: grid;
-  grid-template-columns: 1fr 180px;
-  gap: 12px;
-  align-items: stretch;
-}
-
-.course-progress__value {
-  font-size: 34px;
-  line-height: 1;
+.course-title {
+  font-size: 24px;
   font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-primary);
   margin-bottom: 8px;
 }
 
-.course-progress__side {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-}
-
-.progress-action {
-  border: 1px solid var(--divider);
-  border-radius: 12px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: center;
-  padding: 10px;
-  cursor: pointer;
-}
-
-.progress-action__icon {
-  font-size: 16px;
-}
-
-.progress-action__label {
+.course-description {
   font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.45;
 }
 
-.sections-header {
+/* ——— Прогресс ——— */
+.course-progress {
+  margin-bottom: 24px;
+}
+
+.course-progress__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 10px;
 }
 
-.sections-timeline {
+.progress-label {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.progress-percent {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.progress-bar-wrap {
+  width: 100%;
+  height: 8px;
+  background-color: var(--divider);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: #6355f5;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-hint {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* ——— Список тем ——— */
+.sections-list-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px;
+}
+
+.sections-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-bottom: 20px;
 }
 
-.timeline-row {
-  display: grid;
-  grid-template-columns: 24px 1fr;
-  gap: 10px;
-}
-
-.timeline-marker {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.marker-dot {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #dbe2f8;
-  color: #1e3a8a;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-}
-
-.marker-line {
-  width: 2px;
-  flex: 1;
-  margin-top: 6px;
-  background: repeating-linear-gradient(
-    to bottom,
-    #d1d5db 0,
-    #d1d5db 5px,
-    transparent 5px,
-    transparent 10px
-  );
-}
-
-.timeline-row:last-child .marker-line {
-  display: none;
-}
-
-.timeline-card {
+.section-card {
   width: 100%;
-  border: 1px solid var(--divider);
-  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1.5px solid var(--divider);
   background: var(--bg-primary);
   color: var(--text-primary);
-  padding: 10px;
-  display: grid;
-  grid-template-columns: 52px 1fr auto;
-  align-items: center;
-  gap: 10px;
   text-align: left;
   cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
-.timeline-thumb {
-  width: 52px;
-  height: 52px;
-  border-radius: 10px;
-  background: linear-gradient(145deg, #dbeafe, #bfdbfe);
-  color: #1e40af;
+.section-card.is-active {
+  background: #f0eeff;
+  border-color: #6355f5;
+}
+
+.section-card.is-locked {
+  background: var(--bg-primary);
+  border-color: var(--divider);
+}
+
+.section-number {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #ede9fe;
+  color: #6355f5;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-size: 14px;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
-.timeline-title {
-  margin: 0;
-  font-size: 17px;
+.section-number :deep(svg) {
+  display: block;
+}
+
+.section-card.is-passed .section-number {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.section-card.is-locked .section-number {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.section-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.section-card.is-locked .section-title {
+  color: var(--text-secondary);
+}
+
+.section-right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.section-count {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.section-lock-icon {
+  color: #9ca3af;
+}
+
+/* ——— Итоговая аттестация ——— */
+.final-assessment-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ede9fe;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.final-icon-wrap {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #d8d0fb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.final-icon {
+  color: #6355f5;
+}
+
+.final-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.final-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
   line-height: 1.3;
 }
 
-.timeline-subtitle {
-  margin: 3px 0 0;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.timeline-status {
+.final-hint {
   font-size: 12px;
   color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.btn-final {
+  flex-shrink: 0;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: none;
+  background: #6355f5;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
   white-space: nowrap;
 }
 
-.timeline-row.is-locked .marker-dot,
-.timeline-row.is-locked .timeline-thumb {
-  background: #e5e7eb;
-  color: #6b7280;
+.btn-final:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
-.timeline-row.is-passed .marker-dot,
-.timeline-row.is-passed .timeline-thumb {
-  background: #d1fae5;
-  color: #047857;
-}
-
-.lock-text {
-  color: var(--warning, #ff9500);
+/* ——— Модалка ——— */
+.empty-state {
+  text-align: center;
 }
 
 .modal-content {
@@ -844,21 +805,114 @@ export default {
   padding: 20px;
 }
 
-@media (max-width: 640px) {
-  .course-progress {
-    grid-template-columns: 1fr;
+/* ——— Скелетон ——— */
+@keyframes sk-shimmer {
+  0% {
+    background-position: -300px 0;
   }
+  100% {
+    background-position: 300px 0;
+  }
+}
 
-  .course-progress__side {
-    grid-template-columns: 1fr 1fr;
-  }
+.sk-title,
+.sk-subtitle,
+.sk-bar,
+.sk-circle,
+.sk-line,
+.sk-section-card {
+  background: linear-gradient(90deg, #e8e8e8 25%, #f5f5f5 50%, #e8e8e8 75%);
+  background-size: 600px 100%;
+  animation: sk-shimmer 1.4s infinite linear;
+  border-radius: 8px;
+}
 
-  .timeline-card {
-    grid-template-columns: 46px 1fr;
-  }
+.sk-title {
+  height: 28px;
+  width: 75%;
+  margin: 12px 0 10px;
+}
 
-  .timeline-status {
-    grid-column: 2 / 3;
-  }
+.sk-subtitle {
+  height: 14px;
+  width: 90%;
+  margin-bottom: 8px;
+}
+
+.sk-subtitle--short {
+  width: 60%;
+  margin-bottom: 24px;
+}
+
+.sk-progress-block {
+  margin-bottom: 24px;
+}
+
+.sk-progress-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.sk-bar {
+  height: 8px;
+  width: 100%;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.sk-line {
+  border-radius: 6px;
+}
+
+.sk-line--label {
+  height: 16px;
+  width: 110px;
+}
+
+.sk-line--percent {
+  height: 16px;
+  width: 40px;
+}
+
+.sk-line--meta {
+  height: 14px;
+  width: 80px;
+}
+
+.sk-line--section-title {
+  height: 18px;
+  width: 100px;
+  margin-bottom: 14px;
+}
+
+.sk-section-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 62px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #eeeeee;
+}
+
+.sk-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #d8d8d8;
+  flex-shrink: 0;
+  animation: sk-shimmer 1.4s infinite linear;
+  background-size: 600px 100%;
+}
+
+.sk-line--section-name {
+  flex: 1;
+  height: 16px;
+}
+
+.sk-line--count {
+  width: 30px;
+  height: 14px;
 }
 </style>

@@ -4,7 +4,9 @@
       <div v-if="modelValue" class="confirm-overlay" @click="handleCancel">
         <div class="confirm-dialog" @click.stop>
           <div class="confirm-header">
-            <div class="confirm-icon" :class="`confirm-icon-${variant}`">{{ icon }}</div>
+            <div class="confirm-icon" :class="`confirm-icon-${variant}`">
+              <Icon :name="iconName" :size="24" :stroke-width="2.25" aria-hidden="true" />
+            </div>
             <h2 class="confirm-title">{{ title }}</h2>
           </div>
 
@@ -26,9 +28,11 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
 import Button from "./Button.vue";
+import Icon from "./Icon.vue";
 
-defineProps({
+const props = defineProps({
   modelValue: Boolean,
   title: {
     type: String,
@@ -56,7 +60,7 @@ defineProps({
 
 const emit = defineEmits(["update:modelValue", "confirm", "cancel"]);
 
-const actionVariant = (() => {
+const actionVariant = computed(() => {
   const variantMap = {
     warning: "primary",
     danger: "danger",
@@ -64,17 +68,17 @@ const actionVariant = (() => {
     success: "success",
   };
   return variantMap[props.variant] || "primary";
-})();
+});
 
-const icon = (() => {
+const iconName = computed(() => {
   const iconMap = {
-    warning: "⚠️",
-    danger: "🗑️",
-    info: "ℹ️",
-    success: "✅",
+    warning: "TriangleAlert",
+    danger: "Trash2",
+    info: "Info",
+    success: "CircleCheck",
   };
-  return iconMap[props.variant] || "❓";
-})();
+  return iconMap[props.variant] || "HelpCircle";
+});
 
 const handleConfirm = () => {
   emit("confirm");
@@ -131,7 +135,6 @@ const handleCancel = () => {
 }
 
 .confirm-icon {
-  font-size: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -143,18 +146,22 @@ const handleCancel = () => {
 
 .confirm-icon-warning {
   background: #fbbf241a;
+  color: #d97706;
 }
 
 .confirm-icon-danger {
   background: #ef44441a;
+  color: #dc2626;
 }
 
 .confirm-icon-info {
   background: #3b82f61a;
+  color: #2563eb;
 }
 
 .confirm-icon-success {
   background: #10b9811a;
+  color: #059669;
 }
 
 .confirm-title {

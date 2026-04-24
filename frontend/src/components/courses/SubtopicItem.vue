@@ -1,40 +1,26 @@
 <template>
-  <article class="subtopic-row" :class="`state-${resolvedState}`">
-    <div class="row-marker" aria-hidden="true">
-      <span class="marker-dot">{{ markerSymbol }}</span>
-      <span class="marker-line"></span>
+  <button class="subtopic-item" :class="`state-${resolvedState}`" type="button" @click="handleOpen">
+    <span class="subtopic-index">{{ numberLabel }}</span>
+    <div class="subtopic-body">
+      <h4 class="subtopic-title">{{ topic.title }}</h4>
+      <p v-if="lockDescriptionText" class="subtopic-description">{{ lockDescriptionText }}</p>
     </div>
-
-    <div class="row-card">
-      <div class="row-card__thumb">{{ index + 1 }}</div>
-
-      <div class="row-card__content">
-        <h4 class="row-title">{{ topic.title }}</h4>
-        <p v-if="descriptionText" class="row-description">{{ descriptionText }}</p>
-      </div>
-
-      <div class="row-card__actions">
-        <StatusBadge :status="badgeStatus" :text="badgeText" />
-        <button v-if="canOpen" class="btn btn-primary row-btn" type="button" @click="$emit('open', topic)">
-          Открыть
-        </button>
-        <button v-else class="btn btn-secondary row-btn" type="button" @click="$emit('lock-click', topic)">
-          Причина
-        </button>
-      </div>
-    </div>
-  </article>
+    <span class="subtopic-state">
+      <CheckCircle2 v-if="resolvedState === 'completed'" class="icon-completed" :size="22" :stroke-width="2" />
+      <Circle v-else-if="resolvedState === 'in_progress'" class="icon-in-progress" :size="22" :stroke-width="1.5" />
+      <Lock v-else-if="resolvedState === 'locked' || resolvedState === 'completed_locked'" class="icon-locked" :size="18" :stroke-width="1.5" />
+      <Circle v-else class="icon-not-started" :size="22" :stroke-width="1.5" />
+    </span>
+  </button>
 </template>
 
 <script>
 import { computed } from "vue";
-import StatusBadge from "./StatusBadge.vue";
+import { CheckCircle2, Circle, Lock } from "lucide-vue-next";
 
 export default {
   name: "SubtopicItem",
-  components: {
-    StatusBadge,
-  },
+  components: { CheckCircle2, Circle, Lock },
   emits: ["open", "lock-click"],
   props: {
     topic: {
@@ -45,8 +31,12 @@ export default {
       type: Number,
       default: 0,
     },
+    sectionOrderIndex: {
+      type: Number,
+      default: null,
+    },
   },
-  setup(props) {
+  setup(props, { emit }) {
     const resolvedState = computed(() => {
       const status = props.topic?.progress?.status || "not_started";
       const isLocked = Boolean(props.topic?.progress?.locked);
@@ -59,185 +49,121 @@ export default {
 
     const canOpen = computed(() => !["locked", "completed_locked"].includes(resolvedState.value));
 
-    const badgeStatus = computed(() => {
-      if (resolvedState.value === "locked" || resolvedState.value === "completed_locked") {
-        return "closed";
-      }
-      return props.topic?.progress?.status || "not_started";
-    });
-
-    const badgeText = computed(() => {
-      switch (resolvedState.value) {
-        case "in_progress":
-          return "В процессе";
-        case "completed":
-          return "Завершена";
-        case "completed_locked":
-          return "Пройдена, но закрыта";
-        case "locked":
-          return "Закрыта";
-        default:
-          return "Не начата";
-      }
-    });
-
-    const markerSymbol = computed(() => {
-      if (resolvedState.value === "locked" || resolvedState.value === "completed_locked") {
-        return "🔒";
-      }
-      if (resolvedState.value === "completed") {
-        return "✓";
-      }
-      if (resolvedState.value === "in_progress") {
-        return "▶";
-      }
-      return "•";
-    });
-
-    const descriptionText = computed(() => {
+    const lockDescriptionText = computed(() => {
       if (resolvedState.value === "completed_locked" || resolvedState.value === "locked") {
-        return props.topic?.progress?.lockReasonText || "Доступ временно ограничен";
+        return props.topic?.progress?.lockReasonText || "Сначала завершите предыдущую подтему";
       }
-      if (props.topic?.assessmentId && props.topic?.hasMaterial) {
-        return "Сначала материал, затем тест";
-      }
-      if (props.topic?.assessmentId) {
-        return "Подтема с тестом";
-      }
-      if (props.topic?.hasMaterial) {
-        return "Подтема с материалом";
-      }
-      return "Подтема без материалов";
+      return null;
     });
+
+    const numberLabel = computed(() => {
+      const topicNum = Number(props.topic?.orderIndex || props.index + 1);
+      const sectionNum = props.sectionOrderIndex != null ? Number(props.sectionOrderIndex) : null;
+      if (sectionNum != null && Number.isFinite(sectionNum) && Number.isFinite(topicNum)) {
+        return `${sectionNum}.${topicNum}`;
+      }
+      return Number.isFinite(topicNum) ? String(topicNum) : `${props.index + 1}`;
+    });
+
+    function handleOpen() {
+      if (canOpen.value) {
+        emit("open", props.topic);
+        return;
+      }
+      emit("lock-click", props.topic);
+    }
 
     return {
       resolvedState,
-      canOpen,
-      badgeStatus,
-      badgeText,
-      markerSymbol,
-      descriptionText,
+      lockDescriptionText,
+      numberLabel,
+      handleOpen,
     };
   },
 };
 </script>
 
 <style scoped>
-.subtopic-row {
-  display: grid;
-  grid-template-columns: 22px 1fr;
-  gap: 10px;
-}
-
-.row-marker {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.marker-dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #dbe2f8;
-  color: #1d4ed8;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-}
-
-.marker-line {
-  width: 2px;
-  flex: 1;
-  margin-top: 6px;
-  background: repeating-linear-gradient(
-    to bottom,
-    #d1d5db 0,
-    #d1d5db 5px,
-    transparent 5px,
-    transparent 10px
-  );
-}
-
-.subtopic-row:last-child .marker-line {
-  display: none;
-}
-
-.row-card {
-  border: 1px solid var(--divider, #e2e8f0);
+.subtopic-item {
+  width: 100%;
+  border: 1px solid var(--divider);
   border-radius: 14px;
-  padding: 10px;
-  background: var(--bg-primary, #ffffff);
+  background: var(--bg-primary);
   display: grid;
-  grid-template-columns: 52px 1fr auto;
-  gap: 10px;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  text-align: left;
+  transition: background 0.15s;
 }
 
-.row-card__thumb {
-  width: 52px;
-  height: 52px;
-  border-radius: 10px;
-  background: linear-gradient(145deg, #dbeafe, #bfdbfe);
-  color: #1e3a8a;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.subtopic-index {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  min-width: 28px;
 }
 
-.row-title {
+.subtopic-title {
   margin: 0;
-  font-size: 17px;
-  line-height: 1.3;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text-primary);
 }
 
-.row-description {
+.subtopic-description {
   margin-top: 3px;
-  font-size: 13px;
-  color: var(--text-secondary, #64748b);
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
-.row-card__actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+.subtopic-state {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
 }
 
-.row-btn {
-  min-height: 34px;
-  padding: 6px 10px;
-  font-size: 13px;
+.state-in_progress {
+  background: color-mix(in srgb, #5856d6 8%, var(--bg-primary) 92%);
+  border-color: color-mix(in srgb, #5856d6 30%, var(--divider) 70%);
 }
 
-.state-completed .marker-dot,
-.state-completed .row-card__thumb {
-  background: #d1fae5;
-  color: #047857;
+.state-in_progress .subtopic-index {
+  color: #5856d6;
+  font-weight: 600;
 }
 
-.state-completed_locked .marker-dot,
-.state-locked .marker-dot,
-.state-completed_locked .row-card__thumb,
-.state-locked .row-card__thumb {
-  background: #e5e7eb;
-  color: #6b7280;
+.state-in_progress .subtopic-title {
+  font-weight: 500;
 }
 
-@media (max-width: 640px) {
-  .row-card {
-    grid-template-columns: 46px 1fr;
-  }
+.state-locked .subtopic-title,
+.state-completed_locked .subtopic-title {
+  color: var(--text-secondary);
+}
 
-  .row-card__actions {
-    grid-column: 2 / 3;
-    align-items: stretch;
-  }
+.state-locked .subtopic-index,
+.state-completed_locked .subtopic-index {
+  color: var(--text-secondary);
+}
 
-  .row-btn {
-    width: 100%;
-  }
+.icon-completed {
+  color: #34c759;
+}
+
+.icon-in-progress {
+  color: #5856d6;
+}
+
+.icon-locked {
+  color: #8e8e93;
+}
+
+.icon-not-started {
+  color: #c7c7cc;
 }
 </style>

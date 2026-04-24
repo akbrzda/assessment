@@ -14,15 +14,11 @@
 
 <script>
 import { computed } from "vue";
-import { Home, ClipboardList, Trophy, User } from "lucide-vue-next";
+import { Home, ClipboardList, BarChart2, User } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
-import UserAvatar from "./UserAvatar.vue";
 
 export default {
   name: "BottomNavigation",
-  components: {
-    UserAvatar,
-  },
   setup() {
     const userStore = useUserStore();
 
@@ -36,14 +32,14 @@ export default {
       {
         name: "assessments",
         to: "/assessments",
-        label: "Аттестации",
+        label: "Курсы",
         icon: ClipboardList,
       },
       {
         name: "leaderboard",
         to: "/leaderboard",
-        label: "Рейтинг",
-        icon: Trophy,
+        label: "Лидерборд",
+        icon: BarChart2,
       },
       {
         name: "profile",
@@ -66,26 +62,24 @@ export default {
   bottom: 0;
   left: 0;
   right: 0;
-  background-color: var(--blur-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background-color: #ffffff;
+  border-top: 1px solid #e5e7eb;
   z-index: 1000;
 }
 
 .bottom-nav-divider {
-  height: 1px;
-  background-color: var(--divider);
+  display: none;
 }
 
 .bottom-nav-content {
   display: flex;
-  height: 56px;
+  height: 60px;
   align-items: stretch;
 }
 
 .platform-mobile .bottom-nav-content {
-  height: 76px;
-  padding-bottom: 16px;
+  height: 78px;
+  padding-bottom: 18px;
 }
 
 .nav-item {
@@ -95,38 +89,34 @@ export default {
   align-items: center;
   justify-content: center;
   text-decoration: none;
-  color: var(--text-secondary);
-  transition: color 0.2s ease;
+  color: #9ca3af;
+  transition: color 0.18s ease;
   padding: 6px 4px;
+  gap: 3px;
 }
 
 .nav-item.active {
-  color: var(--accent-blue);
+  color: #6355f5;
 }
 
 .nav-icon {
-  width: 24px;
-  height: 24px;
-  margin-bottom: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .nav-icon :deep(svg) {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
+}
+
+.nav-item.active .nav-icon :deep(svg) {
+  stroke-width: 2.2;
 }
 
 .nav-label {
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1;
-}
-
-@media (max-width: 480px) {
-  .nav-label {
-    font-size: 9px;
-  }
 }
 </style>
