@@ -1,696 +1,436 @@
 <template>
-  <div class="page-container">
-    <div class="container">
-      <!-- User Avatar and Info -->
-      <div class="profile-header">
-        <div class="avatar-section mb-20">
-          <div class="avatar-large">
-            <img v-if="user?.avatar" :src="user.avatar" :alt="user?.firstName" />
-            <span v-else class="initials">{{ userStore.initials }}</span>
-          </div>
-        </div>
+  <div class="profile-page">
+    <!-- Кнопка настроек -->
+    <button class="settings-btn" @click="handleSettings">
+      <Settings :size="22" />
+    </button>
 
-        <div class="user-info mb-24">
-          <h1 class="title-large mb-8">{{ userStore.fullName }}</h1>
-          <p class="body-medium text-secondary">{{ user?.position }} • {{ getBranchName(user?.branch) }}</p>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="action-buttons mb-24">
-          <button class="btn-icon profile-edit" @click="editProfile">
-            <Pencil />
-          </button>
-        </div>
+    <!-- Шапка профиля -->
+    <div class="profile-header">
+      <div class="avatar-wrap">
+        <img v-if="user?.avatar" :src="user.avatar" :alt="user?.firstName" class="avatar-img" />
+        <span v-else class="avatar-initials">{{ userStore.initials }}</span>
       </div>
 
-      <!-- Level Progress -->
-      <div v-if="overviewReady" class="card mb-12">
-        <h3 class="title-small mb-16">Уровень: {{ user?.level }}</h3>
-
-        <div class="progress-section">
-          <div class="progress-bar mb-8">
-            <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
-          </div>
-
-          <div class="progress-info">
-            <span class="body-small">{{ user?.points }} / {{ user?.nextLevelPoints }} очков</span>
-          </div>
-        </div>
-      </div>
-      <div v-else class="card skeleton-card mb-12">
-        <div class="skeleton-title mb-12"></div>
-        <div class="skeleton-line mb-8"></div>
-        <div class="skeleton-line w-60"></div>
-      </div>
-
-      <!-- Badges -->
-      <div v-if="overviewReady" class="card mb-12">
-        <h3 class="title-small mb-16">Бейджи</h3>
-
-        <div v-if="badges.length" class="badges-grid">
-          <div v-for="badge in badges" :key="badge.id" class="badge-item" :class="{ earned: badge.earned }" @click="showBadgeDetails(badge)">
-            <div class="badge-icon">{{ badge.icon }}</div>
-            <div class="badge-name">{{ badge.name }}</div>
-          </div>
-        </div>
-
-        <div v-else class="empty-state">
-          <p class="body-small text-secondary">Бейджи появятся здесь</p>
-        </div>
-      </div>
-      <div v-else class="card skeleton-card mb-12">
-        <div class="skeleton-title mb-12"></div>
-        <div class="skeleton-badges">
-          <div class="skeleton-badge" v-for="n in 3" :key="n"></div>
-        </div>
-      </div>
-
-      <!-- Statistics -->
-      <div v-if="overviewReady" class="card">
-        <h3 class="title-small mb-16">Статистика</h3>
-
-        <div class="stats-list">
-          <div class="stat-row">
-            <span class="stat-label">Пройдено аттестаций</span>
-            <span class="stat-value">{{ userStats.completed }}</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">Средний балл</span>
-            <span class="stat-value">{{ userStats.averageScore }}%</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">Успешных прохождений</span>
-            <span class="stat-value">{{ userStats.successful }}</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">Место в рейтинге</span>
-            <span class="stat-value">{{ userStats.rank !== null ? "#" + userStats.rank : "—" }}</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">Общее время</span>
-            <span class="stat-value">{{ userStats.totalTime }}</span>
-          </div>
-        </div>
-      </div>
-      <div v-else class="card skeleton-card">
-        <div class="skeleton-title mb-16"></div>
-        <div class="skeleton-line mb-8"></div>
-        <div class="skeleton-line mb-8 w-80"></div>
-        <div class="skeleton-line mb-8 w-70"></div>
-        <div class="skeleton-line mb-8 w-60"></div>
-      </div>
-
-      <!-- Attempt History -->
-      <div class="card mt-12">
-        <h3 class="title-small mb-16">История попыток</h3>
-        <div v-if="historyLoading">
-          <div class="skeleton-line mb-8" v-for="n in 3" :key="n"></div>
-        </div>
-        <div v-else-if="attemptHistory.length" class="attempt-history-list">
-          <div v-for="attempt in attemptHistory" :key="attempt.attemptId" class="attempt-history-item">
-            <div class="attempt-history-title">{{ attempt.assessmentTitle }}</div>
-            <div class="attempt-history-meta">
-              <span class="attempt-history-date">{{ formatDate(attempt.completedAt || attempt.startedAt) }}</span>
-              <span
-                class="attempt-badge"
-                :class="attempt.passed ? 'badge-success' : attempt.status === 'in_progress' ? 'badge-neutral' : 'badge-error'"
-              >
-                {{ attempt.status === "in_progress" ? "В процессе" : attempt.passed ? "Пройдено" : "Не пройдено" }}
-              </span>
-              <span v-if="attempt.scorePercent != null" class="attempt-score">{{ attempt.scorePercent }}%</span>
-            </div>
-          </div>
-        </div>
-        <div v-else class="empty-state">
-          <p class="body-small text-secondary">Попыток ещё не было</p>
-        </div>
-      </div>
+      <h1 class="user-name">{{ userStore.fullName }}</h1>
+      <p class="user-position">{{ user?.position }}</p>
     </div>
 
-    <!-- Edit Profile Modal -->
-    <div v-if="showEditModal" class="modal-overlay" @click="closeEditModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h2 class="title-medium">Редактировать профиль</h2>
-          <button class="btn-icon profile-edit" @click="closeEditModal">
-            <X />
-          </button>
+    <!-- Статистика: skeleton при загрузке -->
+    <div class="stats-row">
+      <template v-if="isStatsLoading">
+        <div class="stat-item">
+          <span class="sk-stat-val"></span>
+          <span class="sk-stat-lbl"></span>
         </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="sk-stat-val"></span>
+          <span class="sk-stat-lbl"></span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="sk-stat-val"></span>
+          <span class="sk-stat-lbl"></span>
+        </div>
+      </template>
+      <template v-else>
+        <div class="stat-item">
+          <span class="stat-value">{{ statsData.courses }}</span>
+          <span class="stat-label">Курсы</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="stat-value">{{ statsData.completed }}</span>
+          <span class="stat-label">Завершено</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="stat-value">{{ statsData.certificates }}</span>
+          <span class="stat-label">Сертификаты</span>
+        </div>
+      </template>
+    </div>
 
-        <form @submit.prevent="saveProfile" class="modal-body">
-          <div class="form-group">
-            <label class="form-label">Имя</label>
-            <input v-model="editForm.firstName" type="text" class="form-input" required />
-          </div>
+    <!-- Меню -->
+    <div class="menu-card">
+      <button class="menu-item" @click="handleAchievements">
+        <span class="menu-icon-wrap">
+          <Star :size="20" class="menu-icon" />
+        </span>
+        <span class="menu-label">Мои достижения</span>
+        <ChevronRight :size="18" class="menu-chevron" />
+      </button>
 
-          <div class="form-group">
-            <label class="form-label">Фамилия</label>
-            <input v-model="editForm.lastName" type="text" class="form-input" required />
-          </div>
+      <div class="menu-divider"></div>
 
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary btn-full" :disabled="isLoading || !hasChanges">
-              {{ isLoading ? "Сохранение..." : "Сохранить" }}
-            </button>
-          </div>
-        </form>
-      </div>
+      <button class="menu-item" @click="handleHistory">
+        <span class="menu-icon-wrap">
+          <Clock :size="20" class="menu-icon" />
+        </span>
+        <span class="menu-label">История обучения</span>
+        <ChevronRight :size="18" class="menu-chevron" />
+      </button>
+
+      <div class="menu-divider"></div>
+
+      <button class="menu-item" @click="handleCertificates">
+        <span class="menu-icon-wrap">
+          <Award :size="20" class="menu-icon" />
+        </span>
+        <span class="menu-label">Сертификаты</span>
+        <ChevronRight :size="18" class="menu-chevron" />
+      </button>
+
+      <div class="menu-divider"></div>
+
+      <button class="menu-item" @click="handleSettings">
+        <span class="menu-icon-wrap">
+          <Settings :size="20" class="menu-icon" />
+        </span>
+        <span class="menu-label">Настройки</span>
+        <ChevronRight :size="18" class="menu-chevron" />
+      </button>
+
+      <div class="menu-divider"></div>
+
+      <button class="menu-item menu-item--logout" @click="handleLogout">
+        <span class="menu-icon-wrap menu-icon-wrap--logout">
+          <LogOut :size="20" class="menu-icon menu-icon--logout" />
+        </span>
+        <span class="menu-label menu-label--logout">Выйти</span>
+        <ChevronRight :size="18" class="menu-chevron" />
+      </button>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, reactive, onMounted } from "vue";
-import { Pencil, X } from "lucide-vue-next";
+import { ref, computed, onMounted } from "vue";
+import { Settings, Star, Clock, Award, LogOut, ChevronRight } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
+import { useRouter } from "vue-router";
 import { apiClient } from "../services/apiClient";
 
 export default {
   name: "ProfileView",
   components: {
-    Pencil,
-    X,
+    Settings,
+    Star,
+    Clock,
+    Award,
+    LogOut,
+    ChevronRight,
   },
   setup() {
     const userStore = useUserStore();
     const telegramStore = useTelegramStore();
+    const router = useRouter();
 
     const user = computed(() => userStore.user);
-    const isLoading = computed(() => userStore.isLoading);
-    const overviewReady = computed(() => Boolean(userStore.overview) && !userStore.overviewLoading);
 
-    const showEditModal = ref(false);
-    const badges = ref([]);
-    const userStats = ref({
+    const isStatsLoading = ref(true);
+    const statsData = ref({
+      courses: 0,
       completed: 0,
-      averageScore: 0,
-      successful: 0,
-      rank: null,
-      totalTime: "--:--",
+      certificates: 0,
     });
 
-    const editForm = reactive({
-      firstName: "",
-      lastName: "",
-    });
-
-    const progressPercentage = computed(() => {
-      if (!user.value) return 0;
-      return Math.min((user.value.points / user.value.nextLevelPoints) * 100, 100);
-    });
-
-    const hasChanges = computed(() => {
-      return editForm.firstName !== user.value?.firstName || editForm.lastName !== user.value?.lastName;
-    });
-
-    function getBranchName(branch) {
-      return branch || "—";
-    }
-
-    function editProfile() {
-      editForm.firstName = user.value?.firstName || "";
-      editForm.lastName = user.value?.lastName || "";
-      showEditModal.value = true;
-      telegramStore.hapticFeedback("impact", "light");
-    }
-
-    function closeEditModal() {
-      showEditModal.value = false;
-    }
-
-    async function saveProfile() {
-      const result = await userStore.updateProfile({
-        firstName: editForm.firstName,
-        lastName: editForm.lastName,
-      });
-
-      if (result.success) {
-        telegramStore.hapticFeedback("notification", "success");
-        telegramStore.showAlert("Профиль обновлён!");
-        showEditModal.value = false;
-      } else {
-        telegramStore.hapticFeedback("notification", "error");
-        telegramStore.showAlert(result.error || "Ошибка сохранения");
-      }
-    }
-
-    function showBadgeDetails(badge) {
-      telegramStore.hapticFeedback("impact", "light");
-      const message = badge.earned
-        ? `Бейдж "${badge.name}" получен!\n\n${badge.description}`
-        : `Бейдж "${badge.name}"\n\n${badge.description}\n\nТребования: ${badge.requirements}`;
-
-      telegramStore.showAlert(message);
-    }
-
-    function formatDuration(seconds) {
-      if (!Number.isFinite(seconds) || seconds <= 0) {
-        return "--:--";
-      }
-      const hours = Math.floor(seconds / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      if (hours > 0) {
-        return `${hours}ч ${minutes}м`;
-      }
-      const secs = seconds % 60;
-      return `${minutes}:${String(secs).padStart(2, "0")}`;
-    }
-
-    async function loadProfileData() {
-      if (!userStore.isInitialized) {
-        await userStore.ensureStatus();
-      }
-
-      const leaderboardPromise = apiClient.getLeaderboardUsers().catch((error) => {
-        console.warn("Не удалось получить лидерборд", error);
-        return null;
-      });
-
-      const [overviewResponse, assessmentsResponse, leaderboard] = await Promise.all([
-        userStore.loadOverview(),
-        apiClient.listUserAssessments(),
-        leaderboardPromise,
-      ]);
-
-      const overview = overviewResponse || userStore.overview;
-
-      badges.value = Array.isArray(overview?.badges)
-        ? overview.badges.map((badge) => ({
-            id: badge.code,
-            name: badge.name,
-            icon: badge.icon || "",
-            earned: Boolean(badge.earned),
-            description: badge.description,
-            requirements: badge.description,
-          }))
-        : [];
-
+    async function loadStats() {
+      isStatsLoading.value = true;
       try {
-        const normalized = (assessmentsResponse?.assessments || []).map((item) => {
-          const threshold = Number.isFinite(item.passScorePercent) ? Number(item.passScorePercent) : null;
-          const bestScore = Number.isFinite(item.bestScorePercent) ? Number(item.bestScorePercent) : null;
-          const passed = bestScore != null && threshold != null ? bestScore >= threshold : false;
-          const lastCompletedAt = item.lastCompletedAt || null;
-          return {
-            id: item.id,
-            bestScore,
-            passed,
-            lastCompletedAt,
-          };
-        });
-
-        const completed = normalized.filter((item) => item.bestScore != null).length;
-        const successful = normalized.filter((item) => item.passed).length;
-        const averageScore = completed ? Math.round(normalized.reduce((total, item) => total + (item.bestScore || 0), 0) / completed) : 0;
-
-        let userRank = "—";
-        if (leaderboard?.currentUser?.rank) {
-          userRank = Number(leaderboard.currentUser.rank);
+        if (!userStore.isInitialized) {
+          await userStore.ensureStatus();
         }
 
-        userStats.value = {
+        const [coursesResponse, overviewResponse] = await Promise.all([
+          apiClient.listCourses().catch(() => null),
+          userStore.loadOverview().catch(() => null),
+        ]);
+
+        const coursesList = coursesResponse?.courses || [];
+        const total = coursesList.length;
+        const completed = coursesList.filter((c) => c.progress?.status === "completed").length;
+
+        const overview = overviewResponse || userStore.overview;
+        const badges = Array.isArray(overview?.badges) ? overview.badges : [];
+        const earnedBadges = badges.filter((b) => b.earned).length;
+
+        statsData.value = {
+          courses: total,
           completed,
-          averageScore,
-          successful,
-          rank: typeof userRank === "number" ? userRank : null,
-          totalTime: "--:--",
+          certificates: earnedBadges,
         };
       } catch (error) {
-        console.warn("Не удалось загрузить статистику аттестаций", error);
+        console.warn("Не удалось загрузить статистику профиля", error);
+      } finally {
+        isStatsLoading.value = false;
       }
+    }
+
+    function handleAchievements() {
+      telegramStore.hapticFeedback("impact", "light");
+      telegramStore.showAlert("Раздел «Мои достижения» будет доступен в следующем обновлении");
+    }
+
+    function handleHistory() {
+      telegramStore.hapticFeedback("impact", "light");
+      router.push("/assessments");
+    }
+
+    function handleCertificates() {
+      telegramStore.hapticFeedback("impact", "light");
+      telegramStore.showAlert("Раздел «Сертификаты» будет доступен в следующем обновлении");
+    }
+
+    function handleSettings() {
+      telegramStore.hapticFeedback("impact", "light");
+      telegramStore.showAlert("Раздел «Настройки» будет доступен в следующем обновлении");
+    }
+
+    async function handleLogout() {
+      telegramStore.hapticFeedback("impact", "medium");
+      userStore.logout();
+      router.push("/invitation");
     }
 
     onMounted(() => {
-      loadProfileData();
-      loadAttemptHistory();
+      loadStats();
     });
-
-    const attemptHistory = ref([]);
-    const historyLoading = ref(false);
-
-    async function loadAttemptHistory() {
-      historyLoading.value = true;
-      try {
-        const res = await apiClient.getUserAttemptHistory({ limit: 10 });
-        attemptHistory.value = res?.attempts || [];
-      } catch {
-        attemptHistory.value = [];
-      } finally {
-        historyLoading.value = false;
-      }
-    }
-
-    function formatDate(dateStr) {
-      if (!dateStr) return "";
-      return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", year: "numeric" }).format(new Date(dateStr));
-    }
 
     return {
       userStore,
       user,
-      isLoading,
-      overviewReady,
-      showEditModal,
-      badges,
-      userStats,
-      editForm,
-      progressPercentage,
-      hasChanges,
-      getBranchName,
-      editProfile,
-      closeEditModal,
-      saveProfile,
-      showBadgeDetails,
-      attemptHistory,
-      historyLoading,
-      formatDate,
+      statsData,
+      isStatsLoading,
+      handleAchievements,
+      handleHistory,
+      handleCertificates,
+      handleSettings,
+      handleLogout,
     };
   },
 };
 </script>
 
 <style scoped>
-.profile-header {
-  text-align: center;
-  padding-top: 6px;
+.profile-page {
+  min-height: 100vh;
+  background-color: var(--bg-secondary);
+  padding-bottom: 80px;
+  position: relative;
 }
 
-.avatar-section {
-  display: flex;
-  justify-content: center;
-}
-
-.avatar-large {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  background-color: var(--accent-blue);
+.settings-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-weight: 700;
-  font-size: 32px;
-  overflow: hidden;
-}
-.profile-edit {
-  background: var(--bg-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-radius: 50%;
+  transition: background-color 0.15s ease;
+  z-index: 1;
 }
 
-.avatar-large img {
+.settings-btn:active {
+  background-color: var(--divider);
+}
+
+.profile-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 24px 28px;
+  background-color: var(--bg-primary);
+}
+
+.avatar-wrap {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background-color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.avatar-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.action-buttons {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
+.avatar-initials {
+  font-size: 34px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -1px;
 }
 
-.progress-section {
-  background-color: var(--bg-primary);
-  padding: 16px;
-  border-radius: 12px;
-}
-
-.badges-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-
-.badge-item {
-  padding: 16px 12px;
-  background-color: var(--bg-primary);
-  border-radius: 12px;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  opacity: 0.4;
-  border: 1px solid var(--divider);
-}
-
-.badge-item.earned {
-  opacity: 1;
-  transform: scale(1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border-color: transparent;
-}
-
-.badge-item.earned:nth-child(1) {
-  background: linear-gradient(135deg, #ffd700, #ffa500);
-}
-.badge-item.earned:nth-child(2) {
-  background: linear-gradient(135deg, #ff6b6b, #ee5a24);
-}
-.badge-item.earned:nth-child(3) {
-  background: linear-gradient(135deg, #a855f7, #7c3aed);
-}
-.badge-item.earned:nth-child(4) {
-  background: linear-gradient(135deg, #06b6d4, #0891b2);
-}
-.badge-item.earned:nth-child(5) {
-  background: linear-gradient(135deg, #10b981, #059669);
-}
-.badge-item.earned:nth-child(6) {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-}
-
-.badge-item:hover {
-  transform: translateY(-2px) scale(1.05);
-}
-
-.badge-item.earned:hover {
-  transform: translateY(-3px) scale(1.05);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-}
-
-.badge-icon {
-  font-size: 28px;
-  margin-bottom: 8px;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
-}
-
-.badge-item.earned .badge-icon {
-  filter: drop-shadow(0 2px 4px rgba(255, 255, 255, 0.3));
-}
-
-.badge-name {
-  font-size: 12px;
-  font-weight: 600;
+.user-name {
+  font-size: 22px;
+  font-weight: 700;
   color: var(--text-primary);
+  margin-bottom: 6px;
+  text-align: center;
+  line-height: 1.25;
 }
 
-.badge-item.earned .badge-name {
-  color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-.stats-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.stat-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--divider);
-}
-
-.stat-row:last-child {
-  border-bottom: none;
-}
-
-.stat-label {
+.user-position {
   font-size: 14px;
   color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.4;
+}
+
+.stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-primary);
+  padding: 20px 0 24px;
+  gap: 0;
+  border-top: 1px solid var(--divider);
+  margin-bottom: 16px;
+}
+
+.stat-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
 .stat-value {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--accent-blue);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
 }
 
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: flex-end;
-  z-index: 1000;
+.stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.3;
 }
 
-.modal-content {
-  width: 100%;
-  max-height: 70vh;
+.stat-divider {
+  width: 1px;
+  height: 36px;
+  background-color: var(--divider);
+  flex-shrink: 0;
+}
+
+.menu-card {
   background-color: var(--bg-primary);
-  border-radius: 16px 16px 0 0;
+  border-radius: 16px;
+  margin: 0 16px;
   overflow: hidden;
-  margin-bottom: 76px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
-.modal-header {
+.menu-item {
+  width: 100%;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid var(--divider);
+  gap: 14px;
+  padding: 16px 20px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
 }
 
-.modal-body {
-  padding: 20px;
-  max-height: calc(70vh - 80px);
-  overflow-y: auto;
+.menu-item:active {
+  background-color: var(--bg-secondary);
 }
 
-.empty-state {
-  padding: 20px 0;
-  text-align: center;
+.menu-icon-wrap {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background-color: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.text-secondary {
+.menu-icon {
   color: var(--text-secondary);
 }
 
-.skeleton-card {
-  position: relative;
-  overflow: hidden;
+.menu-label {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text-primary);
+  line-height: 1.4;
 }
 
-.skeleton-title,
-.skeleton-line,
-.skeleton-badge {
-  display: block;
-  border-radius: 12px;
-  background: linear-gradient(90deg, rgba(148, 163, 184, 0.2), rgba(148, 163, 184, 0.35), rgba(148, 163, 184, 0.2));
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
+.menu-chevron {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  opacity: 0.5;
 }
 
-.skeleton-title {
-  height: 20px;
-  width: 50%;
+.menu-divider {
+  height: 1px;
+  background-color: var(--divider);
+  margin-left: 68px;
 }
 
-.skeleton-line {
-  height: 14px;
-  width: 100%;
+.menu-icon-wrap--logout {
+  background-color: rgba(255, 59, 48, 0.1);
 }
 
-.skeleton-badges {
-  display: flex;
-  gap: 12px;
+.menu-icon--logout {
+  color: var(--error);
 }
 
-.skeleton-badge {
-  width: 70px;
-  height: 70px;
-  border-radius: 16px;
+.menu-label--logout {
+  color: var(--error);
 }
 
-.w-60 {
-  width: 60%;
-}
-
-.w-70 {
-  width: 70%;
-}
-
-.w-80 {
-  width: 80%;
-}
-
-@keyframes shimmer {
+/* ── Skeleton статистики ── */
+@keyframes sk-shimmer {
   0% {
-    background-position: 200% 0;
+    background-position: -300px 0;
   }
   100% {
-    background-position: -200% 0;
+    background-position: 300px 0;
   }
 }
 
-@media (max-width: 480px) {
-  .badges-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-  }
-
-  .badge-item {
-    padding: 12px 8px;
-  }
-
-  .badge-icon {
-    font-size: 20px;
-    margin-bottom: 6px;
-  }
-
-  .badge-name {
-    font-size: 11px;
-  }
+.sk-stat-val,
+.sk-stat-lbl {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--divider) 50%, var(--bg-secondary) 75%);
+  background-size: 600px 100%;
+  animation: sk-shimmer 1.4s infinite linear;
 }
 
-@media (min-width: 768px) {
-  .modal-overlay {
-    align-items: center;
-    justify-content: center;
-  }
-
-  .modal-content {
-    width: 400px;
-    max-height: 600px;
-    border-radius: 16px;
-    margin-bottom: 76px;
-  }
-}
-
-.attempt-history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.attempt-history-item {
-  padding: 12px;
-  background: var(--bg-secondary);
-  border-radius: 8px;
-}
-
-.attempt-history-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
+.sk-stat-val {
+  width: 36px;
+  height: 22px;
   margin-bottom: 6px;
 }
 
-.attempt-history-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.attempt-history-date {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.attempt-score {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent-blue);
-}
-
-.mt-12 {
-  margin-top: 12px;
+.sk-stat-lbl {
+  width: 48px;
+  height: 12px;
 }
 </style>

@@ -39,6 +39,15 @@ function parseList(value) {
 
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
+  telegramInitDataBypass:
+    (process.env.TELEGRAM_INITDATA_BYPASS || "").toLowerCase() === "true" &&
+    (process.env.NODE_ENV || "development") !== "production",
+  telegramBypassUser: {
+    id: String(process.env.TELEGRAM_BYPASS_USER_ID || "999000001"),
+    firstName: process.env.TELEGRAM_BYPASS_FIRST_NAME || "Dev",
+    lastName: process.env.TELEGRAM_BYPASS_LAST_NAME || "Tester",
+    username: process.env.TELEGRAM_BYPASS_USERNAME || "dev_tester",
+  },
   port: Number(process.env.PORT || 3001),
   db: {
     host: process.env.DB_HOST,

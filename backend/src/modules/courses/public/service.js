@@ -192,6 +192,20 @@ async function completeTopic({ courseId, topicId, userId }) {
       topicOrderIndex: topic.orderIndex,
     });
 
+    const topicsCheck = await progressRepo.areAllTopicsCompletedBySection({ sectionId: topic.sectionId, userId }, { connection });
+    if (topicsCheck.allCompleted) {
+      await progressRepo.upsertSectionProgress({
+        courseId,
+        sectionId: topic.sectionId,
+        userId,
+        status: "passed",
+        attemptId: null,
+        scorePercent: 0,
+        attemptNumber: 0,
+        connection,
+      });
+    }
+
     const aggregate = await progressRepo.getCourseProgressAggregate({ courseId, userId, connection });
     await progressRepo.syncCourseProgress({ courseId, userId, aggregate, connection });
 

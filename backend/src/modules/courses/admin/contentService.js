@@ -1,6 +1,7 @@
 const { pool } = require("../../../config/database");
 const coursesRepo = require("../courses.repository");
 const mutationsRepo = require("../coursesMutations.repository");
+const progressRepo = require("../courseProgress.repository");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
 
 function ensureCourseEditable(courseStatus) {
@@ -9,6 +10,13 @@ function ensureCourseEditable(courseStatus) {
     error.status = 409;
     throw error;
   }
+}
+
+async function recalculateProgressIfPublished(courseId, isPublished, connection) {
+  if (!isPublished) {
+    return;
+  }
+  await progressRepo.recalculateCourseProgressForAllUsers({ courseId, connection });
 }
 
 // ─── Разделы ────────────────────────────────────────────────────────────────
@@ -28,6 +36,7 @@ async function createSection(courseId, payload, userId, req) {
     if (payload.orderIndex) await mutationsRepo.shiftSectionsUp(courseId, orderIndex, connection);
     const sectionId = await mutationsRepo.insertSection(courseId, { ...payload, orderIndex }, connection);
     await mutationsRepo.touchCourse(courseId, userId, course.status === "published", connection);
+    await recalculateProgressIfPublished(courseId, course.status === "published", connection);
     await connection.commit();
 
     const sections = await coursesRepo.listSectionsByCourseId(courseId);
@@ -72,6 +81,7 @@ async function updateSection(sectionId, payload, userId, req) {
     }
     await mutationsRepo.updateSectionFields(sectionId, payload, connection);
     await mutationsRepo.touchCourse(section.courseId, userId, section.courseStatus === "published", connection);
+    await recalculateProgressIfPublished(section.courseId, section.courseStatus === "published", connection);
     await connection.commit();
 
     const sections = await coursesRepo.listSectionsByCourseId(section.courseId);
@@ -109,6 +119,7 @@ async function deleteSection(sectionId, userId, req) {
     await mutationsRepo.deleteSectionById(sectionId, connection);
     await mutationsRepo.compactSectionOrder(section.courseId, section.orderIndex, connection);
     await mutationsRepo.touchCourse(section.courseId, userId, section.courseStatus === "published", connection);
+    await recalculateProgressIfPublished(section.courseId, section.courseStatus === "published", connection);
     await connection.commit();
 
     const updatedCourse = await coursesRepo.getCourseByIdForAdmin(section.courseId);
@@ -147,6 +158,7 @@ async function createTopic(sectionId, payload, userId, req) {
     if (payload.orderIndex) await mutationsRepo.shiftTopicsUp(sectionId, orderIndex, connection);
     const topicId = await mutationsRepo.insertTopic(sectionId, section.courseId, { ...payload, orderIndex }, connection);
     await mutationsRepo.touchCourse(section.courseId, userId, section.courseStatus === "published", connection);
+    await recalculateProgressIfPublished(section.courseId, section.courseStatus === "published", connection);
     await connection.commit();
 
     const topics = await coursesRepo.listTopicsBySectionId(sectionId);
@@ -286,6 +298,7 @@ async function updateTopic(topicId, payload, userId, req) {
     }
     await mutationsRepo.updateTopicFields(topicId, payload, connection);
     await mutationsRepo.touchCourse(topic.courseId, userId, topic.courseStatus === "published", connection);
+    await recalculateProgressIfPublished(topic.courseId, topic.courseStatus === "published", connection);
     await connection.commit();
 
     const topics = await coursesRepo.listTopicsBySectionId(topic.sectionId);
@@ -323,6 +336,7 @@ async function deleteTopic(topicId, userId, req) {
     await mutationsRepo.deleteTopicById(topicId, connection);
     await mutationsRepo.compactTopicOrder(topic.sectionId, topic.orderIndex, connection);
     await mutationsRepo.touchCourse(topic.courseId, userId, topic.courseStatus === "published", connection);
+    await recalculateProgressIfPublished(topic.courseId, topic.courseStatus === "published", connection);
     await connection.commit();
 
     const updatedCourse = await coursesRepo.getCourseByIdForAdmin(topic.courseId);

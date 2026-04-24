@@ -1,13 +1,17 @@
 <template>
   <div class="container assessment-process">
-    <!-- Header with Timer -->
+    <!-- Badge + Title -->
     <div class="assessment-header">
       <div class="wrapper">
-        <div class="header-content">
+        <span class="assessment-badge">Аттестация</span>
+        <div class="assessment-title-row">
           <h1 class="assessment-title">{{ assessment?.title }}</h1>
-          <div class="timer" :class="{ warning: timeRemaining < 300, 'half-warning': halfTimePassed && timeRemaining >= 300 }">
-            {{ formatTime(timeRemaining) }}
-          </div>
+          <span
+            v-if="assessment?.timeLimitSeconds"
+            class="assessment-timer"
+            :class="{ 'timer-warning': timeRemaining <= 300 && timeRemaining > 0, 'timer-half': halfTimePassed && timeRemaining > 300 }"
+            >{{ formatTime(timeRemaining) }}</span
+          >
         </div>
       </div>
     </div>
@@ -17,6 +21,7 @@
       <div class="wrapper">
         <div class="progress-info">
           <span class="question-counter">Вопрос {{ currentQuestionIndex + 1 }} из {{ questions.length }}</span>
+          <span class="progress-percent">{{ Math.round(progressPercentage) }}%</span>
         </div>
         <div class="progress-bar">
           <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
@@ -86,7 +91,7 @@
 
           <div v-else class="answers-list" :class="{ multiple: isMultiChoice(currentQuestion.questionType) }">
             <label
-              v-for="answer in currentQuestion.answers"
+              v-for="(answer, answerIndex) in currentQuestion.answers"
               :key="answer.id"
               class="answer-option"
               :class="{
@@ -108,7 +113,7 @@
                 :checked="selectedAnswer === answer.id"
                 style="display: none"
               />
-              <div class="indicator" :class="{ checkbox: isMultiChoice(currentQuestion.questionType) }"></div>
+              <div class="answer-letter">{{ String.fromCharCode(65 + answerIndex) }}</div>
               <span class="answer-text">{{ answer.text }}</span>
             </label>
           </div>
@@ -126,31 +131,13 @@
       <div class="nav-buttons" v-if="currentQuestion">
         <button
           v-if="currentQuestionIndex < questions.length - 1"
-          class="btn btn-primary btn-full"
+          class="btn btn-primary btn-next"
           :disabled="!canProceedCurrent || isSaving"
           @click="nextQuestion"
         >
           Далее
         </button>
-
-        <button v-else class="btn btn-primary btn-full" :disabled="!canProceedCurrent || isSaving" @click="showFinishConfirmation">Завершить</button>
-      </div>
-    </div>
-
-    <!-- Question Dots -->
-    <div class="dots-section" v-if="!awaitingStart && questions.length > 0">
-      <div class="question-dots">
-        <div
-          v-for="(question, index) in questions"
-          :key="question.id"
-          class="question-dot"
-          :class="{
-            current: index === currentQuestionIndex,
-            answered: userAnswers[index] !== undefined,
-          }"
-          @click="navigateToQuestion(index)"
-          :title="`Вопрос ${index + 1}`"
-        ></div>
+        <button v-else class="btn btn-primary btn-next" :disabled="!canProceedCurrent || isSaving" @click="showFinishConfirmation">Завершить</button>
       </div>
     </div>
   </div>
@@ -667,6 +654,17 @@ export default {
       telegramStore.hapticFeedback("impact", "light");
     }
 
+    function goBack() {
+      if (currentQuestionIndex.value > 0) {
+        syncCurrentAnswer();
+        currentQuestionIndex.value -= 1;
+        applyStoredAnswer(currentQuestionIndex.value);
+        telegramStore.hapticFeedback("impact", "light");
+      } else {
+        handleEarlyExit();
+      }
+    }
+
     function showFinishConfirmation() {
       if (isSaving.value) {
         return;
@@ -1168,6 +1166,7 @@ export default {
       startAttempt,
       awaitingStart,
       isSaving,
+      goBack,
     };
   },
 };
@@ -1185,60 +1184,59 @@ export default {
 .assessment-header {
   flex-shrink: 0;
   background-color: var(--bg-primary);
-  border-bottom: 1px solid var(--divider);
-  backdrop-filter: blur(10px);
 }
 
-.header-content {
+.assessment-badge {
+  display: inline-block;
+  background-color: rgba(0, 136, 204, 0.1);
+  color: var(--accent-blue);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+
+.assessment-title-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  max-width: 768px;
-  margin: 0 auto;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .assessment-title {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 28px;
+  font-weight: 700;
   margin: 0;
+  color: var(--text-primary);
   flex: 1;
-  margin-right: 16px;
 }
 
-.timer {
-  background-color: var(--accent-blue);
-  color: white;
-  padding: 8px 12px;
-  border-radius: 12px;
-  font-size: 14px;
+.assessment-timer {
+  font-size: 20px;
   font-weight: 600;
-  min-width: 60px;
-  text-align: center;
-  transition: all 0.3s ease;
+  color: var(--text-primary);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
-.timer.warning {
-  background-color: var(--error);
-  animation: pulse 1s infinite;
+.assessment-timer.timer-half {
+  color: var(--warning, #f59e0b);
 }
 
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
+.assessment-timer.timer-warning {
+  color: var(--error, #ef4444);
 }
 
 .progress-section {
   flex-shrink: 0;
   background-color: var(--bg-primary);
-  border-bottom: 1px solid var(--divider);
 }
 
 .progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
   max-width: 768px;
   margin-left: auto;
@@ -1247,6 +1245,12 @@ export default {
 
 .question-counter {
   font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.progress-percent {
+  font-size: 14px;
+  font-weight: 500;
   color: var(--text-secondary);
 }
 
@@ -1281,10 +1285,10 @@ export default {
 }
 
 .question-text {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1.4;
-  margin: 0 0 24px 0;
+  margin: 0 0 20px;
   color: var(--text-primary);
 }
 
@@ -1391,27 +1395,47 @@ export default {
 .answer-option {
   position: relative;
   display: flex;
-  align-items: flex-start;
-  padding: 16px 20px;
+  align-items: center;
+  padding: 14px 16px;
   background-color: var(--bg-secondary);
   border: 2px solid var(--divider);
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
-  gap: 8px;
+  gap: 12px;
   user-select: none;
 }
 
 .answer-option:hover {
-  border-color: var(--accent-blue);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 136, 204, 0.1);
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(123, 111, 255, 0.12);
 }
 
 .answer-option.selected {
-  border-color: var(--accent-blue);
-  background-color: rgba(0, 136, 204, 0.05);
-  box-shadow: 0 4px 12px rgba(0, 136, 204, 0.15);
+  border-color: var(--accent);
+  background-color: var(--accent-bg);
+}
+
+.answer-letter {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background-color: var(--bg-primary);
+  border: 1.5px solid var(--divider);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.answer-option.selected .answer-letter {
+  background-color: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .answer-text {
@@ -1423,40 +1447,6 @@ export default {
 
 .answers-list.multiple .answer-option {
   align-items: center;
-}
-
-.indicator {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--divider);
-  border-radius: 50%;
-  position: relative;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.indicator.checkbox {
-  border-radius: 6px;
-}
-
-.answer-option.selected .indicator {
-  border-color: var(--accent-blue);
-}
-
-.answer-option.selected .indicator::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 12px;
-  height: 12px;
-  background-color: var(--accent-blue);
-  border-radius: 50%;
-}
-
-.indicator.checkbox::after {
-  border-radius: 4px;
 }
 
 .text-answer-block {
@@ -1494,14 +1484,20 @@ export default {
 .navigation-section {
   flex-shrink: 0;
   background-color: var(--bg-primary);
-  border-top: 1px solid var(--divider);
-  padding: 16px;
-  backdrop-filter: blur(10px);
+  padding: 12px 16px 20px;
 }
 
 .nav-buttons {
   max-width: 768px;
   margin: 0 auto;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.btn-next {
+  flex: 1;
+  border-radius: 16px;
 }
 
 .dots-section {
@@ -1577,10 +1573,6 @@ export default {
   background-color: var(--success);
 }
 
-.timer.half-warning {
-  color: var(--warning, #f59e0b);
-}
-
 .text-warning {
   color: var(--warning, #ff9500) !important;
 }
@@ -1617,13 +1609,7 @@ export default {
 
 @media (max-width: 480px) {
   .assessment-title {
-    font-size: 16px;
-  }
-
-  .timer {
-    font-size: 13px;
-    padding: 6px 10px;
-    min-width: 55px;
+    font-size: 24px;
   }
 
   .question-text {

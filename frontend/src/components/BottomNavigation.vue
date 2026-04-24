@@ -62,8 +62,8 @@ export default {
   bottom: 0;
   left: 0;
   right: 0;
-  background-color: #ffffff;
-  border-top: 1px solid #e5e7eb;
+  background-color: var(--bg-primary);
+  border-top: 1px solid var(--divider);
   z-index: 1000;
 }
 
@@ -89,14 +89,14 @@ export default {
   align-items: center;
   justify-content: center;
   text-decoration: none;
-  color: #9ca3af;
+  color: var(--text-secondary);
   transition: color 0.18s ease;
   padding: 6px 4px;
   gap: 3px;
 }
 
 .nav-item.active {
-  color: #6355f5;
+  color: var(--accent);
 }
 
 .nav-icon {

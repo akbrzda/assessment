@@ -234,7 +234,7 @@ async function upsertSectionProgress({ courseId, sectionId, userId, status, atte
       (course_id, section_id, user_id, status, last_attempt_id, best_score_percent, attempt_count, started_at, completed_at, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), IF(? = 'passed', UTC_TIMESTAMP(), NULL), UTC_TIMESTAMP(), UTC_TIMESTAMP())
      ON DUPLICATE KEY UPDATE
-       status = VALUES(status),
+       status = IF(status = 'passed', status, VALUES(status)),
        last_attempt_id = VALUES(last_attempt_id),
        best_score_percent = GREATEST(IFNULL(best_score_percent, 0), VALUES(best_score_percent)),
        attempt_count = GREATEST(IFNULL(attempt_count, 0), VALUES(attempt_count)),
@@ -374,6 +374,100 @@ async function getCourseProgressStatus({ courseId, userId, connection }) {
 
 // --- Административные запросы прогресса -------------------------------------
 
+async function recalculateCourseProgressForAllUsers({ courseId, connection }) {
+  const executor = connection || pool;
+
+  await executor.execute(
+    `UPDATE course_section_user_progress csup
+        JOIN course_sections cs ON cs.id = csup.section_id
+        LEFT JOIN (
+          SELECT ct.section_id,
+                 ctup.user_id,
+                 SUM(CASE WHEN ct.is_required = 1 THEN 1 ELSE 0 END) AS total_required_topics,
+                 SUM(CASE WHEN ct.is_required = 1 AND ctup.status = 'completed' THEN 1 ELSE 0 END) AS completed_required_topics
+            FROM course_topics ct
+            LEFT JOIN course_topic_user_progress ctup ON ctup.topic_id = ct.id
+           WHERE ct.course_id = ?
+           GROUP BY ct.section_id, ctup.user_id
+        ) topic_agg ON topic_agg.section_id = csup.section_id AND topic_agg.user_id = csup.user_id
+       SET csup.status = CASE
+                           WHEN csup.status = 'passed'
+                            AND COALESCE(topic_agg.completed_required_topics, 0) < COALESCE(topic_agg.total_required_topics, 0)
+                           THEN 'in_progress'
+                           ELSE csup.status
+                         END,
+           csup.completed_at = CASE
+                                 WHEN csup.status = 'passed'
+                                  AND COALESCE(topic_agg.completed_required_topics, 0) < COALESCE(topic_agg.total_required_topics, 0)
+                                 THEN NULL
+                                 ELSE csup.completed_at
+                               END,
+           csup.updated_at = UTC_TIMESTAMP()
+      WHERE csup.course_id = ?
+        AND cs.course_id = ?`,
+    [courseId, courseId, courseId],
+  );
+
+  await executor.execute(
+    `UPDATE course_user_progress cup
+        JOIN (
+          SELECT cup_inner.user_id,
+                 COUNT(CASE WHEN cs.is_required = 1 THEN 1 END) AS total_required_sections,
+                 COUNT(
+                   CASE
+                     WHEN cs.is_required = 1
+                      AND csup.status = 'passed'
+                      AND COALESCE(topic_agg.completed_required_topics, 0) = COALESCE(topic_agg.total_required_topics, 0)
+                     THEN 1
+                   END
+                 ) AS passed_required_sections
+            FROM course_user_progress cup_inner
+            JOIN course_sections cs ON cs.course_id = cup_inner.course_id
+            LEFT JOIN course_section_user_progress csup ON csup.section_id = cs.id AND csup.user_id = cup_inner.user_id
+            LEFT JOIN (
+              SELECT ct.section_id,
+                     ctup.user_id,
+                     SUM(CASE WHEN ct.is_required = 1 THEN 1 ELSE 0 END) AS total_required_topics,
+                     SUM(CASE WHEN ct.is_required = 1 AND ctup.status = 'completed' THEN 1 ELSE 0 END) AS completed_required_topics
+                FROM course_topics ct
+                LEFT JOIN course_topic_user_progress ctup ON ctup.topic_id = ct.id
+               WHERE ct.course_id = ?
+               GROUP BY ct.section_id, ctup.user_id
+            ) topic_agg ON topic_agg.section_id = cs.id AND topic_agg.user_id = cup_inner.user_id
+           WHERE cup_inner.course_id = ?
+           GROUP BY cup_inner.user_id
+        ) agg ON agg.user_id = cup.user_id
+       SET cup.total_modules_count = agg.total_required_sections,
+           cup.completed_modules_count = agg.passed_required_sections,
+           cup.progress_percent = CASE
+                                    WHEN agg.total_required_sections > 0
+                                    THEN ROUND((agg.passed_required_sections / agg.total_required_sections) * 100, 2)
+                                    ELSE 0
+                                  END,
+           cup.status = CASE
+                          WHEN cup.status = 'closed' THEN 'closed'
+                          WHEN cup.status = 'completed'
+                           AND agg.total_required_sections > 0
+                           AND agg.passed_required_sections = agg.total_required_sections
+                          THEN 'completed'
+                          WHEN agg.passed_required_sections > 0 THEN 'in_progress'
+                          ELSE 'not_started'
+                        END,
+           cup.completed_at = CASE
+                                WHEN cup.status = 'closed' THEN cup.completed_at
+                                WHEN cup.status = 'completed'
+                                 AND agg.total_required_sections > 0
+                                 AND agg.passed_required_sections = agg.total_required_sections
+                                THEN cup.completed_at
+                                ELSE NULL
+                              END,
+           cup.last_activity_at = UTC_TIMESTAMP(),
+           cup.updated_at = UTC_TIMESTAMP()
+      WHERE cup.course_id = ?`,
+    [courseId, courseId, courseId],
+  );
+}
+
 async function getAdminUsersProgress(courseId) {
   const [rows] = await pool.execute(
     `SELECT cup.user_id, cup.status, cup.progress_percent,
@@ -508,6 +602,7 @@ module.exports = {
   syncCourseProgress,
   completeCourseProgress,
   getCourseProgressStatus,
+  recalculateCourseProgressForAllUsers,
   getAdminUsersProgress,
   getAdminUserDetailedProgress,
   resetUserProgressForCourse,

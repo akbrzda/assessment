@@ -62,6 +62,32 @@ function mapUserProgress(row, requiredTotalDefault) {
   };
 }
 
+function buildEffectiveCourseProgress(baseProgress, sections) {
+  const requiredSections = sections.filter((section) => section.isRequired);
+  const totalRequiredSections = requiredSections.length;
+  const passedRequiredSections = requiredSections.filter(
+    (section) => section.progress.status === "passed" && section.progress.allTopicsCompleted,
+  ).length;
+  const progressPercent = totalRequiredSections > 0 ? Number(((passedRequiredSections / totalRequiredSections) * 100).toFixed(2)) : 0;
+
+  let status = baseProgress.status || "not_started";
+  if (status !== "closed") {
+    if (status === "completed") {
+      status = passedRequiredSections === totalRequiredSections && totalRequiredSections > 0 ? "completed" : "in_progress";
+    } else {
+      status = passedRequiredSections > 0 ? "in_progress" : "not_started";
+    }
+  }
+
+  return {
+    ...baseProgress,
+    status,
+    progressPercent,
+    completedSectionsCount: passedRequiredSections,
+    totalSectionsCount: totalRequiredSections,
+  };
+}
+
 function resolveSectionLockReason({ isClosedForUser, isLockedBySequence }) {
   if (isClosedForUser) {
     return {
@@ -303,10 +329,12 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
 
     const requiredTopics = topics.filter((item) => item.isRequired);
     const allTopicsCompleted = requiredTopics.length === 0 || requiredTopics.every((item) => item.progress.status === "completed");
+    const sectionStatus = sectionRow.user_section_status || "not_started";
+    const effectiveSectionStatus = sectionStatus === "passed" && !allTopicsCompleted ? "in_progress" : sectionStatus;
     return {
       ...section,
       progress: {
-        status: sectionRow.user_section_status || "not_started",
+        status: effectiveSectionStatus,
         bestScorePercent: sectionRow.section_best_score != null ? Number(sectionRow.section_best_score) : null,
         attemptCount: sectionRow.section_attempt_count != null ? Number(sectionRow.section_attempt_count) : 0,
         lastAttemptId: sectionRow.section_last_attempt_id != null ? Number(sectionRow.section_last_attempt_id) : null,
@@ -323,11 +351,13 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
   });
 
   const [finalAccess, snapshot] = await Promise.all([canAccessFinalAssessment({ courseId, userId }), getCourseSnapshot(courseId, userId)]);
+  const baseProgress = mapUserProgress(row, sections.filter((item) => item.isRequired).length);
+  const effectiveProgress = buildEffectiveCourseProgress(baseProgress, sections);
 
   return {
     ...course,
     testsCount: sectionRows.filter((item) => item.assessment_id != null).length + topicRows.filter((item) => item.assessment_id != null).length,
-    progress: mapUserProgress(row, sections.filter((item) => item.isRequired).length),
+    progress: effectiveProgress,
     sections,
     finalAssessment: {
       id: course.finalAssessmentId,

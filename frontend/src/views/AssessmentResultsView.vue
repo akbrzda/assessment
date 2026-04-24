@@ -1,84 +1,78 @@
 <template>
-  <div class="page-container">
+  <div class="page-container results-page">
     <div class="container">
-      <!-- Results Header -->
-      <div class="results-header">
-        <div class="result-icon mb-16" :class="result.passed ? 'success' : 'error'">
-          <CheckCircle v-if="result.passed" />
-          <XCircle v-else />
-        </div>
-
-        <h1 class="title-large mb-8">{{ result.passed ? "Успешно!" : "Не пройдено" }}</h1>
-        <p class="body-medium text-secondary mb-20">{{ assessment?.title }}</p>
+      <!-- Badge + Title -->
+      <div class="results-header-top">
+        <span class="assessment-badge">Итоговая аттестация</span>
+        <h1 class="results-main-title">Результаты теста</h1>
       </div>
 
-      <!-- Results Summary -->
-      <div class="card card-large mb-12">
-        <div class="results-summary">
-          <div class="score-section mb-12">
-            <div class="score-circle" :class="{ passed: result.passed }">
-              <span class="score-value">{{ result.score }}%</span>
-            </div>
-            <div class="score-info">
-              <div class="score-label">Ваш результат</div>
-              <div class="threshold-info">Порог прохождения: {{ assessment?.threshold }}%</div>
-            </div>
-          </div>
-
-          <div class="stats-grid">
-            <div class="stat-item">
-              <div class="stat-label">Правильных ответов</div>
-              <div class="stat-value">{{ result.correctAnswers }} из {{ result.totalQuestions }}</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">Время прохождения</div>
-              <div class="stat-value">{{ result.timeSpent }}</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">Попытка</div>
-              <div class="stat-value">{{ formatAttemptSummary(result.attemptNumber, assessment?.maxAttempts) }}</div>
-            </div>
-          </div>
-        </div>
+      <!-- Trophy/Icon -->
+      <div class="result-trophy-wrap" :class="result.passed ? 'passed' : 'failed'">
+        <CheckCircle v-if="result.passed" class="trophy-icon" />
+        <XCircle v-else class="trophy-icon" />
       </div>
 
-      <!-- Questions Review -->
-      <div class="card mb-16">
-        <h3 class="title-small mb-16">Обзор ответов</h3>
+      <!-- Status text -->
+      <div class="result-status-block">
+        <h2 class="result-status-title">{{ result.passed ? "Поздравляем!" : "Не пройдено" }}</h2>
+        <p class="result-status-sub">{{ result.passed ? "Тест успешно пройден" : assessment?.title }}</p>
+      </div>
 
-        <div class="questions-list">
-          <div v-for="(question, index) in result.questions" :key="question.id" class="question-review">
-            <div class="question-number">
-              <span class="number">{{ index + 1 }}</span>
-              <div class="result-indicator" :class="{ correct: question.isCorrect }">
-                <Check v-if="question.isCorrect" />
-                <X v-else />
-              </div>
-            </div>
-            <div class="question-summary">
-              <div class="question-text">{{ question.text }}</div>
-              <div v-if="!question.isCorrect && (question.correctOptionText || question.correctTextAnswer)" class="correct-answer-hint">
-                <span class="correct-answer-label">Правильный ответ:</span>
-                <span class="correct-answer-value">{{ question.correctOptionText || question.correctTextAnswer }}</span>
-              </div>
-            </div>
-          </div>
+      <!-- Circular score -->
+      <div class="score-section">
+        <div class="score-ring-wrap">
+          <svg class="score-ring-svg" viewBox="0 0 88 88" width="88" height="88">
+            <circle cx="44" cy="44" r="36" fill="none" stroke="var(--divider)" stroke-width="7" />
+            <circle
+              cx="44"
+              cy="44"
+              r="36"
+              fill="none"
+              :stroke="result.passed ? 'var(--success)' : 'var(--error)'"
+              stroke-width="7"
+              stroke-linecap="round"
+              :stroke-dasharray="`${2 * Math.PI * 36}`"
+              :stroke-dashoffset="`${2 * Math.PI * 36 * (1 - (result.score || 0) / 100)}`"
+              transform="rotate(-90 44 44)"
+            />
+          </svg>
+          <span class="score-ring-text" :class="result.passed ? 'text-success' : 'text-error'">{{ result.score }}%</span>
+        </div>
+        <div class="score-info-block">
+          <div class="score-big" :class="result.passed ? 'text-success' : 'text-error'">{{ result.score }}%</div>
+          <div class="score-sub">Общий результат</div>
         </div>
       </div>
 
-      <!-- Actions -->
+      <!-- Stats card -->
+      <div class="stats-card">
+        <div class="stat-row">
+          <span class="stat-label">Правильных ответов</span>
+          <span class="stat-val">{{ result.correctAnswers }} из {{ result.totalQuestions }}</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-row">
+          <span class="stat-label">Время прохождения</span>
+          <span class="stat-val">{{ result.timeSpent }}</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-row">
+          <span class="stat-label">Лучший результат</span>
+          <span class="stat-val">{{ result.score }}%</span>
+        </div>
+      </div>
+
+      <!-- Action -->
       <div class="results-actions">
-        <button v-if="canRetake" class="btn btn-secondary btn-full mb-12" @click="retakeAssessment">
-          Пройти снова ({{ remainingAttempts }} {{ pluralizeAttempts(remainingAttempts) }})
-        </button>
-
-        <router-link v-if="relatedCourseId" :to="`/courses/${relatedCourseId}`" class="btn btn-primary btn-full mb-12">
+        <router-link
+          v-if="finalAssessmentPassedCourseId || relatedCourseId"
+          :to="`/courses/${finalAssessmentPassedCourseId || relatedCourseId}`"
+          class="btn btn-primary btn-full"
+        >
           Вернуться к курсу
         </router-link>
-
-        <router-link to="/assessments" class="btn btn-primary btn-full mb-12"> Вернуться к аттестациям </router-link>
-
-        <router-link to="/dashboard" class="btn btn-secondary btn-full"> На главную </router-link>
+        <router-link v-else to="/assessments" class="btn btn-primary btn-full"> Вернуться к аттестациям </router-link>
       </div>
     </div>
   </div>
@@ -113,6 +107,7 @@ export default {
     const isLoading = ref(false);
     const summaryItem = ref(null);
     const relatedCourseId = ref(null);
+    const finalAssessmentPassedCourseId = ref(null);
 
     const canRetake = computed(() => {
       if (!assessment.value || !result.value) {
@@ -333,8 +328,7 @@ export default {
         };
 
         if (completionContext?.type === "final" && result.value.passed && relatedCourseId.value) {
-          router.replace(`/courses/${relatedCourseId.value}/status/final_assessment_passed`);
-          return;
+          finalAssessmentPassedCourseId.value = relatedCourseId.value;
         }
 
         const isFirstVisit = route.query.fromAssessment === "true";
@@ -382,6 +376,7 @@ export default {
       canRetake,
       remainingAttempts,
       relatedCourseId,
+      finalAssessmentPassedCourseId,
       pluralizeAttempts,
       formatAttemptSummary,
       retakeAssessment,
@@ -392,223 +387,172 @@ export default {
 </script>
 
 <style scoped>
-.results-header {
-  text-align: center;
-  padding-top: 16px;
-  margin-bottom: 16px;
+.results-page {
+  padding-bottom: 40px;
 }
 
-.result-icon {
-  display: inline-flex;
+/* Badge + Title */
+.results-header-top {
+  padding-top: 12px;
+  margin-bottom: 24px;
+}
+
+.assessment-badge {
+  display: inline-block;
+  background-color: var(--accent-bg);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+
+.results-main-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+/* Trophy */
+.result-trophy-wrap {
+  display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 16px;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  margin: 0 auto 20px;
 }
 
-.result-icon svg {
-  width: 64px;
-  height: 64px;
+.result-trophy-wrap.passed {
+  background-color: var(--accent-bg);
 }
 
-.result-icon.success svg {
-  color: var(--success);
+.result-trophy-wrap.failed {
+  background-color: rgba(255, 59, 48, 0.1);
 }
 
-.result-icon.error svg {
+.trophy-icon {
+  width: 52px;
+  height: 52px;
+}
+
+.result-trophy-wrap.passed .trophy-icon {
+  color: var(--accent);
+}
+
+.result-trophy-wrap.failed .trophy-icon {
   color: var(--error);
 }
 
-.results-summary {
+/* Status */
+.result-status-block {
   text-align: center;
+  margin-bottom: 28px;
 }
 
+.result-status-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.result-status-sub {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Score ring */
 .score-section {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 20px;
+  margin-bottom: 24px;
 }
 
-.score-circle {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background-color: var(--error);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.score-ring-wrap {
   position: relative;
+  width: 88px;
+  height: 88px;
+  flex-shrink: 0;
 }
 
-.score-circle.passed {
-  background-color: var(--success);
+.score-ring-svg {
+  display: block;
 }
 
-.score-value {
-  font-size: 14px;
+.score-ring-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 15px;
   font-weight: 700;
-  color: white;
 }
 
-.score-info {
+.score-info-block {
   text-align: left;
 }
 
-.score-label {
-  font-size: 16px;
-  font-weight: 600;
+.score-big {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
   margin-bottom: 4px;
 }
 
-.threshold-info {
+.score-sub {
   font-size: 14px;
   color: var(--text-secondary);
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-
-.stat-item {
-  text-align: center;
-  padding: 16px 12px;
-  background-color: var(--bg-primary);
-  border-radius: 12px;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-}
-
-.stat-value {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--accent-blue);
-}
-
-.questions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.question-review {
-  display: flex;
-  gap: 16px;
-  padding: 16px;
-  background-color: var(--bg-primary);
-  border-radius: 12px;
-}
-
-.question-number {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  min-width: 40px;
-}
-
-.number {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background-color: var(--divider);
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.result-indicator {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background-color: rgba(255, 59, 48, 0.1);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.result-indicator svg {
-  width: 12px;
-  height: 12px;
-  color: var(--error);
-}
-.result-indicator.correct svg {
+.text-success {
   color: var(--success);
 }
 
-.result-indicator.correct {
-  background-color: rgba(52, 199, 89, 0.1);
+.text-error {
+  color: var(--error);
 }
 
-.question-summary {
-  flex: 1;
+/* Stats */
+.stats-card {
+  background-color: var(--bg-secondary);
+  border-radius: 16px;
+  padding: 4px 16px;
+  margin-bottom: 24px;
 }
 
-.question-text {
-  font-weight: 600;
-  margin-bottom: 8px;
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.correct-answer-hint {
+.stat-row {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 6px;
-  padding: 8px 10px;
-  background: rgba(52, 199, 89, 0.08);
-  border-left: 3px solid var(--success, #22c55e);
-  border-radius: 4px;
-  font-size: 13px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0;
 }
 
-.correct-answer-label {
-  font-weight: 500;
-  color: var(--success, #22c55e);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.correct-answer-value {
-  color: var(--text-primary);
-}
-
-.text-secondary {
+.stat-label {
+  font-size: 14px;
   color: var(--text-secondary);
 }
 
-@media (max-width: 480px) {
-  .score-section {
-    flex-direction: column;
-    gap: 16px;
-  }
+.stat-val {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
 
-  .score-info {
-    text-align: center;
-  }
+.stat-divider {
+  height: 1px;
+  background-color: var(--divider);
+}
 
-  .stats-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .question-review {
-    gap: 12px;
-  }
-
-  .question-number {
-    min-width: 32px;
-  }
+/* Actions */
+.results-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 </style>

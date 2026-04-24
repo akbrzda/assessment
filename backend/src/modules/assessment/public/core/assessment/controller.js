@@ -33,17 +33,13 @@ const questionSchema = Joi.object({
   if (value.questionType === "single") {
     const correctCount = value.options.filter((option) => option.isCorrect).length;
     if (correctCount !== 1) {
-      return helpers.message(
-        "          ",
-      );
+      return helpers.message("          ");
     }
   }
   if (value.questionType === "multiple") {
     const correctCount = value.options.filter((option) => option.isCorrect).length;
     if (correctCount < 2) {
-      return helpers.message(
-        "          ",
-      );
+      return helpers.message("          ");
     }
   }
   if (value.questionType === "matching") {
@@ -107,9 +103,7 @@ const baseSchema = Joi.object({
   clientTimezoneOffsetMinutes: Joi.number().integer().min(-720).max(840).optional(),
 }).custom((value, helpers) => {
   if (!value.userIds.length && !value.positionIds.length && !value.branchIds.length) {
-    return helpers.message(
-      "     ,   ",
-    );
+    return helpers.message("     ,   ");
   }
   if (new Date(value.closeAt) <= new Date(value.openAt)) {
     return helpers.message("      ");
@@ -184,7 +178,7 @@ async function getForUser(req, res, next) {
 
     const assessment = await assessmentModel.getAssessmentForUser(assessmentId, req.currentUser.id);
     if (!assessment) {
-      return res.status(404).json({ error: "    " });
+      return res.status(404).json({ error: "Аттестация не найдена" });
     }
     res.json({ assessment });
   } catch (error) {
@@ -247,9 +241,7 @@ async function prepareTargets(value, currentUser) {
     const invalidUsers = users.filter((user) => user.branchId !== currentUser.branchId);
     if (invalidUsers.length) {
       const names = invalidUsers.map((user) => `${user.firstName} ${user.lastName}`).join(", ");
-      const error = new Error(
-        `       . : ${names}`,
-      );
+      const error = new Error(`       . : ${names}`);
       error.status = 422;
       throw error;
     }
@@ -257,9 +249,7 @@ async function prepareTargets(value, currentUser) {
     const invalidUsers = users.filter((user) => user.branchId && !branchIds.includes(Number(user.branchId)));
     if (invalidUsers.length) {
       const names = invalidUsers.map((user) => `${user.firstName} ${user.lastName}`).join(", ");
-      const error = new Error(
-        `     . : ${names}`,
-      );
+      const error = new Error(`     . : ${names}`);
       error.status = 422;
       throw error;
     }
@@ -289,9 +279,7 @@ async function prepareTargets(value, currentUser) {
   }
 
   if (!branchIds.length && !userIds.length && !positionIds.length) {
-    const error = new Error(
-      "     ,   ",
-    );
+    const error = new Error("     ,   ");
     error.status = 422;
     throw error;
   }

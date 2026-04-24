@@ -77,15 +77,19 @@
           </div>
         </section>
 
-        <div class="final-assessment-card" :class="{ 'is-available': course.finalAssessment.available }">
-          <div class="final-icon-wrap">
+        <div class="final-assessment-card" :class="{ 'is-available': course.finalAssessment.available, 'is-passed': isFinalAssessmentPassed }">
+          <div class="final-icon-wrap" :class="{ 'final-icon-wrap--passed': isFinalAssessmentPassed }">
             <GraduationCap class="final-icon" :size="26" />
           </div>
           <div class="final-text">
             <span class="final-title">Итоговая аттестация</span>
-            <span class="final-hint">Доступна после прохождения всех тем курса</span>
+            <span v-if="isFinalAssessmentPassed" class="final-hint final-hint--passed"> Пройдена · {{ finalAssessmentBestScore }}% </span>
+            <span v-else class="final-hint">Доступна после прохождения всех тем курса</span>
           </div>
-          <button class="btn-final" :disabled="!course.finalAssessment.available || !course.finalAssessment.id" @click="openFinalAssessment">
+          <button v-if="isFinalAssessmentPassed" class="btn-final btn-final--result" @click="router.push(finalAssessmentResultLink)">
+            Результат
+          </button>
+          <button v-else class="btn-final" :disabled="!course.finalAssessment.available || !course.finalAssessment.id" @click="openFinalAssessment">
             Перейти
           </button>
         </div>
@@ -110,7 +114,7 @@
         </div>
       </div>
 
-      <BottomSheet v-model="lockSheet.visible" :title="lockSheet.title" :description="lockSheet.description" />
+      <LockPopup v-model="lockSheet.visible" :title="lockSheet.title" :description="lockSheet.description" />
     </div>
   </div>
 </template>
@@ -122,7 +126,7 @@ import { Check, GraduationCap, Lock } from "lucide-vue-next";
 import { apiClient } from "../services/apiClient";
 import { useTelegramStore } from "../stores/telegram";
 import { useUserStore } from "../stores/user";
-import BottomSheet from "../components/courses/BottomSheet.vue";
+import LockPopup from "../components/courses/LockPopup.vue";
 
 const COURSE_COMPLETION_STORAGE_KEY = "courseCompletionContext";
 
@@ -145,7 +149,7 @@ function mapLockReasonToStatus(lockReasonType) {
 export default {
   name: "CourseDetailsView",
   components: {
-    BottomSheet,
+    LockPopup,
     Check,
     GraduationCap,
     Lock,
@@ -177,6 +181,32 @@ export default {
 
     const courseId = computed(() => Number(route.params.id));
 
+    const isFinalAssessmentPassed = computed(() => {
+      if (!course.value) return false;
+      // Если курс завершён — итоговая аттестация точно пройдена
+      if (course.value.progress?.status === "completed") return true;
+      const finalId = course.value?.finalAssessment?.id;
+      if (!finalId) return false;
+      return getAssessmentSummary(finalId)?.passed === true;
+    });
+
+    const finalAssessmentBestScore = computed(() => {
+      const finalId = course.value?.finalAssessment?.id;
+      if (!finalId) return null;
+      return getAssessmentSummary(finalId)?.bestScore ?? null;
+    });
+
+    const finalAssessmentResultLink = computed(() => {
+      const finalId = course.value?.finalAssessment?.id;
+      if (!finalId) return null;
+      const summary = getAssessmentSummary(finalId);
+      const attemptId = summary?.lastAttemptId;
+      if (attemptId) {
+        return `/assessment-results/${finalId}?attemptId=${attemptId}`;
+      }
+      return `/assessment-results/${finalId}`;
+    });
+
     const stickyActionLabel = computed(() => {
       if (!course.value) return "Продолжить";
       if (isStarting.value) return "Запускаем...";
@@ -198,6 +228,9 @@ export default {
         status: item.status,
         requiresTheory: Boolean(item.theory?.completionRequired),
         theoryCompleted: Boolean(item.theory?.completedAt),
+        passed: item.bestScorePercent != null || item.status === "completed" || item.status === "passed",
+        bestScore: item.bestScorePercent != null ? Math.round(Number(item.bestScorePercent)) : null,
+        lastAttemptId: item.lastAttemptId ? Number(item.lastAttemptId) : null,
       };
     }
 
@@ -546,6 +579,7 @@ export default {
       isLoading,
       isStarting,
       course,
+      courseId,
       lockSheet,
       stickyActionLabel,
       stickyActionDisabled,
@@ -558,6 +592,9 @@ export default {
       getFinalReasonText,
       getFinalActionText,
       openFinalAssessment,
+      isFinalAssessmentPassed,
+      finalAssessmentBestScore,
+      finalAssessmentResultLink,
       attemptResultModal,
       closeAttemptResultModal,
     };
@@ -621,7 +658,7 @@ export default {
 
 .progress-bar-fill {
   height: 100%;
-  background-color: #6355f5;
+  background-color: var(--accent);
   border-radius: 4px;
   transition: width 0.3s ease;
 }
@@ -664,8 +701,8 @@ export default {
 }
 
 .section-card.is-active {
-  background: #f0eeff;
-  border-color: #6355f5;
+  background: var(--accent-bg);
+  border-color: var(--accent);
 }
 
 .section-card.is-locked {
@@ -677,8 +714,8 @@ export default {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #ede9fe;
-  color: #6355f5;
+  background: var(--accent-bg);
+  color: var(--accent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -692,13 +729,13 @@ export default {
 }
 
 .section-card.is-passed .section-number {
-  background: #d1fae5;
-  color: #059669;
+  background: var(--accent-bg-success);
+  color: var(--accent-text-success);
 }
 
 .section-card.is-locked .section-number {
-  background: #f3f4f6;
-  color: #9ca3af;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
 }
 
 .section-title {
@@ -725,7 +762,7 @@ export default {
 }
 
 .section-lock-icon {
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 /* ——— Итоговая аттестация ——— */
@@ -733,7 +770,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #ede9fe;
+  background: var(--accent-bg);
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 16px;
@@ -743,7 +780,7 @@ export default {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: #d8d0fb;
+  background: var(--accent-bg-violet);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -751,7 +788,7 @@ export default {
 }
 
 .final-icon {
-  color: #6355f5;
+  color: var(--accent);
 }
 
 .final-text {
@@ -779,7 +816,7 @@ export default {
   padding: 10px 18px;
   border-radius: 12px;
   border: none;
-  background: #6355f5;
+  background: var(--accent);
   color: #fff;
   font-size: 15px;
   font-weight: 600;
@@ -791,6 +828,27 @@ export default {
 .btn-final:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.btn-final--result {
+  background: var(--success);
+}
+
+.final-assessment-card.is-passed {
+  background: var(--accent-bg-success);
+}
+
+.final-icon-wrap--passed {
+  background: rgba(52, 199, 89, 0.2);
+}
+
+.final-icon-wrap--passed .final-icon {
+  color: var(--success);
+}
+
+.final-hint--passed {
+  color: var(--success);
+  font-weight: 600;
 }
 
 /* ——— Модалка ——— */

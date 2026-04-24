@@ -10,31 +10,47 @@ html {
   /* Light theme colors */
   --bg-primary: #ffffff;
   --bg-secondary: #f2f2f7;
-  --text-primary: #000000;
-  --text-secondary: #6c6c70;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
   --divider: #e5e5ea;
-  --accent-blue: #0088cc;
+  --accent: #6355f5;
+  --accent-blue: #6355f5;
   --success: #34c759;
   --error: #ff3b30;
   --warning: #ff9500;
-  --card-shadow: rgba(0, 0, 0, 0.1);
+  --card-shadow: rgba(0, 0, 0, 0.08);
   --blur-bg: rgba(255, 255, 255, 0.8);
+  --accent-bg: #f0eeff;
+  --accent-bg-success: #dcfce7;
+  --accent-text-success: #16a34a;
+  --accent-bg-violet: #ede9ff;
+  --accent-text-violet: #6d28d9;
+  --accent-bg-warning: #fef3c7;
+  --accent-text-warning: #d97706;
 }
 
 :root[data-theme="dark"],
 html[data-theme="dark"] {
-  /* Dark theme colors */
-  --bg-primary: #121212;
-  --bg-secondary: #1c1c1e;
-  --text-primary: #ffffff;
-  --text-secondary: #8e8e93;
-  --divider: #2c2c2e;
-  --accent-blue: #0088cc;
+  /* Dark theme — нейтральный тёмный с фиолетовым акцентом */
+  --bg-primary: #111118;
+  --bg-secondary: #1c1c26;
+  --text-primary: #f0f0f5;
+  --text-secondary: #7a7a90;
+  --divider: #252530;
+  --accent: #7b6fff;
+  --accent-blue: #7b6fff;
   --success: #32d74b;
   --error: #ff453a;
   --warning: #ff9f0a;
-  --card-shadow: rgba(0, 0, 0, 0.3);
-  --blur-bg: rgba(18, 18, 18, 0.8);
+  --card-shadow: rgba(0, 0, 0, 0.5);
+  --blur-bg: rgba(17, 17, 24, 0.9);
+  --accent-bg: #221e42;
+  --accent-bg-success: #0d2218;
+  --accent-text-success: #32d74b;
+  --accent-bg-violet: #1d1a36;
+  --accent-text-violet: #9d94f5;
+  --accent-bg-warning: #221a0d;
+  --accent-text-warning: #ff9f0a;
 }
 
 html {
@@ -152,12 +168,13 @@ body {
 }
 
 .btn-primary {
-  background-color: var(--accent-blue);
+  background-color: var(--accent);
   color: white;
 }
 
 .btn-primary:hover {
-  background-color: #0077b3;
+  background-color: var(--accent);
+  filter: brightness(1.1);
   transform: translateY(-1px);
 }
 
@@ -501,18 +518,18 @@ body {
 }
 
 .app-round-icon--success {
-  background: #dcfce7;
-  color: #16a34a;
+  background: var(--accent-bg-success);
+  color: var(--accent-text-success);
 }
 
 .app-round-icon--violet {
-  background: #ede9ff;
-  color: #6d28d9;
+  background: var(--accent-bg-violet);
+  color: var(--accent-text-violet);
 }
 
 .app-round-icon--warning {
-  background: #fef3c7;
-  color: #d97706;
+  background: var(--accent-bg-warning);
+  color: var(--accent-text-warning);
 }
 
 /* Responsive */
@@ -569,17 +586,16 @@ body {
 
 /* Icons */
 svg {
-  color: var(--text-secondary);
   transition:
     color 0.2s ease,
     transform 0.2s ease;
 }
 
-.card-icon svg,
-.action-icon svg {
-  width: 24px;
-  height: 24px;
-  color: #fff;
+/* Иконки внутри цветных кружков наследуют цвет контейнера */
+.app-round-icon svg,
+.nav-item svg,
+.final-icon-wrap svg {
+  color: inherit;
 }
 
 .btn svg,

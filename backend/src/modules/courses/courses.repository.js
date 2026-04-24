@@ -224,11 +224,27 @@ async function canAccessFinalAssessment({ courseId, userId }, options = {}) {
 
   const [[agg]] = await executor.execute(
     `SELECT COUNT(CASE WHEN cs.is_required = 1 THEN 1 END) AS total,
-            COUNT(CASE WHEN csup.status = 'passed' AND cs.is_required = 1 THEN 1 END) AS passed
+            COUNT(
+              CASE
+                WHEN cs.is_required = 1
+                 AND csup.status = 'passed'
+                 AND COALESCE(topic_agg.completed_required_topics, 0) = COALESCE(topic_agg.total_required_topics, 0)
+                THEN 1
+              END
+            ) AS passed
        FROM course_sections cs
        LEFT JOIN course_section_user_progress csup ON csup.section_id = cs.id AND csup.user_id = ?
-      WHERE cs.course_id = ?`,
-    [userId, courseId],
+       LEFT JOIN (
+         SELECT ct.section_id,
+                SUM(CASE WHEN ct.is_required = 1 THEN 1 ELSE 0 END) AS total_required_topics,
+                SUM(CASE WHEN ct.is_required = 1 AND ctup.status = 'completed' THEN 1 ELSE 0 END) AS completed_required_topics
+           FROM course_topics ct
+           LEFT JOIN course_topic_user_progress ctup ON ctup.topic_id = ct.id AND ctup.user_id = ?
+          WHERE ct.course_id = ?
+          GROUP BY ct.section_id
+       ) topic_agg ON topic_agg.section_id = cs.id
+       WHERE cs.course_id = ?`,
+    [userId, userId, courseId, courseId],
   );
 
   const total = Number(agg?.total || 0);

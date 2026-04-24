@@ -64,7 +64,7 @@
         </div>
       </template>
 
-      <BottomSheet v-model="lockSheet.visible" :title="lockSheet.title" :description="lockSheet.description" />
+      <LockPopup v-model="lockSheet.visible" :title="lockSheet.title" :description="lockSheet.description" />
     </div>
   </div>
 </template>
@@ -73,7 +73,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { apiClient } from "../services/apiClient";
-import BottomSheet from "../components/courses/BottomSheet.vue";
+import LockPopup from "../components/courses/LockPopup.vue";
 import SubtopicItem from "../components/courses/SubtopicItem.vue";
 
 function mapLockReasonToStatus(lockReasonType) {
@@ -95,7 +95,7 @@ function mapLockReasonToStatus(lockReasonType) {
 export default {
   name: "TopicView",
   components: {
-    BottomSheet,
+    LockPopup,
     SubtopicItem,
   },
   setup() {

@@ -1,9 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import {
-  clearTelegramRuntimeState,
-  setTelegramRuntimeState,
-} from "../services/telegramRuntimeState";
+import { clearTelegramRuntimeState, setTelegramRuntimeState } from "../services/telegramRuntimeState";
 
 const INIT_DATA_MAX_AGE_SECONDS = 5 * 60;
 
@@ -193,11 +190,13 @@ export const useTelegramStore = defineStore("telegram", () => {
   }
 
   function showAlert(message) {
+    const safeMessage = String(message || "").trim();
+    if (!safeMessage) return;
     const telegramApp = resolveTelegramApp();
     if (telegramApp?.showAlert) {
-      telegramApp.showAlert(message);
+      telegramApp.showAlert(safeMessage);
     } else if (typeof window !== "undefined") {
-      window.alert(message);
+      window.alert(safeMessage);
     }
   }
 

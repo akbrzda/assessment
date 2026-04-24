@@ -1166,9 +1166,19 @@ async function getAssessmentForUser(assessmentId, userId) {
          JOIN assessment_position_assignments apa ON apa.assessment_id = aba.assessment_id
          JOIN users u ON u.branch_id = aba.branch_id AND u.position_id = apa.position_id
          WHERE aba.assessment_id = a.id AND u.id = ?
+         UNION
+         SELECT 1
+         FROM courses c
+         JOIN course_user_progress cup ON cup.course_id = c.id AND cup.user_id = ?
+         WHERE c.final_assessment_id = a.id
+         UNION
+         SELECT 1
+         FROM course_sections cs
+         JOIN course_user_progress cup ON cup.course_id = cs.course_id AND cup.user_id = ?
+         WHERE cs.assessment_id = a.id
        )
      LIMIT 1`,
-    [assessmentId, userId, userId, userId, userId],
+    [assessmentId, userId, userId, userId, userId, userId, userId],
   );
 
   if (!rows.length) {

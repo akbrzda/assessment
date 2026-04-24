@@ -1,75 +1,50 @@
 <template>
-  <div class="page-container">
-    <!-- Скелетон загрузки -->
-    <div v-if="isLoading" class="container sk-wrapper">
-      <div class="sk-back"></div>
-      <div class="sk-badge"></div>
-      <div class="sk-heading"></div>
-      <div class="sk-heading sk-heading--short"></div>
-      <div class="sk-video"></div>
-      <div class="sk-line" v-for="n in 5" :key="n"></div>
-    </div>
-
-    <!-- Ошибка -->
-    <div v-else-if="errorText" class="container">
-      <div class="card error-card mt-16">
-        <h3 class="title-small mb-8">Не удалось загрузить подтему</h3>
-        <p class="body-medium text-secondary mb-12">{{ errorText }}</p>
-        <button class="btn btn-primary btn-full" type="button" @click="init">Повторить</button>
-      </div>
-    </div>
-
-    <!-- Контент -->
-    <template v-else-if="topic">
-      <!-- Шапка с навигацией -->
-      <div class="subtopic-nav">
-        <button class="back-btn" type="button" @click="goBack" aria-label="Назад">
-          <ChevronLeft :size="22" :stroke-width="2" />
-        </button>
-        <span class="breadcrumb-badge">{{ breadcrumbLabel }}</span>
+  <div class="page-container subtopic-page">
+    <div class="subtopic-shell">
+      <div v-if="isLoading" class="subtopic-skeleton">
+        <div class="sk-badge-row">
+          <div class="sk-badge"></div>
+          <div class="sk-caption"></div>
+        </div>
+        <div class="sk-line" v-for="n in 8" :key="n"></div>
       </div>
 
-      <div class="container">
-        <!-- Заголовок -->
-        <h1 class="title-large topic-title mb-16">{{ topicTitle }}</h1>
+      <div v-else-if="errorText" class="subtopic-error">
+        <h3 class="title-small">Не удалось загрузить подтему</h3>
+        <p class="body-medium text-secondary">{{ errorText }}</p>
+        <button class="btn btn-primary" type="button" @click="init">Повторить</button>
+      </div>
 
-        <!-- Блок с контентом подтемы -->
-        <div v-if="topic.content" class="topic-content mb-16" v-html="sanitizedContent"></div>
-
-        <div v-else class="card empty-content mb-16">
-          <p class="body-medium text-secondary">Материал отсутствует.</p>
+      <template v-else-if="topic">
+        <div class="subtopic-breadcrumb">
+          <span class="subtopic-chip">{{ topicChipLabel }}</span>
+        </div>
+        <div class="subtopic-content">
+          <div v-if="topic.content" class="topic-content" v-html="sanitizedContent"></div>
+          <p v-else class="empty-content">Материал отсутствует.</p>
         </div>
 
-        <!-- Таймер чтения -->
-        <ReadingTimerNotice
-          v-if="requiredReadingSeconds > 0 || timerCompleted"
-          :remainingSeconds="remainingSeconds"
-          :requiredSeconds="requiredReadingSeconds"
-          :completed="timerCompleted"
-          class="mb-16"
-        />
-
-        <!-- Подсказка: следующая подтема -->
-        <div v-if="nextTopic" class="next-hint mb-4">
-          <span class="body-small text-secondary">Следующая подтема</span>
-          <p class="body-medium next-hint__title">{{ nextTopic.title }}</p>
+        <div class="subtopic-footer">
+          <div class="next-topic">
+            <p class="next-topic__caption">Следующая подтема</p>
+            <p class="next-topic__title">{{ nextTopicLabel }}</p>
+          </div>
+          <button class="next-button" type="button" :disabled="!canProceed || isCompleting" @click="handleProceed">
+            <span>{{ ctaLabel }}</span>
+            <ChevronRight v-if="showNextIcon" class="next-button__icon" :size="18" />
+          </button>
         </div>
-      </div>
-
-      <!-- Фиксированная кнопка -->
-      <StickyFooterCTA :label="ctaLabel" :disabled="!canProceed || isCompleting" @action="handleProceed" />
-    </template>
+      </template>
+    </div>
   </div>
 </template>
 
 <script>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ChevronLeft } from "lucide-vue-next";
+import { ChevronRight } from "lucide-vue-next";
 import { apiClient } from "../services/apiClient";
 import { calculateReadingSeconds } from "../utils/readingTime";
-import ReadingTimerNotice from "../components/courses/ReadingTimerNotice.vue";
-import StickyFooterCTA from "../components/courses/StickyFooterCTA.vue";
 
 function sanitizeContent(html) {
   if (!html) return "";
@@ -82,9 +57,7 @@ function sanitizeContent(html) {
 export default {
   name: "SubtopicView",
   components: {
-    ChevronLeft,
-    ReadingTimerNotice,
-    StickyFooterCTA,
+    ChevronRight,
   },
   setup() {
     const route = useRoute();
@@ -105,31 +78,33 @@ export default {
     const topicId = computed(() => Number(route.params.topicId));
 
     const topics = computed(() => section.value?.topics || []);
-    const currentTopicIndex = computed(() => topics.value.findIndex((t) => t.id === topicId.value));
+    const orderedTopics = computed(() =>
+      [...topics.value].sort((a, b) => {
+        const aOrder = Number(a?.orderIndex || 0);
+        const bOrder = Number(b?.orderIndex || 0);
+        if (aOrder !== bOrder) {
+          return aOrder - bOrder;
+        }
+        return Number(a?.id || 0) - Number(b?.id || 0);
+      }),
+    );
+
+    const currentTopicIndex = computed(() => orderedTopics.value.findIndex((t) => t.id === topicId.value));
     const nextTopic = computed(() => {
       const idx = currentTopicIndex.value;
-      if (idx < 0 || idx >= topics.value.length - 1) return null;
-      const candidate = topics.value[idx + 1];
-      if (candidate?.progress?.locked) return null;
-      return candidate;
+      if (idx < 0 || idx >= orderedTopics.value.length - 1) return null;
+      return orderedTopics.value[idx + 1];
     });
 
-    const breadcrumbLabel = computed(() => {
+    const topicChipLabel = computed(() => {
       if (!section.value || !topic.value) return "";
       const sectionNum = section.value.orderIndex ?? "";
-      const topicNum = topic.value.orderIndex ?? "";
-      const num = sectionNum && topicNum ? `${sectionNum}.${topicNum}` : topicNum || sectionNum;
-      return num ? `${num} ${section.value.title}` : section.value.title;
-    });
-
-    const topicTitle = computed(() => {
-      if (!topic.value) return "";
-      const num = topic.value.orderIndex;
-      return num ? `${num}. ${topic.value.title}` : topic.value.title;
+      const resolvedTopicNum = Number(topic.value.orderIndex) || Math.max(1, currentTopicIndex.value + 1);
+      const numberLabel = sectionNum ? `${sectionNum}.${resolvedTopicNum}` : String(resolvedTopicNum);
+      return numberLabel ? `${numberLabel} ${topic.value.title}` : topic.value.title;
     });
 
     const sanitizedContent = computed(() => sanitizeContent(topic.value?.content || ""));
-
     const timerCompleted = computed(() => remainingSeconds.value <= 0);
     const hasAssessment = computed(() => Boolean(topic.value?.assessmentId));
     const isCompleted = computed(() => topic.value?.progress?.status === "completed");
@@ -140,28 +115,50 @@ export default {
       return timerCompleted.value;
     });
 
-    const ctaLabel = computed(() => {
-      if (hasAssessment.value) return "Пройти тест";
-      return "Далее";
+    const ctaLabel = computed(() => (nextTopic.value ? "Далее" : "Завершить"));
+    const showNextIcon = computed(() => Boolean(nextTopic.value));
+
+    const nextTopicLabel = computed(() => {
+      if (nextTopic.value) {
+        const sectionNum = section.value?.orderIndex ?? "";
+        const resolvedNextNum = Number(nextTopic.value.orderIndex) || Math.max(1, currentTopicIndex.value + 2);
+        const numberLabel = sectionNum ? `${sectionNum}.${resolvedNextNum}` : String(resolvedNextNum);
+        return `${numberLabel} ${nextTopic.value.title}`;
+      }
+      return "К списку подтем";
     });
 
+    function stopTimer() {
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+    }
+
     function startTimer(seconds) {
-      if (timerId) clearInterval(timerId);
-      if (seconds <= 0) return;
+      stopTimer();
+      if (seconds <= 0) {
+        remainingSeconds.value = 0;
+        return;
+      }
       remainingSeconds.value = seconds;
       timerId = setInterval(() => {
         if (remainingSeconds.value > 0) {
           remainingSeconds.value -= 1;
         } else {
-          clearInterval(timerId);
-          timerId = null;
+          stopTimer();
         }
       }, 1000);
     }
 
     async function init() {
+      stopTimer();
       isLoading.value = true;
       errorText.value = "";
+      topic.value = null;
+      requiredReadingSeconds.value = 0;
+      remainingSeconds.value = 0;
+
       try {
         const response = await apiClient.getCourseSection(courseId.value, sectionId.value);
         section.value = response?.section || null;
@@ -188,7 +185,6 @@ export default {
               remainingSeconds.value = 0;
             }
           } catch (startError) {
-            // Если подтема уже запущена (409) — просчитываем таймер из контента
             if (startError.status === 409 || startError.status === 200) {
               const contentRequired = calculateReadingSeconds(topic.value.content || "");
               requiredReadingSeconds.value = contentRequired;
@@ -200,7 +196,6 @@ export default {
             }
           }
         } else {
-          // Подтема уже завершена — таймер не нужен
           requiredReadingSeconds.value = 0;
           remainingSeconds.value = 0;
         }
@@ -214,11 +209,6 @@ export default {
     async function handleProceed() {
       if (!canProceed.value || isCompleting.value) return;
 
-      if (hasAssessment.value) {
-        router.push(`/assessment/${topic.value.assessmentId}`);
-        return;
-      }
-
       isCompleting.value = true;
       try {
         await apiClient.completeCourseTopic(courseId.value, topicId.value);
@@ -229,7 +219,6 @@ export default {
         }
       } catch (err) {
         if (err.status === 409) {
-          // Уже завершена или требуется тест
           if (nextTopic.value) {
             router.push(`/courses/${courseId.value}/topics/${sectionId.value}/subtopics/${nextTopic.value.id}`);
           } else {
@@ -243,34 +232,31 @@ export default {
       }
     }
 
-    function goBack() {
-      router.push(`/courses/${courseId.value}/topics/${sectionId.value}`);
-    }
-
-    onMounted(() => {
-      init();
-    });
+    watch(
+      () => [courseId.value, sectionId.value, topicId.value],
+      () => {
+        init();
+      },
+      { immediate: true },
+    );
 
     onBeforeUnmount(() => {
-      if (timerId) clearInterval(timerId);
+      stopTimer();
     });
 
     return {
+      section,
       isLoading,
       errorText,
       topic,
-      breadcrumbLabel,
-      topicTitle,
+      topicChipLabel,
       sanitizedContent,
-      requiredReadingSeconds,
-      remainingSeconds,
-      timerCompleted,
-      nextTopic,
       canProceed,
       ctaLabel,
+      showNextIcon,
       isCompleting,
+      nextTopicLabel,
       handleProceed,
-      goBack,
       init,
     };
   },
@@ -278,66 +264,72 @@ export default {
 </script>
 
 <style scoped>
-/* ── Навигационная шапка ── */
-.subtopic-nav {
+.subtopic-page {
+  background: #ffffff;
+  min-height: 100vh;
+}
+
+.subtopic-shell {
+  max-width: 430px;
+  margin: 0 auto;
+  padding: 14px 16px 14px;
+  min-height: calc(100vh - 76px - env(safe-area-inset-bottom));
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px 8px;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--bg-primary);
+  flex-direction: column;
 }
 
-.back-btn {
+.subtopic-breadcrumb {
   display: flex;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.subtopic-chip {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: 50%;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.15s;
-}
-
-.back-btn:active {
-  background: var(--divider);
-}
-
-.breadcrumb-badge {
-  background: rgba(99, 102, 241, 0.1);
-  color: #4f46e5;
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  min-height: 26px;
   border-radius: 8px;
-  padding: 4px 10px;
+  background: #ececf8;
+  color: #5e56e6;
+  border: 1px solid #dde0f1;
+  padding: 3px 10px;
   font-size: 13px;
+  line-height: 1.3;
   font-weight: 600;
-  line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: calc(100% - 56px);
 }
 
-/* ── Заголовок ── */
-.topic-title {
-  padding-top: 8px;
+.subtopic-content {
+  flex: 1;
+  min-height: 0;
 }
 
-/* ── Контент подтемы ── */
 .topic-content {
+  color: #3f4a71;
   font-size: 16px;
-  line-height: 1.65;
-  color: var(--text-primary);
+  line-height: 1.56;
+  margin-bottom: 18px;
+}
+
+.topic-content :deep(h1) {
+  color: #111a44;
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 700;
+  margin: 0 0 18px;
 }
 
 .topic-content :deep(p) {
-  margin-bottom: 12px;
+  margin: 0 0 14px;
+  color: #3f4a71;
+}
+
+.topic-content :deep(p:first-of-type) {
+  color: #111a44;
+  font-size: 16px;
+}
+
+.topic-content :deep(p:not(:first-of-type)) {
+  color: #8b93b8;
 }
 
 .topic-content :deep(p:last-child) {
@@ -346,157 +338,150 @@ export default {
 
 .topic-content :deep(h2),
 .topic-content :deep(h3) {
+  color: #111a44;
+  margin: 20px 0 10px;
   font-weight: 700;
-  margin: 20px 0 8px;
-  line-height: 1.3;
-}
-
-.topic-content :deep(h2) {
-  font-size: 20px;
-}
-
-.topic-content :deep(h3) {
-  font-size: 17px;
 }
 
 .topic-content :deep(ul),
 .topic-content :deep(ol) {
   padding-left: 20px;
-  margin-bottom: 12px;
+  margin: 0 0 14px;
 }
 
 .topic-content :deep(li) {
-  margin-bottom: 6px;
-}
-
-.topic-content :deep(img) {
-  width: 100%;
-  border-radius: 12px;
-  margin: 8px 0;
-  display: block;
-}
-
-.topic-content :deep(video) {
-  width: 100%;
-  border-radius: 12px;
-  margin: 8px 0;
-}
-
-.topic-content :deep(iframe) {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border: none;
-  border-radius: 12px;
-  margin: 8px 0;
-}
-
-.topic-content :deep(blockquote) {
-  border-left: 3px solid var(--accent-blue);
-  padding-left: 12px;
-  margin: 12px 0;
-  color: var(--text-secondary);
-}
-
-.topic-content :deep(strong),
-.topic-content :deep(b) {
-  font-weight: 700;
-}
-
-/* ── Подсказка следующей подтемы ── */
-.next-hint {
-  padding: 12px 0 0;
-}
-
-.next-hint__title {
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-top: 2px;
-}
-
-/* ── Вспомогательные отступы ── */
-.mt-16 {
-  margin-top: 16px;
-}
-
-.mb-4 {
-  margin-bottom: 4px;
-}
-
-.mb-8 {
   margin-bottom: 8px;
 }
 
-.mb-12 {
-  margin-bottom: 12px;
+.topic-content :deep(img),
+.topic-content :deep(iframe),
+.topic-content :deep(video) {
+  width: 100%;
+  border-radius: 20px;
+  display: block;
+  margin: 12px 0;
+  background: #e7eaf5;
 }
 
-.mb-16 {
+.empty-content {
+  font-size: 16px;
+  color: #697196;
   margin-bottom: 16px;
 }
 
-/* ── Карточка ошибки ── */
-.error-card {
-  margin-top: 16px;
-}
-
-/* ── Пустой контент ── */
-.empty-content {
-  padding: 20px;
-}
-
-/* ── Скелетон ── */
-.sk-wrapper {
+.subtopic-footer {
+  margin-top: auto;
   padding-top: 16px;
+  border-top: 1px solid #e7e9f3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
 }
 
-.sk-back {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--divider);
-  margin-bottom: 12px;
-  animation: sk-pulse 1.4s ease-in-out infinite;
+.next-topic {
+  min-width: 0;
+  flex: 1;
+}
+
+.next-topic__caption {
+  margin: 0 0 5px;
+  color: #7e86a8;
+  font-size: 13px;
+}
+
+.next-topic__title {
+  margin: 0;
+  color: #131c47;
+  font-size: 17px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.next-button {
+  width: 128px;
+  height: 56px;
+  border-radius: 16px;
+  border: none;
+  background: #e8e9f3;
+  color: #8a90ab;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.next-button__icon {
+  flex-shrink: 0;
+  color: currentColor;
+  opacity: 0.95;
+}
+
+.next-button:not(:disabled) {
+  background: #5e56e6;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.next-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.subtopic-error {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid #e5e7ef;
+  border-radius: 16px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.subtopic-skeleton {
+  padding-top: 8px;
+}
+
+.sk-badge,
+.sk-caption,
+.sk-line {
+  border-radius: 10px;
+  background: #e7e9f4;
+  animation: sk-pulse 1.3s ease-in-out infinite;
+}
+
+.sk-badge-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
 .sk-badge {
-  width: 140px;
-  height: 22px;
-  border-radius: 8px;
-  background: var(--divider);
-  margin-bottom: 16px;
-  animation: sk-pulse 1.4s ease-in-out infinite;
+  width: 78px;
+  height: 32px;
 }
 
-.sk-heading {
-  height: 28px;
-  border-radius: 6px;
-  background: var(--divider);
-  margin-bottom: 10px;
-  animation: sk-pulse 1.4s ease-in-out infinite;
-}
-
-.sk-heading--short {
-  width: 60%;
-}
-
-.sk-video {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border-radius: 12px;
-  background: var(--divider);
-  margin-bottom: 16px;
-  animation: sk-pulse 1.4s ease-in-out infinite;
+.sk-caption {
+  width: 190px;
+  height: 32px;
 }
 
 .sk-line {
+  width: 100%;
   height: 14px;
-  border-radius: 4px;
-  background: var(--divider);
   margin-bottom: 10px;
-  animation: sk-pulse 1.4s ease-in-out infinite;
 }
 
-.sk-line:nth-child(even) {
+.sk-line:nth-child(2n) {
   width: 80%;
 }
 
@@ -506,7 +491,51 @@ export default {
     opacity: 1;
   }
   50% {
-    opacity: 0.5;
+    opacity: 0.56;
+  }
+}
+
+@media (max-width: 760px) {
+  .subtopic-shell {
+    max-width: 100%;
+    padding: 14px 16px 12px;
+  }
+
+  .subtopic-chip {
+    min-height: 32px;
+    border-radius: 8px;
+    font-size: 16px;
+    padding: 5px 10px;
+  }
+
+  .topic-content {
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+
+  .empty-content {
+    font-size: 14px;
+  }
+
+  .subtopic-footer {
+    margin-top: 18px;
+    padding-top: 16px;
+  }
+
+  .next-topic__caption {
+    font-size: 12px;
+  }
+
+  .next-topic__title {
+    font-size: 15px;
+  }
+
+  .next-button {
+    width: 116px;
+    height: 56px;
+    border-radius: 14px;
+    font-size: 13px;
   }
 }
 </style>

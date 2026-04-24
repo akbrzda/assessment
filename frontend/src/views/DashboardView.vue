@@ -55,11 +55,11 @@
       <template v-else>
         <section class="dashboard-section">
           <h2 class="section-title">Продолжить обучение</h2>
-          <article class="continue-card app-panel">
+          <article v-if="continueCourse" class="continue-card app-panel">
             <div class="continue-content">
               <h3 class="continue-title">{{ continueCourseTitle }}</h3>
               <p class="continue-meta">{{ continueCourseMeta }}</p>
-              <button class="continue-btn" type="button" :disabled="isContinueDisabled" @click="handleContinueAction">Продолжить</button>
+              <button class="continue-btn" type="button" @click="handleContinueAction">Продолжить</button>
             </div>
             <div class="continue-image" :class="{ 'continue-image--placeholder': !continueCourseImageUrl }" aria-hidden="true">
               <img
@@ -71,6 +71,20 @@
                 @error="handleContinueImageError"
               />
               <BookOpen v-else :size="28" class="continue-image-icon" />
+            </div>
+          </article>
+          <article v-else-if="dashboardStats.courses === 0" class="continue-empty app-panel">
+            <BookOpen :size="32" class="continue-empty-icon" />
+            <div class="continue-empty-text">
+              <p class="continue-empty-title">Курсы пока не назначены</p>
+              <p class="continue-empty-sub">Обратитесь к руководителю</p>
+            </div>
+          </article>
+          <article v-else class="continue-empty app-panel">
+            <ShieldCheck :size="32" class="continue-empty-icon continue-empty-icon--success" />
+            <div class="continue-empty-text">
+              <p class="continue-empty-title">Все курсы завершены!</p>
+              <p class="continue-empty-sub">Отличная работа 🎉</p>
             </div>
           </article>
         </section>
@@ -98,11 +112,13 @@
 
         <section class="dashboard-section">
           <h2 class="section-title">Ближайшие задачи</h2>
-          <div class="task-list app-list-stack">
+          <div v-if="displayTasks.length" class="task-list app-list-stack">
             <button v-for="task in displayTasks" :key="task.id" class="task-item app-panel" type="button" @click="router.push('/assessments')">
               <div
                 class="task-icon app-round-icon"
-                :class="task.icon === 'time' ? 'app-round-icon--success' : task.icon === 'message' ? 'app-round-icon--violet' : 'app-round-icon--warning'"
+                :class="
+                  task.icon === 'time' ? 'app-round-icon--success' : task.icon === 'message' ? 'app-round-icon--violet' : 'app-round-icon--warning'
+                "
               >
                 <Clock3 v-if="task.icon === 'time'" :size="24" />
                 <MessageSquareText v-else-if="task.icon === 'message'" :size="24" />
@@ -114,6 +130,11 @@
               </div>
               <ChevronRight class="task-arrow" :size="28" />
             </button>
+          </div>
+          <div v-else class="tasks-empty app-panel">
+            <ShieldCheck :size="32" class="tasks-empty-icon" />
+            <p class="tasks-empty-text">Все курсы завершены или ещё не начаты</p>
+            <button class="tasks-empty-link" type="button" @click="router.push('/assessments')">Перейти к курсам</button>
           </div>
         </section>
       </template>
@@ -128,70 +149,6 @@ import { Bell, BookOpen, ChevronRight, Clock3, MessageSquareText, ShieldCheck } 
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 import { apiClient } from "../services/apiClient";
-
-function normalizeAssessment(item) {
-  if (!item) {
-    return null;
-  }
-
-  const threshold = Number.isFinite(item.passScorePercent) ? Math.round(item.passScorePercent) : null;
-  const bestScore = Number.isFinite(item.bestScorePercent) ? Math.round(item.bestScorePercent) : null;
-  const lastScore = Number.isFinite(item.lastScorePercent) ? Math.round(item.lastScorePercent) : null;
-  const hasPassed = bestScore != null && threshold != null ? bestScore >= threshold : false;
-  const attemptsUsed = Number.isFinite(item.lastAttemptNumber) ? Number(item.lastAttemptNumber) : 0;
-  const maxAttempts = Number.isFinite(item.maxAttempts) ? Number(item.maxAttempts) : 1;
-
-  let status = "pending";
-  if (item.status === "active") {
-    status = "open";
-  } else if (item.status === "closed") {
-    status = "closed";
-  } else if (item.status === "pending") {
-    status = "pending";
-  }
-
-  if (hasPassed || item.lastAttemptStatus === "completed") {
-    const hasAttemptsLeft = maxAttempts === 0 ? true : attemptsUsed < maxAttempts;
-    const isPerfectScore = bestScore === 100;
-
-    if (item.status === "active" && hasAttemptsLeft && !isPerfectScore) {
-      status = "open";
-    } else {
-      status = "completed";
-    }
-  }
-
-  const requiresTheory = Boolean(item.theory?.completionRequired);
-  const theoryCompleted = requiresTheory ? Boolean(item.theory?.completedAt) : false;
-
-  return {
-    id: item.id,
-    title: item.title,
-    status,
-    startDate: item.openAt,
-    endDate: item.closeAt,
-    threshold: threshold ?? 0,
-    maxAttempts,
-    attemptsUsed,
-    lastAttemptStatus: item.lastAttemptStatus,
-    lastCompletedAt: item.lastCompletedAt,
-    lastStartedAt: item.lastStartedAt,
-    bestResult:
-      bestScore != null
-        ? {
-            score: bestScore,
-            passed: hasPassed,
-          }
-        : lastScore != null
-          ? {
-              score: lastScore,
-              passed: threshold != null ? lastScore >= threshold : false,
-            }
-          : null,
-    requiresTheory,
-    theoryCompleted,
-  };
-}
 
 function normalizeCourse(item) {
   if (!item) {
@@ -227,7 +184,6 @@ export default {
     const userStore = useUserStore();
     const telegramStore = useTelegramStore();
 
-    const nextAssessment = ref(null);
     const recentActivity = ref([]);
     const courses = ref([]);
     const isDataLoading = ref(false);
@@ -238,26 +194,7 @@ export default {
       certificates: 0,
     });
 
-    const fallbackTasks = [
-      {
-        id: "fallback-1",
-        icon: "time",
-        title: "Тайм-менеджмент",
-        subtitle: "Продолжить тему 1.2",
-      },
-      {
-        id: "fallback-2",
-        icon: "message",
-        title: "Пройти тест",
-        subtitle: "Эффективная коммуникация",
-      },
-      {
-        id: "fallback-3",
-        icon: "shield",
-        title: "Лидерство и мотивация",
-        subtitle: "Доступна новая тема",
-      },
-    ];
+    const fallbackTasks = [];
 
     const greetingText = computed(() => {
       const currentHour = new Date().getHours();
@@ -276,17 +213,17 @@ export default {
     const continueCourse = computed(() => {
       const activeCourse = courses.value.find((course) => {
         const percent = Number(course?.progress?.progressPercent || 0);
-        return percent > 0 && percent < 100;
+        return course?.progress?.status !== "completed" && percent > 0;
       });
 
       if (activeCourse) {
         return activeCourse;
       }
 
-      return courses.value.find((course) => Number(course?.progress?.progressPercent || 0) < 100) || null;
+      return courses.value.find((course) => course?.progress?.status !== "completed") || null;
     });
 
-    const continueCourseTitle = computed(() => continueCourse.value?.title || nextAssessment.value?.title || "Эффективная коммуникация");
+    const continueCourseTitle = computed(() => continueCourse.value?.title || "Обучение");
 
     const continueCourseMeta = computed(() => {
       if (continueCourse.value) {
@@ -297,17 +234,10 @@ export default {
         return `Тема ${currentTopic} из ${totalTopics || 1} • ${score}%`;
       }
 
-      const score = nextAssessment.value?.bestResult?.score || 75;
-      return `Тема 2 из 4 • ${score}%`;
+      return "Вам доступны курсы для изучения";
     });
 
-    const isContinueDisabled = computed(() => {
-      if (continueCourse.value) {
-        return false;
-      }
-
-      return !nextAssessment.value || nextAssessment.value.status === "pending" || nextAssessment.value.status === "closed";
-    });
+    const isContinueDisabled = computed(() => !continueCourse.value);
 
     const continueCourseImageUrl = computed(() => {
       if (!continueCourse.value?.coverUrl || isContinueImageBroken.value) {
@@ -334,28 +264,9 @@ export default {
         id: activity.id,
         icon: iconTypes[index % iconTypes.length],
         title: activity.title,
-        subtitle: activity.result ? `Результат: ${activity.result.score}%` : "Продолжить обучение",
+        subtitle: activity.result ? `Прогресс: ${activity.result.score}%` : "Продолжить обучение",
       }));
     });
-
-    function openTheory(id) {
-      telegramStore.hapticFeedback("impact", "light");
-      router.push(`/assessment/${id}/theory`);
-    }
-
-    function startAssessment(assessment) {
-      if (!assessment) {
-        return;
-      }
-
-      if (assessment.requiresTheory) {
-        openTheory(assessment.id);
-        return;
-      }
-
-      telegramStore.hapticFeedback("impact", "light");
-      router.push(`/assessment/${assessment.id}`);
-    }
 
     function openCourse(courseId) {
       if (!courseId) {
@@ -371,11 +282,7 @@ export default {
         return;
       }
 
-      if (!nextAssessment.value || nextAssessment.value.status === "pending" || nextAssessment.value.status === "closed") {
-        return;
-      }
-
-      startAssessment(nextAssessment.value);
+      router.push("/assessments");
     }
 
     function handleContinueImageError() {
@@ -389,19 +296,7 @@ export default {
 
       isDataLoading.value = true;
       try {
-        const [, assessmentsResponse, coursesResponse] = await Promise.all([
-          userStore.loadOverview(),
-          apiClient.listUserAssessments(),
-          apiClient.listCourses(),
-        ]);
-
-        const normalizedAssessments = (assessmentsResponse?.assessments || []).map((item) => normalizeAssessment(item)).filter(Boolean);
-
-        const upcoming = normalizedAssessments
-          .filter((assessment) => assessment.status === "open" || assessment.status === "pending")
-          .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-
-        nextAssessment.value = upcoming.length ? upcoming[0] : null;
+        const [, coursesResponse] = await Promise.all([userStore.loadOverview(), apiClient.listCourses()]);
 
         courses.value = (coursesResponse?.courses || []).map((item) => normalizeCourse(item)).filter(Boolean);
 
@@ -414,23 +309,21 @@ export default {
           certificates: certificatesCount,
         };
 
-        recentActivity.value = normalizedAssessments
-          .filter((assessment) => assessment.lastCompletedAt || assessment.lastStartedAt)
+        recentActivity.value = courses.value
+          .filter((course) => Number(course.progress?.progressPercent || 0) > 0)
           .sort((a, b) => {
-            const left = a.lastCompletedAt || a.lastStartedAt;
-            const right = b.lastCompletedAt || b.lastStartedAt;
-            return new Date(right).getTime() - new Date(left).getTime();
+            return Number(b.progress?.progressPercent || 0) - Number(a.progress?.progressPercent || 0);
           })
           .slice(0, 5)
-          .map((assessment) => ({
-            id: `${assessment.id}-${assessment.lastCompletedAt || assessment.lastStartedAt}`,
-            title: assessment.title,
-            result: assessment.bestResult
-              ? {
-                  success: assessment.bestResult.passed,
-                  score: assessment.bestResult.score,
-                }
-              : null,
+          .map((course) => ({
+            id: `${course.id}-${course.progress?.progressPercent || 0}`,
+            title: course.title,
+            result:
+              Number(course.progress?.progressPercent || 0) > 0
+                ? {
+                    score: Math.round(Number(course.progress?.progressPercent || 0)),
+                  }
+                : null,
           }));
       } catch (error) {
         console.error("Не удалось загрузить данные дашборда", error);
@@ -455,10 +348,10 @@ export default {
       isDataLoading,
       dashboardStats,
       greetingText,
+      continueCourse,
       continueCourseTitle,
       continueCourseMeta,
       continueCourseImageUrl,
-      isContinueDisabled,
       displayTasks,
       handleContinueAction,
       handleContinueImageError,
@@ -470,7 +363,7 @@ export default {
 
 <style scoped>
 .dashboard-page {
-  background: #ffffff;
+  background: var(--bg-primary);
 }
 
 .dashboard-container {
@@ -502,7 +395,7 @@ export default {
 
 .welcome-title {
   margin: 0;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 26px;
   font-weight: 700;
   line-height: 1.2;
@@ -511,7 +404,7 @@ export default {
 
 .welcome-subtitle {
   margin-top: 6px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.4;
 }
@@ -522,7 +415,7 @@ export default {
   border-radius: 50%;
   border: none;
   background: transparent;
-  color: #9ca3af;
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -545,14 +438,14 @@ export default {
 
 .section-title {
   margin: 0 0 12px;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 18px;
   font-weight: 700;
   line-height: 1.25;
 }
 
 .section-link {
-  color: #6355f5;
+  color: var(--accent);
   text-decoration: none;
   font-size: 13px;
   font-weight: 500;
@@ -575,7 +468,7 @@ export default {
 
 .continue-title {
   margin: 0;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 17px;
   font-weight: 700;
   line-height: 1.3;
@@ -583,14 +476,19 @@ export default {
 
 .continue-meta {
   margin: 6px 0 12px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 400;
 }
 
+.continue-meta--warning {
+  color: #cc7a00;
+  font-weight: 600;
+}
+
 .continue-btn {
   border: none;
-  background: #6355f5;
+  background: var(--accent);
   color: #ffffff;
   border-radius: 12px;
   min-height: 44px;
@@ -610,7 +508,7 @@ export default {
   width: 36%;
   min-width: 100px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
+  background: var(--bg-secondary);
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
@@ -630,7 +528,7 @@ export default {
 }
 
 .continue-image-icon {
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 /* ── Stats grid ──────────────────────────────────── */
@@ -647,7 +545,7 @@ export default {
 }
 
 .stat-label {
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 500;
   margin: 0;
@@ -655,7 +553,7 @@ export default {
 
 .stat-value {
   margin: 8px 0 0;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 26px;
   line-height: 1;
   font-weight: 700;
@@ -691,7 +589,7 @@ export default {
 
 .task-title {
   margin: 0;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 15px;
   font-weight: 700;
   line-height: 1.25;
@@ -699,13 +597,13 @@ export default {
 
 .task-subtitle {
   margin: 3px 0 0;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.3;
 }
 
 .task-arrow {
-  color: #d1d5db;
+  color: var(--divider);
   flex-shrink: 0;
 }
 
@@ -726,7 +624,7 @@ export default {
 .sk-continue-image,
 .sk-task-icon,
 .sk-stat-card {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--divider) 50%, var(--bg-secondary) 75%);
   background-size: 600px 100%;
   animation: sk-shimmer 1.4s infinite linear;
   border-radius: 8px;
@@ -740,7 +638,7 @@ export default {
 }
 
 .sk-continue-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--divider);
   border-radius: 16px;
   padding: 14px;
   display: flex;
@@ -802,12 +700,12 @@ export default {
   flex-direction: column;
   justify-content: flex-end;
   padding: 12px;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--divider) 50%, var(--bg-secondary) 75%);
   background-size: 600px 100%;
 }
 
 .sk-task-item {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--divider);
   border-radius: 14px;
   min-height: 72px;
   padding: 12px 14px;
@@ -904,5 +802,70 @@ export default {
   .task-subtitle {
     font-size: 12px;
   }
+}
+
+/* ── Continue empty state ────────────────────────── */
+.continue-empty {
+  padding: 20px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.continue-empty-icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.continue-empty-icon--success {
+  color: var(--success);
+}
+
+.continue-empty-text {
+  flex: 1;
+}
+
+.continue-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 2px;
+}
+
+.continue-empty-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ── Tasks empty state ───────────────────────────── */
+.tasks-empty {
+  padding: 20px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.tasks-empty-icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.tasks-empty-text {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.tasks-empty-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
 }
 </style>

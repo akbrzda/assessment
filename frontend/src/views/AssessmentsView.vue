@@ -28,8 +28,15 @@
         </button>
       </div>
 
-      <div v-if="isCoursesLoading" class="loading-state">
-        <p class="body-small text-secondary">Загрузка курсов...</p>
+      <div v-if="isCoursesLoading" class="courses-list">
+        <div v-for="n in 4" :key="n" class="sk-course-card">
+          <div class="sk-course-icon"></div>
+          <div class="sk-course-body">
+            <div class="sk-line sk-line--title"></div>
+            <div class="sk-line sk-line--meta"></div>
+            <div class="sk-line sk-line--progress"></div>
+          </div>
+        </div>
       </div>
 
       <div v-else-if="coursesError" class="error-state">
@@ -46,7 +53,10 @@
           <div class="course-body">
             <h3 class="course-title">{{ course.title }}</h3>
             <p class="course-meta">{{ course.sectionsCount }} {{ getSectionsLabel(course.sectionsCount) }}</p>
-            <div class="course-progress">
+            <div v-if="course.progress.status === 'completed'" class="course-completed-badge">
+              <span class="course-completed-text">Курс завершён</span>
+            </div>
+            <div v-else class="course-progress">
               <div class="progress-track">
                 <div
                   class="progress-fill"
@@ -114,7 +124,7 @@ export default {
       return courses.value
         .filter((course) => {
           if (courseFilter.value === "completed") {
-            return course.progress.status === "completed" || Number(course.progress.progressPercent || 0) >= 100;
+            return course.progress.status === "completed";
           }
           if (courseFilter.value === "my") {
             return course.progress.status !== "completed";
@@ -143,8 +153,8 @@ export default {
     }
 
     function getCourseIcon(course) {
+      if (course?.progress?.status === "completed") return Trophy;
       const percent = Number(course?.progress?.progressPercent || 0);
-      if (percent >= 100) return Trophy;
       if (percent >= 50) return Clock3;
       return BookOpen;
     }
@@ -297,7 +307,7 @@ export default {
 }
 
 .filter-tab.active {
-  background-color: #5046e0;
+  background-color: var(--accent);
   color: #ffffff;
   font-weight: 600;
 }
@@ -340,7 +350,7 @@ export default {
 }
 
 .course-icon-symbol {
-  color: #5046e0;
+  color: var(--accent);
 }
 
 .course-body {
@@ -364,6 +374,16 @@ export default {
   margin: 0 0 6px;
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.course-status {
+  margin: -2px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.course-status--warning {
+  color: #cc7a00;
 }
 
 .course-progress {
@@ -432,5 +452,76 @@ export default {
 
 .text-secondary {
   color: var(--text-secondary);
+}
+
+/* ── Статус завершения ── */
+.course-completed-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.course-completed-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--success);
+}
+
+/* ── Skeleton ── */
+@keyframes sk-shimmer {
+  0% {
+    background-position: -300px 0;
+  }
+  100% {
+    background-position: 300px 0;
+  }
+}
+
+.sk-course-card {
+  border: 1px solid var(--divider);
+  border-radius: 16px;
+  background: var(--bg-secondary);
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.sk-course-icon,
+.sk-line {
+  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--divider) 50%, var(--bg-secondary) 75%);
+  background-size: 600px 100%;
+  animation: sk-shimmer 1.4s infinite linear;
+  border-radius: 8px;
+}
+
+.sk-course-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.sk-course-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sk-line--title {
+  width: 70%;
+  height: 15px;
+}
+
+.sk-line--meta {
+  width: 40%;
+  height: 12px;
+}
+
+.sk-line--progress {
+  width: 100%;
+  height: 4px;
+  border-radius: 4px;
 }
 </style>

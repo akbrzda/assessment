@@ -12,6 +12,26 @@ async function assertCourseNotClosed({ courseId, userId, connection }) {
   }
 }
 
+async function syncSectionCompletionAfterTopicProgress({ topic, userId, connection }) {
+  const topicsCheck = await progressRepo.areAllTopicsCompletedBySection({ sectionId: topic.sectionId, userId }, { connection });
+  if (!topicsCheck.allCompleted) {
+    return false;
+  }
+
+  await progressRepo.upsertSectionProgress({
+    courseId: topic.courseId,
+    sectionId: topic.sectionId,
+    userId,
+    status: "passed",
+    attemptId: null,
+    scorePercent: 0,
+    attemptNumber: 0,
+    connection,
+  });
+
+  return true;
+}
+
 async function startCourse({ courseId, userId }) {
   const connection = await pool.getConnection();
   try {
@@ -100,6 +120,7 @@ async function handleTopicMaterialViewed({ topicId, userId }) {
     await progressRepo.markTopicMaterial({ topicId, sectionId: topic.sectionId, courseId: topic.courseId, userId, completedStatus, connection });
 
     if (completedStatus === "completed") {
+      await syncSectionCompletionAfterTopicProgress({ topic, userId, connection });
       const aggregate = await progressRepo.getCourseProgressAggregate({ courseId: topic.courseId, userId, connection });
       await progressRepo.syncCourseProgress({ courseId: topic.courseId, userId, aggregate, connection });
     }
@@ -156,6 +177,10 @@ async function handleTopicAttemptCompletion({ topicId, userId, attemptId }) {
       attemptNumber: result.attemptNumber,
       connection,
     });
+
+    if (status === "completed" && topicInfo) {
+      await syncSectionCompletionAfterTopicProgress({ topic: topicInfo, userId, connection });
+    }
 
     const aggregate = await progressRepo.getCourseProgressAggregate({ courseId: result.courseId, userId, connection });
     await progressRepo.syncCourseProgress({ courseId: result.courseId, userId, aggregate, connection });
