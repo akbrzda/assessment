@@ -200,7 +200,7 @@ const loadPositions = async () => {
 };
 
 const resetFilters = () => {
-  filters.value.search = "";
+  filters.value = { search: "" };
   loadPositions();
 };
 

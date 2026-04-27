@@ -37,8 +37,6 @@
         </span>
       </div>
     </Card>
-
-    <!-- Content -->
     <Card class="users-card" padding="none">
       <div class="bulk-actions">
         <span class="bulk-selected">Выбрано: {{ selectedUserIds.length }}</span>

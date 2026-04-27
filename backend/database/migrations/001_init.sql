@@ -346,7 +346,6 @@ CREATE TABLE IF NOT EXISTS assessment_theory_completions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Добавляем внешний ключ к текущей версии теории в assessments
-ALTER TABLE assessments DROP FOREIGN KEY IF EXISTS fk_current_theory_version;
 ALTER TABLE assessments
   ADD CONSTRAINT fk_current_theory_version
     FOREIGN KEY (current_theory_version_id) REFERENCES assessment_theory_versions(id)

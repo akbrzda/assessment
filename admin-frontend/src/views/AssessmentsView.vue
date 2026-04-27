@@ -268,11 +268,7 @@ const loadAssessments = async () => {
 };
 
 const resetFilters = () => {
-  filters.value = {
-    search: "",
-    status: "",
-    branch: "",
-  };
+  filters.value = { search: "", status: "", branch: "" };
   pagination.value.page = 1;
   loadAssessments();
 };

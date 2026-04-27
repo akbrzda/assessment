@@ -1,33 +1,31 @@
 <template>
   <header class="topbar" :class="{ collapsed: sidebarCollapsed }">
     <div class="topbar-content">
-      <!-- Кнопка меню (мобильные) -->
+      <!-- Кнопка меню -->
       <button @click="$emit('toggle-sidebar')" class="menu-btn">
         <Icon name="Menu" class="menu-icon" :size="24" aria-hidden="true" />
       </button>
 
-      <div class="page-title-container">
-        <h1 class="page-title">{{ pageTitle }}</h1>
-      </div>
+      <!-- Хлебные крошки -->
+      <nav class="breadcrumb" aria-label="Навигация">
+        <router-link to="/dashboard" class="breadcrumb-home" title="Главная">
+          <Icon name="Home" :size="16" />
+        </router-link>
+        <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
+          <span class="breadcrumb-sep">›</span>
+          <router-link :to="crumb.path" class="breadcrumb-item" :class="{ 'is-last': i === breadcrumbs.length - 1 }">{{ crumb.label }}</router-link>
+        </template>
+      </nav>
 
       <div class="topbar-actions">
         <div class="global-search">
-          <input
-            v-model="searchQuery"
-            type="search"
-            class="global-search-input"
-            placeholder="Глобальный поиск..."
-            @input="handleSearchInput"
-          />
+          <Icon name="Search" :size="16" class="search-icon" aria-hidden="true" />
+          <input v-model="searchQuery" type="search" class="global-search-input" placeholder="Поиск..." @input="handleSearchInput" />
+          <kbd class="search-kbd">⌘K</kbd>
           <div v-if="showSearchResults" class="global-search-dropdown">
             <div v-if="searchLoading" class="global-search-empty">Поиск...</div>
             <template v-else>
-              <button
-                v-for="item in flattenedSearchResults"
-                :key="item.key"
-                class="global-search-item"
-                @click="openSearchResult(item)"
-              >
+              <button v-for="item in flattenedSearchResults" :key="item.key" class="global-search-item" @click="openSearchResult(item)">
                 <span class="global-search-type">{{ item.type }}</span>
                 <span class="global-search-title">{{ item.title }}</span>
               </button>
@@ -36,30 +34,10 @@
           </div>
         </div>
 
-        <!-- Индикатор подключения WebSocket -->
-        <div
-          class="connection-status"
-          :class="{ connected: isConnected, disconnected: !isConnected }"
-          :title="isConnected ? 'Подключено' : 'Отключено'"
-        >
-          <span class="status-dot"></span>
-        </div>
-
-        <div class="theme-toggle">
-          <div class="theme-toggle-group" role="group" aria-label="Переключение темы">
-            <button
-              v-for="option in themeOptions"
-              :key="option.mode"
-              class="theme-toggle-btn"
-              :class="{ active: isThemeActive(option.mode) }"
-              :title="getThemeButtonTitle(option.mode)"
-              @click="selectTheme(option.mode)"
-            >
-              <Icon :name="option.icon" size="16" aria-hidden="true" />
-              <span class="theme-toggle-label">{{ option.label }}</span>
-            </button>
-          </div>
-        </div>
+        <!-- Переключатель темы -->
+        <button class="theme-btn" @click="toggleTheme" :title="themeToggleTitle" aria-label="Переключить тему">
+          <Icon :name="themeMode === 'dark' ? 'Sun' : 'Moon'" :size="18" aria-hidden="true" />
+        </button>
 
         <!-- Профильное меню -->
         <div class="profile-menu" :class="{ 'is-open': isProfileMenuOpen }">
@@ -77,10 +55,17 @@
 
           <transition name="dropdown">
             <div v-if="isProfileMenuOpen" class="profile-dropdown">
-              <router-link to="/profile" class="dropdown-item" @click="handleProfileClick">
-                <Icon name="User" size="16" />
-                <span>Профиль</span>
-              </router-link>
+              <div class="dropdown-header">
+                <div class="dropdown-avatar">
+                  <img v-if="authStore.user?.avatarUrl" :src="authStore.user.avatarUrl" alt="Avatar" />
+                  <Icon v-else name="User" size="22" />
+                </div>
+                <div class="dropdown-user-info">
+                  <p class="dropdown-name">{{ getUserFullName }}</p>
+                  <p class="dropdown-role">{{ getRoleLabel(authStore.user?.role) }}</p>
+                </div>
+              </div>
+              <div class="dropdown-divider"></div>
               <button @click="handleLogout" class="dropdown-item">
                 <Icon name="LogOut" size="16" />
                 <span>Выйти</span>
@@ -98,14 +83,12 @@ import { computed, ref, onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useThemeStore } from "../../stores/theme";
 import { useAuthStore } from "../../stores/auth";
-import { useWebSocket } from "../../composables/useWebSocket";
 import { globalSearch } from "../../api/users";
 import Icon from "../ui/Icon.vue";
 
 const authStore = useAuthStore();
 const router = useRouter();
 const isProfileMenuOpen = ref(false);
-const profileMenuRef = ref(null);
 const searchQuery = ref("");
 const searchLoading = ref(false);
 const searchResults = ref({ users: [], assessments: [], questions: [] });
@@ -122,48 +105,45 @@ defineProps({
 const themeStore = useThemeStore();
 const themeMode = computed(() => themeStore.themeMode);
 
-const themeOptions = [
-  { mode: "light", label: "", icon: "Sun" },
-  { mode: "dark", label: "", icon: "Moon" },
-];
-
-const isThemeActive = (mode) => themeMode.value === mode;
-
-const selectTheme = (mode) => {
-  if (!mode || themeMode.value === mode) {
-    return;
-  }
-  themeStore.setThemeMode(mode);
+const toggleTheme = () => {
+  themeStore.setThemeMode(themeMode.value === "dark" ? "light" : "dark");
 };
 
-const getThemeButtonTitle = (mode) => {
-  const label = mode === "dark" ? "тёмную" : "светлую";
-  if (themeMode.value === mode) {
-    return `Сейчас активна ${label} тема`;
-  }
-  return `Переключить на ${label} тему`;
-};
-
-const { isConnected } = useWebSocket();
+const themeToggleTitle = computed(() => (themeMode.value === "dark" ? "Переключить на светлую тему" : "Переключить на тёмную тему"));
 
 defineEmits(["toggle-sidebar"]);
 
 const route = useRoute();
 
-const pageTitle = computed(() => {
-  const titles = {
-    dashboard: "Дашборд",
-    users: "Управление пользователями",
-    invitations: "Приглашения для управляющих",
-    assessments: "Управление аттестациями",
-    questions: "Банк вопросов",
-    reports: "Отчёты и аналитика",
-    branches: "Управление филиалами",
-    positions: "Управление должностями",
-    settings: "Настройки системы",
-    logs: "Журнал действий",
-  };
-  return titles[route.name?.toLowerCase()] || "Админ-панель";
+const sectionLabels = {
+  dashboard: "Дашборд",
+  users: "Пользователи",
+  courses: "Курсы",
+  assessments: "Аттестации",
+  questions: "Банк вопросов",
+  reports: "Отчёты",
+  branches: "Филиалы",
+  positions: "Должности",
+  invitations: "Приглашения",
+  settings: "Настройки",
+  profile: "Профиль",
+};
+
+const breadcrumbs = computed(() => {
+  const segments = route.path.split("/").filter(Boolean);
+  if (!segments.length) return [];
+
+  const crumbs = [];
+  const sectionLabel = sectionLabels[segments[0]];
+  if (sectionLabel) {
+    crumbs.push({ label: sectionLabel, path: "/" + segments[0] });
+  }
+
+  if (segments.length > 1 && route.meta?.title) {
+    crumbs.push({ label: route.meta.title, path: route.path });
+  }
+
+  return crumbs;
 });
 
 const getUserFullName = computed(() => {
@@ -307,7 +287,9 @@ onUnmounted(() => {
 }
 
 .menu-btn {
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 8px;
   background: transparent;
   border: none;
@@ -315,14 +297,7 @@ onUnmounted(() => {
   color: var(--text-primary);
   border-radius: 6px;
   transition: all 0.2s;
-}
-
-@media (max-width: 1023px) {
-  .menu-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+  flex-shrink: 0;
 }
 
 .menu-btn:hover {
@@ -345,10 +320,53 @@ onUnmounted(() => {
   margin: 0;
 }
 
-@media (max-width: 768px) {
-  .page-title {
-    font-size: 16px;
-  }
+/* Хлебные крошки */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.breadcrumb-home {
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.breadcrumb-home:hover {
+  color: var(--text-primary);
+}
+
+.breadcrumb-sep {
+  color: var(--text-secondary);
+  font-size: 16px;
+  flex-shrink: 0;
+  line-height: 1;
+  font-weight: 300;
+}
+
+.breadcrumb-item {
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s;
+}
+
+.breadcrumb-item:hover {
+  color: var(--text-primary);
+}
+
+.breadcrumb-item.is-last {
+  color: #7c3aed;
+  font-weight: 500;
 }
 
 .topbar-actions {
@@ -357,105 +375,79 @@ onUnmounted(() => {
   gap: 12px;
 }
 
-.theme-toggle {
+/* Переключатель темы */
+.theme-btn {
+  width: 36px;
+  height: 36px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
-
-.theme-toggle-group {
-  display: inline-flex;
   align-items: center;
+  justify-content: center;
   border: 1px solid var(--divider);
-  border-radius: 999px;
-  padding: 2px;
   background: var(--surface-card);
-  gap: 4px;
-}
-
-.theme-toggle-btn {
-  border: none;
-  background: transparent;
-  border-radius: 999px;
-  padding: 6px 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 500;
+  border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s;
+  flex-shrink: 0;
 }
 
-.theme-toggle-btn:hover {
+.theme-btn:hover {
+  background: var(--nav-hover-bg);
   color: var(--text-primary);
 }
 
-.theme-toggle-btn.active {
-  background: var(--nav-active-bg);
-  color: var(--nav-active-text);
-}
-
-.theme-toggle-label {
-  white-space: nowrap;
-}
-
-@media (max-width: 768px) {
-  .theme-toggle {
-    align-items: center;
-  }
-
-  .theme-toggle-btn {
-    padding: 6px;
-  }
-
-  .theme-toggle-label {
-    display: none;
-  }
-}
-
-.user-profile {
+/* Dropdown header с инфо о пользователе */
+.dropdown-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding-left: 12px;
-  border-left: 1px solid var(--border-color);
+  padding: 16px;
 }
 
-.user-info {
-  text-align: right;
-}
-
-.user-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-  line-height: 1.4;
-}
-
-.user-role {
-  font-size: 12px;
+.dropdown-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   color: var(--text-secondary);
-  line-height: 1.4;
 }
 
-.logout-btn {
-  padding: 10px 18px;
-  background: #ffffff14;
-  color: var(--text-primary);
-  border: 1px solid var(--divider);
-  border-radius: 14px;
+.dropdown-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dropdown-user-info {
+  min-width: 0;
+}
+
+.dropdown-name {
   font-size: 14px;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+  color: var(--text-primary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-role {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
   white-space: nowrap;
 }
 
-.logout-btn:hover {
-  opacity: 0.6;
+.dropdown-divider {
+  height: 1px;
+  background: var(--divider);
+  margin: 0;
 }
 
 .connection-status {
@@ -675,7 +667,17 @@ onUnmounted(() => {
 }
 .global-search {
   position: relative;
-  width: 320px;
+  width: 280px;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-secondary);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .global-search-input {
@@ -683,9 +685,34 @@ onUnmounted(() => {
   height: 36px;
   border-radius: 10px;
   border: 1px solid var(--divider);
-  background: var(--bg-elevated);
+  background: var(--bg-secondary);
   color: var(--text-primary);
-  padding: 0 12px;
+  padding: 0 56px 0 34px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.global-search-input:focus {
+  border-color: #7c3aed;
+}
+
+.global-search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.search-kbd {
+  position: absolute;
+  right: 8px;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--surface-card);
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  padding: 2px 5px;
+  pointer-events: none;
+  line-height: 1.4;
 }
 
 .global-search-dropdown {

@@ -1,12 +1,7 @@
 <template>
   <div class="app-shell" :class="{ 'sidebar-collapsed': isSidebarCollapsed }">
-    <Sidebar
-      :isOpen="sidebarOpen"
-      :isCollapsed="isSidebarCollapsed"
-      @close="sidebarOpen = false"
-      @toggle-collapse="toggleSidebarCollapsed"
-    />
-    <TopBar :sidebar-collapsed="isSidebarCollapsed" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
+    <Sidebar :isOpen="sidebarOpen" :isCollapsed="isSidebarCollapsed" @close="sidebarOpen = false" @toggle-collapse="toggleSidebarCollapsed" />
+    <TopBar :sidebar-collapsed="isSidebarCollapsed" @toggle-sidebar="handleToggleSidebar" />
 
     <main class="main-content" :class="{ 'sidebar-open': sidebarOpen }">
       <router-view />
@@ -30,6 +25,14 @@ const isSidebarCollapsed = computed(() => themeStore.sidebarCollapsed);
 
 const toggleSidebarCollapsed = () => {
   themeStore.toggleSidebarCollapsed();
+};
+
+const handleToggleSidebar = () => {
+  if (isMobile.value) {
+    sidebarOpen.value = !sidebarOpen.value;
+  } else {
+    themeStore.toggleSidebarCollapsed();
+  }
 };
 
 const checkMobile = () => {
@@ -68,7 +71,6 @@ onUnmounted(() => {
 }
 
 .main-content :deep(> *) {
-  
   margin: 0 auto;
 }
 

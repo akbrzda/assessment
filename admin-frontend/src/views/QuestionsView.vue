@@ -128,12 +128,8 @@
       <div v-if="totalPages > 1" class="pagination">
         <span class="pagination-info">Страница {{ pagination.page }} из {{ totalPages }}</span>
         <div class="pagination-buttons">
-          <Button size="sm" variant="ghost" :disabled="pagination.page <= 1" @click="changePage(pagination.page - 1)">
-            Предыдущая
-          </Button>
-          <Button size="sm" variant="ghost" :disabled="pagination.page >= totalPages" @click="changePage(pagination.page + 1)">
-            Следующая
-          </Button>
+          <Button size="sm" variant="ghost" :disabled="pagination.page <= 1" @click="changePage(pagination.page - 1)"> Предыдущая </Button>
+          <Button size="sm" variant="ghost" :disabled="pagination.page >= totalPages" @click="changePage(pagination.page + 1)"> Следующая </Button>
         </div>
       </div>
     </Card>
@@ -234,17 +230,13 @@ const loadCategories = async () => {
   }
 };
 
-const resetFilters = () => {
-  filters.value = {
-    search: "",
-    category: "",
-    type: "",
-  };
+const applyFilters = () => {
   pagination.value.page = 1;
   loadQuestions();
 };
 
-const applyFilters = () => {
+const resetFilters = () => {
+  filters.value = { search: "", category: "", type: "" };
   pagination.value.page = 1;
   loadQuestions();
 };

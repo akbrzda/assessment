@@ -1,27 +1,136 @@
 <template>
-  <div class="courses-view">
+  <div class="courses-view" @click="closeMenus">
+    <!-- Заголовок страницы -->
     <div class="page-header">
-      <Button icon="plus" @click="goToCreate">Создать курс</Button>
+      <div class="page-title-block">
+        <h1 class="page-title">Курсы</h1>
+        <p class="page-subtitle">Управляйте курсами, модулями и версиями</p>
+      </div>
+      <Button icon="plus" @click.stop="goToCreate">Создать курс</Button>
     </div>
 
-    <Card class="filters-card">
-      <div class="filters-grid">
-        <Input v-model="filters.search" placeholder="Поиск по названию или описанию" @keyup.enter="loadCourses" />
-        <Select v-model="filters.status" :options="statusFilterOptions" placeholder="Все статусы" @update:modelValue="loadCourses" />
-        <Button variant="secondary" icon="search" @click="loadCourses">Найти</Button>
-        <Button variant="secondary" icon="refresh-ccw" @click="resetFilters">Сбросить</Button>
+    <!-- Фильтры -->
+    <div class="filters-bar">
+      <div class="filters-search-wrap">
+        <Icon name="search" :size="16" class="search-icon" />
+        <input v-model="filters.search" placeholder="Поиск по названию или описанию" class="search-input" @keyup.enter="loadCourses" />
       </div>
-    </Card>
+      <div class="filter-sep"></div>
+      <select v-model="filters.status" class="filter-select" @change="loadCourses">
+        <option value="">Все статусы</option>
+        <option v-for="opt in statusFilterOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+      </select>
+      <div class="filter-sep"></div>
+      <select v-model="filters.author" class="filter-select">
+        <option value="">Все авторы</option>
+      </select>
+      <div style="flex: 1; min-width: 8px"></div>
+      <Button @click="loadCourses">Найти</Button>
+      <button class="filter-reset-btn" @click="resetFilters">
+        <Icon name="rotate-ccw" :size="15" />
+        Сбросить
+      </button>
+    </div>
 
-    <Card padding="none" class="courses-card">
-      <Preloader v-if="loading" />
+    <!-- Переключатель вида -->
+    <div class="view-tabs">
+      <button class="view-tab" :class="{ active: viewMode === 'cards' }" @click="viewMode = 'cards'">
+        <Icon name="layout-grid" :size="16" />
+        Карточки
+      </button>
+      <button class="view-tab" :class="{ active: viewMode === 'table' }" @click="viewMode = 'table'">
+        <Icon name="table-2" :size="16" />
+        Таблица
+      </button>
+    </div>
 
-      <div v-else-if="courses.length === 0" class="empty-state">
-        <p>Курсы не найдены</p>
+    <!-- Загрузка -->
+    <Preloader v-if="loading" />
+
+    <!-- Пустое состояние -->
+    <div v-else-if="courses.length === 0" class="empty-state">
+      <p>Курсы не найдены</p>
+    </div>
+
+    <!-- Карточный режим -->
+    <template v-else-if="viewMode === 'cards'">
+      <div class="cards-grid">
+        <div v-for="(course, index) in paginatedCourses" :key="course.id" class="course-card" @click.stop>
+          <!-- Иконка + заголовок + описание -->
+          <div class="card-head">
+            <div class="course-icon-wrap" :style="{ background: ICON_PALETTES[index % ICON_PALETTES.length].bg }">
+              <Icon name="file-text" :size="20" :color="ICON_PALETTES[index % ICON_PALETTES.length].color" />
+            </div>
+            <div class="card-title-block">
+              <h3 class="course-name">{{ course.title }}</h3>
+              <p class="course-desc">{{ course.description || "Без описания" }}</p>
+            </div>
+          </div>
+
+          <!-- Бейдж статуса -->
+          <Badge :variant="getStatusVariant(course.status)" size="sm" class="status-badge">
+            {{ getStatusLabel(course.status) }}
+          </Badge>
+
+          <!-- Статистика -->
+          <div class="course-stats">
+            <div class="stat-row">
+              <Icon name="file-text" :size="14" class="stat-icon" />
+              <span class="stat-label">Версия</span>
+              <span class="stat-val">{{ course.version }}</span>
+            </div>
+            <div class="stat-row">
+              <Icon name="layers" :size="14" class="stat-icon" />
+              <span class="stat-label">Тем курса</span>
+              <span class="stat-val">{{ course.sectionsCount }}</span>
+            </div>
+            <div class="stat-row">
+              <Icon name="clock" :size="14" class="stat-icon" />
+              <span class="stat-label">Обновлен</span>
+              <span class="stat-val">{{ formatDate(course.updatedAt) }}</span>
+            </div>
+          </div>
+
+          <!-- Футер карточки -->
+          <div class="card-footer">
+            <button class="card-edit-btn" @click="goToEdit(course.id)">Редактировать</button>
+            <div class="menu-wrap" @click.stop>
+              <button class="menu-btn" @click="toggleMenu(course.id)">
+                <Icon name="more-horizontal" :size="18" />
+              </button>
+              <div v-if="openMenuId === course.id" class="dropdown-menu">
+                <button class="dropdown-item" @click="goToEdit(course.id)"><Icon name="pencil" :size="14" /> Редактировать</button>
+                <button
+                  v-if="course.status === 'published'"
+                  class="dropdown-item"
+                  @click="
+                    handleArchive(course);
+                    openMenuId = null;
+                  "
+                >
+                  <Icon name="archive" :size="14" /> Закрыть
+                </button>
+                <button
+                  v-if="course.status !== 'published'"
+                  class="dropdown-item danger"
+                  @click="
+                    handleDelete(course);
+                    openMenuId = null;
+                  "
+                >
+                  <Icon name="trash" :size="14" /> Удалить
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+    </template>
 
-      <div v-else>
-        <div class="table-wrapper hide-mobile">
+    <!-- Табличный режим -->
+    <template v-else>
+      <div class="table-container">
+        <div class="table-scroll">
           <table class="courses-table">
             <thead>
               <tr>
@@ -30,32 +139,74 @@
                 <th>Тем курса</th>
                 <th>Версия</th>
                 <th>Обновлен</th>
-                <th class="actions-col">Действия</th>
+                <th>Автор</th>
+                <th>Действия</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="course in courses" :key="course.id">
+              <tr v-for="course in paginatedCourses" :key="course.id">
                 <td>
-                  <div class="course-title">{{ course.title }}</div>
-                  <div class="course-desc">{{ course.description || "Без описания" }}</div>
+                  <div class="cell-name">{{ course.title }}</div>
+                  <div class="cell-desc">{{ course.description || "Без описания" }}</div>
                 </td>
                 <td>
-                  <Badge :variant="getStatusVariant(course.status)" rounded size="sm">
+                  <Badge :variant="getStatusVariant(course.status)" size="sm">
                     {{ getStatusLabel(course.status) }}
                   </Badge>
                 </td>
                 <td>{{ course.sectionsCount }}</td>
                 <td>{{ course.version }}</td>
                 <td>{{ formatDate(course.updatedAt) }}</td>
-                <td class="actions-cell">
-                  <div class="actions-buttons">
-                    <Button size="sm" variant="secondary" icon="pencil" @click="goToEdit(course.id)">Изменить</Button>
-                    <Button v-if="course.status === 'published'" size="sm" variant="secondary" icon="archive" @click="handleArchive(course)">
-                      Закрыть
-                    </Button>
-                    <Button v-if="course.status !== 'published'" size="sm" variant="danger" icon="trash" @click="handleDelete(course)">
-                      Удалить
-                    </Button>
+                <td>
+                  <div class="author-cell">
+                    <div class="author-avatar">{{ getAuthorInitials(course.authorName) }}</div>
+                    <div>
+                      <div class="author-name">{{ course.authorName || "Суперадмин" }}</div>
+                      <div class="author-role">Суперадмин</div>
+                    </div>
+                  </div>
+                </td>
+                <td @click.stop>
+                  <div class="row-actions">
+                    <button class="icon-btn" @click="goToEdit(course.id)">
+                      <Icon name="pencil" :size="16" />
+                    </button>
+                    <div class="menu-wrap" @click.stop>
+                      <button class="icon-btn" @click="toggleMenu(course.id)">
+                        <Icon name="more-horizontal" :size="16" />
+                      </button>
+                      <div v-if="openMenuId === course.id" class="dropdown-menu table-dropdown">
+                        <button
+                          class="dropdown-item"
+                          @click="
+                            goToEdit(course.id);
+                            openMenuId = null;
+                          "
+                        >
+                          <Icon name="pencil" :size="14" /> Редактировать
+                        </button>
+                        <button
+                          v-if="course.status === 'published'"
+                          class="dropdown-item"
+                          @click="
+                            handleArchive(course);
+                            openMenuId = null;
+                          "
+                        >
+                          <Icon name="archive" :size="14" /> Закрыть
+                        </button>
+                        <button
+                          v-if="course.status !== 'published'"
+                          class="dropdown-item danger"
+                          @click="
+                            handleDelete(course);
+                            openMenuId = null;
+                          "
+                        >
+                          <Icon name="trash" :size="14" /> Удалить
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </td>
               </tr>
@@ -63,106 +214,107 @@
           </table>
         </div>
 
-        <div class="mobile-cards show-mobile">
-            <div v-for="course in courses" :key="course.id" class="course-card">
-              <div class="course-card-header">
-                <div>
-                  <h3 class="course-card-title">{{ course.title }}</h3>
-                <p class="course-card-desc">{{ course.description || "Без описания" }}</p>
-                </div>
-                <Badge :variant="getStatusVariant(course.status)" rounded size="sm">
-                  {{ getStatusLabel(course.status) }}
-                </Badge>
-            </div>
-
-            <div class="course-card-grid">
-              <div class="course-card-row">
-                <span>Тем курса:</span><strong>{{ course.sectionsCount }}</strong>
-              </div>
-              <div class="course-card-row">
-                <span>Версия:</span><strong>{{ course.version }}</strong>
-              </div>
-              <div class="course-card-row">
-                <span>Обновлен:</span><strong>{{ formatDate(course.updatedAt) }}</strong>
-              </div>
-            </div>
-
-            <div class="course-card-actions">
-              <Button size="sm" variant="secondary" icon="pencil" @click="goToEdit(course.id)" fullWidth>Изменить</Button>
-              <Button v-if="course.status === 'published'" size="sm" variant="secondary" icon="archive" @click="handleArchive(course)" fullWidth>
-                Закрыть
-              </Button>
-              <Button v-if="course.status !== 'published'" size="sm" variant="danger" icon="trash" @click="handleDelete(course)" fullWidth>
-                Удалить
-              </Button>
-            </div>
+        <!-- Пагинация -->
+        <div class="pagination-bar">
+          <span class="total-count">Всего курсов: {{ courses.length }}</span>
+          <div class="page-controls">
+            <button class="page-nav-btn" :disabled="currentPage <= 1" @click="currentPage--">
+              <Icon name="chevron-left" :size="16" />
+            </button>
+            <button v-for="page in totalPages" :key="page" class="page-num-btn" :class="{ active: page === currentPage }" @click="currentPage = page">
+              {{ page }}
+            </button>
+            <button class="page-nav-btn" :disabled="currentPage >= totalPages" @click="currentPage++">
+              <Icon name="chevron-right" :size="16" />
+            </button>
           </div>
+          <select v-model.number="pageSize" class="page-size-select" @change="currentPage = 1">
+            <option :value="10">10 на странице</option>
+            <option :value="25">25 на странице</option>
+            <option :value="50">50 на странице</option>
+          </select>
         </div>
       </div>
-    </Card>
+    </template>
 
-    <Card class="analytics-summary-card">
-      <div class="funnel-header">
-        <h2>Сводка аналитики</h2>
-        <p>Заглушка карточек до подключения итоговых метрик модуля курсов.</p>
+    <!-- Сводка аналитики -->
+    <div class="section-block">
+      <div class="section-head">
+        <h2 class="section-title">Сводка аналитики</h2>
+        <button class="help-btn" title="Справка"><Icon name="circle-help" :size="16" /></button>
       </div>
       <AnalyticsSummaryCards />
-    </Card>
+    </div>
 
-    <!-- Аналитика: воронка курсов -->
-    <Card v-if="funnel.length > 0" class="funnel-card">
-      <div class="funnel-header">
-        <h2>Воронка по курсам</h2>
-        <p>Назначения, прогресс и суммарное время прохождения по каждому опубликованному курсу.</p>
+    <!-- Воронка по курсам -->
+    <div v-if="funnel.length > 0" class="section-block">
+      <div class="section-head funnel-head">
+        <div>
+          <h2 class="section-title">Воронка по курсам</h2>
+          <p class="section-desc">Назначения, прогресс и суммарное время прохождения по каждому курсу.</p>
+        </div>
+        <select class="period-select">
+          <option>Последние 30 дней</option>
+        </select>
       </div>
-      <div class="table-wrapper">
+
+      <!-- Столбчатая диаграмма воронки -->
+      <div class="funnel-bars">
+        <div v-for="col in funnelColumns" :key="col.key" class="funnel-col">
+          <div class="funnel-bar-wrap">
+            <div v-if="col.count === 0" class="funnel-bar-zero"></div>
+            <div v-else class="funnel-bar" :style="{ height: col.heightPct + '%' }"></div>
+          </div>
+          <div class="funnel-col-label">{{ col.label }}</div>
+          <div class="funnel-col-count">{{ col.count }}</div>
+        </div>
+      </div>
+
+      <!-- Таблица воронки -->
+      <div class="table-scroll">
         <table class="courses-table">
           <thead>
             <tr>
               <th>Курс</th>
               <th>Назначено</th>
-              <th>Начали</th>
-              <th>Проходят</th>
               <th>Завершили</th>
-              <th>Попытки (темы)</th>
-              <th>Попытки (итог)</th>
-              <th>Время в курсе</th>
-              <th>Ср. балл курса</th>
-              <th>Ср. балл итога</th>
-              <th>Ср. прогресс</th>
               <th>Конверсия</th>
+              <th>Ср. балл</th>
+              <th>Ср. время</th>
+              <th>Прогресс</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in funnel" :key="row.courseId">
-              <td>
-                <span class="course-title">{{ row.courseTitle }}</span>
-              </td>
+              <td>{{ row.courseTitle }}</td>
               <td>{{ row.assignedCount }}</td>
-              <td>{{ row.startedCount }}</td>
-              <td>{{ row.inProgressCount }}</td>
               <td>{{ row.completedCount }}</td>
-              <td>{{ row.sectionTestsAttemptsCount }}</td>
-              <td>{{ row.finalAssessmentAttemptsCount }}</td>
-              <td>{{ formatDuration(row.totalTimeSpentSeconds) }}</td>
+              <td>{{ row.assignedCount > 0 ? Math.round((row.completedCount / row.assignedCount) * 100) : 0 }}%</td>
               <td>{{ row.avgCourseScore }}%</td>
-              <td>{{ row.avgFinalScore }}%</td>
-              <td>{{ row.avgProgress }}%</td>
+              <td>{{ formatDuration(row.totalTimeSpentSeconds) }}</td>
               <td>
-                <span class="funnel-conv"> {{ row.assignedCount > 0 ? Math.round((row.completedCount / row.assignedCount) * 100) : 0 }}% </span>
+                <div class="progress-cell">
+                  <div class="progress-track">
+                    <div class="progress-fill" :style="{ width: row.avgProgress + '%' }"></div>
+                  </div>
+                  <span class="progress-pct">{{ row.avgProgress }}%</span>
+                </div>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-    </Card>
+      <div class="funnel-link-row">
+        <a href="#" class="funnel-link">Смотреть детальную статистику →</a>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { Badge, Button, Card, Input, Preloader, Select } from "../components/ui";
+import { Badge, Button, Icon, Preloader } from "../components/ui";
 import AnalyticsSummaryCards from "../components/courses/AnalyticsSummaryCards.vue";
 import { archiveCourse, deleteCourse, getCourses, getCourseAnalyticsFunnel } from "../api/courses";
 import { useToast } from "../composables/useToast";
@@ -173,19 +325,27 @@ const { showToast } = useToast();
 const loading = ref(false);
 const courses = ref([]);
 const funnel = ref([]);
+const viewMode = ref("cards");
+const openMenuId = ref(null);
+const currentPage = ref(1);
+const pageSize = ref(10);
+
 const filters = ref({
   search: "",
   status: "",
+  author: "",
 });
 
 const statusFilterOptions = [
   { value: "published", label: "Опубликован" },
+  { value: "draft", label: "Черновик" },
   { value: "archived", label: "Закрыт" },
 ];
 
 const getStatusLabel = (status) => {
   const labels = {
     published: "Опубликован",
+    draft: "Черновик",
     archived: "Закрыт",
   };
   return labels[status] || status;
@@ -194,6 +354,7 @@ const getStatusLabel = (status) => {
 const getStatusVariant = (status) => {
   const variants = {
     published: "success",
+    draft: "secondary",
     archived: "default",
   };
   return variants[status] || "default";
@@ -253,6 +414,7 @@ const resetFilters = () => {
   filters.value = {
     search: "",
     status: "",
+    author: "",
   };
   loadCourses();
 };
@@ -302,30 +464,429 @@ onMounted(async () => {
     // Воронка — не критичная функция, ошибку не показываем
   }
 });
+
+// Палитра иконок карточек
+const ICON_PALETTES = [
+  { bg: "#e6f4fa", color: "#0088cc" },
+  { bg: "#fef5e7", color: "#f59e0b" },
+  { bg: "#fde8e8", color: "#ef4444" },
+  { bg: "#e8f8f2", color: "#10b981" },
+];
+
+// Пагинация
+const totalPages = computed(() => Math.max(1, Math.ceil(courses.value.length / pageSize.value)));
+
+const paginatedCourses = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  return courses.value.slice(start, start + pageSize.value);
+});
+
+// Данные для столбчатой диаграммы воронки
+const funnelColumns = computed(() => {
+  const totals = funnel.value.reduce(
+    (acc, row) => {
+      acc.assigned += row.assignedCount || 0;
+      acc.started += row.startedCount || 0;
+      acc.inProgress += row.inProgressCount || 0;
+      acc.completed += row.completedCount || 0;
+      return acc;
+    },
+    { assigned: 0, started: 0, inProgress: 0, completed: 0 },
+  );
+
+  const maxCount = Math.max(totals.assigned, totals.started, totals.inProgress, totals.completed, 1);
+  const pct = (n) => Math.round((n / maxCount) * 100);
+  const conv = (n) => (totals.assigned > 0 ? Math.round((n / totals.assigned) * 100) : null);
+
+  return [
+    { key: "assigned", label: "Назначено", count: totals.assigned, heightPct: pct(totals.assigned), convPct: null },
+    { key: "started", label: "Начали", count: totals.started, heightPct: pct(totals.started), convPct: conv(totals.started) },
+    { key: "inProgress", label: "Проходят", count: totals.inProgress, heightPct: pct(totals.inProgress), convPct: conv(totals.inProgress) },
+    { key: "completed", label: "Завершили", count: totals.completed, heightPct: pct(totals.completed), convPct: conv(totals.completed) },
+  ];
+});
+
+const toggleMenu = (id) => {
+  openMenuId.value = openMenuId.value === id ? null : id;
+};
+
+const closeMenus = () => {
+  openMenuId.value = null;
+};
+
+const getAuthorInitials = (name) => {
+  if (!name) return "СА";
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
+};
 </script>
 
 <style scoped>
+/* ===== Базовый контейнер ===== */
 .courses-view {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
+/* ===== Заголовок страницы ===== */
 .page-header {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 24px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.filters-card {
-  margin-bottom: 24px;
+.page-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.filters-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr auto auto;
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.page-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* ===== Фильтры ===== */
+.filters-bar {
+  display: flex;
+  align-items: center;
+  background: var(--bg-primary);
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  padding: 0 8px 0 16px;
+  height: 52px;
+  gap: 0;
+}
+
+.filters-search-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
   gap: 8px;
+  min-width: 0;
+  height: 100%;
 }
 
-.table-wrapper {
+.search-icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.search-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text-primary);
+  height: 100%;
+}
+
+.search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.filter-sep {
+  width: 1px;
+  height: 24px;
+  background: var(--divider);
+  flex-shrink: 0;
+  margin: 0 12px;
+}
+
+.filter-select {
+  height: 36px;
+  padding: 0 28px 0 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: transparent
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%234b4b4b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")
+    no-repeat right 8px center;
+  border: none;
+  border-radius: 0;
+  appearance: none;
+  outline: none;
+  cursor: pointer;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.filter-select:focus {
+  outline: none;
+}
+
+.filter-reset-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  height: 36px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-left: 4px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.filter-reset-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* ===== Переключатель вида ===== */
+.view-tabs {
+  display: flex;
+  gap: 4px;
+  align-self: flex-start;
+}
+
+.view-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: none;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
+}
+
+.view-tab.active {
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+.view-tab:hover:not(.active) {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* ===== Пустое состояние ===== */
+.empty-state {
+  padding: 64px 32px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+/* ===== Карточный режим ===== */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.course-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--divider);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+
+/* Шапка карточки: иконка + заголовок + описание */
+.card-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.course-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.card-title-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.course-name {
+  margin: 0 0 3px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.course-desc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.status-badge {
+  align-self: flex-start;
+}
+
+.course-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.stat-icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.stat-label {
+  flex: 1;
+}
+
+.stat-val {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.card-footer {
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid var(--divider);
+  padding-top: 12px;
+  margin-top: auto;
+}
+
+.card-edit-btn {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: center;
+}
+
+.card-edit-btn:hover {
+  background: var(--divider);
+}
+
+.menu-wrap {
+  position: relative;
+}
+
+.menu-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background 0.15s;
+}
+
+.menu-btn:hover {
+  background: var(--divider);
+}
+
+/* ===== Выпадающее меню ===== */
+.dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: var(--bg-primary);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  min-width: 160px;
+  overflow: hidden;
+}
+
+.table-dropdown {
+  right: 0;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.dropdown-item:hover {
+  background: var(--bg-secondary);
+}
+
+.dropdown-item.danger {
+  color: #ef4444;
+}
+
+/* ===== Табличный режим ===== */
+.table-container {
+  background: var(--bg-primary);
+  border: 1px solid var(--divider);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.table-scroll {
   overflow-x: auto;
 }
 
@@ -338,145 +899,346 @@ onMounted(async () => {
   border-bottom: 1px solid var(--divider);
 }
 
-.courses-table th,
+.courses-table th {
+  padding: 12px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  text-align: left;
+  white-space: nowrap;
+}
+
 .courses-table td {
   padding: 14px 16px;
-  text-align: left;
-}
-
-.courses-table th {
-  font-size: 12px;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.courses-table tbody tr {
+  font-size: 14px;
+  color: var(--text-primary);
   border-bottom: 1px solid var(--divider);
+  vertical-align: middle;
 }
 
-.course-title {
-  font-weight: 600;
+.courses-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
-.course-desc {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin-top: 4px;
-}
-
-.actions-cell {
-  text-align: right;
-}
-
-.actions-buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.empty-state {
-  padding: 64px 32px;
-  text-align: center;
-  color: var(--text-secondary);
-}
-
-.show-mobile {
-  display: none;
-}
-
-.mobile-cards {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.course-card {
-  border: 1px solid var(--divider);
-  border-radius: 12px;
-  padding: 14px;
+.courses-table tbody tr:hover td {
   background: var(--bg-secondary);
 }
 
-.course-card-header {
+.cell-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cell-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* ===== Автор ===== */
+.author-cell {
   display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.author-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent-blue-soft);
+  color: var(--accent-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.author-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.author-role {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ===== Действия в таблице ===== */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.icon-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* ===== Пагинация ===== */
+.pagination-bar {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--divider);
 }
 
-.course-card-title {
-  margin: 0;
-  font-size: 16px;
-}
-
-.course-card-desc {
-  margin: 6px 0 0;
-  color: var(--text-secondary);
+.total-count {
   font-size: 13px;
-}
-
-.course-card-grid {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.course-card-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
-.course-card-row strong {
+.page-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.page-nav-btn,
+.page-num-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--bg-primary);
   color: var(--text-primary);
-  text-align: right;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
 }
 
-.course-card-actions {
-  display: grid;
+.page-num-btn.active {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+
+.page-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-nav-btn:not(:disabled):hover,
+.page-num-btn:not(.active):hover {
+  background: var(--bg-secondary);
+}
+
+.page-size-select {
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+}
+
+/* ===== Секции аналитики ===== */
+.section-block {
+  background: var(--bg-primary);
+  border: 1px solid var(--divider);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
   gap: 8px;
-}
-
-@media (max-width: 1024px) {
-  .hide-mobile {
-    display: none !important;
-  }
-
-  .show-mobile {
-    display: block !important;
-  }
-
-  .filters-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.funnel-card {
-  margin-top: 24px;
-}
-
-.analytics-summary-card {
-  margin-top: 24px;
-}
-
-.funnel-header {
   margin-bottom: 16px;
 }
 
-.funnel-header h2 {
-  margin: 0 0 4px;
+.funnel-head {
+  align-items: flex-start;
+  justify-content: space-between;
 }
 
-.funnel-header p {
+.section-title {
   margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.section-desc {
+  margin: 4px 0 0;
   font-size: 13px;
   color: var(--text-secondary);
 }
 
-.funnel-conv {
-  font-weight: 600;
-  color: var(--primary, #6366f1);
+.help-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+
+.period-select {
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+}
+
+/* ===== Воронка: столбчатая диаграмма ===== */
+.funnel-bars {
+  display: flex;
+  gap: 0;
+  align-items: flex-end;
+  height: 180px;
+  padding-bottom: 0;
+  border-bottom: 1px solid var(--divider);
+  margin-bottom: 0;
+}
+
+.funnel-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  padding-bottom: 16px;
+}
+
+.funnel-bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 8px;
+}
+
+.funnel-bar {
+  width: 56px;
+  background: var(--accent-blue);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s;
+}
+
+/* Нулевой бар — горизонтальная линия */
+.funnel-bar-zero {
+  width: 56px;
+  height: 3px;
+  background: var(--accent-blue);
+  border-radius: 2px;
+}
+
+.funnel-col-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  margin-bottom: 2px;
+}
+
+.funnel-col-count {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ===== Прогресс в воронке ===== */
+.progress-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+}
+
+.progress-track {
+  flex: 1;
+  height: 6px;
+  background: var(--divider);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent-blue);
+  border-radius: 999px;
+  transition: width 0.3s;
+}
+
+.progress-pct {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.funnel-link-row {
+  margin-top: 12px;
+  text-align: right;
+}
+
+.funnel-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-blue);
+  text-decoration: none;
+}
+
+.funnel-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 1280px) {
+  .cards-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .filters-bar {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 600px) {
+  .cards-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

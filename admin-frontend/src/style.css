@@ -12,8 +12,8 @@
   --nav-bg: #ffffff;
   --nav-hover-bg: #f3f4f6;
   --nav-hover-text: #101828;
-  --nav-active-bg: #262626;
-  --nav-active-text: #f3f3f3;
+  --nav-active-bg: #ede9fe;
+  --nav-active-text: #7c3aed;
 
   --bg-primary: #fafafa;
   --bg-secondary: #f5f5f5;
@@ -95,7 +95,9 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
   font-size: 16px;
   line-height: 1.5;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -116,7 +118,9 @@ input[type="radio"]:not(.native-checkbox) {
   justify-content: center;
   background-color: var(--bg-primary);
   cursor: pointer;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 
 input[type="radio"]:not(.native-checkbox) {
@@ -130,7 +134,9 @@ input[type="radio"]:not(.native-checkbox)::after {
   height: 10px;
   border-radius: 4px;
   background-color: transparent;
-  transition: background-color 0.2s ease, transform 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
   transform: scale(0);
 }
 
@@ -228,7 +234,9 @@ body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  transition: background-color 0.25s ease, color 0.25s ease;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
 }
 
 #app {
@@ -404,7 +412,9 @@ body {
     border-radius: 14px;
     border-color: var(--divider) !important;
     color: var(--text-primary) !important;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
   }
 
   input::placeholder,
@@ -422,7 +432,9 @@ body {
   }
 
   table tbody tr {
-    transition: transform 0.08s ease, background-color 0.2s ease;
+    transition:
+      transform 0.08s ease,
+      background-color 0.2s ease;
   }
 
   table tbody tr:hover {

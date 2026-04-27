@@ -3,21 +3,12 @@
     <div class="sidebar-inner">
       <div class="sidebar-header">
         <div class="sidebar-brand">
-          <div v-if="!isCollapsed" class="sidebar-title-wrapper">
-            <h1 class="sidebar-title">Управление</h1>
-            <!-- <p class="sidebar-subtitle">Центр управления</p>-->
+          <div class="logo-icon">
+            <Icon name="LayoutTemplate" size="20" />
           </div>
+          <span v-if="!isCollapsed" class="logo-text">Theorica</span>
         </div>
         <div class="sidebar-header-actions">
-          <button
-            v-if="!isMobile"
-            @click="$emit('toggle-collapse')"
-            class="collapse-btn"
-            :title="collapseTitle"
-            aria-label="Переключить ширину сайдбара"
-          >
-            <Icon :name="isCollapsed ? 'ChevronRight' : 'ChevronLeft'" size="18" aria-hidden="true" />
-          </button>
           <button @click="$emit('close')" class="close-btn" aria-label="Закрыть меню">
             <Icon name="X" size="18" aria-hidden="true" />
           </button>
@@ -67,8 +58,6 @@ const props = defineProps({
 const emit = defineEmits(["close", "toggle-collapse"]);
 
 const isMobile = ref(false);
-
-const collapseTitle = computed(() => (props.isCollapsed ? "Развернуть меню" : "Свернуть меню"));
 
 const menuItems = computed(() => {
   const items = [
@@ -178,66 +167,36 @@ onUnmounted(() => {
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex: 1;
   min-width: 0;
 }
 
-.brand-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+.logo-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #6d28d9;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
   flex-shrink: 0;
 }
 
-.sidebar-title-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.sidebar-title {
-  font-size: 20px;
+.logo-text {
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0;
-}
-
-.sidebar-subtitle {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.collapse-btn {
-  border: 1px solid var(--divider);
-  background: var(--surface-card);
-  color: var(--text-secondary);
-  border-radius: 999px;
-  padding: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-  width: 36px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.collapse-btn:hover {
-  background: var(--nav-hover-bg);
-  color: var(--text-primary);
 }
 
 .close-btn {
@@ -288,7 +247,7 @@ onUnmounted(() => {
 }
 
 .sidebar.is-collapsed .sidebar-brand {
-  display: none;
+  justify-content: center;
 }
 
 .nav-item {

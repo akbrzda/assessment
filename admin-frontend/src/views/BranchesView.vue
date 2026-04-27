@@ -217,7 +217,7 @@ const loadBranches = async () => {
 };
 
 const resetFilters = () => {
-  filters.value.search = "";
+  filters.value = { search: "" };
   loadBranches();
 };
 
