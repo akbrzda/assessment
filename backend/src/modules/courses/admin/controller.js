@@ -19,6 +19,7 @@ const {
 } = require("./validators");
 
 const COURSE_COVERS_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/courses");
+const COURSE_MEDIA_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/course-media");
 
 const courseCoverStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -47,6 +48,37 @@ const uploadCourseCoverFile = multer({
     cb(new Error("Разрешены только изображения: jpeg, jpg, png, webp, gif"));
   },
 }).single("cover");
+
+const courseMediaStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    if (!fs.existsSync(COURSE_MEDIA_UPLOAD_DIR)) {
+      fs.mkdirSync(COURSE_MEDIA_UPLOAD_DIR, { recursive: true });
+    }
+    cb(null, COURSE_MEDIA_UPLOAD_DIR);
+  },
+  filename: (req, file, cb) => {
+    const extension = path.extname(file.originalname || "").toLowerCase();
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `course-media-${uniqueSuffix}${extension}`);
+  },
+});
+
+const uploadCourseMediaFile = multer({
+  storage: courseMediaStorage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const mimeType = String(file.mimetype || "").toLowerCase();
+    const imageTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
+    const videoTypes = ["video/mp4", "video/webm", "video/ogg", "video/quicktime"];
+
+    if (!imageTypes.includes(mimeType) && !videoTypes.includes(mimeType)) {
+      cb(new Error("Разрешены только изображения (jpg, png, webp, gif) и видео (mp4, webm, ogg, mov)"));
+      return;
+    }
+
+    cb(null, true);
+  },
+}).single("media");
 
 function parseId(value) {
   const n = Number(value);
@@ -142,6 +174,37 @@ async function uploadCourseCover(req, res, next) {
     try {
       const course = await coursesService.uploadCourseCover(courseId, req.file, req.user.id, req);
       res.json({ course, coverUrl: course.coverUrl });
+    } catch (error) {
+      if (req.file?.path && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      next(error);
+    }
+  });
+}
+
+async function uploadCourseMedia(req, res, next) {
+  uploadCourseMediaFile(req, res, async (uploadError) => {
+    if (uploadError) {
+      return res.status(400).json({ error: uploadError.message });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "Файл медиа не загружен" });
+    }
+
+    try {
+      const mimeType = String(req.file.mimetype || "").toLowerCase();
+      const isVideo = mimeType.startsWith("video/");
+      const mediaType = isVideo ? "video" : "image";
+      const mediaUrl = `/uploads/course-media/${req.file.filename}`;
+
+      res.json({
+        mediaUrl,
+        mediaType,
+        mimeType,
+        originalName: req.file.originalname,
+      });
     } catch (error) {
       if (req.file?.path && fs.existsSync(req.file.path)) {
         fs.unlinkSync(req.file.path);
@@ -495,6 +558,7 @@ module.exports = {
   createCourse,
   updateCourse,
   uploadCourseCover,
+  uploadCourseMedia,
   deleteCourse,
   publishCourse,
   archiveCourse,

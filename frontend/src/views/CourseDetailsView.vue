@@ -130,22 +130,6 @@ import LockPopup from "../components/courses/LockPopup.vue";
 
 const COURSE_COMPLETION_STORAGE_KEY = "courseCompletionContext";
 
-function mapLockReasonToStatus(lockReasonType) {
-  if (!lockReasonType) {
-    return "sequence_blocked";
-  }
-  if (lockReasonType === "course_closed") {
-    return "course_closed";
-  }
-  if (lockReasonType === "expired") {
-    return "course_expired";
-  }
-  if (lockReasonType === "attempts_exhausted") {
-    return "attempts_exhausted";
-  }
-  return "sequence_blocked";
-}
-
 export default {
   name: "CourseDetailsView",
   components: {
@@ -297,8 +281,7 @@ export default {
       }
 
       if (section.progress?.locked) {
-        const statusType = mapLockReasonToStatus(section.progress.lockReasonType);
-        router.push(`/courses/${courseId.value}/status/${statusType}`);
+        openSectionLockReason(section);
         return;
       }
 

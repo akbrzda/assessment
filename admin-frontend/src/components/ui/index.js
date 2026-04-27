@@ -11,3 +11,4 @@ export { default as EmptyState } from "./EmptyState.vue";
 export { default as ConfirmDialog } from "./ConfirmDialog.vue";
 export { default as Textarea } from "./Textarea.vue";
 export { default as FilterBar } from "./FilterBar.vue";
+export { default as WysiwygEditor } from "./WysiwygEditor.vue";

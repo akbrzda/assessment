@@ -14,6 +14,7 @@ router.get("/:id", controller.getCourse);
 router.get("/:id/preview", controller.getCoursePreview);
 router.patch("/:id", controller.updateCourse);
 router.post("/:id/upload-cover", controller.uploadCourseCover);
+router.post("/upload-media", controller.uploadCourseMedia);
 router.delete("/:id", controller.deleteCourse);
 router.post("/:id/publish", controller.publishCourse);
 router.post("/:id/archive", controller.archiveCourse);

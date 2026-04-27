@@ -48,8 +48,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Статические файлы (иконки бейджей)
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+// Статические файлы (иконки, обложки, медиа)
+app.use("/uploads", express.static(path.join(__dirname, "../../uploads")));
 
 const apiRouter = express.Router();
 

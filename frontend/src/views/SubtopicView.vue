@@ -298,6 +298,15 @@ export default {
   font-weight: 600;
 }
 
+.material-title {
+  margin: 0 0 16px;
+  color: #111a44;
+  font-size: 28px;
+  line-height: 1.18;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
 .subtopic-content {
   flex: 1;
   min-height: 0;
@@ -506,6 +515,12 @@ export default {
     border-radius: 8px;
     font-size: 16px;
     padding: 5px 10px;
+  }
+
+  .material-title {
+    font-size: 24px;
+    line-height: 1.22;
+    margin-bottom: 14px;
   }
 
   .topic-content {

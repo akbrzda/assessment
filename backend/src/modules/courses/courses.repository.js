@@ -147,14 +147,12 @@ async function validatePublicationIntegrity(courseId, options = {}) {
   }
 
   for (const section of sections) {
-    if (!section.assessmentId) {
-      errors.push(`Раздел "${section.title}": не назначен тест раздела`);
-      continue;
-    }
-    const [aRows] = await executor.execute("SELECT id FROM assessments WHERE id = ? LIMIT 1", [section.assessmentId]);
-    if (!aRows.length) {
-      errors.push(`Раздел "${section.title}": тест раздела не найден`);
-      continue;
+    if (section.assessmentId) {
+      const [aRows] = await executor.execute("SELECT id FROM assessments WHERE id = ? LIMIT 1", [section.assessmentId]);
+      if (!aRows.length) {
+        errors.push(`Раздел "${section.title}": тест раздела не найден`);
+        continue;
+      }
     }
     const topics = await listTopicsBySectionId(section.id, options);
     if (!topics.length) {

@@ -1,147 +1,176 @@
 <template>
   <div class="course-editor-view">
-    <div class="page-header">
-      <Button variant="secondary" icon="arrow-left" @click="goBack">К списку курсов</Button>
-      <div class="page-header-actions" v-if="isEditMode && course">
-        <Badge :variant="getStatusVariant(course.status)" rounded>
-          {{ getStatusLabel(course.status) }}
-        </Badge>
-        <Button
-          v-if="course.status === 'published'"
-          variant="success"
-          icon="send"
-          :loading="publishing"
-          @click="handlePublish"
-        >
-          Применить изменения
-        </Button>
-        <Button v-if="course.status === 'published'" variant="secondary" icon="archive" :loading="archiving" @click="handleArchive">
-          Закрыть курс
-        </Button>
+    <div class="course-editor-header">
+      <div class="course-editor-header-left">
+        <Button variant="ghost" icon="arrow-left" size="sm" @click="goBack">К списку курсов</Button>
+        <h1 class="course-editor-title">{{ isEditMode ? "Редактирование курса" : "Создание курса" }}</h1>
+      </div>
+      <div class="course-editor-header-right">
+        <Button v-if="currentStep < wizardSteps.length" :loading="saving" :disabled="!canProceed" @click="goToNextStep">Далее</Button>
+        <Button v-else variant="secondary" :loading="saving" @click="saveFromHeader">Сохранить</Button>
       </div>
     </div>
 
     <Preloader v-if="loading" />
 
     <template v-else>
-      <Card class="wizard-card">
-        <div class="wizard-header">
-          <div>
-            <h2>Мастер настройки курса</h2>
-            <p>
-              {{
-                isEditMode
-                  ? "Проверьте шаги курса и подготовьте его к публикации."
-                  : "Сначала сохраните основу курса, затем добавьте темы и итоговую аттестацию."
-              }}
-            </p>
+      <div class="course-stepper">
+        <div
+          v-for="(step, index) in wizardSteps"
+          :key="step.id"
+          class="stepper-item"
+          :class="{
+            'stepper-active': currentStep === step.id,
+            'stepper-completed': currentStep > step.id,
+          }"
+          @click="goToStep(step.id)"
+        >
+          <div v-if="index > 0" class="stepper-connector"></div>
+          <div class="stepper-bubble">
+            <Check v-if="currentStep > step.id" :size="14" :stroke-width="2.5" />
+            <span v-else>{{ step.id }}</span>
           </div>
-          <Badge variant="primary" rounded>Шаг {{ currentStep }} из {{ wizardSteps.length }}</Badge>
-        </div>
-
-        <div class="wizard-steps">
-          <div
-            v-for="step in wizardSteps"
-            :key="step.id"
-            class="wizard-step"
-            :class="{ active: currentStep === step.id, completed: currentStep > step.id }"
-          >
-            <div class="step-number">{{ step.id }}</div>
-            <div class="step-label">{{ step.title }}</div>
+          <div class="stepper-labels">
+            <span class="stepper-title">{{ step.title }}</span>
+            <span class="stepper-subtitle">{{ step.subtitle }}</span>
           </div>
         </div>
-      </Card>
+      </div>
 
-      <Card v-if="currentStep === 1" class="editor-card">
-        <div class="step-card-header">
-          <h2>Шаг 1. Основная информация</h2>
-          <p>Заполните общие данные курса и сохраните основу перед наполнением.</p>
-        </div>
-
-        <div class="editor-grid">
-          <Input v-model="form.title" label="Название курса" placeholder="Например: Стандарты обслуживания" :error="errors.title" required />
-          <div class="status-summary">
-            <span class="status-summary-label">Статус публикации</span>
-            <Badge :variant="course ? getStatusVariant(course.status) : 'default'" rounded>
-              {{ course ? getStatusLabel(course.status) : "Не опубликован" }}
-            </Badge>
+      <div v-if="currentStep === 1" class="step1-layout">
+        <div class="step1-main">
+          <div class="step1-section-header">
+            <h2>Основная информация о курсе</h2>
+            <p>Заполните базовые данные курса и загрузите обложку.</p>
           </div>
-          <Textarea
-            v-model="form.description"
-            class="grid-span-full"
-            label="Описание курса"
-            placeholder="Кратко опишите цель и содержание курса"
-            :rows="4"
-          />
-          <div class="cover-upload grid-span-full">
-            <Input
-              v-model="form.coverUrl"
-              label="Ссылка на обложку"
-              placeholder="https://cdn.example.com/course-cover.jpg"
-            />
-            <div class="cover-upload-controls">
-              <input type="file" accept="image/*" @change="handleCoverFileChange" />
-              <Button
-                size="sm"
-                variant="secondary"
-                :loading="uploadingCover"
-                :disabled="!isEditMode || !selectedCoverFile"
-                @click="handleCoverUpload"
-              >
-                Загрузить файл
-              </Button>
+
+          <div class="step1-form-grid">
+            <Input v-model="form.title" label="Название курса" placeholder="Введите название курса" :error="errors.title" required />
+            <Select v-model="form.category" label="Категория" placeholder="Выберите категорию" :options="categoryOptions" />
+
+            <div class="field-with-counter">
+              <Textarea
+                v-model="form.shortDescription"
+                label="Краткое описание курса"
+                placeholder="Опишите цель и содержание курса"
+                :rows="2"
+                :maxlength="200"
+              />
+              <span class="field-counter">{{ (form.shortDescription || "").length }}/200</span>
             </div>
-            <p class="cover-upload-hint">Для загрузки файла курс должен быть сначала сохранён.</p>
+
+            <div class="tags-field">
+              <label class="tags-label">Теги</label>
+              <div class="tags-input-wrapper">
+                <span v-for="(tag, i) in parsedTags" :key="i" class="tag-chip">
+                  {{ tag }}
+                  <button type="button" class="tag-chip-remove" @click="removeTag(i)">×</button>
+                </span>
+                <input
+                  class="tags-raw-input"
+                  v-model="form.tagsInput"
+                  placeholder="Введите тег и нажмите Enter"
+                  @keydown.enter.prevent="confirmTagInput"
+                  @keydown.comma.prevent="confirmTagInput"
+                />
+              </div>
+              <p class="tags-hint">Например: сервис, стандарты, клиентоориентированность</p>
+            </div>
+
+            <Select v-model="form.difficulty" label="Уровень сложности" placeholder="Выберите уровень" :options="difficultyOptions" />
+            <Select v-model="form.courseLanguage" label="Язык курса" placeholder="Выберите язык" :options="languageOptions" />
           </div>
-          <Input
-            v-model="form.category"
-            label="Категория"
-            placeholder="Например: Сервис"
-          />
-          <Input
-            v-model="form.tagsInput"
-            class="grid-span-full"
-            label="Теги"
-            placeholder="например: касса, стандарты, клиентский сервис"
-          />
-          <Select
-            v-model="form.availabilityMode"
-            class="grid-span-full"
-            label="Срок действия курса"
-            :options="[
-              { value: 'unlimited', label: 'Бессрочный курс' },
-              { value: 'relative_days', label: 'N дней от назначения пользователю' },
-              { value: 'fixed_dates', label: 'Фиксированные даты' },
-            ]"
-          />
-          <Input
-            v-if="form.availabilityMode === 'relative_days'"
-            v-model="form.availabilityDays"
-            type="number"
-            min="1"
-            max="3650"
-            label="Количество дней"
-            placeholder="Например, 90"
-          />
-          <Input
-            v-if="form.availabilityMode === 'fixed_dates'"
-            v-model="form.availabilityFrom"
-            type="datetime-local"
-            label="Дата начала действия"
-          />
-          <Input
-            v-if="form.availabilityMode === 'fixed_dates'"
-            v-model="form.availabilityTo"
-            type="datetime-local"
-            label="Дата окончания действия"
+
+          <div class="cover-upload-row">
+            <input
+              ref="coverFileInputRef"
+              id="course-cover-file-input"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              class="cover-file-input-hidden"
+              @change="handleCoverFileChange"
+            />
+            <label
+              class="cover-dropzone"
+              for="course-cover-file-input"
+              :class="{ 'cover-dropzone-hover': coverDragOver }"
+              @dragover.prevent="coverDragOver = true"
+              @dragleave.prevent="coverDragOver = false"
+              @drop.prevent="handleCoverDrop"
+            >
+              <Upload class="cover-dropzone-icon" :size="32" :stroke-width="1.5" />
+              <p>
+                Перетащите файл сюда или
+                <button type="button" class="cover-dropzone-link" @click.stop.prevent="triggerCoverFileInput">выберите файл</button>
+              </p>
+              <p class="cover-dropzone-hint">PNG, JPG или WEBP. Макс. размер 5 МБ</p>
+            </label>
+            <div v-if="form.coverUrl" class="cover-preview-box">
+              <img :src="form.coverUrl" alt="Обложка курса" class="cover-preview-img" />
+              <button type="button" class="cover-preview-remove" @mousedown.stop.prevent @click.stop.prevent="removeCover">
+                <Trash2 :size="16" :stroke-width="2" />
+                Удалить
+              </button>
+            </div>
+          </div>
+
+          <WysiwygEditor
+            v-model="form.description"
+            label="Описание курса"
+            placeholder="Подробное описание курса. Цели, задачи, результаты обучения..."
+            :min-height="140"
+            :show-counter="true"
+            :max-length="2000"
           />
         </div>
-      </Card>
 
-      <Card v-if="currentStep === 2 && isEditMode && course" class="sections-card">
-        <div class="step-card-header">
-          <h2>Шаг 2. Темы курса и подтемы</h2>
-          <p>Каждая тема курса содержит подтемы и при необходимости завершается своим тестом.</p>
+        <div class="step1-sidebar">
+          <div class="course-info-card">
+            <h3 class="course-info-title">Информация о курсе</h3>
+            <div class="course-info-row">
+              <span class="course-info-label">Темы</span>
+              <span class="course-info-value">{{ previewStats.themesCount }}</span>
+            </div>
+            <div class="course-info-row">
+              <span class="course-info-label">Подтемы</span>
+              <span class="course-info-value">{{ previewStats.subtopicsCount }}</span>
+            </div>
+            <div class="course-info-row">
+              <span class="course-info-label">Материалы</span>
+              <span class="course-info-value">{{ previewStats.materialsCount }}</span>
+            </div>
+            <div class="course-info-row">
+              <span class="course-info-label">Тест для темы</span>
+              <span class="course-info-value" :class="previewStats.sectionTestsCount > 0 ? 'course-info-ok' : 'course-info-empty'">
+                {{ previewStats.sectionTestsCount > 0 ? previewStats.sectionTestsCount : "Не создан" }}
+              </span>
+            </div>
+            <div class="course-info-row">
+              <span class="course-info-label">Аттестация курса</span>
+              <span class="course-info-value" :class="form.finalAssessmentId ? 'course-info-ok' : 'course-info-empty'">
+                {{ form.finalAssessmentId ? "Настроена" : "Не настроена" }}
+              </span>
+            </div>
+          </div>
+
+          <div class="whats-next-card">
+            <div class="whats-next-icon">
+              <Info :size="18" :stroke-width="2" />
+            </div>
+            <div>
+              <p class="whats-next-title">Что дальше?</p>
+              <p class="whats-next-text">После сохранения курса вы сможете добавить темы, материалы и настроить проверку знаний.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Card v-if="currentStep === 2 && isEditMode && course" class="sections-card structure-card">
+        <div class="structure-header">
+          <div>
+            <h2>Структура курса</h2>
+            <p>Добавьте темы и подтемы. Перетаскивайте элементы для изменения порядка.</p>
+          </div>
         </div>
 
         <div v-if="publicationErrorsForDisplay.length > 0" class="publication-errors">
@@ -153,293 +182,420 @@
           </ul>
         </div>
 
-        <div v-if="!course.sections || course.sections.length === 0" class="empty-sections">
-          <p>Темы курса ещё не добавлены.</p>
+        <div class="structure-toolbar">
+          <div class="structure-search">
+            <Search :size="16" :stroke-width="2" />
+            <input v-model="structureSearchQuery" type="search" placeholder="Поиск по темам и подтемам" />
+          </div>
+          <button type="button" class="structure-secondary-action structure-secondary-action-disabled" disabled>
+            <Upload :size="16" :stroke-width="1.8" />
+            Импорт структуры
+          </button>
+          <button type="button" class="structure-primary-action" @click="showNewSectionForm = !showNewSectionForm">
+            <span>+</span>
+            Добавить тему
+          </button>
         </div>
 
-        <draggable v-model="course.sections" item-key="id" handle=".section-drag-handle" class="sections-list" @end="handleSectionsReorder">
-          <template #item="{ element: section }">
-          <div class="section-item">
-            <!-- Строка раздела -->
-            <div class="section-row">
-              <span class="section-order">{{ section.orderIndex }}</span>
-              <div class="section-info">
-                <span class="section-name">{{ section.title }}</span>
-                <span v-if="!section.isRequired" class="section-badge-optional">необязательная</span>
-                <span v-if="!section.assessmentId" class="section-badge-error">нет теста</span>
-                <span v-else class="section-badge-ok">тест привязан</span>
-              </div>
-              <div class="section-actions">
-                <button
-                  v-if="(course.sections || []).length > 1"
-                  type="button"
-                  class="drag-handle section-drag-handle"
-                  title="Перетащите для изменения порядка"
-                >
-                  ↕
-                </button>
-                <button
-                  v-if="(course.sections || []).length > 1"
-                  type="button"
-                  class="reorder-fallback-btn"
-                  :disabled="!canMoveSection(section.id, -1)"
-                  @click="moveSectionByOffset(section.id, -1)"
-                >
-                  ↑
-                </button>
-                <button
-                  v-if="(course.sections || []).length > 1"
-                  type="button"
-                  class="reorder-fallback-btn"
-                  :disabled="!canMoveSection(section.id, 1)"
-                  @click="moveSectionByOffset(section.id, 1)"
-                >
-                  ↓
-                </button>
-                <Button size="sm" variant="ghost" :icon="sectionEditingId === section.id ? 'x' : 'pencil'" @click="toggleSectionEdit(section.id)">
-                  {{ sectionEditingId === section.id ? "Закрыть" : "Редактировать" }}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  icon="trash"
-                  :loading="deletingSectionId === section.id"
-                  @click="removeSection(section.id, section.title)"
-                >
-                  Удалить
-                </Button>
-              </div>
+        <div class="structure-layout">
+          <div class="structure-list-panel">
+            <div v-if="!visibleSections.length" class="empty-sections">
+              <p>Темы курса ещё не добавлены.</p>
             </div>
 
-            <!-- Форма редактирования раздела -->
-            <div v-if="sectionEditingId === section.id" class="section-edit-form">
-              <div class="section-edit-grid">
-                <Input v-model="sectionForms[section.id].title" label="Название темы курса" :error="sectionErrors[section.id]?.title" required />
-                <Input v-model="sectionForms[section.id].orderIndex" type="number" min="1" label="Порядок" />
-                <Select
-                  v-model="sectionForms[section.id].assessmentId"
-                  label="Проверочный тест темы курса"
-                  :options="assessmentOptions"
-                  placeholder="Выберите тест"
-                />
-                <div class="inline-actions">
-                  <Button size="sm" variant="secondary" @click="openAssessmentEditor({ type: 'section', id: section.id })">Создать тест</Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    :disabled="!sectionForms[section.id].assessmentId"
-                    @click="openAssessmentEditor({ type: 'section', id: section.id }, sectionForms[section.id].assessmentId)"
-                  >
-                    Редактировать тест
-                  </Button>
-                </div>
-                <Input v-model="sectionForms[section.id].estimatedMinutes" type="number" min="1" max="1440" label="Время (мин.)" />
-                <div class="field-checkbox">
-                  <label class="switch-label">
-                    <input v-model="sectionForms[section.id].isRequired" type="checkbox" />
-                    <span>Обязательная тема курса</span>
-                  </label>
-                </div>
-                <Textarea v-model="sectionForms[section.id].description" class="grid-span-full" label="Описание" :rows="2" />
-              </div>
-              <div class="section-edit-actions">
-                <Button size="sm" icon="save" :loading="updatingSectionId === section.id" @click="saveSection(section.id)"
-                  >Сохранить тему курса</Button
+            <draggable
+              v-else
+              v-model="course.sections"
+              item-key="id"
+              handle=".section-drag-handle"
+              class="structure-sections-list"
+              @end="handleSectionsReorder"
+            >
+              <template #item="{ element: section }">
+                <div
+                  v-show="isSectionVisible(section)"
+                  class="structure-section"
+                  :class="{ 'structure-section-active': Number(activeSection?.id) === Number(section.id) }"
                 >
-              </div>
-            </div>
+                  <button type="button" class="structure-section-head" @click="selectSection(section.id)">
+                    <span
+                      v-if="(course.sections || []).length > 1"
+                      class="structure-drag section-drag-handle"
+                      title="Перетащите для изменения порядка"
+                      >⠿</span
+                    >
+                    <span class="structure-section-number">{{ section.orderIndex }}</span>
+                    <span class="structure-section-title">{{ section.title }}</span>
+                    <span class="structure-section-count">{{ (section.topics || []).length }} подтемы</span>
+                    <ChevronUp class="structure-chevron" :size="16" :stroke-width="2" />
+                  </button>
 
-            <!-- Темы раздела -->
-            <div class="topics-container">
-              <div v-if="!section.topics || section.topics.length === 0" class="empty-topics">Подтем пока нет.</div>
-              <draggable
-                v-else
-                v-model="section.topics"
-                item-key="id"
-                handle=".topic-drag-handle"
-                class="topics-list"
-                @end="() => handleTopicsReorder(section)"
-              >
-                <template #item="{ element: topic }">
-                <div class="topic-item">
-                  <div class="topic-row">
-                    <span class="topic-order">{{ topic.orderIndex }}</span>
-                    <div class="topic-info">
-                      <span class="topic-name">{{ topic.title }}</span>
-                      <span v-if="!topic.isRequired" class="topic-badge topic-badge-optional">необязательная</span>
-                      <span v-if="topic.hasMaterial" class="topic-badge">материал</span>
-                      <span v-if="topic.assessmentId" class="topic-badge">тест</span>
-                    </div>
-                    <div class="topic-actions">
-                      <button
-                        v-if="(section.topics || []).length > 1"
-                        type="button"
-                        class="drag-handle topic-drag-handle"
-                        title="Перетащите для изменения порядка"
-                      >
-                        ↕
-                      </button>
-                      <button
-                        v-if="(section.topics || []).length > 1"
-                        type="button"
-                        class="reorder-fallback-btn"
-                        :disabled="!canMoveTopic(section.id, topic.id, -1)"
-                        @click="moveTopicByOffset(section.id, topic.id, -1)"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        v-if="(section.topics || []).length > 1"
-                        type="button"
-                        class="reorder-fallback-btn"
-                        :disabled="!canMoveTopic(section.id, topic.id, 1)"
-                        @click="moveTopicByOffset(section.id, topic.id, 1)"
-                      >
-                        ↓
-                      </button>
-                      <Button size="sm" variant="ghost" :icon="topicEditingId === topic.id ? 'x' : 'pencil'" @click="toggleTopicEdit(topic.id)" />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        icon="trash"
-                        :loading="deletingTopicId === topic.id"
-                        @click="removeTopic(topic.id, topic.title)"
-                      />
-                    </div>
-                  </div>
-                  <!-- Форма редактирования темы -->
-                  <div v-if="topicEditingId === topic.id" class="topic-edit-form">
-                    <div class="topic-edit-grid">
-                      <Input v-model="topicForms[topic.id].title" label="Название подтемы" :error="topicErrors[topic.id]?.title" required />
-                      <Input v-model="topicForms[topic.id].orderIndex" type="number" min="1" label="Порядок" />
-                      <Select
-                        v-model="topicForms[topic.id].assessmentId"
-                        label="Тест подтемы"
-                        :options="assessmentOptions"
-                        placeholder="Без теста"
-                      />
-                      <div class="inline-actions">
-                        <Button size="sm" variant="secondary" @click="openAssessmentEditor({ type: 'topic', id: topic.id })">Создать тест</Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          :disabled="!topicForms[topic.id].assessmentId"
-                          @click="openAssessmentEditor({ type: 'topic', id: topic.id }, topicForms[topic.id].assessmentId)"
-                        >
-                          Редактировать тест
-                        </Button>
+                  <div v-if="Number(activeSection?.id) === Number(section.id)" class="structure-subtopics">
+                    <draggable
+                      v-if="section.topics?.length"
+                      v-model="section.topics"
+                      item-key="id"
+                      handle=".topic-drag-handle"
+                      class="structure-subtopics-list"
+                      @end="() => handleTopicsReorder(section)"
+                    >
+                      <template #item="{ element: topic }">
+                        <div class="structure-subtopic" :class="{ 'structure-subtopic-active': topicEditingId === topic.id }">
+                          <div class="structure-subtopic-row" @click="toggleTopicEdit(topic.id)">
+                            <span
+                              v-if="(section.topics || []).length > 1"
+                              class="structure-drag topic-drag-handle"
+                              title="Перетащите для изменения порядка"
+                              @click.stop
+                              >⠿</span
+                            >
+                            <FileText class="structure-doc-icon" :size="16" :stroke-width="1.8" />
+                            <span class="structure-subtopic-title">{{ section.orderIndex }}.{{ topic.orderIndex }} {{ topic.title }}</span>
+                            <button type="button" class="structure-kebab" @click.stop="toggleTopicEdit(topic.id)"><MoreVertical :size="16" /></button>
+                          </div>
+
+                          <div v-if="topicEditingId === topic.id && topicForms[topic.id]" class="structure-topic-editor">
+                            <div class="structure-topic-grid">
+                              <label class="structure-topic-field structure-topic-field-wide">
+                                <span>Название подтемы</span>
+                                <input v-model="topicForms[topic.id].title" type="text" placeholder="Введите название подтемы" />
+                              </label>
+                            </div>
+
+                            <p v-if="topicErrors[topic.id]?.title" class="structure-inline-error">{{ topicErrors[topic.id]?.title }}</p>
+
+                            <div class="structure-topic-toggles">
+                              <label>
+                                <input v-model="topicForms[topic.id].hasMaterial" type="checkbox" />
+                                <span>Есть учебный материал</span>
+                              </label>
+                              <label>
+                                <input v-model="topicForms[topic.id].isRequired" type="checkbox" />
+                                <span>Обязательная подтема</span>
+                              </label>
+                              <label>
+                                <input
+                                  type="checkbox"
+                                  :checked="Boolean(topicForms[topic.id].assessmentId)"
+                                  @change="
+                                    ($event) => {
+                                      if ($event.target.checked) {
+                                        openAssessmentEditor({ type: 'topic', id: topic.id }, topicForms[topic.id].assessmentId || null);
+                                      } else {
+                                        topicForms[topic.id].assessmentId = '';
+                                      }
+                                    }
+                                  "
+                                />
+                                <span>Есть тест</span>
+                              </label>
+                            </div>
+
+                            <div class="structure-topic-actions">
+                              <button
+                                type="button"
+                                class="structure-topic-save"
+                                :disabled="updatingTopicId === topic.id"
+                                @click="saveTopic(topic.id)"
+                              >
+                                Сохранить
+                              </button>
+                              <button
+                                type="button"
+                                class="structure-topic-delete"
+                                :disabled="deletingTopicId === topic.id"
+                                @click="removeTopic(topic.id, topic.title)"
+                              >
+                                Удалить
+                              </button>
+                              <button
+                                v-if="topicForms[topic.id]?.hasMaterial"
+                                type="button"
+                                class="structure-topic-material"
+                                @click="openMaterialEditor(topic.id)"
+                              >
+                                {{ topicForms[topic.id]?.content ? "Редактировать материал" : "Добавить материал" }}
+                              </button>
+                              <button
+                                v-if="topicForms[topic.id]?.hasMaterial && !topicForms[topic.id]?.content"
+                                type="button"
+                                class="structure-topic-material"
+                                style="display: none"
+                              ></button>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </draggable>
+                    <div v-else class="empty-topics">Подтем пока нет.</div>
+
+                    <button type="button" class="structure-add-subtopic-trigger" @click="toggleNewTopicForm(section.id)">
+                      <span>+</span>
+                      Добавить подтему
+                    </button>
+
+                    <div v-if="newTopics[section.id] && isNewTopicFormOpen(section.id)" class="structure-topic-create">
+                      <div class="structure-topic-create-title">Новая подтема</div>
+                      <div class="structure-topic-grid">
+                        <label class="structure-topic-field structure-topic-field-wide">
+                          <span>Название подтемы</span>
+                          <input v-model="newTopics[section.id].title" type="text" placeholder="Например, 1.1 Роль сервиса" />
+                        </label>
                       </div>
-                      <div class="field-checkbox">
-                        <label class="switch-label">
-                          <input v-model="topicForms[topic.id].isRequired" type="checkbox" />
+
+                      <p v-if="newTopicErrors[section.id]?.title" class="structure-inline-error">{{ newTopicErrors[section.id]?.title }}</p>
+
+                      <div class="structure-topic-toggles">
+                        <label>
+                          <input v-model="newTopics[section.id].hasMaterial" type="checkbox" />
+                          <span>Есть учебный материал</span>
+                        </label>
+                        <label>
+                          <input v-model="newTopics[section.id].isRequired" type="checkbox" />
                           <span>Обязательная подтема</span>
                         </label>
-                      </div>
-                      <div class="field-checkbox">
-                        <label class="switch-label">
-                          <input v-model="topicForms[topic.id].hasMaterial" type="checkbox" />
-                          <span>Есть материал</span>
+                        <label>
+                          <input
+                            type="checkbox"
+                            :checked="Boolean(newTopics[section.id].assessmentId)"
+                            @change="
+                              ($event) => {
+                                if ($event.target.checked) {
+                                  openAssessmentEditor({ type: 'newTopic', id: section.id }, newTopics[section.id].assessmentId || null);
+                                } else {
+                                  newTopics[section.id].assessmentId = '';
+                                }
+                              }
+                            "
+                          />
+                          <span>Есть тест</span>
                         </label>
                       </div>
-                      <Textarea
-                        v-if="topicForms[topic.id].hasMaterial"
-                        v-model="topicForms[topic.id].content"
-                        class="grid-span-full"
-                        label="Контент подтемы"
-                        :rows="5"
-                      />
-                    </div>
-                    <div class="topic-edit-actions">
-                      <Button size="sm" icon="save" :loading="updatingTopicId === topic.id" @click="saveTopic(topic.id)">Сохранить подтему</Button>
+
+                      <div class="structure-topic-actions">
+                        <button
+                          type="button"
+                          class="structure-topic-save"
+                          :disabled="creatingTopicSectionId === section.id"
+                          @click="addTopic(section.id)"
+                        >
+                          Добавить подтему
+                        </button>
+                        <button type="button" class="structure-topic-cancel" @click="closeNewTopicForm">Отмена</button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </template>
-              </draggable>
+            </draggable>
 
-              <!-- Добавить тему -->
-              <div v-if="newTopics[section.id]" class="new-topic">
-                <h4>Новая подтема</h4>
-                <div class="topic-edit-grid">
-                  <Input v-model="newTopics[section.id].title" label="Название подтемы" :error="newTopicErrors[section.id]?.title" required />
-                  <Input v-model="newTopics[section.id].orderIndex" type="number" min="1" label="Порядок" />
-                  <Select v-model="newTopics[section.id].assessmentId" label="Тест подтемы" :options="assessmentOptions" placeholder="Без теста" />
-                  <div class="inline-actions">
-                    <Button size="sm" variant="secondary" @click="openAssessmentEditor({ type: 'newTopic', id: section.id })">Создать тест</Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      :disabled="!newTopics[section.id].assessmentId"
-                      @click="openAssessmentEditor({ type: 'newTopic', id: section.id }, newTopics[section.id].assessmentId)"
-                    >
-                      Редактировать тест
-                    </Button>
-                  </div>
-                  <div class="field-checkbox">
-                    <label class="switch-label">
-                      <input v-model="newTopics[section.id].isRequired" type="checkbox" />
-                      <span>Обязательная подтема</span>
-                    </label>
-                  </div>
-                  <div class="field-checkbox">
-                    <label class="switch-label">
-                      <input v-model="newTopics[section.id].hasMaterial" type="checkbox" />
-                      <span>Есть материал</span>
-                    </label>
-                  </div>
-                  <Textarea
-                    v-if="newTopics[section.id].hasMaterial"
-                    v-model="newTopics[section.id].content"
-                    class="grid-span-full"
-                    label="Контент подтемы"
-                    :rows="4"
+            <div v-if="showNewSectionForm" class="new-section structure-new-section">
+              <div class="section-edit-grid">
+                <Input v-model="newSection.title" label="Название темы курса" :error="newSectionErrors.title" required />
+              </div>
+              <div class="new-section-actions">
+                <Button icon="plus" :loading="creatingSection" @click="addSection">Добавить тему</Button>
+              </div>
+            </div>
+
+            <button type="button" class="structure-add-area" @click="showNewSectionForm = true">
+              <span>+</span>
+              Добавить тему
+            </button>
+          </div>
+
+          <aside class="structure-detail-panel">
+            <template v-if="activeSection && activeSectionForm">
+              <div class="structure-detail-head">
+                <div class="structure-detail-head-title">
+                  <span class="structure-detail-eyebrow">Тема</span>
+                  <template v-if="sectionEditingId === activeSection.id">
+                    <input
+                      v-model="activeSectionForm.title"
+                      class="structure-title-input"
+                      type="text"
+                      placeholder="Название темы"
+                      @keydown.enter.prevent="saveSection(activeSection.id)"
+                      @keydown.esc.prevent="toggleSectionEdit(activeSection.id)"
+                    />
+                  </template>
+                  <template v-else>
+                    <h3>{{ activeSection.orderIndex }}. {{ activeSection.title }}</h3>
+                  </template>
+                </div>
+                <div class="structure-head-actions">
+                  <button
+                    v-if="sectionEditingId === activeSection.id"
+                    type="button"
+                    class="structure-save-button"
+                    :disabled="updatingSectionId === activeSection.id"
+                    @click="saveSection(activeSection.id)"
+                  >
+                    Сохранить
+                  </button>
+                  <button
+                    type="button"
+                    class="structure-edit-button"
+                    :disabled="updatingSectionId === activeSection.id"
+                    @click="toggleSectionEdit(activeSection.id)"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                      <path d="M12 20h9" stroke-linecap="round" />
+                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5z" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    {{ sectionEditingId === activeSection.id ? "Отмена" : "Изменить" }}
+                  </button>
+                </div>
+              </div>
+
+              <label class="structure-field">
+                <span>Краткое описание</span>
+                <textarea
+                  v-model="activeSectionForm.description"
+                  maxlength="500"
+                  placeholder="Базовые понятия о сервисе, его роли в ресторане и стандартах общения с гостями."
+                ></textarea>
+                <small>{{ (activeSectionForm.description || "").length }}/500</small>
+              </label>
+
+              <div class="structure-settings">
+                <h4>Настройки темы</h4>
+                <label class="structure-toggle">
+                  <span>
+                    <strong>Тема обязательна для изучения</strong>
+                    <small>Пользователь не сможет отметить тему как пройденную, пока не изучит все материалы</small>
+                  </span>
+                  <input v-model="activeSectionForm.isRequired" class="native-checkbox" type="checkbox" />
+                </label>
+                <label class="structure-toggle">
+                  <span>
+                    <strong>Тема содержит тест</strong>
+                    <small>После изучения материалов будет доступен тест для проверки знаний</small>
+                  </span>
+                  <input
+                    class="native-checkbox"
+                    type="checkbox"
+                    :checked="Boolean(activeSectionForm.assessmentId)"
+                    @change="handleActiveSectionAssessmentToggle"
+                  />
+                </label>
+                <label class="structure-toggle">
+                  <span>
+                    <strong>Показывать тему в оглавлении</strong>
+                    <small>Тема будет отображаться в содержании курса</small>
+                  </span>
+                  <input class="native-checkbox" type="checkbox" checked />
+                </label>
+              </div>
+
+              <button
+                type="button"
+                class="structure-delete-button"
+                :disabled="deletingSectionId === activeSection.id"
+                @click="removeSection(activeSection.id, activeSection.title)"
+              >
+                <Trash2 :size="16" :stroke-width="1.8" />
+                Удалить тему
+              </button>
+            </template>
+          </aside>
+        </div>
+      </Card>
+      <div v-if="showMaterialStep && currentStep === 3 && isEditMode && course" class="materials-step-card">
+        <div class="materials-breadcrumbs">
+          <button type="button" @click="closeMaterialEditor(2)">‹ Структура курса</button>
+          <span>›</span>
+          <span>{{ activeMaterialSection?.orderIndex || "—" }}. {{ activeMaterialSection?.title || "Тема курса" }}</span>
+          <span>›</span>
+          <strong>{{ activeMaterialTopicTitle }}</strong>
+        </div>
+
+        <div class="materials-title-row">
+          <div>
+            <h2>Добавление материалов в подтему</h2>
+            <p>Добавьте текст, изображения, видео и ссылки. Материалы будут доступны обучающимся в том порядке, в котором вы их расположите.</p>
+          </div>
+          <button type="button" class="materials-preview-button">
+            <Eye :size="16" :stroke-width="1.8" />
+            Предпросмотр для ученика
+          </button>
+        </div>
+
+        <div class="materials-layout">
+          <section class="materials-editor-panel" ref="materialEditorPanelRef">
+            <div v-if="activeMaterialTopic && activeMaterialForm" class="materials-editor-card">
+              <div class="materials-form">
+                <div class="materials-content-field">
+                  <WysiwygEditor
+                    v-model="activeMaterialForm.content"
+                    label="Содержание"
+                    placeholder="Добавьте текст материала"
+                    :min-height="260"
+                    :show-counter="true"
+                    :max-length="5000"
                   />
                 </div>
-                <div class="new-topic-actions">
-                  <Button size="sm" icon="plus" :loading="creatingTopicSectionId === section.id" @click="addTopic(section.id)"
-                    >Добавить подтему</Button
-                  >
+
+                <div class="materials-tab-placeholder">
+                  <strong>Видео через iframe</strong>
+                  <p>Вставьте iframe-код плеера, если видео размещено на внешней платформе.</p>
+                  <label class="materials-field">
+                    <span>Iframe-код видео</span>
+                    <textarea v-model="materialIframeDraft" placeholder='<iframe src="https://example.com/embed/video"></iframe>' rows="4"></textarea>
+                  </label>
+                  <button type="button" class="materials-secondary-button" @click="appendMaterialIframe">Добавить iframe</button>
+                </div>
+
+                <div class="materials-settings">
+                  <h3>Дополнительные настройки</h3>
+                  <label class="materials-toggle">
+                    <span>Отображать материал как обязательный для изучения</span>
+                    <input v-model="activeMaterialForm.isRequired" type="checkbox" />
+                  </label>
+                </div>
+
+                <div class="materials-actions">
+                  <button type="button" class="materials-delete-button" @click="clearActiveMaterialContent">
+                    <Trash2 :size="16" :stroke-width="1.8" />
+                    Удалить материал
+                  </button>
+                  <div>
+                    <button type="button" class="materials-cancel-button" @click="closeMaterialEditor(2)">Отмена</button>
+                    <button
+                      type="button"
+                      class="materials-save-button"
+                      :disabled="updatingTopicId === activeMaterialTopic.id"
+                      @click="saveMaterialTopic"
+                    >
+                      Сохранить изменения
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </template>
-        </draggable>
 
-        <div class="new-section">
-          <h3>Новая тема курса</h3>
-          <div class="section-edit-grid">
-            <Input v-model="newSection.title" label="Название темы курса" :error="newSectionErrors.title" required />
-            <Input v-model="newSection.orderIndex" type="number" min="1" label="Порядок" />
-            <Select v-model="newSection.assessmentId" label="Проверочный тест темы курса" :options="assessmentOptions" placeholder="Выберите тест" />
-            <div class="inline-actions">
-              <Button size="sm" variant="secondary" @click="openAssessmentEditor({ type: 'newSection' })">Создать тест</Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                :disabled="!newSection.assessmentId"
-                @click="openAssessmentEditor({ type: 'newSection' }, newSection.assessmentId)"
-              >
-                Редактировать тест
-              </Button>
+            <div v-else class="materials-editor-empty">
+              <h3>Выберите подтему</h3>
+              <p>Материал можно добавить только к подтемам, где включена галочка «Есть учебный материал».</p>
             </div>
-            <Input v-model="newSection.estimatedMinutes" type="number" min="1" max="1440" label="Время (мин.)" />
-            <div class="field-checkbox">
-              <label class="switch-label">
-                <input v-model="newSection.isRequired" type="checkbox" />
-                <span>Обязательная тема курса</span>
-              </label>
-            </div>
-          </div>
-          <div class="new-section-actions">
-            <Button icon="plus" :loading="creatingSection" @click="addSection">Добавить тему курса</Button>
-          </div>
+          </section>
+        </div>
+      </div>
+
+      <Card v-if="currentStep === testsStepId && isEditMode && course" class="editor-card">
+        <div class="step-card-header">
+          <h2>Шаг {{ testsStepId }}. Тест для темы</h2>
+          <p>Настройте проверочные тесты для каждой темы курса.</p>
+        </div>
+        <div class="step-placeholder">
+          <p>Перейдите в шаг «Структура курса» и назначьте тест для каждой темы.</p>
+          <Button variant="secondary" @click="currentStep = 2">Перейти к структуре курса</Button>
         </div>
       </Card>
 
-      <Card v-if="currentStep === 3 && isEditMode && course" class="editor-card final-assessment-card">
+      <Card v-if="currentStep === finalAssessmentStepId && isEditMode && course" class="editor-card final-assessment-card">
         <div class="step-card-header">
-          <h2>Шаг 3. Итоговая аттестация</h2>
+          <h2>Шаг {{ finalAssessmentStepId }}. Аттестация курса</h2>
           <p>Назначьте обязательную итоговую аттестацию курса и сохраните настройки.</p>
         </div>
 
@@ -471,9 +627,9 @@
         </div>
       </Card>
 
-      <Card v-if="currentStep === 4 && isEditMode && course" class="preview-card">
+      <Card v-if="currentStep === previewStepId && isEditMode && course" class="preview-card">
         <div class="step-card-header">
-          <h2>Шаг 4. Предпросмотр курса</h2>
+          <h2>Шаг {{ previewStepId }}. Предпросмотр и публикация</h2>
           <p>Проверьте структуру курса, итоговую аттестацию и готовность к публикации.</p>
         </div>
 
@@ -503,8 +659,8 @@
             <strong>{{ previewStats.subtopicsCount }}</strong>
           </div>
           <div class="preview-item">
-            <span class="preview-label">Обязательных тем</span>
-            <strong>{{ previewStats.requiredThemesCount }}</strong>
+            <span class="preview-label">Материалов</span>
+            <strong>{{ previewStats.materialsCount }}</strong>
           </div>
           <div class="preview-item">
             <span class="preview-label">Итоговая аттестация</span>
@@ -530,23 +686,6 @@
           </ul>
         </div>
       </Card>
-
-      <div class="wizard-navigation">
-        <Button v-if="currentStep > 1" variant="secondary" @click="goToPrevStep">Назад</Button>
-        <div class="spacer"></div>
-        <Button v-if="currentStep < wizardSteps.length" @click="goToNextStep" :disabled="!canProceed">Далее</Button>
-        <Button
-          v-else-if="course?.status === 'published'"
-          variant="success"
-          icon="send"
-          :loading="publishing"
-          @click="handlePublish"
-          :disabled="publicationErrorsForDisplay.length > 0"
-        >
-          Применить изменения
-        </Button>
-        <Button v-else-if="course?.status === 'published'" variant="secondary" icon="archive" :loading="archiving" @click="handleArchive">Закрыть курс</Button>
-      </div>
 
       <!-- Блок назначения курса -->
       <Card v-if="currentStep === 1 && isEditMode && course" class="assignments-card">
@@ -577,10 +716,6 @@
               </label>
             </div>
           </div>
-        </div>
-
-        <div class="targets-actions">
-          <Button :loading="savingTargets" icon="save" @click="saveTargets">Сохранить назначения</Button>
         </div>
 
         <div class="manual-assignments">
@@ -639,7 +774,7 @@
       </Card>
 
       <!-- Блок участников с прогрессом -->
-      <Card v-if="currentStep === 4 && isEditMode && course" class="participants-card">
+      <Card v-if="currentStep === previewStepId && isEditMode && course" class="participants-card">
         <div class="participants-header">
           <h2>Участники</h2>
           <p>Отчет по прогрессу пользователей внутри курса.</p>
@@ -775,10 +910,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import draggable from "vuedraggable";
-import { Badge, Button, Card, Input, Modal, Preloader, Select, Textarea } from "../components/ui";
+import { Check, ChevronUp, Eye, FileText, GripVertical, Info, MoreVertical, Search, Trash2, Upload, X } from "lucide-vue-next";
+import { Badge, Button, Card, Input, Modal, Preloader, Select, Textarea, WysiwygEditor } from "../components/ui";
 import AssessmentForm from "../components/AssessmentForm.vue";
 import {
   archiveCourse,
@@ -822,6 +958,7 @@ const publishing = ref(false);
 const archiving = ref(false);
 const uploadingCover = ref(false);
 const selectedCoverFile = ref(null);
+const localCoverPreviewUrl = ref("");
 const previewWarnings = ref([]);
 const tempIdCounter = ref(-1);
 
@@ -831,7 +968,7 @@ const sectionEditingId = ref(null);
 const updatingSectionId = ref(null);
 const deletingSectionId = ref(null);
 const creatingSection = ref(false);
-const newSection = ref({ title: "", orderIndex: "", assessmentId: "", isRequired: true, estimatedMinutes: "", description: "" });
+const newSection = ref({ title: "", assessmentId: "", isRequired: true, estimatedMinutes: "", description: "" });
 const newSectionErrors = ref({ title: "" });
 
 const topicForms = ref({});
@@ -844,10 +981,21 @@ const newTopicErrors = ref({});
 const creatingTopicSectionId = ref(null);
 const reorderingSections = ref(false);
 const reorderingTopicSectionId = ref(null);
+const selectedStructureSectionId = ref(null);
+const structureSearchQuery = ref("");
+const newTopicFormSectionId = ref(null);
+const showNewSectionForm = ref(false);
+const showMaterialStep = ref(false);
+const activeMaterialTopicId = ref(null);
+const materialIframeDraft = ref("");
+const materialEditorPanelRef = ref(null);
 
 const form = ref({
   title: "",
+  shortDescription: "",
   description: "",
+  difficulty: "",
+  courseLanguage: "ru",
   coverUrl: "",
   category: "",
   tagsInput: "",
@@ -869,7 +1017,6 @@ const positionOptions = ref([]);
 const branchOptions = ref([]);
 const selectedPositionIds = ref([]);
 const selectedBranchIds = ref([]);
-const savingTargets = ref(false);
 const assignments = ref([]);
 const newAssignmentUserId = ref("");
 const newAssignmentDeadlineAt = ref("");
@@ -885,6 +1032,83 @@ const viewingProgressUserId = ref(null);
 const selectedUserProgress = ref(null);
 const selectedUserName = ref("");
 const assessmentEditorOpen = ref(false);
+
+const coverDragOver = ref(false);
+
+const coverFileInputRef = ref(null);
+
+const difficultyOptions = [
+  { value: "beginner", label: "Начальный" },
+  { value: "intermediate", label: "Средний" },
+  { value: "advanced", label: "Продвинутый" },
+];
+
+const languageOptions = [{ value: "ru", label: "Русский" }];
+
+const categoryOptions = [
+  { value: "service", label: "Сервис" },
+  { value: "standards", label: "Стандарты" },
+  { value: "safety", label: "Безопасность" },
+  { value: "management", label: "Управление" },
+  { value: "other", label: "Другое" },
+];
+
+const parsedTags = computed(() => {
+  return String(form.value.tagsInput || "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+});
+
+const confirmTagInput = () => {
+  // теги сохраняются как строка через запятую
+};
+
+const removeTag = (index) => {
+  const tags = parsedTags.value.filter((_, i) => i !== index);
+  form.value.tagsInput = tags.join(", ");
+};
+
+const setLocalCoverPreview = (file) => {
+  if (localCoverPreviewUrl.value) {
+    URL.revokeObjectURL(localCoverPreviewUrl.value);
+  }
+  localCoverPreviewUrl.value = URL.createObjectURL(file);
+  form.value.coverUrl = localCoverPreviewUrl.value;
+};
+
+const clearLocalCoverPreview = () => {
+  if (localCoverPreviewUrl.value) {
+    URL.revokeObjectURL(localCoverPreviewUrl.value);
+    localCoverPreviewUrl.value = "";
+  }
+};
+
+const triggerCoverFileInput = () => {
+  coverFileInputRef.value?.click();
+};
+
+const handleCoverDrop = (event) => {
+  coverDragOver.value = false;
+  const file = event.dataTransfer?.files?.[0] || null;
+  if (file) {
+    selectedCoverFile.value = file;
+    setLocalCoverPreview(file);
+  }
+};
+
+const removeCover = () => {
+  clearLocalCoverPreview();
+  form.value.coverUrl = "";
+  selectedCoverFile.value = null;
+  if (coverFileInputRef.value) {
+    coverFileInputRef.value.value = "";
+  }
+};
+
+const saveFromHeader = async () => {
+  await saveCourse();
+};
 const assessmentEditorAssessmentId = ref(null);
 const assessmentEditorTarget = ref(null);
 const assessmentEditorTitle = ref("Аттестация");
@@ -899,18 +1123,49 @@ const publicationErrors = computed(() => {
   return course.value?.publication?.errors || [];
 });
 
+const visibleSections = computed(() => {
+  const sections = course.value?.sections || [];
+  const query = structureSearchQuery.value.trim().toLowerCase();
+  if (!query) return sections;
+
+  return sections.filter((section) => {
+    const sectionTitle = String(section.title || "").toLowerCase();
+    const hasMatchingTopic = (section.topics || []).some((topic) =>
+      String(topic.title || "")
+        .toLowerCase()
+        .includes(query),
+    );
+    return sectionTitle.includes(query) || hasMatchingTopic;
+  });
+});
+
+const activeSection = computed(() => {
+  const sections = visibleSections.value;
+  if (!sections.length) return null;
+  return sections.find((section) => Number(section.id) === Number(selectedStructureSectionId.value)) || sections[0];
+});
+
+const activeSectionForm = computed(() => {
+  return activeSection.value ? sectionForms.value[activeSection.value.id] : null;
+});
+
 const currentStep = ref(1);
-const wizardSteps = [
-  { id: 1, title: "Основная информация" },
-  { id: 2, title: "Темы курса" },
-  { id: 3, title: "Итоговая аттестация" },
-  { id: 4, title: "Предпросмотр" },
-];
+const testsStepId = computed(() => (showMaterialStep.value ? 4 : 3));
+const finalAssessmentStepId = computed(() => (showMaterialStep.value ? 5 : 4));
+const previewStepId = computed(() => (showMaterialStep.value ? 6 : 5));
+const wizardSteps = computed(() => [
+  { id: 1, title: "Основная информация", subtitle: "Базовые данные курса" },
+  { id: 2, title: "Структура курса", subtitle: "Темы и подтемы" },
+  ...(showMaterialStep.value ? [{ id: 3, title: "Добавление материалов", subtitle: "Наполните подтему материалами" }] : []),
+  { id: testsStepId.value, title: "Тест для темы", subtitle: "Создайте тест для темы" },
+  { id: finalAssessmentStepId.value, title: "Аттестация курса", subtitle: "Итоговая аттестация" },
+  { id: previewStepId.value, title: "Предпросмотр", subtitle: "Проверка и публикация" },
+]);
 const canProceed = computed(() => {
   if (currentStep.value === 1) {
     return Boolean(form.value.title?.trim());
   }
-  if (currentStep.value === 3) {
+  if (currentStep.value === finalAssessmentStepId.value) {
     return Boolean(form.value.finalAssessmentId);
   }
   return true;
@@ -921,6 +1176,49 @@ const selectedFinalAssessmentLabel = computed(() => {
   const currentValue = String(form.value.finalAssessmentId || "");
   const option = assessmentOptions.value.find((item) => item.value === currentValue);
   return option?.label || "Не выбрана";
+});
+const materialTopics = computed(() => {
+  const sections = course.value?.sections || [];
+  return sections.flatMap((section) =>
+    (section.topics || [])
+      .filter((topic) => topic.hasMaterial)
+      .map((topic) => ({
+        ...topic,
+        sectionId: section.id,
+        sectionTitle: section.title,
+        sectionOrder: section.orderIndex,
+      })),
+  );
+});
+const activeMaterialTopic = computed(() => {
+  const topics = materialTopics.value;
+  if (!topics.length) return null;
+  return topics.find((topic) => Number(topic.id) === Number(activeMaterialTopicId.value)) || topics[0];
+});
+const activeMaterialSection = computed(() => {
+  if (!activeMaterialTopic.value) return null;
+  return (course.value?.sections || []).find((section) => Number(section.id) === Number(activeMaterialTopic.value.sectionId)) || null;
+});
+const activeMaterialForm = computed(() => {
+  const topicId = activeMaterialTopic.value?.id;
+  return topicId ? topicForms.value[topicId] || null : null;
+});
+const activeMaterialTopicTitle = computed(() => activeMaterialTopic.value?.title || "Выберите подтему");
+const materialPreviewText = computed(() => {
+  const text = stripHtml(activeMaterialForm.value?.content || "");
+  return text ? `${text.slice(0, 116)}${text.length > 116 ? "..." : ""}` : "Материал пока не заполнен.";
+});
+const activeMaterialBlocks = computed(() => {
+  const hasContent = Boolean(stripHtml(activeMaterialForm.value?.content || ""));
+  return [
+    {
+      id: "text",
+      title: hasContent ? "Текстовый материал" : "Материал не добавлен",
+      subtitle: hasContent ? "Текст, ссылки, фото, видео и iframe" : "Заполните содержание материала",
+      icon: hasContent ? "T" : "+",
+      filled: hasContent,
+    },
+  ];
 });
 
 const assessmentTypeLabel = (type) => {
@@ -939,6 +1237,8 @@ const previewStats = computed(() => {
     themesCount: themes.length,
     requiredThemesCount: themes.filter((item) => item.isRequired).length,
     subtopicsCount: themes.reduce((total, item) => total + (item.topics?.length || 0), 0),
+    materialsCount: themes.reduce((total, section) => total + (section.topics || []).filter((t) => t.hasMaterial).length, 0),
+    sectionTestsCount: themes.filter((item) => item.assessmentId).length,
   };
 });
 
@@ -990,6 +1290,41 @@ const parseTags = (value) => {
     .slice(0, 20);
 };
 
+function stripHtml(value) {
+  return String(value || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractMaterialTitle(content) {
+  const match = String(content || "").match(/<h1[^>]*data-material-title=["']true["'][^>]*>([\s\S]*?)<\/h1>/i);
+  return match ? stripHtml(match[1]) : "";
+}
+
+function stripMaterialTitle(content) {
+  return String(content || "")
+    .replace(/<h1[^>]*data-material-title=["']true["'][^>]*>[\s\S]*?<\/h1>/i, "")
+    .trim();
+}
+
+function escapeMaterialTitle(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function buildMaterialContent(materialTitle, content) {
+  const cleanContent = stripMaterialTitle(content || "");
+  const cleanTitle = String(materialTitle || "").trim();
+  if (!cleanTitle) {
+    return cleanContent;
+  }
+  return `<h1 data-material-title="true">${escapeMaterialTitle(cleanTitle)}</h1>${cleanContent}`;
+}
+
 const getNextTempId = () => {
   tempIdCounter.value -= 1;
   return tempIdCounter.value;
@@ -1011,7 +1346,6 @@ const syncSectionForms = (sections = []) => {
     nextForms[section.id] = {
       title: section.title || "",
       description: section.description || "",
-      orderIndex: String(section.orderIndex || ""),
       assessmentId: section.assessmentId ? String(section.assessmentId) : "",
       isRequired: Boolean(section.isRequired),
       estimatedMinutes: section.estimatedMinutes ? String(section.estimatedMinutes) : "",
@@ -1019,20 +1353,37 @@ const syncSectionForms = (sections = []) => {
     for (const topic of section.topics || []) {
       nextTopicForms[topic.id] = {
         title: topic.title || "",
-        orderIndex: String(topic.orderIndex || ""),
         isRequired: topic.isRequired !== false,
         hasMaterial: Boolean(topic.hasMaterial),
         content: topic.content || "",
         assessmentId: topic.assessmentId ? String(topic.assessmentId) : "",
       };
     }
-    nextNewTopics[section.id] = newTopics.value[section.id] || { title: "", orderIndex: "", isRequired: true, hasMaterial: false, content: "", assessmentId: "" };
+    nextNewTopics[section.id] = newTopics.value[section.id] || {
+      title: "",
+      isRequired: true,
+      hasMaterial: true,
+      content: "",
+      assessmentId: "",
+    };
   }
   sectionForms.value = nextForms;
   sectionErrors.value = {};
   topicForms.value = nextTopicForms;
   topicErrors.value = {};
   newTopics.value = nextNewTopics;
+  if (newTopicFormSectionId.value && !sections.some((section) => Number(section.id) === Number(newTopicFormSectionId.value))) {
+    newTopicFormSectionId.value = null;
+  }
+  if (!selectedStructureSectionId.value && sections[0]) {
+    selectedStructureSectionId.value = sections[0].id;
+  }
+  const materialTopicIds = sections.flatMap((section) =>
+    (section.topics || []).filter((topic) => topic.hasMaterial).map((topic) => Number(topic.id)),
+  );
+  if (!materialTopicIds.includes(Number(activeMaterialTopicId.value))) {
+    activeMaterialTopicId.value = materialTopicIds[0] || null;
+  }
 };
 
 const loadAssessments = async () => {
@@ -1071,9 +1422,13 @@ const loadBranches = async () => {
 };
 
 const applyCourseToForm = (courseItem) => {
+  clearLocalCoverPreview();
   form.value = {
     title: courseItem.title || "",
+    shortDescription: courseItem.shortDescription || "",
     description: courseItem.description || "",
+    difficulty: courseItem.difficulty || "",
+    courseLanguage: courseItem.courseLanguage || "ru",
     coverUrl: courseItem.coverUrl || "",
     category: courseItem.category || "",
     tagsInput: Array.isArray(courseItem.tags) ? courseItem.tags.join(", ") : "",
@@ -1089,9 +1444,13 @@ const loadCourse = async () => {
   if (!isEditMode.value) {
     course.value = null;
     previewWarnings.value = [];
+    clearLocalCoverPreview();
     form.value = {
       title: "",
+      shortDescription: "",
       description: "",
+      difficulty: "",
+      courseLanguage: "ru",
       coverUrl: "",
       category: "",
       tagsInput: "",
@@ -1189,31 +1548,42 @@ const loadPreview = async () => {
 
 const handleCoverFileChange = (event) => {
   const file = event?.target?.files?.[0] || null;
+  if (!file) return;
   selectedCoverFile.value = file;
+  setLocalCoverPreview(file);
+  if (event?.target) {
+    event.target.value = "";
+  }
 };
 
-const handleCoverUpload = async () => {
-  if (!isEditMode.value || !courseId.value) {
-    showToast("Сначала сохраните курс, затем загрузите обложку", "error");
-    return;
+const handleCoverUpload = async (overrideCourseId = null, silent = false) => {
+  const id = Number(overrideCourseId || courseId.value);
+  if (!id) {
+    return false;
   }
   if (!selectedCoverFile.value) {
-    showToast("Выберите файл обложки", "error");
-    return;
+    return true;
   }
 
   uploadingCover.value = true;
   try {
-    const response = await uploadCourseCover(courseId.value, selectedCoverFile.value);
+    const response = await uploadCourseCover(id, selectedCoverFile.value);
     const nextCoverUrl = response?.coverUrl || response?.course?.coverUrl || null;
     if (nextCoverUrl) {
       form.value.coverUrl = nextCoverUrl;
+      if (course.value) {
+        course.value.coverUrl = nextCoverUrl;
+      }
     }
+    clearLocalCoverPreview();
     selectedCoverFile.value = null;
-    await loadCourse();
-    showToast("Обложка курса загружена", "success");
+    if (!silent) {
+      showToast("Обложка курса загружена", "success");
+    }
+    return true;
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось загрузить обложку"), "error");
+    return false;
   } finally {
     uploadingCover.value = false;
   }
@@ -1227,32 +1597,59 @@ const saveCourse = async () => {
   const payload = {
     title: form.value.title.trim(),
     description: form.value.description.trim(),
-    coverUrl: form.value.coverUrl.trim() || null,
     category: form.value.category.trim() || null,
     tags: parseTags(form.value.tagsInput),
     finalAssessmentId: sanitizeOptionalNumber(form.value.finalAssessmentId),
     availabilityMode: form.value.availabilityMode || "unlimited",
     availabilityDays: form.value.availabilityMode === "relative_days" ? sanitizeOptionalNumber(form.value.availabilityDays) : null,
-    availabilityFrom: form.value.availabilityMode === "fixed_dates" && form.value.availabilityFrom ? new Date(form.value.availabilityFrom).toISOString() : null,
-    availabilityTo: form.value.availabilityMode === "fixed_dates" && form.value.availabilityTo ? new Date(form.value.availabilityTo).toISOString() : null,
+    availabilityFrom:
+      form.value.availabilityMode === "fixed_dates" && form.value.availabilityFrom ? new Date(form.value.availabilityFrom).toISOString() : null,
+    availabilityTo:
+      form.value.availabilityMode === "fixed_dates" && form.value.availabilityTo ? new Date(form.value.availabilityTo).toISOString() : null,
   };
 
   saving.value = true;
   try {
+    const isEdit = isEditMode.value;
+    let savedCourseId = isEditMode.value ? courseId.value : null;
+
     if (isEditMode.value) {
       const response = await updateCourse(courseId.value, payload);
       course.value = {
         ...course.value,
         ...response.course,
       };
-      showToast("Курс обновлен", "success");
-      await loadCourse();
+      savedCourseId = response?.course?.id || courseId.value;
     } else {
       const response = await createCourse(payload);
-      showToast("Курс создан", "success");
+      savedCourseId = response?.course?.id || null;
       await router.replace(`/courses/${response.course.id}/edit`);
+    }
+
+    if (savedCourseId) {
+      const targetsSaved = await saveTargets(savedCourseId, true);
+      if (!targetsSaved) {
+        return false;
+      }
+
+      const coverSaved = await handleCoverUpload(savedCourseId, true);
+      if (!coverSaved) {
+        return false;
+      }
+    }
+
+    showToast(isEdit ? "Курс обновлен" : "Курс создан", "success");
+
+    // Не показываем полный прелоадер при редактировании: это выглядит как перезагрузка страницы.
+    if (isEdit) {
+      await loadPreview();
+      if (currentStep.value === previewStepId.value) {
+        await loadParticipants();
+      }
+    } else {
       await loadCourse();
     }
+
     return true;
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось сохранить курс"), "error");
@@ -1264,36 +1661,32 @@ const saveCourse = async () => {
 
 const goToStep = async (stepId) => {
   if (stepId === currentStep.value) return;
-  if (stepId > 1 && !course.value && !isEditMode.value) {
-    showToast("Сначала сохраните основную информацию о курсе", "error");
+  if (showMaterialStep.value && currentStep.value === 3 && stepId !== 3) {
+    showMaterialStep.value = false;
+    currentStep.value = stepId > 3 ? stepId - 1 : stepId;
     return;
   }
-  if (stepId > currentStep.value && (currentStep.value === 1 || currentStep.value === 3)) {
-    const saved = await saveCourse();
-    if (!saved) return;
-  }
   currentStep.value = stepId;
-  if (currentStep.value === 4 && isEditMode.value) {
-    await loadParticipants();
-  }
 };
 
 const goToPrevStep = () => {
+  if (showMaterialStep.value && currentStep.value === 3) {
+    closeMaterialEditor(2);
+    return;
+  }
   if (currentStep.value > 1) {
     currentStep.value -= 1;
   }
 };
 
 const goToNextStep = async () => {
-  if (currentStep.value === 1 || currentStep.value === 3) {
-    const saved = await saveCourse();
-    if (!saved) return;
+  if (showMaterialStep.value && currentStep.value === 3) {
+    showMaterialStep.value = false;
+    currentStep.value = 3;
+    return;
   }
-  if (currentStep.value < wizardSteps.length) {
+  if (currentStep.value < wizardSteps.value.length) {
     currentStep.value += 1;
-  }
-  if (currentStep.value === 4 && isEditMode.value) {
-    await loadParticipants();
   }
 };
 
@@ -1351,8 +1744,84 @@ const toggleTopicEdit = (topicId) => {
   topicEditingId.value = topicEditingId.value === topicId ? null : topicId;
 };
 
+const selectSection = (sectionId) => {
+  selectedStructureSectionId.value = sectionId;
+};
+
+const isNewTopicFormOpen = (sectionId) => {
+  return Number(newTopicFormSectionId.value) === Number(sectionId);
+};
+
+const toggleNewTopicForm = (sectionId) => {
+  if (isNewTopicFormOpen(sectionId)) {
+    newTopicFormSectionId.value = null;
+    return;
+  }
+  newTopicFormSectionId.value = sectionId;
+};
+
+const closeNewTopicForm = () => {
+  newTopicFormSectionId.value = null;
+};
+
+const selectMaterialTopic = (topicId) => {
+  activeMaterialTopicId.value = topicId;
+  materialIframeDraft.value = "";
+};
+
+const openMaterialEditor = (topicId) => {
+  selectMaterialTopic(topicId);
+  showMaterialStep.value = true;
+  currentStep.value = 3;
+};
+
+const closeMaterialEditor = (targetStep = 2) => {
+  showMaterialStep.value = false;
+  materialIframeDraft.value = "";
+  currentStep.value = targetStep;
+};
+
+const focusMaterialEditor = () => {
+  materialEditorPanelRef.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+const appendMaterialIframe = () => {
+  if (!activeMaterialForm.value || !materialIframeDraft.value.trim()) return;
+  const iframe = materialIframeDraft.value.trim();
+  if (!/^<iframe[\s\S]*<\/iframe>$/i.test(iframe)) {
+    showToast("Вставьте корректный iframe-код видео", "error");
+    return;
+  }
+  activeMaterialForm.value.content = `${activeMaterialForm.value.content || ""}<p>${iframe}</p>`;
+  materialIframeDraft.value = "";
+};
+
+const clearActiveMaterialContent = () => {
+  if (!activeMaterialForm.value) return;
+  activeMaterialForm.value.content = "";
+};
+
+const saveMaterialTopic = async () => {
+  const topicId = activeMaterialTopic.value?.id;
+  if (!topicId || !activeMaterialForm.value) return;
+  await saveTopic(topicId, { keepEditorOpen: true, successMessage: "Материал сохранен" });
+};
+
+const isSectionVisible = (section) => {
+  return visibleSections.value.some((visibleSection) => Number(visibleSection.id) === Number(section.id));
+};
+
+const handleActiveSectionAssessmentToggle = (event) => {
+  if (!activeSection.value || !activeSectionForm.value) return;
+  if (event.target.checked) {
+    openAssessmentEditor({ type: "section", id: activeSection.value.id }, activeSectionForm.value.assessmentId || null);
+    return;
+  }
+  activeSectionForm.value.assessmentId = "";
+};
+
 const resetNewSection = () => {
-  newSection.value = { title: "", orderIndex: "", assessmentId: "", isRequired: true, estimatedMinutes: "", description: "" };
+  newSection.value = { title: "", assessmentId: "", isRequired: true, estimatedMinutes: "", description: "" };
   newSectionErrors.value = { title: "" };
 };
 
@@ -1366,7 +1835,6 @@ const addSection = async () => {
     const payload = {
       title: newSection.value.title.trim(),
       description: (newSection.value.description || "").trim(),
-      orderIndex: sanitizeOptionalNumber(newSection.value.orderIndex),
       assessmentId: sanitizeOptionalNumber(newSection.value.assessmentId),
       isRequired: Boolean(newSection.value.isRequired),
       estimatedMinutes: sanitizeOptionalNumber(newSection.value.estimatedMinutes),
@@ -1374,6 +1842,8 @@ const addSection = async () => {
     const response = await createCourseSection(courseId.value, payload);
     course.value = response.course;
     syncSectionForms(response.course.sections || []);
+    selectedStructureSectionId.value = response.course.sections?.at(-1)?.id || selectedStructureSectionId.value;
+    showNewSectionForm.value = false;
     resetNewSection();
     showToast("Тема курса добавлена", "success");
   } catch (error) {
@@ -1395,7 +1865,6 @@ const saveSection = async (sectionId) => {
     const payload = {
       title: formState.title.trim(),
       description: (formState.description || "").trim(),
-      orderIndex: sanitizeOptionalNumber(formState.orderIndex),
       assessmentId: sanitizeOptionalNumber(formState.assessmentId),
       isRequired: Boolean(formState.isRequired),
       estimatedMinutes: sanitizeOptionalNumber(formState.estimatedMinutes),
@@ -1443,7 +1912,6 @@ const addTopic = async (sectionId) => {
   try {
     const payload = {
       title: formState.title.trim(),
-      orderIndex: sanitizeOptionalNumber(formState.orderIndex),
       isRequired: Boolean(formState.isRequired),
       hasMaterial: Boolean(formState.hasMaterial),
       content: formState.hasMaterial ? (formState.content || "").trim() || null : null,
@@ -1452,8 +1920,9 @@ const addTopic = async (sectionId) => {
     const response = await createCourseTopic(sectionId, payload);
     course.value = response.course;
     syncSectionForms(response.course.sections || []);
-    newTopics.value[sectionId] = { title: "", orderIndex: "", isRequired: true, hasMaterial: false, content: "", assessmentId: "" };
+    newTopics.value[sectionId] = { title: "", isRequired: true, hasMaterial: true, content: "", assessmentId: "" };
     newTopicErrors.value = { ...newTopicErrors.value, [sectionId]: null };
+    closeNewTopicForm();
     showToast("Подтема добавлена", "success");
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось добавить подтему"), "error");
@@ -1462,7 +1931,7 @@ const addTopic = async (sectionId) => {
   }
 };
 
-const saveTopic = async (topicId) => {
+const saveTopic = async (topicId, options = {}) => {
   const formState = topicForms.value[topicId];
   if (!formState) return;
   if (!formState.title.trim()) {
@@ -1473,7 +1942,6 @@ const saveTopic = async (topicId) => {
   try {
     const payload = {
       title: formState.title.trim(),
-      orderIndex: sanitizeOptionalNumber(formState.orderIndex),
       isRequired: Boolean(formState.isRequired),
       hasMaterial: Boolean(formState.hasMaterial),
       content: formState.hasMaterial ? (formState.content || "").trim() || null : null,
@@ -1482,8 +1950,10 @@ const saveTopic = async (topicId) => {
     const response = await updateCourseTopic(topicId, payload);
     course.value = response.course;
     syncSectionForms(response.course.sections || []);
-    topicEditingId.value = null;
-    showToast("Подтема обновлена", "success");
+    if (!options.keepEditorOpen) {
+      topicEditingId.value = null;
+    }
+    showToast(options.successMessage || "Подтема обновлена", "success");
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось обновить подтему"), "error");
   } finally {
@@ -1632,18 +2102,24 @@ const goBack = () => {
   router.push("/courses");
 };
 
-const saveTargets = async () => {
-  savingTargets.value = true;
+const saveTargets = async (overrideCourseId = null, silent = false) => {
+  const id = Number(overrideCourseId || courseId.value);
+  if (!id) {
+    return false;
+  }
+
   try {
-    await updateCourseTargets(courseId.value, {
+    await updateCourseTargets(id, {
       positionIds: selectedPositionIds.value,
       branchIds: selectedBranchIds.value,
     });
-    showToast("Назначения сохранены", "success");
+    if (!silent) {
+      showToast("Назначения сохранены", "success");
+    }
+    return true;
   } catch (error) {
     showToast(getErrorMessage(error, "Не удалось сохранить назначения"), "error");
-  } finally {
-    savingTargets.value = false;
+    return false;
   }
 };
 
@@ -1777,16 +2253,31 @@ const handleResetProgress = async (userId, name) => {
   }
 };
 
+const preventWindowFileDrop = (event) => {
+  event.preventDefault();
+};
+
 watch(
   () => currentStep.value,
   async (step) => {
-    if (step === 4) {
+    if (step === previewStepId.value) {
       await loadPreview();
+      if (isEditMode.value) {
+        await loadParticipants();
+      }
     }
   },
 );
 
+onBeforeUnmount(() => {
+  clearLocalCoverPreview();
+  window.removeEventListener("dragover", preventWindowFileDrop);
+  window.removeEventListener("drop", preventWindowFileDrop);
+});
+
 onMounted(async () => {
+  window.addEventListener("dragover", preventWindowFileDrop);
+  window.addEventListener("drop", preventWindowFileDrop);
   loading.value = true;
   await Promise.all([loadAssessments(), loadPositions(), loadBranches(), loadCourse()]);
   loading.value = false;
@@ -1799,23 +2290,525 @@ onMounted(async () => {
 <style scoped>
 .course-editor-view {
   width: 100%;
+  --course-accent: #6c5ce7;
+  --course-accent-strong: #5b46f5;
+  --course-page-bg: #f7f8fc;
+  --course-surface: #ffffff;
+  --course-border: #e4e7ee;
+  --course-border-soft: #eceff5;
+  --course-text: #1f2937;
+  --course-text-muted: #667085;
+  --course-text-soft: #98a2b3;
+  --course-radius-lg: 14px;
+  --course-radius-md: 10px;
+  --course-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  font-family: "Inter", "Segoe UI", Roboto, sans-serif;
+  color: var(--course-text);
 }
 
-.page-header {
-  margin-bottom: 24px;
+/* ──────────────── Шапка страницы ──────────────── */
+.course-editor-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
 }
 
-.page-header-actions {
+.course-editor-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.course-editor-title {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: #111827;
+}
+
+.course-editor-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.course-editor-header-left :deep(.button),
+.course-editor-header-right :deep(.button) {
+  border-radius: var(--course-radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 38px;
+  box-shadow: none;
+}
+
+.course-editor-header-left :deep(.button-ghost) {
+  border: 1px solid var(--course-border);
+  background: #fff;
+  color: #344054;
+}
+
+.course-editor-header-right :deep(.button-primary) {
+  background: var(--course-accent-strong);
+  color: #fff;
+}
+
+.course-editor-header-right :deep(.button-primary:hover:not(.button-disabled)) {
+  background: #4f37e8;
+  opacity: 1;
+}
+
+.course-editor-header-right :deep(.button-secondary) {
+  border: 1px solid var(--course-border);
+  background: #fff;
+  color: #344054;
+}
+
+/* ──────────────── Степпер ──────────────── */
+.course-stepper {
+  display: flex;
+  align-items: center;
+  background: var(--course-surface);
+  border: 1px solid var(--course-border);
+  border-radius: var(--course-radius-lg);
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  overflow-x: auto;
+  box-shadow: var(--course-shadow);
+}
+
+.stepper-item {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
 }
 
-.wizard-card,
+.stepper-connector {
+  flex: 0 0 28px;
+  height: 1px;
+  background: var(--course-border);
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.stepper-item.stepper-completed .stepper-connector {
+  background: var(--course-accent-strong);
+}
+
+.stepper-bubble {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+  border: 1px solid var(--course-border);
+  background: #ffffff;
+  color: var(--course-text-muted);
+  transition: all 0.2s;
+}
+
+.stepper-item.stepper-active .stepper-bubble {
+  border-color: var(--course-accent-strong);
+  background: var(--course-accent-strong);
+  color: #fff;
+}
+
+.stepper-item.stepper-completed .stepper-bubble {
+  border-color: var(--course-accent-strong);
+  background: var(--course-accent-strong);
+  color: #fff;
+}
+
+.stepper-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stepper-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--course-text);
+  white-space: nowrap;
+}
+
+.stepper-subtitle {
+  font-size: 12px;
+  color: var(--course-text-soft);
+  white-space: nowrap;
+}
+
+.stepper-item.stepper-active .stepper-title {
+  color: var(--course-accent-strong);
+}
+
+/* ──────────────── Шаг 1 — двухколоночный макет ──────────────── */
+.step1-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 304px;
+  gap: 18px;
+  align-items: start;
+}
+
+.step1-main {
+  background: var(--course-surface);
+  border: 1px solid var(--course-border);
+  border-radius: var(--course-radius-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-shadow: var(--course-shadow);
+}
+
+.step1-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px 16px;
+}
+
+.step1-form-grid > .field-with-counter {
+  margin-top: -2px;
+}
+
+.step1-section-header h2 {
+  margin: 0 0 4px;
+  font-size: 28px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #111827;
+}
+
+.step1-section-header p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--course-text-muted);
+}
+
+.step1-main :deep(.input-label),
+.step1-main :deep(.select-label),
+.step1-main :deep(.textarea-label),
+.step1-main :deep(.wysiwyg-label) {
+  margin-bottom: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #344054;
+}
+
+.step1-main :deep(.input),
+.step1-main :deep(.select),
+.step1-main :deep(.textarea),
+.step1-main :deep(.wysiwyg-shell) {
+  border: 1px solid var(--course-border);
+  border-radius: var(--course-radius-md);
+  background: #fff;
+  color: var(--course-text);
+  box-shadow: none;
+}
+
+.step1-main :deep(.input-md),
+.step1-main :deep(.select-md),
+.step1-main :deep(.textarea-md) {
+  min-height: 42px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+.step1-main :deep(.input::placeholder),
+.step1-main :deep(.textarea::placeholder),
+.step1-main :deep(.select:invalid),
+.step1-main :deep(.wysiwyg-content:empty::before) {
+  color: var(--course-text-soft);
+}
+
+.step1-main :deep(.input:focus),
+.step1-main :deep(.select:focus),
+.step1-main :deep(.textarea:focus),
+.step1-main :deep(.wysiwyg-shell-focused) {
+  border-color: var(--course-accent);
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.12);
+}
+
+.field-with-counter {
+  position: relative;
+}
+
+.field-counter {
+  display: block;
+  text-align: right;
+  font-size: 12px;
+  color: var(--course-text-soft);
+  margin-top: 2px;
+}
+
+/* Drag-drop обложка */
+.cover-upload-row {
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.cover-file-input-hidden {
+  display: none;
+}
+
+.cover-dropzone {
+  flex: 1;
+  border: 1px dashed #d5dbee;
+  border-radius: var(--course-radius-md);
+  padding: 26px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+  color: var(--course-text-muted);
+}
+
+.cover-dropzone:hover,
+.cover-dropzone.cover-dropzone-hover {
+  border-color: var(--course-accent);
+  background: #f8f7ff;
+}
+
+.cover-dropzone-icon {
+  width: 40px;
+  height: 40px;
+  opacity: 0.5;
+}
+
+.cover-dropzone p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.cover-dropzone-link {
+  color: var(--course-accent-strong);
+  text-decoration: underline;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font: inherit;
+  padding: 0;
+}
+
+.cover-dropzone-hint {
+  font-size: 12px;
+  color: var(--course-text-soft);
+}
+
+.cover-preview-box {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.cover-preview-img {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--course-border);
+}
+
+.cover-preview-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--course-border);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  color: var(--course-text-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.cover-preview-remove:hover {
+  color: #ef4444;
+  border-color: #ef444466;
+}
+
+/* ──────────────── Сайдбар ──────────────── */
+.step1-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tags-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* Теги */
+.tags-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #344054;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.tags-input-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 9px 10px;
+  border: 1px solid var(--course-border);
+  border-radius: var(--course-radius-md);
+  background: #fff;
+  min-height: 42px;
+  align-items: center;
+  cursor: text;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(108, 92, 231, 0.1);
+  color: var(--course-accent-strong);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 13px;
+}
+
+.tag-chip-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  color: inherit;
+  padding: 0;
+}
+
+.tags-raw-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  flex: 1;
+  min-width: 120px;
+  color: var(--course-text);
+}
+
+.tags-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--course-text-soft);
+}
+
+/* Карточка информации о курсе */
+.course-info-card {
+  border: 1px solid var(--course-border);
+  border-radius: var(--course-radius-lg);
+  padding: 16px;
+  background: #fff;
+  box-shadow: var(--course-shadow);
+}
+
+.course-info-title {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.course-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--course-border-soft);
+  font-size: 14px;
+}
+
+.course-info-row:last-child {
+  border-bottom: none;
+}
+
+.course-info-label {
+  color: var(--course-text-muted);
+}
+
+.course-info-value {
+  font-weight: 500;
+}
+
+.course-info-empty {
+  color: var(--course-text-muted);
+}
+
+.course-info-ok {
+  color: #22c55e;
+}
+
+/* Карточка "Что дальше?" */
+.whats-next-card {
+  display: flex;
+  gap: 10px;
+  background: #f7f5ff;
+  border: 1px solid #e4ddff;
+  border-radius: var(--course-radius-lg);
+  padding: 14px;
+  box-shadow: var(--course-shadow);
+}
+
+.whats-next-icon {
+  color: var(--course-accent-strong);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.whats-next-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3b2bb2;
+}
+
+.whats-next-text {
+  margin: 0;
+  font-size: 13px;
+  color: #5b4bc7;
+  line-height: 1.5;
+}
+
+/* Шаг-плейсхолдер */
+.step-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0;
+  color: var(--text-secondary);
+}
+
 .editor-card,
 .sections-card,
 .final-assessment-card,
@@ -1823,12 +2816,13 @@ onMounted(async () => {
   margin-bottom: 20px;
 }
 
-.wizard-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
-  margin-bottom: 16px;
+/* Убрать старые стили шапки */
+.page-header {
+  display: none;
+}
+
+.page-header-actions {
+  display: none;
 }
 
 .wizard-header h2,
@@ -1840,92 +2834,6 @@ onMounted(async () => {
 .step-card-header p {
   margin: 0;
   color: var(--text-secondary);
-}
-
-.wizard-steps {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.wizard-step {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--divider);
-  border-radius: 12px;
-  background: var(--surface, #fff);
-  text-align: left;
-}
-
-.wizard-step.active {
-  border-color: var(--primary, #6366f1);
-  background: rgba(99, 102, 241, 0.08);
-}
-
-.wizard-step.completed {
-  border-color: rgba(34, 197, 94, 0.45);
-}
-
-.step-number {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-secondary);
-  font-size: 12px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.step-label {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.cover-upload {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.cover-upload-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.cover-upload-hint {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.wizard-navigation {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 20px;
-}
-
-.spacer {
-  flex: 1;
-}
-
-.wizard-step-index {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-secondary);
-  font-size: 12px;
-  font-weight: 700;
-  flex-shrink: 0;
 }
 
 .wizard-step-text {
@@ -2331,12 +3239,1229 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 
+.structure-card :deep(.card-content) {
+  padding: 24px;
+}
+
+.structure-card {
+  --structure-primary: #5b41f5;
+  --structure-muted: #7a849b;
+  --structure-border: #e7eaf3;
+  --structure-soft: #f7f7fd;
+}
+
+.structure-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.structure-header h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.structure-header p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: #6f7892;
+}
+
+.structure-toolbar {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) auto auto;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.structure-search {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid var(--structure-border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.structure-search svg {
+  width: 18px;
+  height: 18px;
+  color: #9aa4bb;
+  flex-shrink: 0;
+}
+
+.structure-search input {
+  width: 100%;
+  height: 100%;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  font-size: 14px;
+  color: #172033;
+}
+
+.structure-search input:focus {
+  outline: 0;
+}
+
+.structure-secondary-action,
+.structure-primary-action {
+  height: 42px;
+  border-radius: 8px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.structure-secondary-action {
+  border: 1px solid var(--structure-border);
+  background: #ffffff;
+  color: #25314a;
+}
+
+.structure-secondary-action-disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.structure-secondary-action svg {
+  width: 17px;
+  height: 17px;
+  color: #64708a;
+}
+
+.structure-primary-action {
+  border: 1px solid var(--structure-primary);
+  background: var(--structure-primary);
+  color: #ffffff;
+  min-width: 154px;
+}
+
+.structure-primary-action span,
+.structure-add-area span {
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.structure-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 464px;
+  gap: 26px;
+  align-items: start;
+}
+
+.structure-list-panel {
+  min-width: 0;
+}
+
+.structure-sections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.structure-section {
+  border: 1px solid var(--structure-border);
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.structure-section-active {
+  border-color: #e2e5f0;
+}
+
+.structure-section-head {
+  width: 100%;
+  min-height: 64px;
+  border: 0;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.structure-section-active .structure-section-head {
+  background: var(--structure-soft);
+  border-bottom: 1px solid var(--structure-border);
+}
+
+.structure-drag {
+  color: #b4bbcc;
+  cursor: grab;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.structure-section-number {
+  font-size: 16px;
+  line-height: 22px;
+  color: #586179;
+}
+
+.structure-section-title {
+  min-width: 0;
+  overflow: hidden;
+  color: #182236;
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.structure-section-count {
+  color: #7c86a0;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.structure-chevron {
+  width: 16px;
+  height: 16px;
+  color: #7d879f;
+}
+
+.structure-section:not(.structure-section-active) .structure-chevron {
+  transform: rotate(180deg);
+}
+
+.structure-subtopics {
+  padding: 6px 20px 14px 42px;
+}
+
+.structure-subtopics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.structure-subtopic {
+  border-bottom: 1px solid #edf0f6;
+  background: #ffffff;
+  padding: 0;
+  color: #27334a;
+}
+
+.structure-subtopic-active {
+  background: #fbfaff;
+}
+
+.structure-subtopic-row {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px;
+}
+
+.structure-doc-icon {
+  width: 17px;
+  height: 17px;
+  color: #65718b;
+}
+
+.structure-subtopic-title {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.structure-kebab {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #5f6980;
+  font-size: 22px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+
+.structure-topic-editor,
+.structure-topic-create {
+  border-top: 1px dashed #dfe4f2;
+  padding: 10px 0 12px;
+}
+
+.structure-topic-create {
+  margin-top: 10px;
+  border: 1px dashed #d8def0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fafbff;
+}
+
+.structure-add-subtopic-trigger {
+  margin-top: 10px;
+  min-height: 34px;
+  border: 1px dashed #cdc5ff;
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--structure-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.structure-add-subtopic-trigger span {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.structure-topic-create-title {
+  margin-bottom: 10px;
+  color: #1f2a42;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.structure-topic-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 10px;
+}
+
+.structure-topic-field {
+  display: block;
+}
+
+.structure-topic-field-wide {
+  min-width: 0;
+}
+
+.structure-topic-field span {
+  display: block;
+  margin-bottom: 6px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.structure-topic-field input {
+  width: 100%;
+  height: 38px;
+  border: 1px solid #d8def0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+  font-size: 13px;
+  padding: 0 10px;
+}
+
+.structure-topic-field input:focus {
+  outline: 0;
+  border-color: var(--structure-primary);
+  box-shadow: 0 0 0 3px rgba(91, 65, 245, 0.12);
+}
+
+.structure-inline-error {
+  margin: 8px 0 0;
+  color: #dc2626;
+  font-size: 12px;
+}
+
+.structure-topic-toggles {
+  margin-top: 10px;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.structure-topic-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #4b566f;
+  font-size: 12px;
+}
+
+.structure-topic-actions {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.structure-topic-save,
+.structure-topic-delete,
+.structure-topic-cancel {
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.structure-topic-save {
+  background: var(--structure-primary);
+  color: #ffffff;
+}
+
+.structure-topic-delete {
+  background: #ffffff;
+  color: #d14343;
+  border-color: #ffcfcf;
+}
+
+.structure-topic-cancel {
+  background: #ffffff;
+  color: #4b566f;
+  border-color: #d8def0;
+}
+
+.structure-add-area {
+  width: 100%;
+  height: 66px;
+  margin-top: 8px;
+  border: 1px dashed #b8adff;
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--structure-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.structure-new-section {
+  border: 1px solid var(--structure-border);
+  border-radius: 8px;
+  margin: 8px 0;
+  padding: 16px;
+}
+
+.structure-detail-panel {
+  min-height: 612px;
+  border: 1px solid var(--structure-border);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 24px 22px;
+  position: sticky;
+  top: 12px;
+}
+
+.structure-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.structure-detail-eyebrow {
+  display: block;
+  margin-bottom: 6px;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.structure-detail-head h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 800;
+}
+
+.structure-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.structure-detail-head-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.structure-title-input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--structure-border) !important;
+  border-radius: 8px;
+  background: #ffffff !important;
+  color: #172033;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 10px 12px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.structure-title-input:focus {
+  border-color: #4f46e5 !important;
+}
+
+.structure-save-button {
+  height: 44px;
+  border: 1px solid #4f46e5;
+  border-radius: 8px;
+  background: #4f46e5;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.structure-save-button:hover {
+  background: #4338ca;
+  border-color: #4338ca;
+}
+
+.structure-save-button:disabled,
+.structure-edit-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.structure-edit-button {
+  height: 44px;
+  border: 1px solid var(--structure-border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #25314a;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.structure-edit-button svg,
+.structure-delete-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.structure-field {
+  display: block;
+  margin-bottom: 18px;
+}
+
+.structure-field span {
+  display: block;
+  margin-bottom: 8px;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.structure-field textarea,
+.structure-field input {
+  width: 100%;
+  border: 1px solid var(--structure-border) !important;
+  border-radius: 8px;
+  background: #ffffff !important;
+  color: #172033;
+  font-size: 14px;
+}
+
+.structure-field textarea {
+  height: 126px;
+  padding: 14px;
+  line-height: 22px;
+  resize: none;
+}
+
+.structure-field input {
+  height: 46px;
+  padding: 0 14px;
+}
+
+.structure-field small {
+  display: block;
+  margin-top: -26px;
+  padding-right: 12px;
+  color: #64708a;
+  font-size: 12px;
+  text-align: right;
+}
+
+.structure-field em {
+  display: block;
+  margin-top: 8px;
+  color: #7c86a0;
+  font-size: 13px;
+  font-style: normal;
+}
+
+.structure-settings {
+  border-top: 1px solid var(--structure-border);
+  margin-top: 24px;
+  padding-top: 18px;
+}
+
+.structure-settings h4 {
+  margin: 0 0 18px;
+  color: #172033;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.structure-toggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 24px;
+}
+
+.structure-toggle strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.structure-toggle small {
+  display: block;
+  color: #7c86a0;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.structure-toggle input {
+  width: 42px;
+  height: 24px;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: #d8deea;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s ease;
+}
+
+.structure-toggle input::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.structure-toggle input:checked {
+  background: var(--structure-primary);
+}
+
+.structure-toggle input:checked::before {
+  transform: translateX(18px);
+}
+
+.structure-delete-button {
+  height: 44px;
+  margin-top: 4px;
+  border: 1px solid #ffcbc7;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #ef4444;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.structure-topic-material {
+  height: 34px;
+  border: 1px solid #d8d1ff;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #5b41f5;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.materials-step-card {
+  --materials-primary: #5b41f5;
+  --materials-border: #e6eaf4;
+  --materials-muted: #6f7892;
+  border: 1px solid var(--materials-border);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 28px 28px 24px;
+  color: #111827;
+}
+
+.materials-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  color: #6f7892;
+  font-size: 14px;
+}
+
+.materials-breadcrumbs button {
+  border: 0;
+  background: transparent;
+  color: var(--materials-primary);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.materials-breadcrumbs strong {
+  color: #172033;
+  font-weight: 700;
+}
+
+.materials-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.materials-title-row h2 {
+  margin: 0 0 6px;
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.materials-title-row p {
+  margin: 0;
+  max-width: 760px;
+  color: var(--materials-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.materials-preview-button,
+.materials-add-button,
+.materials-secondary-button,
+.materials-save-button,
+.materials-cancel-button,
+.materials-delete-button {
+  height: 40px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.materials-preview-button,
+.materials-cancel-button,
+.materials-secondary-button {
+  border: 1px solid var(--materials-border);
+  background: #ffffff;
+  color: #25314a;
+}
+
+.materials-preview-button svg,
+.materials-delete-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.materials-add-button,
+.materials-save-button {
+  border: 1px solid var(--materials-primary);
+  background: var(--materials-primary);
+  color: #ffffff;
+}
+
+.materials-add-button:disabled,
+.materials-save-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.materials-add-button span {
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.materials-list-panel,
+.materials-editor-card,
+.materials-info-panel {
+  min-width: 0;
+}
+
+.materials-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.materials-list-head h3,
+.materials-info-card h3,
+.materials-preview-card h3,
+.materials-settings h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.materials-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--materials-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.materials-item {
+  min-height: 86px;
+  border: 0;
+  border-bottom: 1px solid var(--materials-border);
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.materials-item:last-child {
+  border-bottom: 0;
+}
+
+.materials-item-active {
+  background: #fbfaff;
+  box-shadow: inset 0 0 0 1px #cfc7ff;
+}
+
+.materials-drag,
+.materials-kebab {
+  color: #9aa4bb;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.materials-type-icon,
+.materials-preview-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  background: #eee8ff;
+  color: var(--materials-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.materials-type-filled {
+  background: #e9f8ef;
+  color: #16a34a;
+}
+
+.materials-item-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+}
+
+.materials-item-text strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 14px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.materials-item-text small {
+  color: #7c86a0;
+  font-size: 13px;
+}
+
+.materials-order-hint {
+  height: 54px;
+  margin-top: 18px;
+  border: 1px dashed #cbc3ff;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64708a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.materials-empty,
+.materials-editor-empty {
+  border: 1px dashed #cfd6e7;
+  border-radius: 10px;
+  padding: 24px;
+  background: #fbfcff;
+  color: var(--materials-muted);
+}
+
+.materials-editor-card {
+  border: 1px solid var(--materials-border);
+  border-radius: 10px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.materials-form {
+  padding: 22px;
+}
+
+.materials-field {
+  display: block;
+  position: relative;
+  margin-bottom: 22px;
+}
+
+.materials-field span {
+  display: block;
+  margin-bottom: 8px;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.materials-field b {
+  color: #ef4444;
+}
+
+.materials-field input,
+.materials-field textarea {
+  width: 100%;
+  border: 1px solid var(--materials-border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+  font-size: 14px;
+}
+
+.materials-field input {
+  height: 42px;
+  padding: 0 14px;
+}
+
+.materials-field textarea {
+  min-height: 104px;
+  padding: 12px 14px;
+  line-height: 20px;
+  resize: vertical;
+}
+
+.materials-field input:focus,
+.materials-field textarea:focus {
+  outline: 0;
+  border-color: var(--materials-primary);
+  box-shadow: 0 0 0 3px rgba(91, 65, 245, 0.12);
+}
+
+.materials-field input[readonly] {
+  background: #f8f9fc;
+  color: #64708a;
+}
+
+.materials-field small {
+  position: absolute;
+  right: 12px;
+  bottom: -18px;
+  color: #64708a;
+  font-size: 12px;
+}
+
+.materials-content-field :deep(.wysiwyg-editor) {
+  border-color: var(--materials-border);
+}
+
+.materials-tab-placeholder {
+  border: 1px dashed #d8def0;
+  border-radius: 10px;
+  background: #fafbff;
+  padding: 18px;
+  margin-bottom: 22px;
+}
+
+.materials-tab-placeholder strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #172033;
+  font-size: 15px;
+}
+
+.materials-tab-placeholder p {
+  margin: 0 0 14px;
+  color: var(--materials-muted);
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.materials-settings {
+  border-top: 1px solid var(--materials-border);
+  margin-top: 26px;
+  padding-top: 20px;
+}
+
+.materials-toggle {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 16px;
+  align-items: center;
+  color: #64708a;
+  font-size: 14px;
+}
+
+.materials-toggle input {
+  width: 42px;
+  height: 24px;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: #d8deea;
+  cursor: pointer;
+  position: relative;
+}
+
+.materials-toggle input::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.materials-toggle input:checked {
+  background: var(--materials-primary);
+}
+
+.materials-toggle input:checked::before {
+  transform: translateX(18px);
+}
+
+.materials-actions {
+  border-top: 1px solid var(--materials-border);
+  margin-top: 22px;
+  padding-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.materials-actions > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.materials-delete-button {
+  border: 1px solid #ffcbc7;
+  background: #ffffff;
+  color: #ef4444;
+}
+
+.materials-info-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.materials-info-card,
+.materials-tip-card,
+.materials-preview-card {
+  border: 1px solid var(--materials-border);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 20px;
+}
+
+.materials-info-card strong {
+  display: block;
+  margin: 18px 0 10px;
+  color: #172033;
+  font-size: 16px;
+}
+
+.materials-info-card p {
+  margin: 8px 0 0;
+  color: var(--materials-muted);
+  font-size: 14px;
+}
+
+.materials-tip-card {
+  display: flex;
+  gap: 14px;
+  background: #f7f5ff;
+}
+
+.materials-tip-card > span {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--materials-primary);
+  border-radius: 50%;
+  color: var(--materials-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.materials-tip-card strong {
+  color: var(--materials-primary);
+  font-size: 14px;
+}
+
+.materials-tip-card p {
+  margin: 8px 0 0;
+  color: #64708a;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.materials-preview-list {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.materials-preview-item {
+  min-height: 58px;
+  border: 1px solid var(--materials-border);
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.materials-preview-item-open {
+  min-height: 142px;
+}
+
+.materials-preview-icon {
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
+}
+
+.materials-preview-item strong {
+  display: block;
+  color: #172033;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.materials-preview-item p {
+  margin: 10px 0 0;
+  color: #7c86a0;
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.materials-preview-item small {
+  display: block;
+  margin-top: 12px;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.materials-preview-empty {
+  color: var(--materials-muted);
+  font-size: 14px;
+}
+
 .assignments-card {
   margin-bottom: 20px;
 }
 
+.assignments-card :deep(.card) {
+  border: 1px solid var(--divider);
+  background: var(--surface, #fff);
+  border-radius: 12px;
+}
+
+.assignments-card :deep(.card-content) {
+  padding: 22px;
+}
+
 .assignments-header {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .assignments-header h2 {
@@ -2346,22 +4471,29 @@ onMounted(async () => {
 .assignments-header p {
   margin: 0;
   color: var(--text-secondary);
+  font-size: 14px;
 }
 
 .targets-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 14px;
   margin-bottom: 16px;
 }
 
+.targets-group {
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--surface, #fff);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
 .targets-group h3 {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   font-size: 14px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .targets-empty {
@@ -2374,19 +4506,21 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 240px;
+  max-height: 180px;
   overflow-y: auto;
   border: 1px solid var(--divider);
-  border-radius: 8px;
-  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--bg-primary);
+  padding: 10px;
 }
 
 .checkbox-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
+  min-height: 28px;
 }
 
 .checkbox-item input[type="checkbox"] {
@@ -2396,32 +4530,38 @@ onMounted(async () => {
   cursor: pointer;
 }
 
-.targets-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 24px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--divider);
-}
-
 .manual-assignments h3 {
   margin: 0 0 12px;
   font-size: 15px;
 }
 
+.manual-assignments {
+  border-top: 1px solid var(--divider);
+  padding-top: 16px;
+}
+
+.manual-assignments h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
 .add-assignment {
   display: flex;
   align-items: flex-end;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .add-assignment .input-wrapper {
-  width: 180px;
+  width: 200px;
 }
 
 .assignments-table {
   width: 100%;
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  overflow: hidden;
   border-collapse: collapse;
   font-size: 14px;
 }
@@ -2439,6 +4579,7 @@ onMounted(async () => {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  background: var(--bg-secondary);
 }
 
 .switch-label input {
@@ -2612,6 +4753,18 @@ onMounted(async () => {
 }
 
 @media (max-width: 1024px) {
+  .step1-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .step1-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .targets-grid {
+    grid-template-columns: 1fr;
+  }
+
   .editor-grid,
   .section-edit-grid,
   .topic-edit-grid {
@@ -2640,6 +4793,60 @@ onMounted(async () => {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .structure-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .structure-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .structure-detail-panel {
+    min-height: auto;
+    position: static;
+  }
+
+  .structure-subtopics {
+    padding: 10px 12px 12px;
+  }
+
+  .structure-add-subtopic-trigger {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .structure-topic-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .materials-step-card {
+    padding: 20px 16px;
+  }
+
+  .materials-title-row,
+  .materials-actions,
+  .materials-list-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .materials-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .materials-preview-button,
+  .materials-add-button,
+  .materials-save-button,
+  .materials-cancel-button,
+  .materials-delete-button {
+    width: 100%;
+  }
+
+  .materials-actions > div {
+    width: 100%;
+    flex-direction: column;
   }
 }
 </style>
