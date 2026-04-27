@@ -74,7 +74,6 @@ defineEmits(["update:modelValue"]);
   border-radius: 12px;
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-family: inherit;
   font-size: 16px;
   resize: vertical;
   transition: all 0.2s ease;

@@ -86,7 +86,6 @@ defineEmits(["update:modelValue"]);
     flex: 1;
     border: none;
     background: transparent;
-    font-family: inherit;
     outline: none;
     padding: 10px 16px;
     display: flex;

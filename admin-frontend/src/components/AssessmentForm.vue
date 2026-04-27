@@ -206,14 +206,14 @@ const branchOptions = computed(() =>
   references.value.branches.map((branch) => ({
     value: branch.id,
     label: formatBranchLabel(branch),
-  }))
+  })),
 );
 
 const positionOptions = computed(() =>
   references.value.positions.map((position) => ({
     value: position.id,
     label: position.name,
-  }))
+  })),
 );
 
 // Максимальная дата (текущий год + 100)
@@ -461,7 +461,6 @@ onMounted(async () => {
   background-color: var(--input-bg);
   color: var(--text-primary);
   font-size: 14px;
-  font-family: inherit;
   transition: border-color 0.15s ease;
 }
 

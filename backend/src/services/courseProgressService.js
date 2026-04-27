@@ -115,86 +115,16 @@ async function handleTopicMaterialViewed({ topicId, userId }) {
       throw error;
     }
 
-    // Без теста — просмотр материала завершает тему
-    const completedStatus = !topic.assessmentId ? "completed" : "in_progress";
+    const completedStatus = "completed";
     await progressRepo.markTopicMaterial({ topicId, sectionId: topic.sectionId, courseId: topic.courseId, userId, completedStatus, connection });
 
-    if (completedStatus === "completed") {
-      await syncSectionCompletionAfterTopicProgress({ topic, userId, connection });
-      const aggregate = await progressRepo.getCourseProgressAggregate({ courseId: topic.courseId, userId, connection });
-      await progressRepo.syncCourseProgress({ courseId: topic.courseId, userId, aggregate, connection });
-    }
+    await syncSectionCompletionAfterTopicProgress({ topic, userId, connection });
+    const aggregate = await progressRepo.getCourseProgressAggregate({ courseId: topic.courseId, userId, connection });
+    await progressRepo.syncCourseProgress({ courseId: topic.courseId, userId, aggregate, connection });
 
     await connection.commit();
-    if (completedStatus === "completed") {
-      eventsRepo.insertCourseEvent({ courseId: topic.courseId, userId, eventType: "course.topic_completed", payload: { topicId } });
-    }
-    return { topicId, materialViewed: true, topicCompleted: completedStatus === "completed" };
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
-}
-
-async function handleTopicAttemptCompletion({ topicId, userId, attemptId }) {
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-
-    const result = await progressRepo.getTopicAttemptResult({ topicId, userId, attemptId, connection });
-    if (!result) {
-      const error = new Error("Результат попытки для темы не найден");
-      error.status = 404;
-      throw error;
-    }
-    await assertCourseNotClosed({ courseId: result.courseId, userId, connection });
-
-    // Проверка последовательности: предыдущая тема должна быть завершена
-    const topicInfo = await progressRepo.findTopicWithSection(topicId, { connection });
-    if (topicInfo) {
-      const prevCompleted = await progressRepo.isPreviousTopicCompleted(
-        { sectionId: topicInfo.sectionId, orderIndex: topicInfo.orderIndex, userId },
-        { connection },
-      );
-      if (!prevCompleted) {
-        const error = new Error("Необходимо завершить предыдущую тему перед сдачей теста этой темы");
-        error.status = 409;
-        throw error;
-      }
-    }
-
-    const status = result.passed ? "completed" : "failed";
-    await progressRepo.upsertTopicProgress({
-      topicId: result.topicId,
-      sectionId: result.sectionId,
-      courseId: result.courseId,
-      userId,
-      status,
-      attemptId: result.attemptId,
-      scorePercent: result.scorePercent,
-      attemptNumber: result.attemptNumber,
-      connection,
-    });
-
-    if (status === "completed" && topicInfo) {
-      await syncSectionCompletionAfterTopicProgress({ topic: topicInfo, userId, connection });
-    }
-
-    const aggregate = await progressRepo.getCourseProgressAggregate({ courseId: result.courseId, userId, connection });
-    await progressRepo.syncCourseProgress({ courseId: result.courseId, userId, aggregate, connection });
-
-    await connection.commit();
-    if (status === "completed") {
-      eventsRepo.insertCourseEvent({
-        courseId: result.courseId,
-        userId,
-        eventType: "course.topic_completed",
-        payload: { topicId: result.topicId, passed: result.passed, scorePercent: result.scorePercent },
-      });
-    }
-    return { result, aggregate };
+    eventsRepo.insertCourseEvent({ courseId: topic.courseId, userId, eventType: "course.topic_completed", payload: { topicId } });
+    return { topicId, materialViewed: true, topicCompleted: true };
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -307,7 +237,6 @@ async function handleFinalAttemptCompletion({ courseId, userId, attemptId }) {
 module.exports = {
   startCourse,
   handleTopicMaterialViewed,
-  handleTopicAttemptCompletion,
   handleSectionAttemptCompletion,
   validateFinalAssessmentAccess,
   handleFinalAttemptCompletion,

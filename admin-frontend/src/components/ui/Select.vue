@@ -88,7 +88,6 @@ defineEmits(["update:modelValue"]);
   border-radius: 12px;
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  font-family: inherit;
   outline: none;
   appearance: none;
   padding-right: 40px;

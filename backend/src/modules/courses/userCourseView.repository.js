@@ -163,8 +163,7 @@ async function listPublishedCoursesForUser(userId, userPositionId, userBranchId)
             (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id) AS sections_count,
             (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id AND cs.is_required = 1) AS required_sections_count,
             (SELECT COUNT(*) FROM course_topics ct WHERE ct.course_id = c.id) AS topics_count,
-            (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id AND cs.assessment_id IS NOT NULL) +
-            (SELECT COUNT(*) FROM course_topics ct WHERE ct.course_id = c.id AND ct.assessment_id IS NOT NULL) AS tests_count
+            (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id AND cs.assessment_id IS NOT NULL) AS tests_count
        FROM courses c
        LEFT JOIN course_user_progress cup ON cup.course_id = c.id AND cup.user_id = ?
        LEFT JOIN course_user_assignments cua ON cua.course_id = c.id AND cua.user_id = ?
@@ -356,7 +355,7 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
 
   return {
     ...course,
-    testsCount: sectionRows.filter((item) => item.assessment_id != null).length + topicRows.filter((item) => item.assessment_id != null).length,
+    testsCount: sectionRows.filter((item) => item.assessment_id != null).length,
     progress: effectiveProgress,
     sections,
     finalAssessment: {

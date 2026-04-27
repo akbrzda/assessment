@@ -282,9 +282,8 @@ async function updateTopic(topicId, payload, userId, req) {
     }
     ensureCourseEditable(topic.courseStatus);
     const resolvedHasMaterial = payload.hasMaterial !== undefined ? payload.hasMaterial : topic.hasMaterial;
-    const resolvedAssessmentId = payload.assessmentId !== undefined ? payload.assessmentId || null : topic.assessmentId;
-    if (!resolvedHasMaterial && !resolvedAssessmentId) {
-      const error = new Error("Тема должна содержать материал или тест");
+    if (!resolvedHasMaterial) {
+      const error = new Error("Подтема должна содержать учебный материал");
       error.status = 422;
       throw error;
     }

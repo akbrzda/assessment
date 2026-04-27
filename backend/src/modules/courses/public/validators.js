@@ -55,21 +55,6 @@ function assertCourseSectionParams({ courseId, sectionId }) {
   throw error;
 }
 
-function assertTopicAttemptParams({ topicId, attemptId }) {
-  const normalizedTopicId = parsePositiveId(topicId);
-  const normalizedAttemptId = parsePositiveId(attemptId);
-  if (normalizedTopicId && normalizedAttemptId) {
-    return {
-      topicId: normalizedTopicId,
-      attemptId: normalizedAttemptId,
-    };
-  }
-
-  const error = new Error("Некорректные параметры попытки темы");
-  error.status = 400;
-  throw error;
-}
-
 function assertSectionAttemptParams({ sectionId, attemptId }) {
   const normalizedSectionId = parsePositiveId(sectionId);
   const normalizedAttemptId = parsePositiveId(attemptId);
@@ -120,7 +105,6 @@ module.exports = {
   assertCourseTopicParams,
   assertCourseSectionParams,
   assertTopicId,
-  assertTopicAttemptParams,
   assertSectionAttemptParams,
   assertModuleAttemptParams,
   assertFinalAttemptParams,

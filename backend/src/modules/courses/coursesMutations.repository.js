@@ -146,12 +146,38 @@ async function shiftSectionsUp2(courseId, fromIndex, toIndex, connection) {
   ]);
 }
 
-async function insertSection(courseId, { title, description, orderIndex, assessmentId, isRequired, estimatedMinutes }, connection) {
+async function insertSection(
+  courseId,
+  {
+    title,
+    description,
+    orderIndex,
+    assessmentId,
+    isRequired,
+    estimatedMinutes,
+    testShuffleQuestions,
+    testShuffleOptions,
+    testShowResultsAfterCompletion,
+  },
+  connection,
+) {
   const [result] = await connection.execute(
     `INSERT INTO course_sections
-      (course_id, title, description, order_index, assessment_id, is_required, estimated_minutes, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
-    [courseId, title, description || "", orderIndex, assessmentId || null, isRequired ? 1 : 0, estimatedMinutes || null],
+      (course_id, title, description, order_index, assessment_id, is_required, estimated_minutes,
+       test_shuffle_questions, test_shuffle_options, test_show_results_after_completion, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
+    [
+      courseId,
+      title,
+      description || "",
+      orderIndex,
+      assessmentId || null,
+      isRequired ? 1 : 0,
+      estimatedMinutes || null,
+      testShuffleQuestions === false ? 0 : 1,
+      testShuffleOptions === false ? 0 : 1,
+      testShowResultsAfterCompletion === false ? 0 : 1,
+    ],
   );
   return result.insertId;
 }
@@ -179,6 +205,18 @@ async function updateSectionFields(sectionId, fields, connection) {
   if (fields.estimatedMinutes !== undefined) {
     cols.push("estimated_minutes = ?");
     params.push(fields.estimatedMinutes || null);
+  }
+  if (fields.testShuffleQuestions !== undefined) {
+    cols.push("test_shuffle_questions = ?");
+    params.push(fields.testShuffleQuestions ? 1 : 0);
+  }
+  if (fields.testShuffleOptions !== undefined) {
+    cols.push("test_shuffle_options = ?");
+    params.push(fields.testShuffleOptions ? 1 : 0);
+  }
+  if (fields.testShowResultsAfterCompletion !== undefined) {
+    cols.push("test_show_results_after_completion = ?");
+    params.push(fields.testShowResultsAfterCompletion ? 1 : 0);
   }
   if (fields.orderIndex !== undefined) {
     cols.push("order_index = ?");
@@ -243,12 +281,12 @@ async function shiftTopicsUp2(sectionId, fromIndex, toIndex, connection) {
   ]);
 }
 
-async function insertTopic(sectionId, courseId, { title, orderIndex, isRequired, hasMaterial, content, assessmentId }, connection) {
+async function insertTopic(sectionId, courseId, { title, orderIndex, isRequired, hasMaterial, content }, connection) {
   const [result] = await connection.execute(
     `INSERT INTO course_topics
       (section_id, course_id, title, order_index, is_required, has_material, content, assessment_id, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
-    [sectionId, courseId, title, orderIndex, isRequired === false ? 0 : 1, hasMaterial ? 1 : 0, content || null, assessmentId || null],
+    [sectionId, courseId, title, orderIndex, isRequired === false ? 0 : 1, hasMaterial ? 1 : 0, content || null, null],
   );
   return result.insertId;
 }
@@ -268,10 +306,6 @@ async function updateTopicFields(topicId, fields, connection) {
   if (fields.content !== undefined) {
     cols.push("content = ?");
     params.push(fields.content || null);
-  }
-  if (fields.assessmentId !== undefined) {
-    cols.push("assessment_id = ?");
-    params.push(fields.assessmentId || null);
   }
   if (fields.orderIndex !== undefined) {
     cols.push("order_index = ?");

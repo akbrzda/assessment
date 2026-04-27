@@ -612,7 +612,6 @@ const getAuthorInitials = (name) => {
   height: 36px;
   padding: 0 28px 0 12px;
   font-size: 14px;
-  font-family: inherit;
   color: var(--text-primary);
   background: transparent
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%234b4b4b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")

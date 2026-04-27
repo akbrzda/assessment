@@ -208,7 +208,7 @@ watch(
   (newParams) => {
     formData.value.condition_data = newParams;
   },
-  { deep: true }
+  { deep: true },
 );
 
 // Загрузка бейджей
@@ -478,7 +478,6 @@ onMounted(() => {
   background: var(--bg-secondary);
   border-radius: 6px;
   font-size: 12px;
-  font-family: monospace;
   color: var(--text-secondary);
   border: 1px solid var(--divider);
 }

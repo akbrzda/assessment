@@ -704,7 +704,6 @@ onUnmounted(() => {
 .search-kbd {
   position: absolute;
   right: 8px;
-  font-family: inherit;
   font-size: 11px;
   color: var(--text-secondary);
   background: var(--surface-card);

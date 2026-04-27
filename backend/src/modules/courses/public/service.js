@@ -148,12 +148,6 @@ async function completeTopic({ courseId, topicId, userId }) {
       error.status = 422;
       throw error;
     }
-    if (topic.assessmentId) {
-      const error = new Error("Для завершения этой подтемы необходимо пройти тест");
-      error.status = 409;
-      throw error;
-    }
-
     await assertCourseNotClosed({ courseId, userId, connection });
     const prevCompleted = await progressRepo.isPreviousTopicCompleted(
       { sectionId: topic.sectionId, orderIndex: topic.orderIndex, userId },
@@ -261,26 +255,6 @@ async function viewTopicMaterial({ topicId, userId }) {
   return courseProgressService.handleTopicMaterialViewed({ topicId, userId });
 }
 
-async function completeTopicAttempt({ topicId, attemptId, userId }) {
-  const result = await courseProgressService.handleTopicAttemptCompletion({ topicId, userId, attemptId });
-  return {
-    topic: {
-      id: result.result.topicId,
-      assessmentId: result.result.assessmentId,
-      attemptId: result.result.attemptId,
-      attemptNumber: result.result.attemptNumber,
-      scorePercent: result.result.scorePercent,
-      passScorePercent: result.result.passScorePercent,
-      passed: result.result.passed,
-    },
-    progress: {
-      progressPercent: result.aggregate.progressPercent,
-      passedRequiredSections: result.aggregate.passedRequiredSections,
-      totalRequiredSections: result.aggregate.totalRequiredSections,
-    },
-  };
-}
-
 async function completeSectionAttempt({ sectionId, attemptId, userId }) {
   const result = await courseProgressService.handleSectionAttemptCompletion({ sectionId, userId, attemptId });
   return {
@@ -366,7 +340,6 @@ module.exports = {
   completeTopic,
   getCourseProgress,
   viewTopicMaterial,
-  completeTopicAttempt,
   completeSectionAttempt,
   completeModuleAttempt,
   getFinalAssessmentAccess,

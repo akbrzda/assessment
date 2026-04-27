@@ -1323,7 +1323,6 @@ export default {
   background-color: var(--bg-secondary);
   color: var(--text-primary);
   font-size: 15px;
-  font-family: inherit;
   appearance: none;
   -webkit-appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23888' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
@@ -1467,7 +1466,6 @@ export default {
   border-radius: 12px;
   padding: 12px;
   font-size: 16px;
-  font-family: inherit;
   resize: vertical;
   min-height: 120px;
   background-color: var(--bg-secondary);

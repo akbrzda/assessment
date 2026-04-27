@@ -474,7 +474,6 @@ onMounted(() => {
   border-radius: 6px;
   font-size: 14px;
   color: var(--accent-blue);
-  font-family: "Courier New", monospace;
 }
 
 .env-columns {
@@ -514,7 +513,6 @@ onMounted(() => {
 }
 
 .env-key {
-  font-family: "Courier New", monospace;
   font-size: 14px;
   font-weight: 600;
   color: var(--accent-blue);
@@ -562,7 +560,6 @@ onMounted(() => {
   padding: 2px 6px;
   border-radius: 6px;
   font-size: 13px;
-  font-family: "Courier New", monospace;
 }
 
 /* Responsive */

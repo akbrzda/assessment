@@ -170,7 +170,7 @@ watch(
     if (newVal && props.userId) {
       loadReport();
     }
-  }
+  },
 );
 
 watch(isOpen, (newVal) => {
@@ -244,7 +244,7 @@ const handleExport = () => {
     "История аттестаций:",
     ...report.value.attempts.map(
       (attempt, index) =>
-        `${index + 1}. ${attempt.assessment_title} — ${formatPercent(attempt.score_percent, 2)} (${attempt.status}) ${formatDate(attempt.completed_at)}`
+        `${index + 1}. ${attempt.assessment_title} — ${formatPercent(attempt.score_percent, 2)} (${attempt.status}) ${formatDate(attempt.completed_at)}`,
     ),
   ].join("\n");
 
@@ -255,7 +255,7 @@ const handleExport = () => {
         <title>Отчёт по сотруднику</title>
       </head>
       <body>
-        <pre style="font-family: 'Inter', Arial, sans-serif; white-space: pre-wrap;">${content}</pre>
+        <pre style=" white-space: pre-wrap;">${content}</pre>
       </body>
     </html>
   `;

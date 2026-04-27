@@ -183,7 +183,7 @@ const handleExport = () => {
         <p>Завершили: ${report.value.summary.completed_count}</p>
         <p>Средний балл: ${report.value.summary.avg_score?.toFixed(2) ?? 0}%</p>
         <p>Процент успеха: ${report.value.summary.pass_percent}%</p>
-        <pre style="white-space: pre-wrap; font-family: 'Inter', Arial, sans-serif; margin-top: 16px;">${rows}</pre>
+        <pre style="white-space: pre-wrap; margin-top: 16px;">${rows}</pre>
       </body>
     </html>
   `;

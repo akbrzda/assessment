@@ -52,6 +52,9 @@ const createSectionSchema = Joi.object({
   assessmentId: Joi.number().integer().positive().allow(null).default(null),
   isRequired: Joi.boolean().default(true),
   estimatedMinutes: Joi.number().integer().min(1).max(1440).allow(null).default(null),
+  testShuffleQuestions: Joi.boolean().default(true),
+  testShuffleOptions: Joi.boolean().default(true),
+  testShowResultsAfterCompletion: Joi.boolean().default(true),
 });
 
 const updateSectionSchema = Joi.object({
@@ -61,6 +64,9 @@ const updateSectionSchema = Joi.object({
   assessmentId: Joi.number().integer().positive().allow(null),
   isRequired: Joi.boolean(),
   estimatedMinutes: Joi.number().integer().min(1).max(1440).allow(null),
+  testShuffleQuestions: Joi.boolean(),
+  testShuffleOptions: Joi.boolean(),
+  testShowResultsAfterCompletion: Joi.boolean(),
 }).min(1);
 
 const createTopicSchema = Joi.object({
@@ -69,13 +75,12 @@ const createTopicSchema = Joi.object({
   isRequired: Joi.boolean().default(true),
   hasMaterial: Joi.boolean().default(false),
   content: Joi.string().allow("", null).default(null),
-  assessmentId: Joi.number().integer().positive().allow(null).default(null),
 }).custom((value, helpers) => {
-  if (!value.hasMaterial && !value.assessmentId) {
+  if (!value.hasMaterial) {
     return helpers.error("any.invalid");
   }
   return value;
-}, "Тема должна содержать материал или тест");
+}, "Подтема должна содержать материал");
 
 const updateTopicSchema = Joi.object({
   title: Joi.string().trim().min(2).max(255),
@@ -83,7 +88,6 @@ const updateTopicSchema = Joi.object({
   isRequired: Joi.boolean(),
   hasMaterial: Joi.boolean(),
   content: Joi.string().allow("", null),
-  assessmentId: Joi.number().integer().positive().allow(null),
 }).min(1);
 
 const reorderSectionsSchema = Joi.object({

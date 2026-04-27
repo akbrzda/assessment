@@ -127,33 +127,6 @@ async function getSectionAttemptResult({ sectionId, userId, attemptId, connectio
   };
 }
 
-async function getTopicAttemptResult({ topicId, userId, attemptId, connection }) {
-  const [rows] = await connection.execute(
-    `SELECT ct.id AS topic_id, ct.section_id, ct.course_id, ct.assessment_id,
-            aa.id AS attempt_id, aa.attempt_number, aa.score_percent, a.pass_score_percent
-       FROM course_topics ct
-       JOIN assessment_attempts aa ON aa.assessment_id = ct.assessment_id
-       JOIN assessments a ON a.id = aa.assessment_id
-      WHERE ct.id = ? AND aa.id = ? AND aa.user_id = ? AND aa.status = 'completed' LIMIT 1`,
-    [topicId, attemptId, userId],
-  );
-  if (!rows.length) return null;
-  const row = rows[0];
-  const scorePercent = Number(row.score_percent || 0);
-  const passScorePercent = Number(row.pass_score_percent || 0);
-  return {
-    topicId: Number(row.topic_id),
-    sectionId: Number(row.section_id),
-    courseId: Number(row.course_id),
-    assessmentId: Number(row.assessment_id),
-    attemptId: Number(row.attempt_id),
-    attemptNumber: Number(row.attempt_number || 0),
-    scorePercent,
-    passScorePercent,
-    passed: scorePercent >= passScorePercent,
-  };
-}
-
 async function getFinalAttemptResult({ courseId, userId, attemptId, connection }) {
   const [rows] = await connection.execute(
     `SELECT c.id AS course_id, c.final_assessment_id,
@@ -245,23 +218,6 @@ async function upsertSectionProgress({ courseId, sectionId, userId, status, atte
   );
 }
 
-async function upsertTopicProgress({ topicId, sectionId, courseId, userId, status, attemptId, scorePercent, attemptNumber, connection }) {
-  await connection.execute(
-    `INSERT INTO course_topic_user_progress
-      (topic_id, section_id, course_id, user_id, status, last_attempt_id, best_score_percent, attempt_count, started_at, completed_at, last_completed_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), IF(? = 'completed', UTC_TIMESTAMP(), NULL), NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP())
-     ON DUPLICATE KEY UPDATE
-       status = VALUES(status),
-       last_attempt_id = VALUES(last_attempt_id),
-       best_score_percent = GREATEST(IFNULL(best_score_percent, 0), VALUES(best_score_percent)),
-       attempt_count = GREATEST(IFNULL(attempt_count, 0), VALUES(attempt_count)),
-       started_at = IF(started_at IS NULL, UTC_TIMESTAMP(), started_at),
-       completed_at = IF(VALUES(status) = 'completed', UTC_TIMESTAMP(), completed_at),
-       updated_at = UTC_TIMESTAMP()`,
-    [topicId, sectionId, courseId, userId, status, attemptId, scorePercent, attemptNumber, status],
-  );
-}
-
 async function startTopicProgress({ topicId, sectionId, courseId, userId, connection }) {
   await connection.execute(
     `INSERT INTO course_topic_user_progress
@@ -277,21 +233,18 @@ async function startTopicProgress({ topicId, sectionId, courseId, userId, connec
 
 async function getTopicProgressState({ topicId, userId, connection }) {
   const [rows] = await connection.execute(
-    `SELECT status, material_viewed, started_at, completed_at
+    `SELECT status, material_viewed, started_at
        FROM course_topic_user_progress
       WHERE topic_id = ? AND user_id = ?
       LIMIT 1`,
     [topicId, userId],
   );
-  if (!rows.length) {
-    return null;
-  }
+  if (!rows.length) return null;
   const row = rows[0];
   return {
     status: row.status || "not_started",
     materialViewed: Boolean(row.material_viewed),
     startedAt: row.started_at ? new Date(row.started_at).toISOString() : null,
-    completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : null,
   };
 }
 
@@ -522,7 +475,7 @@ async function getAdminUserDetailedProgress(courseId, userId) {
 
   const [topicRows] = await pool.execute(
     `SELECT ct.id AS topic_id, ct.section_id, ct.title AS topic_title, ct.order_index,
-            ct.is_required, ct.has_material, ct.assessment_id AS topic_assessment_id,
+            ct.is_required, ct.has_material,
             ctup.status AS topic_status, ctup.material_viewed,
             ctup.best_score_percent AS topic_score, ctup.attempt_count AS topic_attempts,
             ctup.completed_at AS topic_completed_at
@@ -543,7 +496,7 @@ async function getAdminUserDetailedProgress(courseId, userId) {
       orderIndex: Number(t.order_index),
       isRequired: Boolean(t.is_required),
       hasMaterial: Boolean(t.has_material),
-      hasAssessment: Boolean(t.topic_assessment_id),
+      hasAssessment: false,
       status: t.topic_status || "not_started",
       materialViewed: Boolean(t.material_viewed),
       scorePercent: t.topic_score !== null ? Number(t.topic_score) : null,
@@ -587,14 +540,12 @@ module.exports = {
   isPreviousTopicCompleted,
   areAllTopicsCompletedBySection,
   getSectionAttemptResult,
-  getTopicAttemptResult,
   getFinalAttemptResult,
   upsertCourseProgressOnStart,
   upsertSectionProgressOnStart,
   upsertTopicProgressOnStart,
   insertCourseSnapshot,
   upsertSectionProgress,
-  upsertTopicProgress,
   startTopicProgress,
   getTopicProgressState,
   markTopicMaterial,

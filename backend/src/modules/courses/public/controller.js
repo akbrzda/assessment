@@ -6,7 +6,6 @@ const {
   assertFinalAttemptParams,
   assertModuleAttemptParams,
   assertTopicId,
-  assertTopicAttemptParams,
   assertSectionAttemptParams,
 } = require("./validators");
 
@@ -143,19 +142,6 @@ async function completeTopic(req, res, next) {
   }
 }
 
-async function completeTopicAttempt(req, res, next) {
-  try {
-    const params = assertTopicAttemptParams({
-      topicId: req.params.topicId,
-      attemptId: req.params.attemptId,
-    });
-    const payload = await coursesService.completeTopicAttempt({ ...params, userId: req.currentUser.id });
-    res.json(payload);
-  } catch (error) {
-    handleControllerError(error, res, next);
-  }
-}
-
 async function completeSectionAttempt(req, res, next) {
   try {
     const params = assertSectionAttemptParams({
@@ -206,7 +192,6 @@ module.exports = {
   completeTopic,
   getCourseProgress,
   viewTopicMaterial,
-  completeTopicAttempt,
   completeSectionAttempt,
   completeModuleAttempt,
   getFinalAssessmentAccess,

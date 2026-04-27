@@ -345,14 +345,17 @@ async function deleteAssessment(assessmentId) {
 
 async function listAssessmentsForManager({ userId, roleName, branchId }) {
   const params = [];
-  let whereClause = "";
+  const filters = [
+    `NOT EXISTS (SELECT 1 FROM course_sections cs WHERE cs.assessment_id = a.id)`,
+    `NOT EXISTS (SELECT 1 FROM course_topics ct WHERE ct.assessment_id = a.id)`,
+  ];
 
   // Управляющий видит все аттестации, связанные с его филиалом через:
   // 1. Прямое назначение филиала
   // 2. Назначение должностей (сотрудники его филиала)
   // 3. Назначение конкретных пользователей (из его филиала)
   if (roleName === "manager" && branchId) {
-    whereClause = `WHERE (
+    filters.push(`(
       EXISTS (
         SELECT 1 FROM assessment_branch_assignments aba
         WHERE aba.assessment_id = a.id AND aba.branch_id = ?
@@ -367,12 +370,13 @@ async function listAssessmentsForManager({ userId, roleName, branchId }) {
         JOIN users u ON u.id = aua.user_id
         WHERE aua.assessment_id = a.id AND u.branch_id = ?
       )
-    )`;
+    )`);
     params.push(branchId, branchId, branchId);
     logger.debug("[listAssessmentsForManager] Manager branchId=%s", branchId);
   } else {
     logger.debug("[listAssessmentsForManager] Superadmin, no filters");
   }
+  const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
   // Суперадмин видит все аттестации (whereClause остается пустым)
 
   const [rows] = await pool.execute(
@@ -452,6 +456,14 @@ async function findAssessmentByIdForManager(assessmentId, { userId, roleName, br
         SELECT 1 FROM assessment_user_assignments aua
         JOIN users u ON u.id = aua.user_id
         WHERE aua.assessment_id = a.id AND u.branch_id = ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM course_sections cs
+        WHERE cs.assessment_id = a.id
+      )
+      OR EXISTS (
+        SELECT 1 FROM course_topics ct
+        WHERE ct.assessment_id = a.id
       )
     )`;
     params.push(branchId, branchId, branchId);

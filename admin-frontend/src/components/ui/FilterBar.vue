@@ -492,7 +492,6 @@ onUnmounted(() => {
   background: transparent;
   color: var(--text-primary);
   font-size: 14px;
-  font-family: inherit;
   min-width: 0;
 }
 
@@ -541,7 +540,6 @@ onUnmounted(() => {
   cursor: pointer;
   color: var(--text-secondary);
   font-size: 14px;
-  font-family: inherit;
   white-space: nowrap;
   transition: all 0.15s ease;
 }
@@ -633,7 +631,6 @@ onUnmounted(() => {
   cursor: pointer;
   color: var(--text-primary);
   font-size: 14px;
-  font-family: inherit;
   text-align: left;
   width: 100%;
   transition: background 0.1s ease;
@@ -709,7 +706,6 @@ onUnmounted(() => {
   border-radius: 8px;
   padding: 6px 8px;
   font-size: 13px;
-  font-family: inherit;
   color: var(--text-primary);
   background: var(--bg-primary);
   outline: none;
@@ -733,7 +729,7 @@ onUnmounted(() => {
   border: none;
   cursor: pointer;
   font-size: 13px;
-  font-family: inherit;
+  
   font-weight: 500;
   transition: opacity 0.15s;
 }
@@ -763,7 +759,7 @@ onUnmounted(() => {
   background: transparent;
   color: var(--text-secondary);
   font-size: 14px;
-  font-family: inherit;
+  
   cursor: pointer;
   border-radius: 10px;
   white-space: nowrap;
@@ -788,7 +784,7 @@ onUnmounted(() => {
   cursor: pointer;
   color: var(--text-secondary);
   font-size: 14px;
-  font-family: inherit;
+  
   border-radius: 10px;
   flex-shrink: 0;
   margin-left: auto;
@@ -886,7 +882,7 @@ onUnmounted(() => {
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 14px;
-  font-family: inherit;
+  
   outline: none;
   appearance: none;
 }
@@ -905,7 +901,7 @@ onUnmounted(() => {
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 14px;
-  font-family: inherit;
+  
   outline: none;
 }
 
@@ -932,7 +928,7 @@ onUnmounted(() => {
   background: var(--bg-secondary);
   color: var(--text-primary);
   font-size: 14px;
-  font-family: inherit;
+  
   cursor: pointer;
 }
 
@@ -944,7 +940,7 @@ onUnmounted(() => {
   color: var(--nav-active-text);
   font-size: 14px;
   font-weight: 600;
-  font-family: inherit;
+  
   cursor: pointer;
 }
 

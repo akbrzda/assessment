@@ -2314,7 +2314,6 @@ onMounted(async () => {
 
 .credentials-value {
   flex: 1;
-  font-family: monospace;
   font-size: 15px;
   font-weight: 600;
   background: var(--surface-card, #f4f4f5);

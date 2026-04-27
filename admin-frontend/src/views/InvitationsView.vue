@@ -615,7 +615,6 @@ onMounted(loadData);
   background-color: var(--accent-blue-soft);
   padding: 4px 8px;
   border-radius: 6px;
-  font-family: "Courier New", monospace;
   cursor: help;
   transition: background-color 0.2s;
 }
@@ -774,7 +773,6 @@ onMounted(loadData);
   background-color: var(--accent-blue-soft);
   padding: 4px 8px;
   border-radius: 6px;
-  font-family: "Courier New", monospace;
 }
 
 .invitation-card-actions {

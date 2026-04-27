@@ -62,7 +62,8 @@ async function listSectionsByCourseId(courseId, options = {}) {
   const lock = options.forUpdate ? " FOR UPDATE" : "";
   const [rows] = await executor.execute(
     `SELECT id, course_id, title, description, order_index, assessment_id,
-            is_required, estimated_minutes, created_at, updated_at
+            is_required, estimated_minutes, test_shuffle_questions, test_shuffle_options,
+            test_show_results_after_completion, created_at, updated_at
        FROM course_sections WHERE course_id = ? ORDER BY order_index ASC${lock}`,
     [courseId],
   );
@@ -75,6 +76,7 @@ async function findSectionById(sectionId, options = {}) {
   const [rows] = await executor.execute(
     `SELECT cs.id, cs.course_id, cs.title, cs.description, cs.order_index,
             cs.assessment_id, cs.is_required, cs.estimated_minutes,
+            cs.test_shuffle_questions, cs.test_shuffle_options, cs.test_show_results_after_completion,
             cs.created_at, cs.updated_at, c.status AS course_status
        FROM course_sections cs
        JOIN courses c ON c.id = cs.course_id
@@ -160,8 +162,8 @@ async function validatePublicationIntegrity(courseId, options = {}) {
       continue;
     }
     for (const topic of topics) {
-      if (!topic.hasMaterial && !topic.assessmentId) {
-        errors.push(`Раздел "${section.title}", тема "${topic.title}": должна содержать материал или тест`);
+      if (!topic.hasMaterial) {
+        errors.push(`Раздел "${section.title}", тема "${topic.title}": должна содержать материал`);
       }
     }
   }
@@ -195,7 +197,6 @@ function buildCourseSnapshot(course, sections, topicsBySectionId) {
         title: topic.title,
         orderIndex: topic.orderIndex,
         hasMaterial: topic.hasMaterial,
-        assessmentId: topic.assessmentId,
       })),
     })),
   };

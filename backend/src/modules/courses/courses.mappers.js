@@ -52,6 +52,9 @@ function mapSectionRow(row) {
     assessmentId: row.assessment_id ? Number(row.assessment_id) : null,
     isRequired: Boolean(row.is_required),
     estimatedMinutes: row.estimated_minutes ? Number(row.estimated_minutes) : null,
+    testShuffleQuestions: row.test_shuffle_questions == null ? true : Boolean(row.test_shuffle_questions),
+    testShuffleOptions: row.test_shuffle_options == null ? true : Boolean(row.test_shuffle_options),
+    testShowResultsAfterCompletion: row.test_show_results_after_completion == null ? true : Boolean(row.test_show_results_after_completion),
     createdAt: toIsoUtc(row.created_at),
     updatedAt: toIsoUtc(row.updated_at),
   };
@@ -67,7 +70,6 @@ function mapTopicRow(row) {
     isRequired: row.is_required == null ? true : Boolean(row.is_required),
     hasMaterial: Boolean(row.has_material),
     content: row.content || null,
-    assessmentId: row.assessment_id ? Number(row.assessment_id) : null,
     createdAt: toIsoUtc(row.created_at),
     updatedAt: toIsoUtc(row.updated_at),
   };

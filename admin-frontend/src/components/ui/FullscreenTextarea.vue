@@ -155,7 +155,6 @@ const saveFullscreen = () => {
   border: none;
   outline: none;
   resize: none;
-  font-family: inherit;
   font-size: 15px;
   line-height: 1.6;
   color: var(--text-primary);

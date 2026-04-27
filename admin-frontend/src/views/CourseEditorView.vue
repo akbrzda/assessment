@@ -3,7 +3,6 @@
     <div class="course-editor-header">
       <div class="course-editor-header-left">
         <Button variant="ghost" icon="arrow-left" size="sm" @click="goBack">К списку курсов</Button>
-        <h1 class="course-editor-title">{{ isEditMode ? "Редактирование курса" : "Создание курса" }}</h1>
       </div>
       <div class="course-editor-header-right">
         <Button v-if="currentStep < wizardSteps.length" :loading="saving" :disabled="!canProceed" @click="goToNextStep">Далее</Button>
@@ -59,23 +58,13 @@
               <span class="field-counter">{{ (form.shortDescription || "").length }}/200</span>
             </div>
 
-            <div class="tags-field">
-              <label class="tags-label">Теги</label>
-              <div class="tags-input-wrapper">
-                <span v-for="(tag, i) in parsedTags" :key="i" class="tag-chip">
-                  {{ tag }}
-                  <button type="button" class="tag-chip-remove" @click="removeTag(i)">×</button>
-                </span>
-                <input
-                  class="tags-raw-input"
-                  v-model="form.tagsInput"
-                  placeholder="Введите тег и нажмите Enter"
-                  @keydown.enter.prevent="confirmTagInput"
-                  @keydown.comma.prevent="confirmTagInput"
-                />
-              </div>
-              <p class="tags-hint">Например: сервис, стандарты, клиентоориентированность</p>
-            </div>
+            <Input
+              v-model="form.tagsInput"
+              label="Теги"
+              placeholder="Введите тег и нажмите Enter"
+              @keydown.enter.prevent="confirmTagInput"
+              @keydown.comma.prevent="confirmTagInput"
+            />
 
             <Select v-model="form.difficulty" label="Уровень сложности" placeholder="Выберите уровень" :options="difficultyOptions" />
             <Select v-model="form.courseLanguage" label="Язык курса" placeholder="Выберите язык" :options="languageOptions" />
@@ -185,7 +174,7 @@
         <div class="structure-toolbar">
           <div class="structure-search">
             <Search :size="16" :stroke-width="2" />
-            <input v-model="structureSearchQuery" type="search" placeholder="Поиск по темам и подтемам" />
+            <Input v-model="structureSearchQuery" type="search" placeholder="Поиск по темам и подтемам" />
           </div>
           <button type="button" class="structure-secondary-action structure-secondary-action-disabled" disabled>
             <Upload :size="16" :stroke-width="1.8" />
@@ -258,7 +247,7 @@
                             <div class="structure-topic-grid">
                               <label class="structure-topic-field structure-topic-field-wide">
                                 <span>Название подтемы</span>
-                                <input v-model="topicForms[topic.id].title" type="text" placeholder="Введите название подтемы" />
+                                <Input v-model="topicForms[topic.id].title" type="text" placeholder="Введите название подтемы" />
                               </label>
                             </div>
 
@@ -272,22 +261,6 @@
                               <label>
                                 <input v-model="topicForms[topic.id].isRequired" type="checkbox" />
                                 <span>Обязательная подтема</span>
-                              </label>
-                              <label>
-                                <input
-                                  type="checkbox"
-                                  :checked="Boolean(topicForms[topic.id].assessmentId)"
-                                  @change="
-                                    ($event) => {
-                                      if ($event.target.checked) {
-                                        openAssessmentEditor({ type: 'topic', id: topic.id }, topicForms[topic.id].assessmentId || null);
-                                      } else {
-                                        topicForms[topic.id].assessmentId = '';
-                                      }
-                                    }
-                                  "
-                                />
-                                <span>Есть тест</span>
                               </label>
                             </div>
 
@@ -353,22 +326,6 @@
                         <label>
                           <input v-model="newTopics[section.id].isRequired" type="checkbox" />
                           <span>Обязательная подтема</span>
-                        </label>
-                        <label>
-                          <input
-                            type="checkbox"
-                            :checked="Boolean(newTopics[section.id].assessmentId)"
-                            @change="
-                              ($event) => {
-                                if ($event.target.checked) {
-                                  openAssessmentEditor({ type: 'newTopic', id: section.id }, newTopics[section.id].assessmentId || null);
-                                } else {
-                                  newTopics[section.id].assessmentId = '';
-                                }
-                              }
-                            "
-                          />
-                          <span>Есть тест</span>
                         </label>
                       </div>
 
@@ -439,10 +396,7 @@
                     :disabled="updatingSectionId === activeSection.id"
                     @click="toggleSectionEdit(activeSection.id)"
                   >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                      <path d="M12 20h9" stroke-linecap="round" />
-                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5z" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
+                    <Pencil class="structure-edit-icon" :size="16" :stroke-width="1.8" />
                     {{ sectionEditingId === activeSection.id ? "Отмена" : "Изменить" }}
                   </button>
                 </div>
@@ -469,15 +423,10 @@
                 </label>
                 <label class="structure-toggle">
                   <span>
-                    <strong>Тема содержит тест</strong>
-                    <small>После изучения материалов будет доступен тест для проверки знаний</small>
+                    <strong>Тест темы настраивается отдельно</strong>
+                    <small>Создание и параметры теста перенесены на шаг «Тест для темы»</small>
                   </span>
-                  <input
-                    class="native-checkbox"
-                    type="checkbox"
-                    :checked="Boolean(activeSectionForm.assessmentId)"
-                    @change="handleActiveSectionAssessmentToggle"
-                  />
+                  <span class="structure-settings-note">Шаг 3</span>
                 </label>
                 <label class="structure-toggle">
                   <span>
@@ -582,18 +531,26 @@
         </div>
       </div>
 
-      <Card v-if="currentStep === testsStepId && isEditMode && course" class="editor-card">
-        <div class="step-card-header">
-          <h2>Шаг {{ testsStepId }}. Тест для темы</h2>
-          <p>Настройте проверочные тесты для каждой темы курса.</p>
+      <Card v-if="currentStep === testsStepId && isEditMode && course" class="editor-card topic-tests-card" padding="none">
+        <div class="step-card-header step-card-header-tight">
+          <div>
+            <h2>Шаг {{ testsStepId }}. Тест для темы</h2>
+            <p>Создайте отдельный тест для каждой темы курса и настройте его параметры по новому сценарию.</p>
+          </div>
         </div>
-        <div class="step-placeholder">
-          <p>Перейдите в шаг «Структура курса» и назначьте тест для каждой темы.</p>
-          <Button variant="secondary" @click="currentStep = 2">Перейти к структуре курса</Button>
-        </div>
+
+        <CourseSectionTestsStep ref="sectionTestsStepRef" :course="course" @course-updated="handleCourseUpdatedFromTestsStep" />
       </Card>
 
-      <Card v-if="currentStep === finalAssessmentStepId && isEditMode && course" class="editor-card final-assessment-card">
+      <CourseFinalAssessmentStep
+        v-if="currentStep === finalAssessmentStepId && isEditMode && course"
+        ref="finalAssessmentStepRef"
+        :course="course"
+        @assessment-saved="handleFinalAssessmentSaved"
+        @course-updated="handleCourseUpdatedFromFinalStep"
+      />
+
+      <Card v-if="false && currentStep === finalAssessmentStepId && isEditMode && course" class="editor-card final-assessment-card">
         <div class="step-card-header">
           <h2>Шаг {{ finalAssessmentStepId }}. Аттестация курса</h2>
           <p>Назначьте обязательную итоговую аттестацию курса и сохраните настройки.</p>
@@ -913,9 +870,11 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import draggable from "vuedraggable";
-import { Check, ChevronUp, Eye, FileText, GripVertical, Info, MoreVertical, Search, Trash2, Upload, X } from "lucide-vue-next";
+import { Check, ChevronUp, Eye, FileText, GripVertical, Info, MoreVertical, Pencil, Search, Trash2, Upload, X } from "lucide-vue-next";
 import { Badge, Button, Card, Input, Modal, Preloader, Select, Textarea, WysiwygEditor } from "../components/ui";
 import AssessmentForm from "../components/AssessmentForm.vue";
+import CourseFinalAssessmentStep from "../components/CourseFinalAssessmentStep.vue";
+import CourseSectionTestsStep from "../components/CourseSectionTestsStep.vue";
 import {
   archiveCourse,
   createCourse,
@@ -1032,6 +991,8 @@ const viewingProgressUserId = ref(null);
 const selectedUserProgress = ref(null);
 const selectedUserName = ref("");
 const assessmentEditorOpen = ref(false);
+const sectionTestsStepRef = ref(null);
+const finalAssessmentStepRef = ref(null);
 
 const coverDragOver = ref(false);
 
@@ -1107,6 +1068,10 @@ const removeCover = () => {
 };
 
 const saveFromHeader = async () => {
+  if (currentStep.value === finalAssessmentStepId.value && finalAssessmentStepRef.value?.savePendingChanges) {
+    await finalAssessmentStepRef.value.savePendingChanges();
+    return;
+  }
   await saveCourse();
 };
 const assessmentEditorAssessmentId = ref(null);
@@ -1166,7 +1131,7 @@ const canProceed = computed(() => {
     return Boolean(form.value.title?.trim());
   }
   if (currentStep.value === finalAssessmentStepId.value) {
-    return Boolean(form.value.finalAssessmentId);
+    return true;
   }
   return true;
 });
@@ -1225,8 +1190,6 @@ const assessmentTypeLabel = (type) => {
   const labels = {
     section: "теста темы курса",
     newSection: "теста темы курса",
-    topic: "теста подтемы",
-    newTopic: "теста подтемы",
     final: "итоговой аттестации",
   };
   return labels[type] || "аттестации";
@@ -1356,7 +1319,6 @@ const syncSectionForms = (sections = []) => {
         isRequired: topic.isRequired !== false,
         hasMaterial: Boolean(topic.hasMaterial),
         content: topic.content || "",
-        assessmentId: topic.assessmentId ? String(topic.assessmentId) : "",
       };
     }
     nextNewTopics[section.id] = newTopics.value[section.id] || {
@@ -1364,7 +1326,6 @@ const syncSectionForms = (sections = []) => {
       isRequired: true,
       hasMaterial: true,
       content: "",
-      assessmentId: "",
     };
   }
   sectionForms.value = nextForms;
@@ -1546,6 +1507,27 @@ const loadPreview = async () => {
   }
 };
 
+const handleCourseUpdatedFromTestsStep = (nextCourse) => {
+  if (!nextCourse) {
+    return;
+  }
+  course.value = nextCourse;
+  syncSectionForms(nextCourse.sections || []);
+};
+
+const handleCourseUpdatedFromFinalStep = (nextCourse) => {
+  if (!nextCourse) {
+    return;
+  }
+  course.value = nextCourse;
+  form.value.finalAssessmentId = nextCourse.finalAssessmentId ? String(nextCourse.finalAssessmentId) : "";
+  syncSectionForms(nextCourse.sections || []);
+};
+
+const handleFinalAssessmentSaved = (assessmentId) => {
+  form.value.finalAssessmentId = assessmentId ? String(assessmentId) : "";
+};
+
 const handleCoverFileChange = (event) => {
   const file = event?.target?.files?.[0] || null;
   if (!file) return;
@@ -1661,6 +1643,18 @@ const saveCourse = async () => {
 
 const goToStep = async (stepId) => {
   if (stepId === currentStep.value) return;
+  if (currentStep.value === testsStepId.value && sectionTestsStepRef.value?.savePendingChanges) {
+    const saved = await sectionTestsStepRef.value.savePendingChanges();
+    if (!saved) {
+      return;
+    }
+  }
+  if (currentStep.value === finalAssessmentStepId.value && finalAssessmentStepRef.value?.savePendingChanges) {
+    const saved = await finalAssessmentStepRef.value.savePendingChanges();
+    if (!saved) {
+      return;
+    }
+  }
   if (showMaterialStep.value && currentStep.value === 3 && stepId !== 3) {
     showMaterialStep.value = false;
     currentStep.value = stepId > 3 ? stepId - 1 : stepId;
@@ -1684,6 +1678,18 @@ const goToNextStep = async () => {
     showMaterialStep.value = false;
     currentStep.value = 3;
     return;
+  }
+  if (currentStep.value === testsStepId.value && sectionTestsStepRef.value?.savePendingChanges) {
+    const saved = await sectionTestsStepRef.value.savePendingChanges();
+    if (!saved) {
+      return;
+    }
+  }
+  if (currentStep.value === finalAssessmentStepId.value && finalAssessmentStepRef.value?.savePendingChanges) {
+    const saved = await finalAssessmentStepRef.value.savePendingChanges();
+    if (!saved) {
+      return;
+    }
   }
   if (currentStep.value < wizardSteps.value.length) {
     currentStep.value += 1;
@@ -1719,15 +1725,9 @@ const handleAssessmentEditorSubmit = async ({ assessmentId } = {}) => {
   if (target.type === "section" && target.id && sectionForms.value[target.id]) {
     sectionForms.value[target.id].assessmentId = nextId;
     await saveSection(target.id);
-  } else if (target.type === "topic" && target.id && topicForms.value[target.id]) {
-    topicForms.value[target.id].assessmentId = nextId;
-    await saveTopic(target.id);
   } else if (target.type === "newSection") {
     newSection.value.assessmentId = nextId;
     showToast("Тест привязан к новой теме курса", "success");
-  } else if (target.type === "newTopic" && target.id && newTopics.value[target.id]) {
-    newTopics.value[target.id].assessmentId = nextId;
-    showToast("Тест привязан к новой подтеме", "success");
   } else if (target.type === "final") {
     form.value.finalAssessmentId = nextId;
     await saveCourse();
@@ -1904,8 +1904,8 @@ const addTopic = async (sectionId) => {
     newTopicErrors.value = { ...newTopicErrors.value, [sectionId]: { title: "Укажите название подтемы" } };
     return;
   }
-  if (!formState.hasMaterial && !sanitizeOptionalNumber(formState.assessmentId)) {
-    showToast("Подтема должна содержать материал или тест", "error");
+  if (!formState.hasMaterial) {
+    showToast("Подтема должна содержать учебный материал", "error");
     return;
   }
   creatingTopicSectionId.value = sectionId;
@@ -1915,12 +1915,11 @@ const addTopic = async (sectionId) => {
       isRequired: Boolean(formState.isRequired),
       hasMaterial: Boolean(formState.hasMaterial),
       content: formState.hasMaterial ? (formState.content || "").trim() || null : null,
-      assessmentId: sanitizeOptionalNumber(formState.assessmentId),
     };
     const response = await createCourseTopic(sectionId, payload);
     course.value = response.course;
     syncSectionForms(response.course.sections || []);
-    newTopics.value[sectionId] = { title: "", isRequired: true, hasMaterial: true, content: "", assessmentId: "" };
+    newTopics.value[sectionId] = { title: "", isRequired: true, hasMaterial: true, content: "" };
     newTopicErrors.value = { ...newTopicErrors.value, [sectionId]: null };
     closeNewTopicForm();
     showToast("Подтема добавлена", "success");
@@ -1945,7 +1944,6 @@ const saveTopic = async (topicId, options = {}) => {
       isRequired: Boolean(formState.isRequired),
       hasMaterial: Boolean(formState.hasMaterial),
       content: formState.hasMaterial ? (formState.content || "").trim() || null : null,
-      assessmentId: sanitizeOptionalNumber(formState.assessmentId),
     };
     const response = await updateCourseTopic(topicId, payload);
     course.value = response.course;
@@ -2302,7 +2300,6 @@ onMounted(async () => {
   --course-radius-lg: 14px;
   --course-radius-md: 10px;
   --course-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-  font-family: "Inter", "Segoe UI", Roboto, sans-serif;
   color: var(--course-text);
 }
 
@@ -2850,6 +2847,15 @@ onMounted(async () => {
   margin-bottom: 14px;
 }
 
+.step-card-header-tight {
+  margin: 0;
+  padding: 20px 20px 0;
+}
+
+.topic-tests-card {
+  overflow: hidden;
+}
+
 .status-summary {
   border: 1px solid var(--divider);
   border-radius: 12px;
@@ -3291,13 +3297,6 @@ onMounted(async () => {
   background: #ffffff;
 }
 
-.structure-search svg {
-  width: 18px;
-  height: 18px;
-  color: #9aa4bb;
-  flex-shrink: 0;
-}
-
 .structure-search input {
   width: 100%;
   height: 100%;
@@ -3336,12 +3335,6 @@ onMounted(async () => {
 .structure-secondary-action-disabled {
   opacity: 0.65;
   cursor: not-allowed;
-}
-
-.structure-secondary-action svg {
-  width: 17px;
-  height: 17px;
-  color: #64708a;
 }
 
 .structure-primary-action {
@@ -3389,7 +3382,7 @@ onMounted(async () => {
 
 .structure-section-head {
   width: 100%;
-  min-height: 64px;
+  min-height: 48px;
   border: 0;
   background: #ffffff;
   display: flex;
@@ -3460,10 +3453,6 @@ onMounted(async () => {
   background: #ffffff;
   padding: 0;
   color: #27334a;
-}
-
-.structure-subtopic-active {
-  background: #fbfaff;
 }
 
 .structure-subtopic-row {
@@ -3602,6 +3591,19 @@ onMounted(async () => {
   gap: 6px;
   color: #4b566f;
   font-size: 12px;
+}
+
+.structure-settings-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f1eeff;
+  color: #655cff;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .structure-topic-actions {
@@ -3770,12 +3772,6 @@ onMounted(async () => {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-}
-
-.structure-edit-button svg,
-.structure-delete-button svg {
-  width: 17px;
-  height: 17px;
 }
 
 .structure-field {
@@ -4010,12 +4006,6 @@ onMounted(async () => {
   border: 1px solid var(--materials-border);
   background: #ffffff;
   color: #25314a;
-}
-
-.materials-preview-button svg,
-.materials-delete-button svg {
-  width: 17px;
-  height: 17px;
 }
 
 .materials-add-button,
@@ -4447,17 +4437,20 @@ onMounted(async () => {
 }
 
 .assignments-card {
-  margin-bottom: 20px;
-}
-
-.assignments-card :deep(.card) {
-  border: 1px solid var(--divider);
-  background: var(--surface, #fff);
-  border-radius: 12px;
+  margin-top: 16px;
+  box-shadow: var(--course-shadow);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 304px;
+  gap: 18px;
+  align-items: start;
+  background: none;
+  border: none;
 }
 
 .assignments-card :deep(.card-content) {
-  padding: 22px;
+  background: var(--course-surface);
+  border: 1px solid var(--course-border);
+  border-radius: var(--course-radius-lg);
 }
 
 .assignments-header {
@@ -4482,7 +4475,6 @@ onMounted(async () => {
 }
 
 .targets-group {
-  border: 1px solid var(--divider);
   border-radius: 12px;
   padding: 14px;
   background: var(--surface, #fff);

@@ -99,10 +99,11 @@ const baseSchema = Joi.object({
   branchIds: Joi.array().items(Joi.number().integer().positive()).unique().default([]),
   userIds: Joi.array().items(Joi.number().integer().positive()).unique().default([]),
   positionIds: Joi.array().items(Joi.number().integer().positive()).unique().default([]),
+  internalCourseSectionId: Joi.number().integer().positive().allow(null).default(null),
   questions: Joi.array().items(questionSchema).min(1).required(),
   clientTimezoneOffsetMinutes: Joi.number().integer().min(-720).max(840).optional(),
 }).custom((value, helpers) => {
-  if (!value.userIds.length && !value.positionIds.length && !value.branchIds.length) {
+  if (!value.internalCourseSectionId && !value.userIds.length && !value.positionIds.length && !value.branchIds.length) {
     return helpers.message("     ,   ");
   }
   if (new Date(value.closeAt) <= new Date(value.openAt)) {
@@ -303,7 +304,7 @@ async function create(req, res, next) {
       return res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
     }
 
-    const targets = await prepareTargets(value, req.currentUser);
+    const targets = value.internalCourseSectionId ? { branchIds: [], userIds: [], positionIds: [] } : await prepareTargets(value, req.currentUser);
 
     const assessmentData = {
       title: value.title.trim(),
@@ -328,7 +329,7 @@ async function create(req, res, next) {
 
     const created = await assessmentModel.findAssessmentByIdForManager(assessmentId, {
       userId: req.currentUser.id,
-      roleName: req.currentUser.roleName,
+      roleName: value.internalCourseSectionId ? "superadmin" : req.currentUser.roleName,
       branchId: req.currentUser.branchId,
     });
 
@@ -618,7 +619,7 @@ async function update(req, res, next) {
       return res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
     }
 
-    const targets = await prepareTargets(value, req.currentUser);
+    const targets = value.internalCourseSectionId ? { branchIds: [], userIds: [], positionIds: [] } : await prepareTargets(value, req.currentUser);
 
     if (hasInProgressAttempts) {
       const hasParameterChanges =
@@ -664,7 +665,7 @@ async function update(req, res, next) {
 
     const updated = await assessmentModel.findAssessmentByIdForManager(assessmentId, {
       userId: req.currentUser.id,
-      roleName: req.currentUser.roleName,
+      roleName: value.internalCourseSectionId ? "superadmin" : req.currentUser.roleName,
       branchId: req.currentUser.branchId,
     });
 

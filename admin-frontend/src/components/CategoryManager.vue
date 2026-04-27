@@ -202,7 +202,6 @@ onMounted(() => {
   background-color: var(--input-bg);
   color: var(--text-primary);
   font-size: 14px;
-  font-family: inherit;
   resize: vertical;
   transition: border-color 0.15s ease;
 }
