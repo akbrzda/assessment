@@ -1,11 +1,11 @@
 <template>
-  <div class="input-group">
-    <label v-if="props.label" class="input-label">
+  <div class="flex flex-col gap-2">
+    <label v-if="props.label" class="flex items-center gap-1 text-[15px] font-medium text-foreground">
       {{ props.label }}
-      <span v-if="props.required" class="input-required">*</span>
+      <span v-if="props.required" class="text-red-500">*</span>
     </label>
-    <div class="input-wrapper">
-      <slot name="prefix"></slot>
+    <div class="relative flex items-center">
+      <slot name="prefix" />
       <input
         :value="props.modelValue"
         :type="props.type"
@@ -15,17 +15,29 @@
         :required="props.required"
         :min="props.min"
         :max="props.max"
-        :class="['input', `input-${props.size}`, { 'input-error': !!props.error }]"
+        :class="
+          cn(
+            'w-full border border-border rounded-xl bg-background text-foreground transition-all duration-200',
+            'placeholder:text-muted-foreground focus:outline-none focus:border-accent-blue focus:ring-2 focus:ring-accent-blue/10',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+            props.error && 'border-red-500 focus:border-red-500 focus:ring-red-500/10',
+            sizeClass,
+            $slots.prefix && 'pl-10',
+          )
+        "
         @input="$emit('update:modelValue', $event.target.value)"
       />
-      <slot name="suffix"></slot>
+      <slot name="suffix" />
     </div>
-    <p v-if="props.error" class="input-error-text">{{ props.error }}</p>
-    <p v-else-if="props.hint" class="input-hint-text">{{ props.hint }}</p>
+    <p v-if="props.error" class="text-sm text-red-500">{{ props.error }}</p>
+    <p v-else-if="props.hint" class="text-sm text-muted-foreground">{{ props.hint }}</p>
   </div>
 </template>
 
 <script setup>
+import { computed } from "vue";
+import { cn } from "@/lib/utils";
+
 const props = defineProps({
   modelValue: {
     type: [String, Number],
@@ -58,106 +70,6 @@ const props = defineProps({
 });
 
 defineEmits(["update:modelValue"]);
+
+const sizeClass = computed(() => ({ sm: "py-2 px-3 text-sm", md: "py-2.5 px-4 text-[15px]", lg: "py-3 px-5 text-base" })[props.size]);
 </script>
-
-<style scoped>
-.input-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.input-label {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.input-required {
-  color: #ef4444;
-}
-
-.input-wrapper {
-  position: relative;
-
-  .input {
-    flex: 1;
-    border: none;
-    background: transparent;
-    outline: none;
-    padding: 10px 16px;
-    display: flex;
-    align-items: center;
-
-    width: 100%;
-    border: 1px solid var(--divider);
-    border-radius: 12px;
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
-    transition: all 0.2s ease;
-  }
-}
-
-.input-sm,
-.input-md,
-.input-lg {
-  font-size: 16px;
-}
-
-.input-sm {
-  padding: 8px 12px;
-}
-
-.input-md {
-  padding: 10px 16px;
-}
-
-.input-lg {
-  padding: 12px 20px;
-}
-
-@media (min-width: 768px) {
-  .input-sm {
-    font-size: 14px;
-  }
-
-  .input-md {
-    font-size: 15px;
-  }
-
-  .input-lg {
-    font-size: 16px;
-  }
-}
-
-.input::placeholder {
-  color: var(--text-secondary);
-}
-
-.input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.input-error {
-  border-color: #ef4444;
-}
-
-.input:focus.input-error {
-  box-shadow: 0 0 0 3px #ef44441a;
-}
-
-.input-error-text {
-  font-size: 13px;
-  color: #ef4444;
-  margin: 0;
-}
-
-.input-hint-text {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-</style>

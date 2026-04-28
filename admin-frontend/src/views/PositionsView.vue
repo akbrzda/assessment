@@ -18,7 +18,7 @@
     </Card>
 
     <Card padding="none" class="positions-card">
-      <Preloader v-if="loading" />
+      <SkeletonTable v-if="loading" :rows="5" />
 
       <div v-else-if="positions.length === 0" class="empty-state">
         <p>Должности не найдены</p>
@@ -134,6 +134,7 @@
 import { onMounted, ref } from "vue";
 import { deletePosition, getPositions } from "../api/positions";
 import Preloader from "../components/ui/Preloader.vue";
+import SkeletonTable from "../components/ui/SkeletonTable.vue";
 import Modal from "../components/ui/Modal.vue";
 import Card from "../components/ui/Card.vue";
 import Button from "../components/ui/Button.vue";

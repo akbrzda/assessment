@@ -1,17 +1,25 @@
 <template>
-  <div class="select-group">
-    <label v-if="label" class="select-label" :for="selectId">
+  <div class="flex flex-col gap-2">
+    <label v-if="label" :for="selectId" class="flex items-center gap-1 text-[15px] font-medium text-foreground">
       {{ label }}
-      <span v-if="required" class="select-required">*</span>
+      <span v-if="required" class="text-red-500">*</span>
     </label>
-    <div class="select-wrapper">
+    <div class="relative">
       <select
         :id="selectId"
         :name="selectName"
         :value="modelValue"
         :disabled="disabled"
         :required="required"
-        :class="['select', `select-${size}`, { 'select-error': !!error }]"
+        :class="
+          cn(
+            'w-full border border-border rounded-xl bg-background text-foreground appearance-none pr-10 cursor-pointer transition-all duration-200',
+            'focus:outline-none focus:border-accent-blue focus:ring-2 focus:ring-accent-blue/10',
+            'hover:border-accent-blue disabled:opacity-50 disabled:cursor-not-allowed',
+            error && 'border-red-500 focus:border-red-500',
+            sizeClass,
+          )
+        "
         @change="$emit('update:modelValue', $event.target.value)"
       >
         <option v-if="placeholder && !modelValue" value="" disabled selected>{{ placeholder }}</option>
@@ -19,14 +27,15 @@
           {{ option.label }}
         </option>
       </select>
-      <div class="select-arrow">▼</div>
+      <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted-foreground text-xs">▼</div>
     </div>
-    <p v-if="error" class="select-error-text">{{ error }}</p>
+    <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
   </div>
 </template>
 
 <script setup>
 import { computed, useId } from "vue";
+import { cn } from "@/lib/utils";
 
 const props = defineProps({
   modelValue: {
@@ -54,92 +63,7 @@ const props = defineProps({
 const localId = typeof useId === "function" ? useId() : `select-${Math.random().toString(36).slice(2, 9)}`;
 const selectId = computed(() => props.id || localId);
 const selectName = computed(() => props.name || selectId.value);
+const sizeClass = computed(() => ({ sm: "py-2 px-3 text-sm", md: "py-2.5 px-4 text-[15px]", lg: "py-3 px-5 text-base" })[props.size]);
 
 defineEmits(["update:modelValue"]);
 </script>
-
-<style scoped>
-.select-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.select-label {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.select-required {
-  color: #ef4444;
-}
-
-.select-wrapper {
-  position: relative;
-}
-
-.select {
-  width: 100%;
-  border: 1px solid var(--divider);
-  border-radius: 12px;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  outline: none;
-  appearance: none;
-  padding-right: 40px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.select-sm {
-  font-size: 14px;
-  padding: 8px 12px;
-}
-
-.select-md {
-  font-size: 15px;
-  padding: 10px 16px;
-}
-
-.select-lg {
-  font-size: 16px;
-  padding: 12px 20px;
-}
-
-.select:hover:not(:disabled) {
-  border-color: var(--accent-blue);
-}
-
-.select:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.select-arrow {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.select-error {
-  border-color: #ef4444;
-}
-
-.select:focus.select-error {
-  box-shadow: 0 0 0 3px #ef44441a;
-}
-
-.select-error-text {
-  font-size: 13px;
-  color: #ef4444;
-  margin: 0;
-}
-</style>

@@ -61,6 +61,19 @@ function toIsoUtc(value) {
   return date.toISOString();
 }
 
+function toMySqlDateTime(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
 function mapAssessmentRow(row) {
   if (!row) {
     return null;
@@ -181,8 +194,8 @@ async function createAssessment({ assessment, questions, branchIds, userIds, pos
       [
         assessment.title,
         assessment.description,
-        assessment.openAt,
-        assessment.closeAt,
+        toMySqlDateTime(assessment.openAt),
+        toMySqlDateTime(assessment.closeAt),
         assessment.timeLimitMinutes,
         assessment.passScorePercent,
         assessment.maxAttempts,
@@ -265,8 +278,8 @@ async function updateAssessment(assessmentId, { assessment, questions, branchIds
       [
         assessment.title,
         assessment.description,
-        assessment.openAt,
-        assessment.closeAt,
+        toMySqlDateTime(assessment.openAt),
+        toMySqlDateTime(assessment.closeAt),
         assessment.timeLimitMinutes,
         assessment.passScorePercent,
         assessment.maxAttempts,
@@ -348,6 +361,7 @@ async function listAssessmentsForManager({ userId, roleName, branchId }) {
   const filters = [
     `NOT EXISTS (SELECT 1 FROM course_sections cs WHERE cs.assessment_id = a.id)`,
     `NOT EXISTS (SELECT 1 FROM course_topics ct WHERE ct.assessment_id = a.id)`,
+    `NOT EXISTS (SELECT 1 FROM courses c WHERE c.final_assessment_id = a.id)`,
   ];
 
   // Управляющий видит все аттестации, связанные с его филиалом через:

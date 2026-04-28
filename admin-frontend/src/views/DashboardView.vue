@@ -1,6 +1,6 @@
 <template>
   <div class="dashboard">
-    <Preloader v-if="loading" />
+    <SkeletonCards v-if="loading" :count="4" :cols="4" />
 
     <div v-else class="dashboard-content">
       <div class="filters-section">
@@ -258,6 +258,7 @@ import dashboardApi from "../api/dashboard";
 import { getReferences } from "../api/users";
 import { useToast } from "../composables/useToast";
 import Preloader from "../components/ui/Preloader.vue";
+import SkeletonCards from "../components/ui/SkeletonCards.vue";
 import Card from "../components/ui/Card.vue";
 import Badge from "../components/ui/Badge.vue";
 import LineChart from "../components/charts/LineChart.vue";

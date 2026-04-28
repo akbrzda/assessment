@@ -1,41 +1,8 @@
 <template>
-  <div class="preloader-container">
-    <div class="preloader-spinner"></div>
-    <p class="preloader-text">Загрузка...</p>
+  <div class="flex flex-col items-center justify-center py-12 min-h-[200px] gap-4">
+    <div class="h-10 w-10 animate-spin rounded-full border-[3px] border-border border-t-accent-blue" />
+    <p class="text-sm font-medium text-muted-foreground">Загрузка...</p>
   </div>
 </template>
 
 <script setup></script>
-
-<style scoped>
-.preloader-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 0;
-  min-height: 200px;
-}
-
-.preloader-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--divider);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.preloader-text {
-  margin-top: 16px;
-  color: var(--text-secondary, #6b7280);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-</style>

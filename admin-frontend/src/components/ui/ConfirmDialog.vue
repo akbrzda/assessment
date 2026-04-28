@@ -1,21 +1,32 @@
 <template>
   <Teleport to="body">
-    <Transition name="modal">
-      <div v-if="modelValue" class="confirm-overlay" @click="handleCancel">
-        <div class="confirm-dialog" @click.stop>
-          <div class="confirm-header">
-            <div class="confirm-icon" :class="`confirm-icon-${variant}`">
+    <Transition
+      enter-active-class="transition-all duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-all duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5" @click="handleCancel">
+        <div
+          class="bg-muted rounded-xl p-6 max-w-[400px] w-full shadow-modal border border-border"
+          style="animation: slideIn 0.3s ease-out"
+          @click.stop
+        >
+          <div class="flex items-center gap-3 mb-4">
+            <div :class="cn('flex items-center justify-center w-12 h-12 rounded-xl shrink-0', iconBgClass)">
               <Icon :name="iconName" :size="24" :stroke-width="2.25" aria-hidden="true" />
             </div>
-            <h2 class="confirm-title">{{ title }}</h2>
+            <h2 class="text-lg font-semibold text-foreground m-0">{{ title }}</h2>
           </div>
 
-          <div class="confirm-content">
-            <p class="confirm-message">{{ message }}</p>
-            <slot></slot>
+          <div class="mb-6">
+            <p class="text-sm text-muted-foreground m-0 mb-3 leading-relaxed">{{ message }}</p>
+            <slot />
           </div>
 
-          <div class="confirm-actions">
+          <div class="flex gap-3 justify-end">
             <Button variant="ghost" @click="handleCancel">{{ cancelText }}</Button>
             <Button :variant="actionVariant" :loading="loading" @click="handleConfirm">
               {{ confirmText }}
@@ -29,6 +40,7 @@
 
 <script setup>
 import { computed } from "vue";
+import { cn } from "@/lib/utils";
 import Button from "./Button.vue";
 import Icon from "./Icon.vue";
 
@@ -52,7 +64,7 @@ const props = defineProps({
   },
   variant: {
     type: String,
-    default: "warning", // warning, danger, info, success
+    default: "warning",
     validator: (value) => ["warning", "danger", "info", "success"].includes(value),
   },
   loading: Boolean,
@@ -60,62 +72,30 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue", "confirm", "cancel"]);
 
-const actionVariant = computed(() => {
-  const variantMap = {
-    warning: "primary",
-    danger: "danger",
-    info: "primary",
-    success: "success",
-  };
-  return variantMap[props.variant] || "primary";
-});
+const actionVariant = computed(() => ({ warning: "primary", danger: "danger", info: "primary", success: "success" })[props.variant] || "primary");
 
-const iconName = computed(() => {
-  const iconMap = {
-    warning: "TriangleAlert",
-    danger: "Trash2",
-    info: "Info",
-    success: "CircleCheck",
-  };
-  return iconMap[props.variant] || "HelpCircle";
-});
+const iconName = computed(
+  () => ({ warning: "TriangleAlert", danger: "Trash2", info: "Info", success: "CircleCheck" })[props.variant] || "HelpCircle",
+);
 
-const handleConfirm = () => {
-  emit("confirm");
-};
+const iconBgClass = computed(
+  () =>
+    ({
+      warning: "bg-amber-500/10 text-amber-600",
+      danger: "bg-red-500/10 text-red-600",
+      info: "bg-blue-500/10 text-blue-600",
+      success: "bg-emerald-500/10 text-emerald-600",
+    })[props.variant],
+);
 
+const handleConfirm = () => emit("confirm");
 const handleCancel = () => {
   emit("cancel");
   emit("update:modelValue", false);
 };
 </script>
 
-<style scoped>
-.confirm-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: #00000080;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
-
-.confirm-dialog {
-  background: var(--bg-secondary);
-  border-radius: 16px;
-  padding: 24px;
-  max-width: 400px;
-  width: 100%;
-  box-shadow: 0 20px 60px #0000004d;
-  border: 1px solid var(--divider);
-  animation: slideIn 0.3s ease-out;
-}
-
+<style>
 @keyframes slideIn {
   from {
     opacity: 0;
@@ -124,87 +104,6 @@ const handleCancel = () => {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-.confirm-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.confirm-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  flex-shrink: 0;
-}
-
-.confirm-icon-warning {
-  background: #fbbf241a;
-  color: #d97706;
-}
-
-.confirm-icon-danger {
-  background: #ef44441a;
-  color: #dc2626;
-}
-
-.confirm-icon-info {
-  background: #3b82f61a;
-  color: #2563eb;
-}
-
-.confirm-icon-success {
-  background: #10b9811a;
-  color: #059669;
-}
-
-.confirm-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.confirm-content {
-  margin-bottom: 24px;
-}
-
-.confirm-message {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin: 0 0 12px 0;
-  line-height: 1.5;
-}
-
-.confirm-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-}
-
-:deep(.modal-enter-active),
-:deep(.modal-leave-active) {
-  transition: opacity 0.3s ease;
-}
-
-:deep(.modal-enter-from),
-:deep(.modal-leave-to) {
-  opacity: 0;
-}
-
-@media (max-width: 480px) {
-  .confirm-dialog {
-    padding: 20px;
-  }
-
-  .confirm-actions {
-    flex-direction: column-reverse;
   }
 }
 </style>

@@ -1,8 +1,8 @@
 <template>
-  <div class="textarea-group">
-    <label v-if="label" class="textarea-label">
+  <div class="flex flex-col gap-2">
+    <label v-if="label" class="flex items-center gap-1 text-[15px] font-medium text-foreground">
       {{ label }}
-      <span v-if="required" class="textarea-required">*</span>
+      <span v-if="required" class="text-red-500">*</span>
     </label>
     <textarea
       :value="modelValue"
@@ -11,16 +11,27 @@
       :readonly="readonly"
       :required="required"
       :rows="rows"
-      :class="['textarea', `textarea-${size}`, { 'textarea-error': !!error }]"
+      :class="
+        cn(
+          'min-h-24 w-full border border-border rounded-xl bg-background text-foreground resize-vertical transition-all duration-200',
+          'placeholder:text-muted-foreground focus:outline-none focus:border-accent-blue focus:ring-2 focus:ring-accent-blue/10',
+          'disabled:opacity-50 disabled:cursor-not-allowed',
+          error && 'border-red-500 focus:border-red-500 focus:ring-red-500/10',
+          sizeClass,
+        )
+      "
       @input="$emit('update:modelValue', $event.target.value)"
     ></textarea>
-    <p v-if="error" class="textarea-error-text">{{ error }}</p>
-    <p v-else-if="hint" class="textarea-hint-text">{{ hint }}</p>
+    <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
+    <p v-else-if="hint" class="text-sm text-muted-foreground">{{ hint }}</p>
   </div>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from "vue";
+import { cn } from "@/lib/utils";
+
+const props = defineProps({
   modelValue: {
     type: String,
     default: "",
@@ -44,109 +55,6 @@ defineProps({
 });
 
 defineEmits(["update:modelValue"]);
+
+const sizeClass = computed(() => ({ sm: "py-2 px-3 text-sm", md: "py-2.5 px-4 text-[15px]", lg: "py-3 px-5 text-base" })[props.size]);
 </script>
-
-<style scoped>
-.textarea-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.textarea-label {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.textarea-required {
-  color: #ef4444;
-}
-
-.textarea {
-  min-height: 96px;
-  width: 100%;
-  padding: 10px 16px;
-  border: 1px solid var(--divider);
-  border-radius: 12px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: 16px;
-  resize: vertical;
-  transition: all 0.2s ease;
-}
-
-.textarea:hover:not(:disabled) {
-  border-color: var(--accent-blue);
-}
-
-.textarea:focus {
-  outline: none;
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px #007aff1a;
-}
-
-.textarea-sm,
-.textarea-md,
-.textarea-lg {
-  font-size: 16px;
-}
-
-.textarea-sm {
-  padding: 8px 12px;
-}
-
-.textarea-md {
-  padding: 10px 16px;
-}
-
-.textarea-lg {
-  padding: 12px 20px;
-}
-
-@media (min-width: 768px) {
-  .textarea-sm {
-    font-size: 14px;
-  }
-
-  .textarea-md {
-    font-size: 15px;
-  }
-
-  .textarea-lg {
-    font-size: 16px;
-  }
-}
-
-.textarea::placeholder {
-  color: var(--text-secondary);
-}
-
-.textarea:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.textarea-error {
-  border-color: #ef4444;
-}
-
-.textarea:focus.textarea-error {
-  box-shadow: 0 0 0 3px #ef44441a;
-}
-
-.textarea-error-text {
-  font-size: 13px;
-  color: #ef4444;
-  margin: 0;
-}
-
-.textarea-hint-text {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-</style>

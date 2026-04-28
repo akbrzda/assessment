@@ -1,19 +1,29 @@
 <template>
-  <div class="pagination">
-    <div class="pagination-info">
-      Страница {{ page }} из {{ totalPages }} • Всего {{ total }}
-    </div>
-    <div class="pagination-controls">
-      <button class="pagination-btn" :disabled="page === 1" @click="updatePage(page - 1)" aria-label="Предыдущая страница">
+  <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-t border-border">
+    <div class="text-sm text-muted-foreground">Страница {{ page }} из {{ totalPages }} • Всего {{ total }}</div>
+    <div class="flex items-center gap-3">
+      <button
+        class="flex items-center justify-center w-9 h-9 rounded-lg border border-border bg-background text-foreground text-lg cursor-pointer transition-colors hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+        :disabled="page === 1"
+        aria-label="Предыдущая страница"
+        @click="updatePage(page - 1)"
+      >
         ‹
       </button>
-      <button class="pagination-btn" :disabled="page >= totalPages" @click="updatePage(page + 1)" aria-label="Следующая страница">
+      <button
+        class="flex items-center justify-center w-9 h-9 rounded-lg border border-border bg-background text-foreground text-lg cursor-pointer transition-colors hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+        :disabled="page >= totalPages"
+        aria-label="Следующая страница"
+        @click="updatePage(page + 1)"
+      >
         ›
       </button>
-      <select class="pagination-select" :value="limit" @change="updateLimit($event.target.value)">
-        <option v-for="option in limitOptions" :key="option" :value="option">
-          {{ option }} на странице
-        </option>
+      <select
+        class="border border-border rounded-lg bg-background text-foreground text-sm px-3 py-2 cursor-pointer focus:outline-none focus:border-accent-blue"
+        :value="limit"
+        @change="updateLimit($event.target.value)"
+      >
+        <option v-for="option in limitOptions" :key="option" :value="option">{{ option }} на странице</option>
       </select>
     </div>
   </div>
@@ -60,51 +70,3 @@ const updateLimit = (value) => {
   }
 };
 </script>
-
-<style scoped>
-.pagination {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 20px;
-  border-top: 1px solid var(--divider);
-}
-
-.pagination-info {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.pagination-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  border: 1px solid var(--divider);
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  cursor: pointer;
-  font-size: 18px;
-}
-
-.pagination-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.pagination-select {
-  border: 1px solid var(--divider);
-  border-radius: 8px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  padding: 6px 10px;
-  font-size: 14px;
-}
-</style>

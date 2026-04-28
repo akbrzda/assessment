@@ -2,6 +2,21 @@ const { pool } = require("../../../../config/database");
 const { createAdminLog } = require("./repository");
 const assessmentModel = require("../../../../models/assessmentModel");
 
+function toMySqlDateTime(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
+const INVALID_DATE_ERROR = "\u041d\u0435\u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 \u0444\u043e\u0440\u043c\u0430\u0442 \u0434\u0430\u0442\u044b \u043e\u0442\u043a\u0440\u044b\u0442\u0438\u044f \u0438\u043b\u0438 \u0437\u0430\u043a\u0440\u044b\u0442\u0438\u044f";
+
 /**
  * Получить список всех аттестаций для админ-панели
  */
@@ -326,6 +341,13 @@ exports.createAssessment = async (req, res, next) => {
     }
 
     // Создать аттестацию
+    const openAtDb = toMySqlDateTime(openAt);
+    const closeAtDb = toMySqlDateTime(closeAt);
+
+    if (!openAtDb || !closeAtDb) {
+      return res.status(400).json({ error: INVALID_DATE_ERROR });
+    }
+
     const [result] = await connection.query(
       `
       INSERT INTO assessments (
@@ -333,7 +355,7 @@ exports.createAssessment = async (req, res, next) => {
         pass_score_percent, max_attempts, created_by
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `,
-      [title, description || "", openAt, closeAt, timeLimitMinutes, passScorePercent, maxAttempts, req.user.id]
+      [title, description || "", openAtDb, closeAtDb, timeLimitMinutes, passScorePercent, maxAttempts, req.user.id]
     );
 
     const assessmentId = result.insertId;
@@ -545,8 +567,15 @@ exports.updateAssessment = async (req, res, next) => {
     const canEditParameters = !hasInProgressAttempts;
 
     // Обновить основную информацию (title, description, даты можно всегда)
+    const openAtDb = toMySqlDateTime(openAt);
+    const closeAtDb = toMySqlDateTime(closeAt);
+
+    if (!openAtDb || !closeAtDb) {
+      return res.status(400).json({ error: INVALID_DATE_ERROR });
+    }
+
     const updateFields = ["title = ?", "description = ?", "open_at = ?", "close_at = ?"];
-    const updateValues = [title, description || "", openAt, closeAt];
+    const updateValues = [title, description || "", openAtDb, closeAtDb];
 
     if (canEditParameters) {
       updateFields.push("time_limit_minutes = ?", "pass_score_percent = ?", "max_attempts = ?");

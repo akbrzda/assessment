@@ -23,7 +23,7 @@
 
     <!-- Контент -->
     <Card padding="none" class="assessments-card">
-      <Preloader v-if="loading" />
+      <SkeletonTable v-if="loading" :rows="6" />
 
       <div v-else-if="assessments.length === 0" class="empty-state">
         <div class="empty-state-icon"></div>
@@ -188,6 +188,7 @@ import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { getAssessments, deleteAssessment } from "../api/assessments";
 import Preloader from "../components/ui/Preloader.vue";
+import SkeletonTable from "../components/ui/SkeletonTable.vue";
 import Card from "../components/ui/Card.vue";
 import Button from "../components/ui/Button.vue";
 import Badge from "../components/ui/Badge.vue";

@@ -1,13 +1,14 @@
 <template>
-  <button :type="type" :disabled="disabled || loading" :class="buttonClasses" @click="handleClick">
-    <span v-if="loading" class="button-spinner"></span>
-    <Icon v-if="icon && !loading" :name="icon" class="button-icon" />
-    <span v-if="$slots.default" class="button-text"><slot></slot></span>
+  <button :type="type" :disabled="disabled || loading" :class="classes" @click="handleClick">
+    <span v-if="loading" class="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent" />
+    <Icon v-if="icon && !loading" :name="icon" :size="iconSize" />
+    <span v-if="$slots.default"><slot /></span>
   </button>
 </template>
 
 <script setup>
 import { computed } from "vue";
+import { cn } from "@/lib/utils";
 import Icon from "./Icon.vue";
 
 const props = defineProps({
@@ -19,7 +20,7 @@ const props = defineProps({
   },
   size: {
     type: String,
-    default: "md", // sm, md, lg
+    default: "md",
     validator: (value) => ["sm", "md", "lg"].includes(value),
   },
   type: {
@@ -33,19 +34,30 @@ const props = defineProps({
 
 const emit = defineEmits(["click"]);
 
-const buttonClasses = computed(() => {
-  const classes = ["button", `button-${props.variant}`, `button-${props.size}`];
+const variantClasses = {
+  primary: "bg-nav-active text-nav-active-text hover:opacity-90",
+  secondary: "bg-muted text-foreground border border-border hover:bg-nav-hover",
+  danger: "bg-red-500 text-white hover:bg-red-600",
+  success: "bg-accent-green text-white hover:opacity-90",
+  ghost: "bg-transparent text-foreground hover:bg-nav-hover",
+};
 
-  if (props.disabled || props.loading) {
-    classes.push("button-disabled");
-  }
+const sizeClasses = {
+  sm: "px-4 py-2 text-sm gap-1.5",
+  md: "px-5 py-2.5 text-[15px] gap-2",
+  lg: "px-6 py-3 text-base gap-2",
+};
 
-  if (props.fullWidth) {
-    classes.push("button-full");
-  }
+const iconSize = computed(() => ({ sm: 14, md: 16, lg: 18 })[props.size]);
 
-  return classes.join(" ");
-});
+const classes = computed(() =>
+  cn(
+    "inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 whitespace-nowrap cursor-pointer border-none focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed",
+    variantClasses[props.variant],
+    sizeClasses[props.size],
+    props.fullWidth && "w-full",
+  ),
+);
 
 const handleClick = (event) => {
   if (!props.disabled && !props.loading) {
@@ -53,125 +65,3 @@ const handleClick = (event) => {
   }
 };
 </script>
-
-<style scoped>
-.button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-weight: 600;
-  border-radius: 14px;
-  transition: all 0.2s ease;
-  border: none;
-  cursor: pointer;
-  white-space: nowrap;
-  position: relative;
-}
-
-.button:focus {
-  outline: none;
-}
-
-/* Sizes */
-.button-sm {
-  padding: 8px 16px;
-  font-size: 14px;
-  line-height: 20px;
-}
-
-.button-md {
-  padding: 10px 20px;
-  font-size: 15px;
-  line-height: 24px;
-}
-
-.button-lg {
-  padding: 12px 24px;
-  font-size: 16px;
-  line-height: 24px;
-}
-
-/* Variants */
-.button-primary {
-  background-color: var(--nav-active-bg);
-  color: var(--nav-active-text);
-}
-
-.button-primary:hover:not(.button-disabled) {
-  opacity: 0.9;
-}
-
-.button-secondary {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--divider);
-}
-
-.button-secondary:hover:not(.button-disabled) {
-  opacity: 0.7;
-}
-
-.button-danger {
-  background-color: #ff3b30;
-  color: #ffffff;
-}
-
-.button-danger:hover:not(.button-disabled) {
-  opacity: 0.9;
-}
-
-.button-success {
-  background-color: var(--accent-green);
-  color: #ffffff;
-}
-
-.button-success:hover:not(.button-disabled) {
-  opacity: 0.9;
-}
-
-.button-ghost {
-  background-color: transparent;
-  color: var(--text-secondary);
-}
-
-.button-ghost:hover:not(.button-disabled) {
-  opacity: 0.9;
-}
-
-/* States */
-.button-disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.button-full {
-  width: 100%;
-}
-
-/* Spinner */
-.button-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid currentColor;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.button-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-}
-
-.button-text {
-  line-height: 1;
-}
-</style>

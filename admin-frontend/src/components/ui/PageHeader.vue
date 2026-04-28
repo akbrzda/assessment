@@ -1,11 +1,11 @@
 <template>
-  <div class="page-header">
+  <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
     <div>
-      <h1 class="page-title">{{ title }}</h1>
-      <p v-if="subtitle" class="page-subtitle">{{ subtitle }}</p>
+      <h1 class="text-[28px] font-bold text-foreground m-0">{{ title }}</h1>
+      <p v-if="subtitle" class="text-sm text-muted-foreground mt-1 m-0">{{ subtitle }}</p>
     </div>
-    <div class="page-actions">
-      <slot name="actions"></slot>
+    <div class="flex items-center gap-3 flex-wrap">
+      <slot name="actions" />
     </div>
   </div>
 </template>
@@ -22,45 +22,3 @@ defineProps({
   },
 });
 </script>
-
-<style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.page-subtitle {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin: 4px 0 0 0;
-}
-
-.page-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-@media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .page-actions {
-    width: 100%;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-}
-</style>

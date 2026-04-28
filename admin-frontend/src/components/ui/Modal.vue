@@ -1,17 +1,33 @@
 <template>
   <Teleport to="body">
-    <Transition name="modal">
-      <div v-if="isVisible" class="modal-overlay" @click="handleOverlayClick">
-        <div class="modal-dialog" :class="`modal-${size}`" @click.stop>
-          <div v-if="title || closable" class="modal-header">
-            <h2 v-if="title" class="modal-title">{{ title }}</h2>
-            <button v-if="closable" class="modal-close" @click="close">✕</button>
+    <Transition
+      enter-active-class="transition-all duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-all duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="isVisible" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click="handleOverlayClick">
+        <div
+          :class="cn('bg-background rounded-xl shadow-modal max-h-[90vh] overflow-y-auto w-full animate-in fade-in-0 zoom-in-95', sizeClass)"
+          @click.stop
+        >
+          <div v-if="title || closable" class="flex items-center justify-between px-6 py-4 border-b border-border bg-muted">
+            <h2 v-if="title" class="text-xl font-semibold text-foreground m-0">{{ title }}</h2>
+            <button
+              v-if="closable"
+              class="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:bg-nav-hover hover:text-foreground transition-colors duration-200 border-none bg-transparent cursor-pointer text-lg"
+              @click="close"
+            >
+              ✕
+            </button>
           </div>
-          <div class="modal-content">
-            <slot></slot>
+          <div class="p-6">
+            <slot />
           </div>
-          <div v-if="$slots.footer" class="modal-footer">
-            <slot name="footer"></slot>
+          <div v-if="$slots.footer" class="px-6 py-4 border-t border-border bg-muted">
+            <slot name="footer" />
           </div>
         </div>
       </div>
@@ -21,6 +37,7 @@
 
 <script setup>
 import { computed } from "vue";
+import { cn } from "@/lib/utils";
 
 const props = defineProps({
   modelValue: {
@@ -51,6 +68,16 @@ const emit = defineEmits(["close", "update:modelValue"]);
 
 const isVisible = computed(() => (props.modelValue !== undefined ? props.modelValue : props.show));
 
+const sizeClass = computed(
+  () =>
+    ({
+      sm: "max-w-[400px]",
+      md: "max-w-[600px]",
+      lg: "max-w-[800px]",
+      xl: "max-w-[1000px]",
+    })[props.size],
+);
+
 const close = () => {
   emit("update:modelValue", false);
   emit("close");
@@ -62,128 +89,3 @@ const handleOverlayClick = () => {
   }
 };
 </script>
-
-<style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: #00000080;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-dialog {
-  background-color: var(--bg-primary);
-  border-radius: 12px;
-  box-shadow: 0 20px 60px #0000004d;
-  max-height: 90vh;
-  overflow-y: auto;
-  animation: slideUp 0.3s ease;
-}
-
-.modal-sm {
-  width: 90%;
-  max-width: 400px;
-}
-
-.modal-md {
-  width: 90%;
-  max-width: 600px;
-}
-
-.modal-lg {
-  width: 90%;
-  max-width: 800px;
-}
-
-.modal-xl {
-  width: 90%;
-  max-width: 1000px;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--divider);
-  background-color: var(--bg-secondary);
-}
-
-.modal-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.modal-close:hover {
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.modal-content {
-  padding: 24px;
-}
-
-.modal-footer {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  padding: 16px 24px;
-  border-top: 1px solid var(--divider);
-  background-color: var(--bg-secondary);
-}
-
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@media (max-width: 768px) {
-  .modal-sm,
-  .modal-md,
-  .modal-lg,
-  .modal-xl {
-    width: 95%;
-    max-width: none;
-  }
-}
-</style>

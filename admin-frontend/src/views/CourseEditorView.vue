@@ -590,57 +590,82 @@
           <p>Проверьте структуру курса, итоговую аттестацию и готовность к публикации.</p>
         </div>
 
-        <div class="preview-grid">
-          <div class="preview-item">
-            <span class="preview-label">Название</span>
-            <strong>{{ form.title || "—" }}</strong>
-          </div>
-          <div class="preview-item">
-            <span class="preview-label">Статус</span>
-            <strong>{{ getStatusLabel(course.status) }}</strong>
-          </div>
-          <div class="preview-item">
-            <span class="preview-label">Категория</span>
-            <strong>{{ form.category || "—" }}</strong>
-          </div>
-          <div class="preview-item">
-            <span class="preview-label">Теги</span>
-            <strong>{{ form.tagsInput || "—" }}</strong>
-          </div>
-          <div class="preview-item">
-            <span class="preview-label">Тем курса</span>
-            <strong>{{ previewStats.themesCount }}</strong>
-          </div>
-          <div class="preview-item">
-            <span class="preview-label">Подтем</span>
-            <strong>{{ previewStats.subtopicsCount }}</strong>
-          </div>
-          <div class="preview-item">
-            <span class="preview-label">Материалов</span>
-            <strong>{{ previewStats.materialsCount }}</strong>
-          </div>
-          <div class="preview-item">
-            <span class="preview-label">Итоговая аттестация</span>
-            <strong>{{ selectedFinalAssessmentLabel }}</strong>
-          </div>
-        </div>
+        <div class="preview-layout">
+          <div class="preview-content-layout">
+            <aside class="preview-structure-panel">
+              <h3 class="preview-panel-title">Структура курса</h3>
+              <div v-if="previewSections.length === 0" class="preview-empty-state">В курсе пока нет тем и подтем.</div>
+              <div v-else class="preview-structure-list">
+                <div v-for="section in previewSections" :key="section.id" class="preview-structure-section">
+                  <div class="preview-section-title">{{ section.orderIndex }}. {{ section.title }}</div>
+                  <button
+                    v-for="topic in section.topics"
+                    :key="topic.id"
+                    type="button"
+                    class="preview-topic-item"
+                    :class="{ 'preview-topic-item-active': Number(activePreviewTopicId) === Number(topic.id) }"
+                    @click="activePreviewTopicId = topic.id"
+                  >
+                    <span>{{ section.orderIndex }}.{{ topic.orderIndex }} {{ topic.title }}</span>
+                  </button>
+                </div>
+              </div>
+            </aside>
 
-        <div v-if="publicationErrorsForDisplay.length > 0" class="publication-errors">
-          <h3>Что нужно исправить перед публикацией</h3>
-          <ul>
-            <li v-for="(errorText, index) in publicationErrorsForDisplay" :key="`preview-${index}-${errorText}`">
-              {{ errorText }}
-            </li>
-          </ul>
-        </div>
+            <section class="preview-material-panel">
+              <h3 class="preview-material-title">
+                <template v-if="activePreviewTopicWithSection">
+                  {{ activePreviewTopicWithSection.sectionOrderIndex }}.{{ activePreviewTopicWithSection.topic.orderIndex }}
+                  {{ activePreviewTopicWithSection.topic.title }}
+                </template>
+                <template v-else>Материал темы</template>
+              </h3>
 
-        <div v-if="previewWarnings.length > 0" class="publication-warnings">
-          <h3>Предупреждения о влиянии изменений</h3>
-          <ul>
-            <li v-for="(warning, index) in previewWarnings" :key="`preview-warning-${index}`">
-              {{ warning }}
-            </li>
-          </ul>
+              <div v-if="activePreviewTopicContent" class="preview-material-text" v-html="activePreviewTopicContent"></div>
+              <div v-else class="preview-empty-state">Материал для выбранной подтемы пока не добавлен.</div>
+            </section>
+          </div>
+
+          <aside class="preview-sidebar">
+            <section class="preview-side-card">
+              <h3 class="preview-side-title">Публикация курса</h3>
+              <div class="preview-side-row">
+                <span class="preview-side-label">Статус курса</span>
+                <span class="preview-status-chip">{{ getStatusLabel(course.status) }}</span>
+              </div>
+              <div class="preview-info-note">
+                Курс ещё не опубликован. После публикации он станет доступен обучающимся в соответствии с назначениями.
+              </div>
+              <Button :loading="publishing" :disabled="publicationErrorsForDisplay.length > 0" @click="handlePublish">Опубликовать курс</Button>
+            </section>
+
+            <section class="preview-side-card">
+              <h3 class="preview-side-title">Готовность к публикации</h3>
+              <p class="preview-ready-counter">{{ readyChecklistDone }} из {{ readyChecklistTotal }} выполнено</p>
+              <div class="preview-ready-progress">
+                <span :style="{ width: `${readyChecklistPercent}%` }"></span>
+              </div>
+              <ul class="preview-ready-list">
+                <li v-for="item in publicationChecklist" :key="item.id" :class="{ 'preview-ready-item-done': item.done }">
+                  <span class="preview-ready-dot">{{ item.done ? "✓" : "•" }}</span>
+                  <span>{{ item.label }}</span>
+                </li>
+              </ul>
+
+              <div v-if="publicationErrorsForDisplay.length > 0" class="publication-errors">
+                <h3>Что нужно исправить перед публикацией</h3>
+                <ul>
+                  <li v-for="(errorText, index) in publicationErrorsForDisplay" :key="`preview-${index}-${errorText}`">
+                    {{ errorText }}
+                  </li>
+                </ul>
+              </div>
+
+              <div class="preview-info-note">
+                После публикации вы сможете редактировать курс. Изменения будут сразу доступны обучающимся.
+              </div>
+            </section>
+          </aside>
         </div>
       </Card>
 
@@ -730,135 +755,6 @@
         </div>
       </Card>
 
-      <!-- Блок участников с прогрессом -->
-      <Card v-if="currentStep === previewStepId && isEditMode && course" class="participants-card">
-        <div class="participants-header">
-          <h2>Участники</h2>
-          <p>Отчет по прогрессу пользователей внутри курса.</p>
-          <Button size="sm" variant="ghost" icon="refresh-ccw" :loading="loadingParticipants" @click="loadParticipants">Обновить</Button>
-        </div>
-
-        <div v-if="participantsReportSummary" class="participants-summary-grid">
-          <div class="participants-summary-item">
-            <span>Назначено</span>
-            <strong>{{ participantsReportSummary.totalUsers }}</strong>
-          </div>
-          <div class="participants-summary-item">
-            <span>Начали</span>
-            <strong>{{ participantsReportSummary.startedCount }}</strong>
-          </div>
-          <div class="participants-summary-item">
-            <span>Проходят</span>
-            <strong>{{ participantsReportSummary.inProgressCount }}</strong>
-          </div>
-          <div class="participants-summary-item">
-            <span>Завершили</span>
-            <strong>{{ participantsReportSummary.completedCount }}</strong>
-          </div>
-          <div class="participants-summary-item">
-            <span>Попытки тестов тем</span>
-            <strong>{{ participantsReportSummary.sectionTestsAttemptsCount }}</strong>
-          </div>
-          <div class="participants-summary-item">
-            <span>Попытки итоговой</span>
-            <strong>{{ participantsReportSummary.finalAssessmentAttemptsCount }}</strong>
-          </div>
-          <div class="participants-summary-item">
-            <span>Ср. балл курса</span>
-            <strong>{{ participantsReportSummary.avgCourseScore }}%</strong>
-          </div>
-          <div class="participants-summary-item">
-            <span>Ср. балл итоговой</span>
-            <strong>{{ participantsReportSummary.avgFinalScore }}%</strong>
-          </div>
-          <div class="participants-summary-item">
-            <span>Суммарное время</span>
-            <strong>{{ formatDuration(participantsReportSummary.totalTimeSpentSeconds) }}</strong>
-          </div>
-        </div>
-
-        <div v-if="loadingParticipants" class="participants-loading">Загрузка...</div>
-        <div v-else-if="participants.length === 0" class="targets-empty">Участников ещё нет.</div>
-        <table v-else class="assignments-table">
-          <thead>
-            <tr>
-              <th>Пользователь</th>
-              <th>Должность</th>
-              <th>Филиал</th>
-              <th>Статус</th>
-              <th>Прогресс</th>
-              <th>Попытки тем</th>
-              <th>Попытки итоговой</th>
-              <th>Ср. балл курса</th>
-              <th>Ср. балл итоговой</th>
-              <th>Время</th>
-              <th>Начат</th>
-              <th>Завершён</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="p in participants" :key="p.userId">
-              <td>{{ p.name }}</td>
-              <td>{{ p.positionTitle || "—" }}</td>
-              <td>{{ p.branchTitle || "—" }}</td>
-              <td>
-                <span :class="['participant-status', `status-${p.status}`]">{{ getProgressStatusLabel(p.status) }}</span>
-              </td>
-              <td>{{ p.progressPercent }}%</td>
-              <td>{{ p.sectionTestsAttemptsCount || 0 }}</td>
-              <td>{{ p.finalAssessmentAttemptsCount || 0 }}</td>
-              <td>{{ p.avgCourseScore || 0 }}%</td>
-              <td>{{ p.avgFinalScore || 0 }}%</td>
-              <td>{{ formatDuration(p.totalTimeSpentSeconds) }}</td>
-              <td>{{ formatAssignedAt(p.startedAt) }}</td>
-              <td>{{ formatAssignedAt(p.completedAt) }}</td>
-              <td class="participants-actions">
-                <Button size="sm" variant="ghost" icon="eye" :loading="viewingProgressUserId === p.userId" @click="openUserProgress(p.userId)" />
-                <Button
-                  size="sm"
-                  variant="danger"
-                  icon="rotate-ccw"
-                  :loading="resettingProgressUserId === p.userId"
-                  @click="handleResetProgress(p.userId, p.name)"
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <!-- Детальный прогресс одного пользователя -->
-        <div v-if="selectedUserProgress" class="user-progress-detail">
-          <div class="user-progress-header">
-            <h3>Прогресс: {{ selectedUserName }}</h3>
-            <Button
-              size="sm"
-              variant="ghost"
-              icon="x"
-              @click="
-                selectedUserProgress = null;
-                selectedUserName = '';
-              "
-              >Закрыть</Button
-            >
-          </div>
-          <div v-for="section in selectedUserProgress.sections" :key="section.sectionId" class="progress-section">
-            <div class="progress-section-header">
-              <span class="progress-section-title">{{ section.orderIndex }}. {{ section.title }}</span>
-              <span v-if="!section.isRequired" class="section-badge-optional">необязательная</span>
-              <span :class="['participant-status', `status-${section.status}`]">{{ getProgressStatusLabel(section.status) }}</span>
-              <span v-if="section.scorePercent !== null" class="progress-score">{{ section.scorePercent }}%</span>
-            </div>
-            <div v-for="topic in section.topics" :key="topic.topicId" class="progress-topic">
-              <span class="progress-topic-title">{{ topic.orderIndex }}. {{ topic.title }}</span>
-              <span v-if="topic.hasMaterial" class="topic-badge" :class="{ 'badge-done': topic.materialViewed }">материал</span>
-              <span v-if="topic.hasAssessment" class="topic-badge" :class="{ 'badge-done': topic.status === 'completed' }">тест</span>
-              <span :class="['participant-status', `status-${topic.status}`]">{{ getProgressStatusLabel(topic.status) }}</span>
-              <span v-if="topic.scorePercent !== null" class="progress-score">{{ topic.scorePercent }}%</span>
-            </div>
-          </div>
-        </div>
-      </Card>
     </template>
     <Modal v-model="assessmentEditorOpen" size="xl" :title="assessmentEditorTitle">
       <AssessmentForm :assessment-id="assessmentEditorAssessmentId" @submit="handleAssessmentEditorSubmit" @cancel="assessmentEditorOpen = false" />
@@ -946,6 +842,7 @@ const newTopicFormSectionId = ref(null);
 const showNewSectionForm = ref(false);
 const showMaterialStep = ref(false);
 const activeMaterialTopicId = ref(null);
+const activePreviewTopicId = ref(null);
 const materialIframeDraft = ref("");
 const materialEditorPanelRef = ref(null);
 
@@ -1205,8 +1102,80 @@ const previewStats = computed(() => {
   };
 });
 
+const previewSections = computed(() => {
+  return (course.value?.sections || []).map((section) => ({
+    id: section.id,
+    orderIndex: section.orderIndex,
+    title: section.title,
+    topics: (section.topics || []).map((topic) => ({
+      id: topic.id,
+      orderIndex: topic.orderIndex,
+      title: topic.title,
+      hasMaterial: Boolean(topic.hasMaterial),
+      content: topic.content || "",
+    })),
+  }));
+});
+
+const activePreviewTopicWithSection = computed(() => {
+  const sections = previewSections.value;
+  if (!sections.length) return null;
+
+  for (const section of sections) {
+    const selectedTopic = section.topics.find((topic) => Number(topic.id) === Number(activePreviewTopicId.value));
+    if (selectedTopic) {
+      return {
+        sectionId: section.id,
+        sectionOrderIndex: section.orderIndex,
+        topic: selectedTopic,
+      };
+    }
+  }
+
+  const firstSectionWithTopic = sections.find((section) => section.topics.length > 0);
+  if (!firstSectionWithTopic) return null;
+
+  return {
+    sectionId: firstSectionWithTopic.id,
+    sectionOrderIndex: firstSectionWithTopic.orderIndex,
+    topic: firstSectionWithTopic.topics[0],
+  };
+});
+
+const activePreviewTopicContent = computed(() => {
+  return activePreviewTopicWithSection.value?.topic?.content || "";
+});
+
+const publicationChecklist = computed(() => {
+  const hasCourseTitle = Boolean(form.value.title?.trim());
+  const hasSections = previewStats.value.themesCount > 0;
+  const hasMaterials = previewStats.value.materialsCount > 0;
+  const hasSectionTests = previewStats.value.sectionTestsCount > 0;
+  const hasFinalAssessment = Boolean(form.value.finalAssessmentId);
+  const hasNoErrors = publicationErrorsForDisplay.value.length === 0;
+  const hasPreviewTopic = Boolean(activePreviewTopicWithSection.value);
+
+  return [
+    { id: "base", label: "Основная информация заполнена", done: hasCourseTitle },
+    { id: "structure", label: "Структура курса создана", done: hasSections },
+    { id: "materials", label: "Материалы добавлены", done: hasMaterials },
+    { id: "tests", label: "Тесты созданы для всех тем", done: hasSectionTests },
+    { id: "final", label: "Аттестация настроена", done: hasFinalAssessment },
+    { id: "requirements", label: "Минимальные требования выполнены", done: hasNoErrors },
+    { id: "preview", label: "Предпросмотр пройден", done: hasPreviewTopic },
+  ];
+});
+
+const readyChecklistDone = computed(() => publicationChecklist.value.filter((item) => item.done).length);
+const readyChecklistTotal = computed(() => publicationChecklist.value.length);
+const readyChecklistPercent = computed(() => {
+  if (readyChecklistTotal.value === 0) return 0;
+  return Math.round((readyChecklistDone.value / readyChecklistTotal.value) * 100);
+});
+
 const getStatusLabel = (status) => {
   const labels = {
+    draft: "Черновик",
     published: "Опубликован",
     archived: "Закрыт",
   };
@@ -1344,6 +1313,10 @@ const syncSectionForms = (sections = []) => {
   );
   if (!materialTopicIds.includes(Number(activeMaterialTopicId.value))) {
     activeMaterialTopicId.value = materialTopicIds[0] || null;
+  }
+  const allTopicIds = sections.flatMap((section) => (section.topics || []).map((topic) => Number(topic.id)));
+  if (!allTopicIds.includes(Number(activePreviewTopicId.value))) {
+    activePreviewTopicId.value = allTopicIds[0] || null;
   }
 };
 
@@ -1571,7 +1544,8 @@ const handleCoverUpload = async (overrideCourseId = null, silent = false) => {
   }
 };
 
-const saveCourse = async () => {
+const saveCourse = async (options = {}) => {
+  const silentSuccess = Boolean(options?.silentSuccess);
   if (!validateCourse()) {
     return false;
   }
@@ -1619,15 +1593,13 @@ const saveCourse = async () => {
         return false;
       }
     }
-
-    showToast(isEdit ? "Курс обновлен" : "Курс создан", "success");
+    if (!silentSuccess) {
+      showToast(isEdit ? "\u041a\u0443\u0440\u0441 \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d" : "\u041a\u0443\u0440\u0441 \u0441\u043e\u0437\u0434\u0430\u043d", "success");
+    }
 
     // Не показываем полный прелоадер при редактировании: это выглядит как перезагрузка страницы.
     if (isEdit) {
       await loadPreview();
-      if (currentStep.value === previewStepId.value) {
-        await loadParticipants();
-      }
     } else {
       await loadCourse();
     }
@@ -1643,18 +1615,14 @@ const saveCourse = async () => {
 
 const goToStep = async (stepId) => {
   if (stepId === currentStep.value) return;
-  if (currentStep.value === testsStepId.value && sectionTestsStepRef.value?.savePendingChanges) {
-    const saved = await sectionTestsStepRef.value.savePendingChanges();
+
+  if (stepId > currentStep.value) {
+    const saved = await saveCurrentStepBeforeForwardNavigation();
     if (!saved) {
       return;
     }
   }
-  if (currentStep.value === finalAssessmentStepId.value && finalAssessmentStepRef.value?.savePendingChanges) {
-    const saved = await finalAssessmentStepRef.value.savePendingChanges();
-    if (!saved) {
-      return;
-    }
-  }
+
   if (showMaterialStep.value && currentStep.value === 3 && stepId !== 3) {
     showMaterialStep.value = false;
     currentStep.value = stepId > 3 ? stepId - 1 : stepId;
@@ -1679,21 +1647,27 @@ const goToNextStep = async () => {
     currentStep.value = 3;
     return;
   }
-  if (currentStep.value === testsStepId.value && sectionTestsStepRef.value?.savePendingChanges) {
-    const saved = await sectionTestsStepRef.value.savePendingChanges();
-    if (!saved) {
-      return;
-    }
+
+  const saved = await saveCurrentStepBeforeForwardNavigation();
+  if (!saved) {
+    return;
   }
-  if (currentStep.value === finalAssessmentStepId.value && finalAssessmentStepRef.value?.savePendingChanges) {
-    const saved = await finalAssessmentStepRef.value.savePendingChanges();
-    if (!saved) {
-      return;
-    }
-  }
+
   if (currentStep.value < wizardSteps.value.length) {
     currentStep.value += 1;
   }
+};
+
+const saveCurrentStepBeforeForwardNavigation = async () => {
+  if (currentStep.value === testsStepId.value && sectionTestsStepRef.value?.savePendingChanges) {
+    return await sectionTestsStepRef.value.savePendingChanges();
+  }
+
+  if (currentStep.value === finalAssessmentStepId.value && finalAssessmentStepRef.value?.savePendingChanges) {
+    return await finalAssessmentStepRef.value.savePendingChanges();
+  }
+
+  return await saveCourse({ silentSuccess: true });
 };
 
 const openAssessmentEditor = (target, assessmentId = null) => {
@@ -2260,9 +2234,6 @@ watch(
   async (step) => {
     if (step === previewStepId.value) {
       await loadPreview();
-      if (isEditMode.value) {
-        await loadParticipants();
-      }
     }
   },
 );
@@ -2279,9 +2250,6 @@ onMounted(async () => {
   loading.value = true;
   await Promise.all([loadAssessments(), loadPositions(), loadBranches(), loadCourse()]);
   loading.value = false;
-  if (isEditMode.value) {
-    await loadParticipants();
-  }
 });
 </script>
 
@@ -2877,19 +2845,215 @@ onMounted(async () => {
   font-size: 13px;
 }
 
-.preview-grid {
+.preview-content-layout {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.preview-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+}
+
+.preview-sidebar {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
-.preview-item {
+.preview-side-card {
   border: 1px solid var(--divider);
   border-radius: 12px;
-  padding: 12px;
+  background: #ffffff;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
+}
+
+.preview-side-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.preview-side-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.preview-side-label {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.preview-status-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff3e6;
+  color: #d97706;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.preview-info-note {
+  border: 1px solid #e0dcff;
+  border-radius: 10px;
+  background: #f8f7ff;
+  color: #555f7a;
+  font-size: 14px;
+  line-height: 22px;
+  padding: 12px;
+}
+
+.preview-ready-counter {
+  margin: 0;
+  color: #6c7895;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.preview-ready-progress {
+  width: 100%;
+  height: 6px;
+  background: #e8edf6;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.preview-ready-progress > span {
+  display: block;
+  height: 100%;
+  background: #22c55e;
+}
+
+.preview-ready-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-ready-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6c7895;
+  font-size: 14px;
+}
+
+.preview-ready-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef2f7;
+  color: #9aa6c0;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.preview-ready-item-done .preview-ready-dot {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.preview-ready-item-done span:last-child {
+  color: #2f3b59;
+}
+
+.preview-structure-panel,
+.preview-material-panel {
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.preview-panel-title,
+.preview-material-title {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.preview-structure-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preview-structure-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.preview-topic-item {
+  width: 100%;
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  background: #ffffff;
+  text-align: left;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text-primary);
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.preview-topic-item-active {
+  border-color: #cfc7ff;
+  background: #f7f5ff;
+  color: #4c38d2;
+}
+
+.preview-material-text {
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.preview-material-text :deep(h1),
+.preview-material-text :deep(h2),
+.preview-material-text :deep(h3) {
+  margin: 0 0 12px;
+}
+
+.preview-material-text :deep(p) {
+  margin: 0 0 12px;
+}
+
+.preview-material-text :deep(ul),
+.preview-material-text :deep(ol) {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+
+.preview-empty-state {
+  border: 1px dashed var(--divider);
+  border-radius: 10px;
+  background: #fafbff;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+  padding: 16px;
 }
 
 .wizard-actions {
@@ -4810,6 +4974,14 @@ onMounted(async () => {
   }
 
   .structure-topic-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-content-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-layout {
     grid-template-columns: 1fr;
   }
 

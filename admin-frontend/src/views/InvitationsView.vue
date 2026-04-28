@@ -24,7 +24,7 @@
 
     <!-- Content -->
     <Card padding="none" class="invitations-card">
-      <Preloader v-if="loading" />
+      <SkeletonTable v-if="loading" :rows="6" />
 
       <div v-else-if="paginatedInvitations.length === 0" class="empty-state">
         <p>Приглашения не найдены. Создайте первое приглашение, чтобы подключить управляющего.</p>
@@ -178,6 +178,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { listInvitations, createInvitation, updateInvitation, deleteInvitation } from "../api/invitations";
 import { getReferences } from "../api/users";
 import Preloader from "../components/ui/Preloader.vue";
+import SkeletonTable from "../components/ui/SkeletonTable.vue";
 import Modal from "../components/ui/Modal.vue";
 import Card from "../components/ui/Card.vue";
 import Button from "../components/ui/Button.vue";

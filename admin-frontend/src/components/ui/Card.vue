@@ -1,26 +1,35 @@
 <template>
-  <div class="card" :class="{ 'card-hoverable': hoverable }">
-    <div v-if="title || $slots.header" class="card-header">
+  <div
+    :class="
+      cn(
+        'bg-background rounded-lg border border-border overflow-hidden transition-all duration-200',
+        hoverable && 'cursor-pointer hover:border-accent-blue hover:shadow',
+      )
+    "
+  >
+    <div v-if="title || $slots.header" class="px-4 py-3 border-b border-border bg-muted">
       <slot name="header">
-        <div class="card-header-content">
-          <Icon v-if="icon" :name="icon" class="card-header-icon" />
-          <h3 class="card-title">{{ title }}</h3>
+        <div class="flex items-center gap-3">
+          <Icon v-if="icon" :name="icon" :size="20" class="shrink-0 text-foreground" />
+          <h3 class="text-base font-semibold text-foreground m-0 leading-normal">{{ title }}</h3>
         </div>
       </slot>
     </div>
-    <div class="card-content" :class="`card-padding-${padding}`">
-      <slot></slot>
+    <div :class="paddingClass">
+      <slot />
     </div>
-    <div v-if="$slots.footer" class="card-footer">
-      <slot name="footer"></slot>
+    <div v-if="$slots.footer" class="px-4 py-3 border-t border-border bg-muted">
+      <slot name="footer" />
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from "vue";
+import { cn } from "@/lib/utils";
 import Icon from "./Icon.vue";
 
-defineProps({
+const props = defineProps({
   title: String,
   icon: String,
   padding: {
@@ -31,75 +40,7 @@ defineProps({
   hoverable: Boolean,
   noPadding: Boolean,
 });
+
+const paddingMap = { none: "p-0", sm: "p-4", md: "p-5", lg: "p-6" };
+const paddingClass = computed(() => (props.noPadding ? "p-0" : paddingMap[props.padding]));
 </script>
-
-<style scoped>
-.card {
-  background-color: var(--bg-primary);
-  border-radius: 12px;
-  border: 1px solid var(--border-color);
-  overflow: hidden;
-  transition: all 0.2s ease;
-}
-
-.card-hoverable {
-  cursor: pointer;
-}
-
-.card-hoverable:hover {
-  border-color: var(--accent-blue);
-}
-
-.card-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
-  background-color: var(--bg-secondary);
-}
-
-.card-header-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.card-header-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  color: var(--text-primary);
-}
-
-.card-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.5;
-}
-
-.card-content {
-  padding: 24px;
-}
-
-.card-padding-none {
-  padding: 0;
-}
-
-.card-padding-sm {
-  padding: 12px;
-}
-
-.card-padding-md {
-  padding: 24px;
-}
-
-.card-padding-lg {
-  padding: 32px;
-}
-
-.card-footer {
-  padding: 16px 24px;
-  border-top: 1px solid var(--border-color);
-  background-color: var(--bg-secondary);
-}
-</style>

@@ -10,27 +10,13 @@
     </div>
 
     <!-- Фильтры -->
-    <div class="filters-bar">
-      <div class="filters-search-wrap">
-        <Icon name="search" :size="16" class="search-icon" />
-        <input v-model="filters.search" placeholder="Поиск по названию или описанию" class="search-input" @keyup.enter="loadCourses" />
-      </div>
-      <div class="filter-sep"></div>
-      <select v-model="filters.status" class="filter-select" @change="loadCourses">
-        <option value="">Все статусы</option>
-        <option v-for="opt in statusFilterOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-      </select>
-      <div class="filter-sep"></div>
-      <select v-model="filters.author" class="filter-select">
-        <option value="">Все авторы</option>
-      </select>
-      <div style="flex: 1; min-width: 8px"></div>
-      <Button @click="loadCourses">Найти</Button>
-      <button class="filter-reset-btn" @click="resetFilters">
-        <Icon name="rotate-ccw" :size="15" />
-        Сбросить
-      </button>
-    </div>
+    <FilterBar
+      v-model="filterBarModel"
+      search-key="search"
+      search-placeholder="Поиск по названию или описанию"
+      :filter-defs="courseFilterDefs"
+      @change="loadCourses"
+    />
 
     <!-- Переключатель вида -->
     <div class="view-tabs">
@@ -45,7 +31,7 @@
     </div>
 
     <!-- Загрузка -->
-    <Preloader v-if="loading" />
+    <SkeletonCards v-if="loading" :count="6" :cols="3" />
 
     <!-- Пустое состояние -->
     <div v-else-if="courses.length === 0" class="empty-state">
@@ -71,6 +57,7 @@
           <Badge :variant="getStatusVariant(course.status)" size="sm" class="status-badge">
             {{ getStatusLabel(course.status) }}
           </Badge>
+          <div v-if="hasUnpublishedChanges(course)" class="draft-warning-chip">Есть несохраненные изменения</div>
 
           <!-- Статистика -->
           <div class="course-stats">
@@ -150,9 +137,12 @@
                   <div class="cell-desc">{{ course.description || "Без описания" }}</div>
                 </td>
                 <td>
-                  <Badge :variant="getStatusVariant(course.status)" size="sm">
-                    {{ getStatusLabel(course.status) }}
-                  </Badge>
+                  <div class="status-cell-wrap">
+                    <Badge :variant="getStatusVariant(course.status)" size="sm">
+                      {{ getStatusLabel(course.status) }}
+                    </Badge>
+                    <div v-if="hasUnpublishedChanges(course)" class="draft-warning-chip draft-warning-chip-table">Есть несохраненные изменения</div>
+                  </div>
                 </td>
                 <td>{{ course.sectionsCount }}</td>
                 <td>{{ course.version }}</td>
@@ -228,11 +218,7 @@
               <Icon name="chevron-right" :size="16" />
             </button>
           </div>
-          <select v-model.number="pageSize" class="page-size-select" @change="currentPage = 1">
-            <option :value="10">10 на странице</option>
-            <option :value="25">25 на странице</option>
-            <option :value="50">50 на странице</option>
-          </select>
+          <Select v-model="pageSize" :options="pageSizeOptions" size="sm" @update:model-value="currentPage = 1" />
         </div>
       </div>
     </template>
@@ -253,9 +239,7 @@
           <h2 class="section-title">Воронка по курсам</h2>
           <p class="section-desc">Назначения, прогресс и суммарное время прохождения по каждому курсу.</p>
         </div>
-        <select class="period-select">
-          <option>Последние 30 дней</option>
-        </select>
+        <Select v-model="funnelPeriod" :options="[{ value: '30days', label: 'Последние 30 дней' }]" size="sm" />
       </div>
 
       <!-- Столбчатая диаграмма воронки -->
@@ -314,7 +298,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { Badge, Button, Icon, Preloader } from "../components/ui";
+import { Badge, Button, Icon, Preloader, SkeletonCards, FilterBar, Select } from "../components/ui";
 import AnalyticsSummaryCards from "../components/courses/AnalyticsSummaryCards.vue";
 import { archiveCourse, deleteCourse, getCourses, getCourseAnalyticsFunnel } from "../api/courses";
 import { useToast } from "../composables/useToast";
@@ -329,6 +313,7 @@ const viewMode = ref("cards");
 const openMenuId = ref(null);
 const currentPage = ref(1);
 const pageSize = ref(10);
+const funnelPeriod = ref("30days");
 
 const filters = ref({
   search: "",
@@ -336,11 +321,42 @@ const filters = ref({
   author: "",
 });
 
+// Модель для FilterBar (синхронизируется с filters)
+const filterBarModel = computed({
+  get: () => filters.value,
+  set: (val) => {
+    filters.value = val;
+  },
+});
+
+const pageSizeOptions = [
+  { value: 10, label: "10 на странице" },
+  { value: 25, label: "25 на странице" },
+  { value: 50, label: "50 на странице" },
+];
+
 const statusFilterOptions = [
   { value: "published", label: "Опубликован" },
   { value: "draft", label: "Черновик" },
   { value: "archived", label: "Закрыт" },
 ];
+
+const courseFilterDefs = computed(() => [
+  {
+    key: "status",
+    label: "Все статусы",
+    type: "select",
+    placeholder: "Все статусы",
+    options: statusFilterOptions,
+  },
+  {
+    key: "author",
+    label: "Все авторы",
+    type: "select",
+    placeholder: "Все авторы",
+    options: [],
+  },
+]);
 
 const getStatusLabel = (status) => {
   const labels = {
@@ -349,6 +365,17 @@ const getStatusLabel = (status) => {
     archived: "Закрыт",
   };
   return labels[status] || status;
+};
+
+const hasUnpublishedChanges = (course) => {
+  if (!course || course.status !== "published") return false;
+
+  const publishedAtTs = Date.parse(course.publishedAt || "");
+  const updatedAtTs = Date.parse(course.updatedAt || "");
+
+  if (!Number.isFinite(publishedAtTs) || !Number.isFinite(updatedAtTs)) return false;
+
+  return updatedAtTs > publishedAtTs;
 };
 
 const getStatusVariant = (status) => {
@@ -754,6 +781,31 @@ const getAuthorInitials = (name) => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.status-cell-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.draft-warning-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid #f7d7a8;
+  background: #fff8ec;
+  color: #8b5a14;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 6px 10px;
+  margin-top: 8px;
+}
+
+.draft-warning-chip-table {
+  margin-top: 0;
 }
 
 .status-badge {

@@ -54,7 +54,7 @@
         <Button size="sm" :loading="actionLoading" @click="runBulkAction">Применить</Button>
       </div>
 
-      <Preloader v-if="loading" />
+      <SkeletonTable v-if="loading" :rows="8" />
 
       <div v-else-if="users.length === 0" class="empty-state">
         <p>Пользователи не найдены</p>
@@ -288,7 +288,7 @@
 
     <!-- Profile modal -->
     <Modal :show="showProfileModal" :title="`Профиль: ${selectedUser?.first_name} ${selectedUser?.last_name}`" @close="closeModals" size="lg">
-      <Preloader v-if="profileLoading" />
+      <SkeletonTable v-if="profileLoading" :rows="4" />
 
       <div v-else-if="userProfile" class="user-profile">
         <!-- Основная информация -->
@@ -510,6 +510,7 @@ import Select from "../components/ui/Select.vue";
 import Badge from "../components/ui/Badge.vue";
 import Modal from "../components/ui/Modal.vue";
 import Preloader from "../components/ui/Preloader.vue";
+import SkeletonTable from "../components/ui/SkeletonTable.vue";
 import UserForm from "../components/UserForm.vue";
 import UserPermissionsManager from "../components/UserPermissionsManager.vue";
 import Icon from "../components/ui/Icon.vue";

@@ -2,7 +2,11 @@ const { pool } = require("../../../config/database");
 
 async function listAssessments({ status, branch, search, userRole, userId, page = 1, limit = 20 }) {
   const params = [];
-  const conditions = [];
+  const conditions = [
+    `NOT EXISTS (SELECT 1 FROM course_sections cs WHERE cs.assessment_id = a.id)`,
+    `NOT EXISTS (SELECT 1 FROM course_topics ct WHERE ct.assessment_id = a.id)`,
+    `NOT EXISTS (SELECT 1 FROM courses c WHERE c.final_assessment_id = a.id)`,
+  ];
 
   const statusExpression = `
     CASE

@@ -26,7 +26,7 @@
 
     <!-- Контент -->
     <Card padding="none" class="branches-card">
-      <Preloader v-if="loading" />
+      <SkeletonTable v-if="loading" :rows="5" />
 
       <div v-else-if="branches.length === 0" class="empty-state">
         <p>Филиалы не найдены</p>
@@ -178,6 +178,7 @@
 import { ref, onMounted } from "vue";
 import { getBranches, deleteBranch } from "../api/branches";
 import Preloader from "../components/ui/Preloader.vue";
+import SkeletonTable from "../components/ui/SkeletonTable.vue";
 import Modal from "../components/ui/Modal.vue";
 import Card from "../components/ui/Card.vue";
 import Button from "../components/ui/Button.vue";

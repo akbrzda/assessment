@@ -35,7 +35,7 @@
     </Card>
 
     <!-- Список вопросов -->
-    <Preloader v-if="loading" />
+    <SkeletonTable v-if="loading" :rows="8" />
     <Card v-else padding="none" class="questions-card">
       <div v-if="questions.length === 0" class="empty-state">Вопросы не найдены</div>
 
@@ -146,6 +146,7 @@ import { ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import { getQuestions, getCategories, deleteQuestion } from "../api/questionBank";
 import Preloader from "../components/ui/Preloader.vue";
+import SkeletonTable from "../components/ui/SkeletonTable.vue";
 import Modal from "../components/ui/Modal.vue";
 import Card from "../components/ui/Card.vue";
 import Button from "../components/ui/Button.vue";

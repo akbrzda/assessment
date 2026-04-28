@@ -120,7 +120,11 @@
             <span>Вопросы берутся из тестов тем курса. Убедитесь, что тесты созданы и опубликованы.</span>
           </div>
 
-          <button class="final-preview-button" type="button" @click="previewQuestions">Предпросмотр вопросов</button>
+          <button class="final-preview-button" type="button" @click="previewQuestions">{{ CALC_BUTTON_TEXT }}</button>
+          <div v-if="questionsCalculation" class="final-calculation-result">
+            <p>{{ CALC_SECTIONS_TEXT }}: {{ questionsCalculation.sectionsCount }}</p>
+            <p>{{ CALC_QUESTIONS_TEXT }}: {{ questionsCalculation.questionsCount }}</p>
+          </div>
         </aside>
       </div>
     </section>
@@ -199,8 +203,14 @@ const emit = defineEmits(["course-updated", "assessment-saved"]);
 
 const { showToast } = useToast();
 
+const CALC_BUTTON_TEXT = "\u0420\u0430\u0441\u0441\u0447\u0438\u0442\u0430\u0442\u044c \u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e \u0432\u043e\u043f\u0440\u043e\u0441\u043e\u0432";
+const CALC_SECTIONS_TEXT = "\u0422\u0435\u043c \u0432 \u0440\u0430\u0441\u0447\u0435\u0442\u0435";
+const CALC_QUESTIONS_TEXT = "\u0412\u043e\u043f\u0440\u043e\u0441\u043e\u0432 \u0432 \u0440\u0430\u0441\u0447\u0435\u0442\u0435";
+const CALC_ALERT_TEXT = "\u0420\u0430\u0441\u0441\u0447\u0438\u0442\u0430\u043d\u043e \u0432\u043e\u043f\u0440\u043e\u0441\u043e\u0432";
+
 const sourceQuestionsBySectionId = ref({});
 const saving = ref(false);
+const questionsCalculation = ref(null);
 
 const draft = reactive({
   assessmentId: null,
@@ -465,7 +475,11 @@ const savePendingChanges = async () => {
 
 const previewQuestions = async () => {
   const questions = await buildQuestions();
-  showToast(`В предпросмотр попадет ${questions.length} вопросов`, "info");
+  questionsCalculation.value = {
+    sectionsCount: includedSections.value.length,
+    questionsCount: questions.length,
+  };
+  window.alert(`${CALC_ALERT_TEXT}: ${questions.length}`);
 };
 
 defineExpose({
@@ -776,6 +790,21 @@ defineExpose({
   color: #4d6cff;
   font-size: 12px;
   line-height: 18px;
+}
+
+.final-calculation-result {
+  margin-top: 10px;
+  color: #66708f;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.final-calculation-result p {
+  margin: 0;
+}
+
+.final-calculation-result p + p {
+  margin-top: 4px;
 }
 
 .final-preview-button {

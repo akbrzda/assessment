@@ -1,10 +1,12 @@
 <template>
-  <span class="badge" :class="['badge-' + variant, 'badge-' + size]">
-    <slot></slot>
+  <span :class="cn(badgeBase, variantClasses[variant], sizeClasses[size])">
+    <slot />
   </span>
 </template>
 
 <script setup>
+import { cn } from "@/lib/utils";
+
 defineProps({
   variant: {
     type: String,
@@ -17,68 +19,22 @@ defineProps({
     validator: (value) => ["sm", "md", "lg"].includes(value),
   },
 });
+
+const badgeBase = "inline-flex items-center justify-center rounded-full font-medium whitespace-nowrap";
+
+const variantClasses = {
+  default: "bg-muted text-foreground",
+  secondary: "bg-muted text-muted-foreground border border-border",
+  primary: "bg-accent-blue text-white",
+  success: "bg-accent-green text-white",
+  warning: "bg-accent-orange text-white",
+  danger: "bg-red-500 text-white",
+  info: "bg-accent-purple text-white",
+};
+
+const sizeClasses = {
+  sm: "px-2.5 py-1 text-xs",
+  md: "px-3.5 py-1.5 text-sm",
+  lg: "px-4 py-2 text-[15px]",
+};
 </script>
-
-<style scoped>
-.badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-/* Sizes */
-.badge-sm {
-  padding: 0.25rem 0.625rem;
-  font-size: 0.75rem;
-}
-
-.badge-md {
-  padding: 0.375rem 0.875rem;
-  font-size: 0.875rem;
-}
-
-.badge-lg {
-  padding: 0.5rem 1rem;
-  font-size: 0.9375rem;
-}
-
-/* Variants */
-.badge-default {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.badge-secondary {
-  background-color: var(--bg-secondary);
-  color: var(--text-secondary);
-  border: 1px solid var(--divider);
-}
-
-.badge-primary {
-  background-color: var(--accent-blue);
-  color: #ffffff;
-}
-
-.badge-success {
-  background-color: var(--accent-green);
-  color: #ffffff;
-}
-
-.badge-warning {
-  background-color: var(--accent-orange);
-  color: #ffffff;
-}
-
-.badge-danger {
-  background-color: #ef4444;
-  color: #ffffff;
-}
-
-.badge-info {
-  background-color: var(--accent-purple);
-  color: #ffffff;
-}
-</style>
