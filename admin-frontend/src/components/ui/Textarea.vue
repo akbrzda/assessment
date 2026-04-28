@@ -1,8 +1,8 @@
 <template>
-  <div class="flex flex-col gap-2">
-    <label v-if="label" class="flex items-center gap-1 text-[15px] font-medium text-foreground">
+  <div class="flex flex-col gap-1.5">
+    <label v-if="label" class="text-sm font-medium text-foreground leading-none">
       {{ label }}
-      <span v-if="required" class="text-red-500">*</span>
+      <span v-if="required" class="text-destructive ml-0.5">*</span>
     </label>
     <textarea
       :value="modelValue"
@@ -13,29 +13,26 @@
       :rows="rows"
       :class="
         cn(
-          'min-h-24 w-full border border-border rounded-xl bg-background text-foreground resize-vertical transition-all duration-200',
-          'placeholder:text-muted-foreground focus:outline-none focus:border-accent-blue focus:ring-2 focus:ring-accent-blue/10',
-          'disabled:opacity-50 disabled:cursor-not-allowed',
-          error && 'border-red-500 focus:border-red-500 focus:ring-red-500/10',
-          sizeClass,
+          'flex min-h-20 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm',
+          'placeholder:text-muted-foreground',
+          'focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition resize-vertical',
+          'disabled:cursor-not-allowed disabled:opacity-50',
+          'read-only:bg-muted read-only:cursor-default',
+          error && 'border-destructive focus:ring-destructive/30',
         )
       "
       @input="$emit('update:modelValue', $event.target.value)"
     ></textarea>
-    <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
-    <p v-else-if="hint" class="text-sm text-muted-foreground">{{ hint }}</p>
+    <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
+    <p v-else-if="hint" class="text-xs text-muted-foreground">{{ hint }}</p>
   </div>
 </template>
 
 <script setup>
-import { computed } from "vue";
 import { cn } from "@/lib/utils";
 
 const props = defineProps({
-  modelValue: {
-    type: String,
-    default: "",
-  },
+  modelValue: { type: String, default: "" },
   label: String,
   placeholder: String,
   error: String,
@@ -43,18 +40,8 @@ const props = defineProps({
   disabled: Boolean,
   readonly: Boolean,
   required: Boolean,
-  rows: {
-    type: Number,
-    default: 3,
-  },
-  size: {
-    type: String,
-    default: "md",
-    validator: (value) => ["sm", "md", "lg"].includes(value),
-  },
+  rows: { type: Number, default: 3 },
 });
 
 defineEmits(["update:modelValue"]);
-
-const sizeClass = computed(() => ({ sm: "py-2 px-3 text-sm", md: "py-2.5 px-4 text-[15px]", lg: "py-3 px-5 text-base" })[props.size]);
 </script>

@@ -1,41 +1,118 @@
 <template>
-  <div class="flex flex-col gap-2">
-    <label v-if="label" :for="selectId" class="flex items-center gap-1 text-[15px] font-medium text-foreground">
+  <div class="flex flex-col gap-1.5">
+    <label v-if="label" :for="selectId" class="text-sm font-medium text-foreground leading-none">
       {{ label }}
-      <span v-if="required" class="text-red-500">*</span>
+      <span v-if="required" class="text-destructive ml-0.5">*</span>
     </label>
-    <div class="relative">
-      <select
+
+    <SelectRoot :model-value="normalizedModelValue" :disabled="disabled" @update:model-value="handleModelUpdate">
+      <SelectTrigger
         :id="selectId"
-        :name="selectName"
-        :value="modelValue"
-        :disabled="disabled"
-        :required="required"
         :class="
           cn(
-            'w-full border border-border rounded-xl bg-background text-foreground appearance-none pr-10 cursor-pointer transition-all duration-200',
-            'focus:outline-none focus:border-accent-blue focus:ring-2 focus:ring-accent-blue/10',
-            'hover:border-accent-blue disabled:opacity-50 disabled:cursor-not-allowed',
-            error && 'border-red-500 focus:border-red-500',
+            'flex w-full items-center justify-between gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm ring-offset-background',
+            'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0 focus:border-transparent',
+            'hover:border-ring transition',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            '[&>span]:truncate',
+            error && 'border-destructive focus:ring-destructive/30',
             sizeClass,
           )
         "
-        @change="$emit('update:modelValue', $event.target.value)"
       >
-        <option v-if="placeholder && !modelValue" value="" disabled selected>{{ placeholder }}</option>
-        <option v-for="option in options" :key="option.value" :value="option.value" :disabled="option.disabled">
-          {{ option.label }}
-        </option>
-      </select>
-      <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted-foreground text-xs">▼</div>
-    </div>
-    <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
+        <SelectValue :placeholder="placeholder || 'Выберите...'" />
+        <ChevronDownIcon :size="14" class="shrink-0 text-muted-foreground opacity-70" />
+      </SelectTrigger>
+
+      <SelectContent
+        :class="
+          cn(
+            'relative z-50 min-w-[8rem] overflow-hidden rounded-xl border border-border bg-card text-foreground shadow-md',
+            'data-[state=open]:animate-in data-[state=closed]:animate-out',
+            'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+            'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+            'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
+          )
+        "
+        position="popper"
+        :side-offset="4"
+      >
+        <SelectViewport class="p-1">
+          <template v-if="groups.length">
+            <SelectGroup v-for="(group, gi) in groups" :key="gi">
+              <SelectLabel v-if="group.label" class="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                {{ group.label }}
+              </SelectLabel>
+              <SelectItem
+                v-for="opt in group.options"
+                :key="opt.value"
+                :value="normalizeOptionValue(opt.value)"
+                :disabled="opt.disabled"
+                :class="
+                  cn(
+                    'relative flex w-full cursor-pointer select-none items-center rounded-lg py-1.5 pl-3 pr-8 text-sm outline-none',
+                    'focus:bg-accent focus:text-accent-foreground',
+                    'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+                    'data-[state=checked]:font-medium',
+                  )
+                "
+              >
+                <SelectItemText>{{ opt.label }}</SelectItemText>
+                <SelectItemIndicator class="absolute right-2 flex items-center justify-center">
+                  <CheckIcon :size="14" />
+                </SelectItemIndicator>
+              </SelectItem>
+            </SelectGroup>
+          </template>
+
+          <template v-else>
+            <SelectItem
+              v-for="opt in options"
+              :key="opt.value"
+              :value="normalizeOptionValue(opt.value)"
+              :disabled="opt.disabled"
+              :class="
+                cn(
+                  'relative flex w-full cursor-pointer select-none items-center rounded-lg py-1.5 pl-3 pr-8 text-sm outline-none',
+                  'focus:bg-accent focus:text-accent-foreground',
+                  'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+                  'data-[state=checked]:font-medium',
+                )
+              "
+            >
+              <SelectItemText>{{ opt.label }}</SelectItemText>
+              <SelectItemIndicator class="absolute right-2 flex items-center justify-center">
+                <CheckIcon :size="14" />
+              </SelectItemIndicator>
+            </SelectItem>
+          </template>
+        </SelectViewport>
+      </SelectContent>
+    </SelectRoot>
+
+    <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
+    <p v-else-if="hint" class="text-xs text-muted-foreground">{{ hint }}</p>
   </div>
 </template>
 
 <script setup>
 import { computed, useId } from "vue";
+import {
+  SelectRoot,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectViewport,
+  SelectItem,
+  SelectItemText,
+  SelectItemIndicator,
+  SelectGroup,
+  SelectLabel,
+} from "reka-ui";
+import { ChevronDown as ChevronDownIcon, Check as CheckIcon } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
+
+const EMPTY_SELECT_VALUE = "__empty_select_value__";
 
 const props = defineProps({
   modelValue: {
@@ -47,7 +124,12 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  groups: {
+    type: Array,
+    default: () => [],
+  },
   placeholder: String,
+  hint: String,
   error: String,
   disabled: Boolean,
   required: Boolean,
@@ -56,14 +138,27 @@ const props = defineProps({
   size: {
     type: String,
     default: "md",
-    validator: (value) => ["sm", "md", "lg"].includes(value),
+    validator: (v) => ["sm", "md", "lg"].includes(v),
   },
 });
 
 const localId = typeof useId === "function" ? useId() : `select-${Math.random().toString(36).slice(2, 9)}`;
 const selectId = computed(() => props.id || localId);
-const selectName = computed(() => props.name || selectId.value);
-const sizeClass = computed(() => ({ sm: "py-2 px-3 text-sm", md: "py-2.5 px-4 text-[15px]", lg: "py-3 px-5 text-base" })[props.size]);
+const sizeClass = computed(() => ({ sm: "h-8 text-xs", md: "h-9", lg: "h-10 text-base" })[props.size]);
+const normalizedModelValue = computed(() => normalizeOptionValue(props.modelValue));
 
-defineEmits(["update:modelValue"]);
+const emit = defineEmits(["update:modelValue", "change"]);
+
+function normalizeOptionValue(value) {
+  if (value === "" || value === null || value === undefined) {
+    return EMPTY_SELECT_VALUE;
+  }
+  return String(value);
+}
+
+function handleModelUpdate(value) {
+  const normalizedValue = value === EMPTY_SELECT_VALUE ? "" : value;
+  emit("update:modelValue", normalizedValue);
+  emit("change", normalizedValue);
+}
 </script>

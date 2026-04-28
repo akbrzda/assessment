@@ -1,11 +1,18 @@
 <template>
-  <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-    <div>
-      <h1 class="text-[28px] font-bold text-foreground m-0">{{ title }}</h1>
-      <p v-if="subtitle" class="text-sm text-muted-foreground mt-1 m-0">{{ subtitle }}</p>
+  <div class="space-y-3 mb-6">
+    <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div class="space-y-1">
+        <h1 class="text-lg font-semibold text-foreground m-0">{{ title }}</h1>
+        <p v-if="subtitle" class="text-sm text-muted-foreground m-0">{{ subtitle }}</p>
+      </div>
+      <div v-if="$slots.actions" class="flex w-full flex-wrap items-center gap-2 md:w-auto">
+        <slot name="actions" />
+      </div>
     </div>
-    <div class="flex items-center gap-3 flex-wrap">
-      <slot name="actions" />
+    <div v-if="$slots.filters" class="rounded-xl border border-border bg-card p-2.5">
+      <div class="grid gap-2 sm:flex sm:flex-wrap sm:items-end sm:gap-2.5 [&>*]:w-full sm:[&>*]:w-auto">
+        <slot name="filters" />
+      </div>
     </div>
   </div>
 </template>

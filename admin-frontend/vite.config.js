@@ -6,6 +6,9 @@ import { resolve } from "path";
 export default defineConfig(({ mode }) => {
   const envDir = __dirname;
   const env = loadEnv(mode, envDir, "");
+  const hmrHost = env.VITE_HMR_HOST;
+  const hmrProtocol = env.VITE_HMR_PROTOCOL || "wss";
+  const hmrClientPort = Number(env.VITE_HMR_CLIENT_PORT || 443);
 
   return {
     envDir,
@@ -18,6 +21,13 @@ export default defineConfig(({ mode }) => {
       port: 5174,
       host: true,
       allowedHosts: ["admin.dev.akbrzda.ru", "admin.theorica.ru"],
+      hmr: hmrHost
+        ? {
+            host: hmrHost,
+            protocol: hmrProtocol,
+            clientPort: Number.isFinite(hmrClientPort) ? hmrClientPort : 443,
+          }
+        : undefined,
     },
     resolve: {
       alias: {

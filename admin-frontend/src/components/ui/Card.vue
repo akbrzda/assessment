@@ -2,23 +2,20 @@
   <div
     :class="
       cn(
-        'bg-background rounded-lg border border-border overflow-hidden transition-all duration-200',
-        hoverable && 'cursor-pointer hover:border-accent-blue hover:shadow',
+        'rounded-xl border border-border bg-card text-card-foreground shadow-sm',
+        hoverable && 'cursor-pointer transition hover:shadow-md hover:border-ring/50',
       )
     "
   >
-    <div v-if="title || $slots.header" class="px-4 py-3 border-b border-border bg-muted">
+    <div v-if="title || $slots.header" class="flex items-center gap-3 px-5 py-4 border-b border-border">
       <slot name="header">
-        <div class="flex items-center gap-3">
-          <Icon v-if="icon" :name="icon" :size="20" class="shrink-0 text-foreground" />
-          <h3 class="text-base font-semibold text-foreground m-0 leading-normal">{{ title }}</h3>
-        </div>
+        <h3 class="text-sm font-semibold text-foreground leading-none">{{ title }}</h3>
       </slot>
     </div>
     <div :class="paddingClass">
       <slot />
     </div>
-    <div v-if="$slots.footer" class="px-4 py-3 border-t border-border bg-muted">
+    <div v-if="$slots.footer" class="px-5 py-4 border-t border-border">
       <slot name="footer" />
     </div>
   </div>
@@ -27,7 +24,6 @@
 <script setup>
 import { computed } from "vue";
 import { cn } from "@/lib/utils";
-import Icon from "./Icon.vue";
 
 const props = defineProps({
   title: String,
@@ -35,12 +31,12 @@ const props = defineProps({
   padding: {
     type: String,
     default: "sm",
-    validator: (value) => ["none", "sm", "md", "lg"].includes(value),
+    validator: (v) => ["none", "sm", "md", "lg"].includes(v),
   },
   hoverable: Boolean,
   noPadding: Boolean,
 });
 
-const paddingMap = { none: "p-0", sm: "p-4", md: "p-5", lg: "p-6" };
+const paddingMap = { none: "p-0", sm: "p-5", md: "p-6", lg: "p-8" };
 const paddingClass = computed(() => (props.noPadding ? "p-0" : paddingMap[props.padding]));
 </script>

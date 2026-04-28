@@ -1,104 +1,87 @@
 <template>
-  <div class="app-shell" :class="{ 'sidebar-collapsed': isSidebarCollapsed }">
-    <Sidebar :isOpen="sidebarOpen" :isCollapsed="isSidebarCollapsed" @close="sidebarOpen = false" @toggle-collapse="toggleSidebarCollapsed" />
-    <TopBar :sidebar-collapsed="isSidebarCollapsed" @toggle-sidebar="handleToggleSidebar" />
+  <div class="min-h-screen bg-background text-foreground">
+    <div class="flex min-h-screen overflow-x-clip">
+      <!-- Сайдбар: постоянный на desktop -->
+      <Sidebar v-if="!isMobile" class="flex" :is-open="true" :is-collapsed="isSidebarCollapsed" @navigate="() => {}" />
 
-    <main class="main-content" :class="{ 'sidebar-open': sidebarOpen }">
-      <router-view />
-    </main>
+      <!-- Основной контент -->
+      <div class="flex min-h-screen min-w-0 flex-1 flex-col">
+        <TopBar :sidebar-collapsed="isSidebarCollapsed" @toggle-sidebar="handleToggleSidebar" />
+        <main class="mx-auto flex-1 min-w-0 w-full max-w-[1680px] px-3 pb-6 pt-3 sm:px-4 sm:pt-4 lg:px-6 lg:pb-8 lg:pt-5">
+          <router-view />
+        </main>
+      </div>
+    </div>
 
-    <!-- Overlay для мобильных устройств -->
-    <div v-if="sidebarOpen && isMobile" class="sidebar-overlay" @click="sidebarOpen = false"></div>
+    <!-- Overlay на мобильных -->
+    <Transition name="fade">
+      <div v-if="isMobile && mobileMenuOpen" class="fixed inset-0 z-40 bg-black/40" @click="mobileMenuOpen = false" />
+    </Transition>
+
+    <!-- Сайдбар: slide-in на мобильных -->
+    <Transition name="slide">
+      <Sidebar
+        v-if="isMobile && mobileMenuOpen"
+        class="lg:hidden"
+        :is-open="mobileMenuOpen"
+        :is-collapsed="false"
+        @close="mobileMenuOpen = false"
+        @navigate="mobileMenuOpen = false"
+      />
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import Sidebar from "./Sidebar.vue";
 import TopBar from "./TopBar.vue";
 import { useThemeStore } from "../../stores/theme";
 
-const sidebarOpen = ref(true);
-const isMobile = ref(false);
 const themeStore = useThemeStore();
+const isMobile = ref(false);
+const mobileMenuOpen = ref(false);
 const isSidebarCollapsed = computed(() => themeStore.sidebarCollapsed);
-
-const toggleSidebarCollapsed = () => {
-  themeStore.toggleSidebarCollapsed();
-};
 
 const handleToggleSidebar = () => {
   if (isMobile.value) {
-    sidebarOpen.value = !sidebarOpen.value;
+    mobileMenuOpen.value = !mobileMenuOpen.value;
   } else {
     themeStore.toggleSidebarCollapsed();
   }
 };
 
-const checkMobile = () => {
+const updateIsMobile = () => {
   isMobile.value = window.innerWidth < 1024;
-  if (isMobile.value) {
-    sidebarOpen.value = false;
-  }
+  if (!isMobile.value) mobileMenuOpen.value = false;
 };
 
 onMounted(() => {
-  checkMobile();
-  window.addEventListener("resize", checkMobile);
+  updateIsMobile();
+  window.addEventListener("resize", updateIsMobile);
 });
 
-onUnmounted(() => {
-  window.removeEventListener("resize", checkMobile);
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", updateIsMobile);
 });
 </script>
 
 <style scoped>
-.app-shell {
-  min-height: 100vh;
-  background: linear-gradient(145deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
-.main-content {
-  margin-left: 264px;
-  margin-top: 72px;
-  padding: 32px;
-  transition: margin-left 0.3s ease;
-  min-height: calc(100vh - 72px);
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.25s ease;
 }
-
-.app-shell.sidebar-collapsed .main-content {
-  margin-left: 72px;
-}
-
-.main-content :deep(> *) {
-  margin: 0 auto;
-}
-
-@media (max-width: 1279px) {
-  .main-content :deep(> *) {
-    max-width: 100%;
-  }
-}
-
-@media (max-width: 1023px) {
-  .main-content {
-    margin-left: 0;
-    padding: 24px 12px;
-  }
-
-  .app-shell.sidebar-collapsed .main-content {
-    margin-left: 0;
-  }
-}
-
-.sidebar-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: #00000073;
-  z-index: 30;
-  backdrop-filter: blur(6px);
+.slide-enter-from,
+.slide-leave-to {
+  transform: translateX(-100%);
 }
 </style>

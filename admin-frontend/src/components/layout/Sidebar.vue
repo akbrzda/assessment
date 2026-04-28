@@ -1,302 +1,222 @@
 <template>
-  <aside class="sidebar" :class="{ 'is-open': isOpen, 'is-collapsed': isCollapsed }">
-    <div class="sidebar-inner">
-      <div class="sidebar-header">
-        <div class="sidebar-brand">
-          <div class="logo-icon">
-            <Icon name="LayoutTemplate" size="20" />
-          </div>
-          <span v-if="!isCollapsed" class="logo-text">Theorica</span>
+  <aside :class="asideClasses">
+    <div class="flex h-full flex-col">
+      <!-- Кнопка закрытия на мобильных -->
+      <button
+        v-if="isOpen"
+        type="button"
+        class="absolute right-3 top-3 z-20 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border/60 bg-card/80 text-muted-foreground transition hover:bg-accent/40 hover:text-foreground lg:hidden"
+        aria-label="Закрыть меню"
+        @click.stop="$emit('close')"
+      >
+        <component :is="XIcon" :size="16" />
+      </button>
+
+      <!-- Бренд -->
+      <div :class="['flex items-center', isCollapsed ? 'justify-center py-4' : 'min-h-[64px] gap-3 px-4']">
+        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <component :is="LayoutTemplateIcon" :size="18" />
         </div>
-        <div class="sidebar-header-actions">
-          <button @click="$emit('close')" class="close-btn" aria-label="Закрыть меню">
-            <Icon name="X" size="18" aria-hidden="true" />
-          </button>
+        <div v-if="!isCollapsed" class="min-w-0">
+          <p class="truncate text-[15px] font-semibold text-foreground">Theorica</p>
+          <p class="text-xs text-muted-foreground">Административная панель</p>
         </div>
       </div>
 
-      <div class="sidebar-content">
-        <nav class="sidebar-nav">
-          <router-link
-            v-for="item in menuItems"
-            :key="item.path"
-            :to="item.path"
-            class="nav-item"
-            active-class="active"
-            :title="item.label"
-            @click="handleNavClick"
-          >
-            <span class="nav-icon">
-              <Icon :name="item.icon" size="20" aria-hidden="true" />
-            </span>
-            <span class="nav-label">{{ item.label }}</span>
-          </router-link>
+      <!-- Навигация -->
+      <div class="flex-1 overflow-y-auto px-3 pb-3">
+        <nav :class="['flex flex-col text-sm', isCollapsed ? '' : 'gap-3']">
+          <div v-for="section in navSections" :key="section.id" class="space-y-1">
+            <div v-if="!isCollapsed" class="nav-group-title">{{ section.title }}</div>
+            <div class="flex flex-col gap-0.5">
+              <RouterLink
+                v-for="item in section.items"
+                :key="item.label"
+                :to="item.to"
+                class="nav-link"
+                :title="item.label"
+                @click="$emit('navigate')"
+              >
+                <component :is="item.icon" :size="18" />
+                <span v-if="!isCollapsed" class="truncate">{{ item.label }}</span>
+              </RouterLink>
+            </div>
+          </div>
         </nav>
+      </div>
+
+      <!-- Профиль пользователя внизу -->
+      <div class="border-t border-border/60 p-3">
+        <div
+          :class="[
+            'flex items-center rounded-xl px-3 py-2 text-sm text-foreground',
+            isCollapsed ? 'justify-center' : 'gap-3',
+          ]"
+        >
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
+            {{ initials }}
+          </div>
+          <div v-if="!isCollapsed" class="min-w-0 flex-1">
+            <div class="truncate font-medium text-sm">{{ userName }}</div>
+            <div class="truncate text-xs text-muted-foreground">{{ userRole }}</div>
+          </div>
+          <button
+            v-if="!isCollapsed"
+            type="button"
+            class="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-accent/40 hover:text-foreground"
+            title="Выйти"
+            @click="handleLogout"
+          >
+            <component :is="LogOutIcon" :size="15" />
+          </button>
+        </div>
       </div>
     </div>
   </aside>
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from "vue";
-import { useRouter } from "vue-router";
+import { computed } from "vue";
+import { RouterLink } from "vue-router";
 import { useAuthStore } from "../../stores/auth";
+import {
+  LayoutDashboard as LayoutDashboardIcon,
+  Users as UsersIcon,
+  ClipboardList as ClipboardListIcon,
+  BookOpenCheck as BookOpenCheckIcon,
+  FileQuestion as FileQuestionIcon,
+  BarChart3 as BarChart3Icon,
+  Link2 as Link2Icon,
+  Building2 as Building2Icon,
+  Briefcase as BriefcaseIcon,
+  Settings as SettingsIcon,
+  LayoutTemplate as LayoutTemplateIcon,
+  LogOut as LogOutIcon,
+  X as XIcon,
+} from "lucide-vue-next";
+
 const authStore = useAuthStore();
-import { Icon } from "../ui";
 
 const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    default: true,
-  },
-  isCollapsed: {
-    type: Boolean,
-    default: false,
-  },
+  isOpen: { type: Boolean, default: true },
+  isCollapsed: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(["close", "toggle-collapse"]);
+defineEmits(["close", "navigate"]);
 
-const isMobile = ref(false);
+const userName = computed(() => {
+  const u = authStore.user;
+  if (!u) return "Пользователь";
+  return [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Пользователь";
+});
 
-const menuItems = computed(() => {
-  const items = [
-    { path: "/dashboard", label: "Дашборд", icon: "LayoutDashboard" },
-    { path: "/users", label: "Пользователи", icon: "Users", module: "users" },
-    { path: "/assessments", label: "Аттестации", icon: "ClipboardList", module: "assessments" },
-    { path: "/courses", label: "Курсы", icon: "BookOpenCheck", module: "courses" },
-    { path: "/questions", label: "Банк вопросов", icon: "FileQuestion", module: "questions" },
-    { path: "/reports", label: "Отчёты", icon: "BarChart3", module: "analytics" },
+const userRole = computed(() => {
+  const roles = { superadmin: "Суперадмин", manager: "Менеджер" };
+  return roles[authStore.user?.role] || authStore.user?.role || "";
+});
+
+const initials = computed(() => {
+  const u = authStore.user;
+  if (!u) return "?";
+  const first = u.firstName?.[0] || "";
+  const last = u.lastName?.[0] || "";
+  return (first + last).toUpperCase() || u.email?.[0]?.toUpperCase() || "?";
+});
+
+const navSections = computed(() => {
+  const isSA = authStore.isSuperAdmin;
+  const has = (mod) => isSA || authStore.hasModuleAccess(mod);
+
+  const sections = [
+    {
+      id: "main",
+      title: "Главное",
+      items: [
+        { label: "Дашборд", to: "/dashboard", icon: LayoutDashboardIcon },
+        has("users") && { label: "Пользователи", to: "/users", icon: UsersIcon },
+        has("invitations") && { label: "Приглашения", to: "/invitations", icon: Link2Icon },
+      ].filter(Boolean),
+    },
+    {
+      id: "learning",
+      title: "Обучение",
+      items: [
+        has("assessments") && { label: "Аттестации", to: "/assessments", icon: ClipboardListIcon },
+        has("courses") && { label: "Курсы", to: "/courses", icon: BookOpenCheckIcon },
+        has("questions") && { label: "Банк вопросов", to: "/questions", icon: FileQuestionIcon },
+      ].filter(Boolean),
+    },
+    {
+      id: "analytics",
+      title: "Аналитика",
+      items: [
+        has("analytics") && { label: "Отчёты", to: "/reports", icon: BarChart3Icon },
+      ].filter(Boolean),
+    },
+    {
+      id: "admin",
+      title: "Администрирование",
+      items: [
+        has("branches") && { label: "Филиалы", to: "/branches", icon: Building2Icon },
+        has("positions") && { label: "Должности", to: "/positions", icon: BriefcaseIcon },
+        has("settings") && { label: "Настройки", to: "/settings", icon: SettingsIcon },
+      ].filter(Boolean),
+    },
   ];
 
-  // Разделы только для superadmin (или с индивидуальными правами для manager)
-  if (authStore.isSuperAdmin || authStore.hasModuleAccess("invitations")) {
-    items.splice(2, 0, { path: "/invitations", label: "Приглашения", icon: "Link2", module: "invitations" });
-  }
-
-  if (authStore.isSuperAdmin || authStore.hasModuleAccess("branches")) {
-    items.push({ path: "/branches", label: "Филиалы", icon: "Building2", module: "branches" });
-  }
-
-  if (authStore.isSuperAdmin || authStore.hasModuleAccess("positions")) {
-    items.push({ path: "/positions", label: "Должности", icon: "Briefcase", module: "positions" });
-  }
-
-  if (authStore.isSuperAdmin || authStore.hasModuleAccess("settings")) {
-    items.push({ path: "/settings", label: "Настройки", icon: "Settings", module: "settings" });
-  }
-
-  // Фильтруем пункты меню на основе прав
-  return items.filter((item) => {
-    if (!item.module) return true; // Если нет модуля, показываем всегда
-    return authStore.hasModuleAccess(item.module);
-  });
+  return sections
+    .map((s) => ({ ...s, items: s.items.filter((i) => i) }))
+    .filter((s) => s.items.length > 0);
 });
 
-const handleNavClick = () => {
-  // Закрыть сайдбар на мобильных после клика
-  if (window.innerWidth < 1024) {
-    emit("close");
-  }
+const asideClasses = computed(() => [
+  "sidebar",
+  props.isOpen ? "is-open" : "is-closed",
+  props.isCollapsed ? "is-collapsed" : "",
+]);
+
+const handleLogout = async () => {
+  await authStore.logout();
 };
-
-const updateIsMobile = () => {
-  isMobile.value = window.innerWidth < 1024;
-};
-
-onMounted(() => {
-  updateIsMobile();
-  window.addEventListener("resize", updateIsMobile);
-});
-
-onUnmounted(() => {
-  window.removeEventListener("resize", updateIsMobile);
-});
 </script>
 
 <style scoped>
 .sidebar {
-  width: 264px;
-  background: var(--nav-bg);
-  height: 100vh;
-  position: fixed;
-  left: 0;
-  top: 0;
-  border-right: 1px solid var(--divider);
-  z-index: 40;
-  transition: transform 0.3s ease;
-  backdrop-filter: blur(18px);
-  display: flex;
-}
-
-.sidebar-inner {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
+  @apply relative flex h-screen w-60 shrink-0 flex-col border-r border-border/60 bg-card/90 pt-0 backdrop-blur transition-all duration-200 lg:sticky lg:top-0;
 }
 
 .sidebar.is-collapsed {
-  width: 72px;
+  @apply w-[72px];
 }
 
 @media (max-width: 1023px) {
   .sidebar {
-    transform: translateX(-100%);
+    @apply fixed inset-y-0 left-0 z-50 w-[min(20rem,calc(100vw-1rem))] -translate-x-full;
   }
 
   .sidebar.is-open {
-    transform: translateX(0);
+    @apply translate-x-0;
   }
 
   .sidebar.is-collapsed {
-    width: 264px;
+    @apply w-72;
   }
 }
 
-.sidebar-header {
-  border-bottom: 1px solid var(--divider);
-  min-height: 72px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 18px;
-  gap: 12px;
+.nav-group-title {
+  @apply px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground;
 }
 
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  min-width: 0;
+.nav-link {
+  @apply relative flex min-h-[38px] items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-muted-foreground transition hover:bg-accent/40 hover:text-foreground font-medium;
 }
 
-.logo-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: #6d28d9;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+.sidebar.is-collapsed .nav-link {
+  @apply justify-center px-0;
 }
 
-.logo-text {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sidebar-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.close-btn {
-  border: 1px solid var(--divider);
-  background: transparent;
-  color: var(--text-secondary);
-  border-radius: 999px;
-  padding: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-  width: 36px;
-  height: 36px;
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
-
-.close-btn:hover {
-  background: var(--nav-hover-bg);
-  color: var(--text-primary);
-}
-
-@media (max-width: 1023px) {
-  .close-btn {
-    display: inline-flex;
-  }
-
-  .collapse-btn {
-    display: none;
-  }
-}
-
-.sidebar-content {
-  padding: 18px;
-  flex: 1;
-  overflow-y: auto;
-}
-
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  border-radius: 20px;
-}
-
-.sidebar.is-collapsed .sidebar-nav {
-  align-items: center;
-}
-
-.sidebar.is-collapsed .sidebar-brand {
-  justify-content: center;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  color: var(--text-secondary);
-  text-decoration: none;
-  transition: all 0.2s;
-  font-weight: 500;
-  position: relative;
-  min-height: 44px;
-  width: 100%;
-}
-
-.sidebar.is-collapsed .nav-item {
-  justify-content: center;
-  width: auto;
-}
-
-.nav-item:hover {
-  background: var(--nav-hover-bg);
-  color: var(--nav-hover-text);
-}
-
-.nav-item.active {
-  background: var(--nav-active-bg);
-  color: var(--nav-active-text);
-  font-weight: 600;
-}
-
-.nav-icon {
-  font-size: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  flex-shrink: 0;
-}
-
-.nav-label {
-  font-size: 14px;
-  line-height: 1.3;
-  white-space: nowrap;
-}
-
-.sidebar.is-collapsed .nav-label {
-  display: none;
+.router-link-active {
+  @apply bg-nav-active text-nav-active-text font-semibold;
 }
 </style>
+    

@@ -1,467 +1,136 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* === Минималистичная цветовая палитра === */
-:root {
-  /* Базовые цвета */
-  --primary: #030213;
-  --primary-foreground: #ffffff;
+@layer base {
+  :root {
+    --background: 220 14% 96%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 222 47% 16%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 220 14% 92%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 220 14% 92%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 220 14% 90%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 13% 87%;
+    --input: 220 13% 87%;
+    --ring: 222 47% 16%;
+    --radius: 0.625rem;
 
-  --secondary: #101828;
-  --secondary-foreground: #4a5565;
-  --ring: #a1a1a1;
-  --input-bg: #f3f3f5;
+    /* Навигация */
+    --nav-active: 263 70% 95%;
+    --nav-active-text: 263 60% 48%;
 
-  --nav-bg: #ffffff;
-  --nav-hover-bg: #f3f4f6;
-  --nav-hover-text: #101828;
-  --nav-active-bg: #ede9fe;
-  --nav-active-text: #7c3aed;
+    /* Акцентные цвета (в HSL) */
+    --accent-blue: 199 100% 40%;
+    --accent-blue-soft: 199 100% 94%;
+    --accent-green: 160 84% 39%;
+    --accent-green-soft: 160 84% 93%;
+    --accent-orange: 38 92% 50%;
+    --accent-orange-soft: 38 92% 94%;
+    --accent-purple: 263 60% 48%;
+    --accent-purple-soft: 263 60% 95%;
+  }
 
-  --bg-primary: #fafafa;
-  --bg-secondary: #f5f5f5;
-  --surface-card: #ffffff;
-  --text-primary: #101828;
-  --text-secondary: #4b4b4b;
-  --divider: #e5e5e5;
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 213 31% 91%;
+    --card: 222 47% 9%;
+    --card-foreground: 213 31% 91%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 213 31% 91%;
+    --primary: 213 31% 91%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 222 47% 14%;
+    --secondary-foreground: 213 31% 91%;
+    --muted: 222 47% 14%;
+    --muted-foreground: 215 16% 57%;
+    --accent: 222 47% 16%;
+    --accent-foreground: 213 31% 91%;
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 222 47% 20%;
+    --input: 222 47% 20%;
+    --ring: 213 31% 75%;
 
-  /* Акцентные цвета */
-  --accent-blue: #0088cc;
-  --accent-blue-hover: #006ba8;
-  --accent-blue-soft: #e6f4fa;
-  --accent-green: #10b981;
-  --accent-green-soft: #e8f8f2;
-  --accent-orange: #f59e0b;
-  --accent-orange-soft: #fef5e7;
-  --accent-purple: #8b5cf6;
-  --accent-purple-soft: #f3f0fe;
+    --nav-active: 222 47% 16%;
+    --nav-active-text: 263 70% 72%;
 
-  /* Legacy поддержка */
-  --card-bg: var(--surface-card);
-  --border-color: var(--divider);
-  --primary-color: var(--accent-blue);
-  --primary-dark: var(--accent-blue-hover);
-  --primary-light: var(--accent-blue-soft);
-}
+    --accent-blue: 199 100% 55%;
+    --accent-blue-soft: 199 100% 14%;
+    --accent-green: 160 84% 44%;
+    --accent-green-soft: 160 84% 12%;
+    --accent-orange: 38 92% 55%;
+    --accent-orange-soft: 38 92% 14%;
+    --accent-purple: 263 60% 65%;
+    --accent-purple-soft: 263 60% 14%;
+  }
 
-:root.dark,
-.dark {
-  --primary: #fafafa;
-  --primary-foreground: #171717;
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    border-color: hsl(var(--border));
+  }
 
-  --secondary: #f3f4f6;
-  --secondary-foreground: #99a1af;
-  --ring: #525252;
-  --input-bg: #262626;
-
-  --nav-bg: #151515;
-  --nav-active-bg: #f3f4f6;
-  --nav-active-text: #101828;
-  --nav-hover-bg: #262626;
-  --nav-hover-text: #f3f3f3;
-
-  --bg-primary: #0a0a0a;
-  --bg-secondary: #171717;
-  --surface-card: #1f1f1f;
-  --text-primary: #f3f4f6;
-  --text-secondary: #b7b7b7;
-  --divider: #262626;
-
-  --accent-blue: #0ea5e9;
-  --accent-blue-hover: #38bdf8;
-  --accent-blue-soft: #1f3a4a;
-  --accent-green: #22c55e;
-  --accent-green-soft: #1a3329;
-  --accent-orange: #fb923c;
-  --accent-orange-soft: #3a2e1f;
-  --accent-purple: #a78bfa;
-  --accent-purple-soft: #2e2a3f;
-
-  /* Legacy поддержка */
-  --card-bg: var(--surface-card);
-  --border-color: var(--divider);
-  --primary-color: var(--accent-blue);
-  --primary-dark: var(--accent-blue-hover);
-  --primary-light: var(--accent-blue-soft);
-}
-
-/* === Базовые стили === */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family:
-    "Montserrat",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
-}
-
-body {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  font-family:
-    "Montserrat",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family:
+      "Montserrat",
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 }
 
 #app {
   min-height: 100vh;
 }
 
-input[type="checkbox"]:not(.native-checkbox),
-input[type="radio"]:not(.native-checkbox) {
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--divider);
-  border-radius: 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--bg-primary);
-  cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease;
-}
-
-input[type="radio"]:not(.native-checkbox) {
-  border-radius: 50%;
-}
-
-input[type="checkbox"]:not(.native-checkbox)::after,
-input[type="radio"]:not(.native-checkbox)::after {
-  content: "";
-  width: 10px;
-  height: 10px;
-  border-radius: 4px;
-  background-color: transparent;
-  transition:
-    background-color 0.2s ease,
-    transform 0.2s ease;
-  transform: scale(0);
-}
-
-input[type="radio"]:not(.native-checkbox)::after {
-  border-radius: 50%;
-}
-
-input[type="checkbox"]:not(.native-checkbox):checked,
-input[type="radio"]:not(.native-checkbox):checked {
-  border-color: var(--accent-blue);
-  background-color: rgba(0, 136, 204, 0.08);
-}
-
-input[type="checkbox"]:not(.native-checkbox):checked::after,
-input[type="radio"]:not(.native-checkbox):checked::after {
-  background-color: var(--accent-blue);
-  transform: scale(1);
-}
-
 /* === Скроллбар === */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+  background: hsl(var(--muted));
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--divider);
-  border-radius: 4px;
+  background: hsl(var(--border));
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+  background: hsl(var(--muted-foreground));
 }
 
 /* === Утилиты === */
 .page-container {
-  max-width: 1400px;
+  max-width: 1680px;
   margin: 0 auto;
-  padding: 24px;
-}
-
-.admin-card-grid {
-  display: grid;
-  gap: 12px;
-}
-
-.admin-card-grid--min-180 {
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
-
-.admin-data-card {
-  border: 1px solid var(--divider);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--bg-secondary);
-}
-
-.admin-metric-icon {
-  width: 64px;
-  height: 64px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 16px;
-  flex-shrink: 0;
-}
-
-.admin-metric-icon--blue {
-  background-color: var(--accent-blue-soft);
-}
-
-.admin-metric-icon--green {
-  background-color: var(--accent-green-soft);
-}
-
-.admin-metric-icon--purple {
-  background-color: var(--accent-purple-soft);
-}
-
-.admin-metric-icon--orange {
-  background-color: var(--accent-orange-soft);
+  padding: 20px 24px;
 }
 
 @media (max-width: 768px) {
   .page-container {
     padding: 16px;
-  }
-}
-
-body {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  font-family:
-    "Montserrat",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    "Helvetica Neue",
-    sans-serif;
-  transition:
-    background-color 0.25s ease,
-    color 0.25s ease;
-}
-
-#app {
-  min-height: 100vh;
-  background-color: transparent;
-}
-
-.btn-primary {
-  background-color: var(--primary);
-  color: var(--primary-foreground);
-  border-radius: 16px;
-  padding: 10px 18px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.btn-primary:hover {
-  opacity: 0.9;
-}
-
-@layer base {
-  html {
-    background-color: var(--bg-primary);
-  }
-
-  .shadow,
-  .shadow-md,
-  .shadow-lg {
-    box-shadow: var(--card-shadow) !important;
-  }
-
-  .rounded-lg {
-    border-radius: 16px !important;
-  }
-
-  .rounded {
-    border-radius: 14px !important;
-  }
-
-  .bg-white,
-  .bg-gray-50,
-  .bg-gray-100,
-  .dark .dark\:bg-gray-800,
-  .dark .dark\:bg-gray-900,
-  .dark .dark\:bg-gray-700 {
-    background-color: var(--surface-card) !important;
-    backdrop-filter: blur(12px);
-  }
-
-  .bg-blue-50 {
-    background-color: var(--accent-blue-soft) !important;
-  }
-
-  .bg-blue-100 {
-    background-color: #cce9f5 !important;
-  }
-
-  .dark .dark\:bg-blue-900 {
-    background-color: #1a4d66 !important;
-  }
-
-  .bg-green-50 {
-    background-color: var(--accent-green-soft) !important;
-  }
-
-  .bg-green-100 {
-    background-color: #d1f5e3 !important;
-  }
-
-  .dark .dark\:bg-green-900 {
-    background-color: #1a4d33 !important;
-  }
-
-  .bg-purple-50 {
-    background-color: var(--accent-purple-soft) !important;
-  }
-
-  .bg-purple-100 {
-    background-color: #e8d9f7 !important;
-  }
-
-  .dark .dark\:bg-purple-900 {
-    background-color: #3d2b52 !important;
-  }
-
-  .bg-orange-50 {
-    background-color: var(--accent-orange-soft) !important;
-  }
-
-  .bg-yellow-100 {
-    background-color: #ffebcc !important;
-  }
-
-  .dark .dark\:bg-yellow-900 {
-    background-color: #4d3d1a !important;
-  }
-
-  .bg-gray-100 {
-    background-color: #f5f5f5 !important;
-  }
-
-  .dark .dark\:bg-gray-700 {
-    background-color: #2b2b2b !important;
-  }
-
-  .text-gray-900,
-  .dark .dark\:text-white {
-    color: var(--text-primary) !important;
-  }
-
-  .text-gray-700,
-  .text-gray-500,
-  .text-gray-400,
-  .dark .dark\:text-gray-300,
-  .dark .dark\:text-gray-400 {
-    color: var(--text-secondary) !important;
-  }
-
-  .border-gray-300,
-  .border-gray-200,
-  .dark .dark\:border-gray-600,
-  .dark .dark\:border-gray-700 {
-    border-color: var(--divider) !important;
-  }
-
-  .text-blue-600,
-  .text-indigo-600,
-  .dark .dark\:text-blue-400,
-  .dark .dark\:text-indigo-400,
-  .text-blue-800,
-  .dark .dark\:text-blue-300 {
-    color: var(--accent-blue) !important;
-  }
-
-  .bg-blue-600,
-  .bg-indigo-600,
-  .dark .dark\:bg-blue-400,
-  .dark .dark\:bg-indigo-400 {
-    background-color: var(--accent-blue) !important;
-  }
-
-  .hover\:bg-blue-700:hover,
-  .hover\:bg-indigo-700:hover,
-  .dark .dark\:hover\:bg-blue-300:hover,
-  .dark .dark\:hover\:bg-indigo-300:hover {
-    background-color: var(--accent-blue-hover) !important;
-  }
-
-  .hover\:text-blue-800:hover,
-  .hover\:text-indigo-800:hover,
-  .dark .dark\:hover\:text-blue-300:hover,
-  .dark .dark\:hover\:text-indigo-300:hover {
-    color: var(--accent-blue-hover) !important;
-  }
-
-  .text-green-600,
-  .dark .dark\:text-green-400 {
-    color: var(--accent-green) !important;
-  }
-
-  .text-orange-600,
-  .dark .dark\:text-orange-400 {
-    color: var(--accent-orange) !important;
-  }
-
-  input,
-  select,
-  textarea {
-    background-color: var(--input-bg) !important;
-    border-radius: 14px;
-    border-color: var(--divider) !important;
-    color: var(--text-primary) !important;
-    transition:
-      border-color 0.2s ease,
-      box-shadow 0.2s ease;
-  }
-
-  input::placeholder,
-  select::placeholder,
-  textarea::placeholder {
-    color: var(--text-secondary);
-    opacity: 0.7;
-  }
-
-  input:focus,
-  select:focus,
-  textarea:focus {
-    outline: none;
-    border-color: var(--ring) !important;
-  }
-
-  table tbody tr {
-    transition:
-      transform 0.08s ease,
-      background-color 0.2s ease;
-  }
-
-  table tbody tr:hover {
-    background-color: var(--bg-secondary) !important;
   }
 }

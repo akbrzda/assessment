@@ -1,36 +1,17 @@
-import { ref } from "vue";
-
-const toasts = ref([]);
-let nextId = 0;
+import { toast as sonnerToast } from "vue-sonner";
 
 export function useToast() {
-  const showToast = (message, type = "info", duration = 3000) => {
-    const id = nextId++;
-    const toast = {
-      id,
-      message,
-      type, // success, error, warning, info
-      duration,
-    };
-
-    toasts.value.push(toast);
-
-    if (duration > 0) {
-      setTimeout(() => {
-        removeToast(id);
-      }, duration);
-    }
+  const showToast = (message, type = "info") => {
+    if (type === "success") sonnerToast.success(message);
+    else if (type === "error") sonnerToast.error(message);
+    else if (type === "warning") sonnerToast.warning(message);
+    else sonnerToast.info(message);
   };
 
-  const removeToast = (id) => {
-    const index = toasts.value.findIndex((t) => t.id === id);
-    if (index > -1) {
-      toasts.value.splice(index, 1);
-    }
-  };
+  const removeToast = () => {};
 
   return {
-    toasts,
+    toasts: { value: [] },
     showToast,
     removeToast,
   };

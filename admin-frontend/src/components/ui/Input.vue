@@ -1,11 +1,13 @@
 <template>
-  <div class="flex flex-col gap-2">
-    <label v-if="props.label" class="flex items-center gap-1 text-[15px] font-medium text-foreground">
+  <div class="flex flex-col gap-1.5">
+    <label v-if="props.label" class="text-sm font-medium text-foreground leading-none">
       {{ props.label }}
-      <span v-if="props.required" class="text-red-500">*</span>
+      <span v-if="props.required" class="text-destructive ml-0.5">*</span>
     </label>
     <div class="relative flex items-center">
-      <slot name="prefix" />
+      <div v-if="$slots.prefix" class="pointer-events-none absolute left-3 flex items-center text-muted-foreground">
+        <slot name="prefix" />
+      </div>
       <input
         :value="props.modelValue"
         :type="props.type"
@@ -17,20 +19,25 @@
         :max="props.max"
         :class="
           cn(
-            'w-full border border-border rounded-xl bg-background text-foreground transition-all duration-200',
-            'placeholder:text-muted-foreground focus:outline-none focus:border-accent-blue focus:ring-2 focus:ring-accent-blue/10',
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-            props.error && 'border-red-500 focus:border-red-500 focus:ring-red-500/10',
+            'flex w-full rounded-xl border border-input bg-background text-sm text-foreground shadow-sm',
+            'placeholder:text-muted-foreground',
+            'focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            'read-only:bg-muted read-only:cursor-default',
+            props.error && 'border-destructive focus:ring-destructive/30',
             sizeClass,
-            $slots.prefix && 'pl-10',
+            $slots.prefix && 'pl-9',
+            $slots.suffix && 'pr-9',
           )
         "
         @input="$emit('update:modelValue', $event.target.value)"
       />
-      <slot name="suffix" />
+      <div v-if="$slots.suffix" class="absolute right-3 flex items-center text-muted-foreground">
+        <slot name="suffix" />
+      </div>
     </div>
-    <p v-if="props.error" class="text-sm text-red-500">{{ props.error }}</p>
-    <p v-else-if="props.hint" class="text-sm text-muted-foreground">{{ props.hint }}</p>
+    <p v-if="props.error" class="text-xs text-destructive">{{ props.error }}</p>
+    <p v-else-if="props.hint" class="text-xs text-muted-foreground">{{ props.hint }}</p>
   </div>
 </template>
 
@@ -39,37 +46,25 @@ import { computed } from "vue";
 import { cn } from "@/lib/utils";
 
 const props = defineProps({
-  modelValue: {
-    type: [String, Number],
-    default: "",
-  },
+  modelValue: { type: [String, Number], default: "" },
   label: String,
-  type: {
-    type: String,
-    default: "text",
-  },
+  type: { type: String, default: "text" },
   placeholder: String,
   error: String,
   hint: String,
   disabled: Boolean,
   readonly: Boolean,
   required: Boolean,
-  min: {
-    type: [String, Number],
-    default: undefined,
-  },
-  max: {
-    type: [String, Number],
-    default: undefined,
-  },
+  min: { type: [String, Number], default: undefined },
+  max: { type: [String, Number], default: undefined },
   size: {
     type: String,
     default: "md",
-    validator: (value) => ["sm", "md", "lg"].includes(value),
+    validator: (v) => ["sm", "md", "lg"].includes(v),
   },
 });
 
 defineEmits(["update:modelValue"]);
 
-const sizeClass = computed(() => ({ sm: "py-2 px-3 text-sm", md: "py-2.5 px-4 text-[15px]", lg: "py-3 px-5 text-base" })[props.size]);
+const sizeClass = computed(() => ({ sm: "h-8 px-3 text-xs", md: "h-9 px-3", lg: "h-10 px-4 text-base" })[props.size]);
 </script>

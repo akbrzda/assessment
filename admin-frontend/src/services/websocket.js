@@ -34,9 +34,15 @@ class WebSocketService {
       return;
     }
 
-    const apiUrl = API_BASE_URL ? API_BASE_URL.replace("/api", "") : "http://localhost:3001";
+    let wsUrl;
+    try {
+      // Берём только origin из API_BASE_URL (без пути /api)
+      wsUrl = API_BASE_URL ? new URL(API_BASE_URL).origin : "http://localhost:3001";
+    } catch {
+      wsUrl = "http://localhost:3001";
+    }
 
-    this.socket = io(apiUrl, {
+    this.socket = io(wsUrl, {
       auth: { token },
       reconnection: true,
       reconnectionDelay: 1000,

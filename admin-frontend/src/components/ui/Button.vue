@@ -35,11 +35,11 @@ const props = defineProps({
 const emit = defineEmits(["click"]);
 
 const variantClasses = {
-  primary: "bg-nav-active text-nav-active-text hover:opacity-90",
-  secondary: "bg-muted text-foreground border border-border hover:bg-nav-hover",
-  danger: "bg-red-500 text-white hover:bg-red-600",
+  primary: "bg-primary text-primary-foreground hover:opacity-90",
+  secondary: "bg-muted text-foreground border border-border hover:bg-accent/60",
+  danger: "bg-destructive text-destructive-foreground hover:opacity-90",
   success: "bg-accent-green text-white hover:opacity-90",
-  ghost: "bg-transparent text-foreground hover:bg-nav-hover",
+  ghost: "bg-transparent text-foreground hover:bg-accent/60",
 };
 
 const sizeClasses = {

@@ -17,7 +17,7 @@
             <h2 v-if="title" class="text-xl font-semibold text-foreground m-0">{{ title }}</h2>
             <button
               v-if="closable"
-              class="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:bg-nav-hover hover:text-foreground transition-colors duration-200 border-none bg-transparent cursor-pointer text-lg"
+              class="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors duration-200 border-none bg-transparent cursor-pointer text-lg"
               @click="close"
             >
               ✕
