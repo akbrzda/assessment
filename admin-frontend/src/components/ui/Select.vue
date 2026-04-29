@@ -8,86 +8,63 @@
     <SelectRoot :model-value="normalizedModelValue" :disabled="disabled" @update:model-value="handleModelUpdate">
       <SelectTrigger
         :id="selectId"
-        :class="
-          cn(
-            'flex w-full items-center justify-between gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm ring-offset-background',
-            'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0 focus:border-transparent',
-            'hover:border-ring transition',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-            '[&>span]:truncate',
-            error && 'border-destructive focus:ring-destructive/30',
-            sizeClass,
-          )
-        "
+        :class="[
+          'flex w-full items-center justify-between gap-2 rounded-xl border border-input bg-background px-3 text-sm text-foreground shadow-sm',
+          'focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors',
+          'hover:border-ring cursor-pointer',
+          'disabled:cursor-not-allowed disabled:opacity-50',
+          error ? 'border-destructive' : '',
+          sizeClass,
+        ]"
       >
-        <SelectValue :placeholder="placeholder || 'Выберите...'" />
-        <ChevronDownIcon :size="14" class="shrink-0 text-muted-foreground opacity-70" />
+        <SelectValue :placeholder="placeholder || 'Выберите...'" class="truncate" />
+        <Icon name="ChevronDown" :size="14" class="shrink-0 text-muted-foreground" />
       </SelectTrigger>
 
-      <SelectContent
-        :class="
-          cn(
-            'relative z-50 min-w-[8rem] overflow-hidden rounded-xl border border-border bg-card text-foreground shadow-md',
-            'data-[state=open]:animate-in data-[state=closed]:animate-out',
-            'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-            'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
-            'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
-          )
-        "
-        position="popper"
-        :side-offset="4"
-      >
-        <SelectViewport class="p-1">
-          <template v-if="groups.length">
-            <SelectGroup v-for="(group, gi) in groups" :key="gi">
-              <SelectLabel v-if="group.label" class="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                {{ group.label }}
-              </SelectLabel>
+      <SelectPortal>
+        <SelectContent
+          class="z-[9999] w-[var(--reka-select-trigger-width)] overflow-hidden rounded-xl border border-border bg-card text-foreground shadow-lg"
+          position="popper"
+          :side-offset="4"
+        >
+          <SelectViewport class="p-1">
+            <template v-if="groups.length">
+              <SelectGroup v-for="(group, gi) in groups" :key="gi">
+                <SelectLabel v-if="group.label" class="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {{ group.label }}
+                </SelectLabel>
+                <SelectItem
+                  v-for="opt in group.options"
+                  :key="opt.value"
+                  :value="normalizeOptionValue(opt.value)"
+                  :disabled="opt.disabled"
+                  class="relative flex w-full cursor-pointer select-none items-center rounded-lg py-2 pl-3 pr-8 text-sm outline-none hover:bg-accent focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:font-medium"
+                >
+                  <SelectItemText>{{ opt.label }}</SelectItemText>
+                  <SelectItemIndicator class="absolute right-2.5 flex items-center">
+                    <Icon name="Check" :size="14" class="text-primary" />
+                  </SelectItemIndicator>
+                </SelectItem>
+              </SelectGroup>
+            </template>
+
+            <template v-else>
               <SelectItem
-                v-for="opt in group.options"
+                v-for="opt in options"
                 :key="opt.value"
                 :value="normalizeOptionValue(opt.value)"
                 :disabled="opt.disabled"
-                :class="
-                  cn(
-                    'relative flex w-full cursor-pointer select-none items-center rounded-lg py-1.5 pl-3 pr-8 text-sm outline-none',
-                    'focus:bg-accent focus:text-accent-foreground',
-                    'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
-                    'data-[state=checked]:font-medium',
-                  )
-                "
+                class="relative flex w-full cursor-pointer select-none items-center rounded-lg py-2 pl-3 pr-8 text-sm outline-none hover:bg-accent focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:font-medium"
               >
                 <SelectItemText>{{ opt.label }}</SelectItemText>
-                <SelectItemIndicator class="absolute right-2 flex items-center justify-center">
-                  <CheckIcon :size="14" />
+                <SelectItemIndicator class="absolute right-2.5 flex items-center">
+                  <Icon name="Check" :size="14" class="text-primary" />
                 </SelectItemIndicator>
               </SelectItem>
-            </SelectGroup>
-          </template>
-
-          <template v-else>
-            <SelectItem
-              v-for="opt in options"
-              :key="opt.value"
-              :value="normalizeOptionValue(opt.value)"
-              :disabled="opt.disabled"
-              :class="
-                cn(
-                  'relative flex w-full cursor-pointer select-none items-center rounded-lg py-1.5 pl-3 pr-8 text-sm outline-none',
-                  'focus:bg-accent focus:text-accent-foreground',
-                  'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
-                  'data-[state=checked]:font-medium',
-                )
-              "
-            >
-              <SelectItemText>{{ opt.label }}</SelectItemText>
-              <SelectItemIndicator class="absolute right-2 flex items-center justify-center">
-                <CheckIcon :size="14" />
-              </SelectItemIndicator>
-            </SelectItem>
-          </template>
-        </SelectViewport>
-      </SelectContent>
+            </template>
+          </SelectViewport>
+        </SelectContent>
+      </SelectPortal>
     </SelectRoot>
 
     <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
@@ -101,6 +78,7 @@ import {
   SelectRoot,
   SelectTrigger,
   SelectValue,
+  SelectPortal,
   SelectContent,
   SelectViewport,
   SelectItem,
@@ -109,8 +87,8 @@ import {
   SelectGroup,
   SelectLabel,
 } from "reka-ui";
-import { ChevronDown as ChevronDownIcon, Check as CheckIcon } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
+import Icon from "./Icon.vue";
 
 const EMPTY_SELECT_VALUE = "__empty_select_value__";
 

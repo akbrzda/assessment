@@ -6,7 +6,7 @@
       <div v-else>
         <!-- Предупреждение для открытых/закрытых аттестаций -->
         <div v-if="!canEditParameters" class="warning-banner">
-          <p class="warning-title"> Аттестация уже открыта</p>
+          <p class="warning-title">Аттестация уже открыта</p>
           <p class="warning-text">
             Вы можете редактировать только вопросы и теорию. Параметры (порог прохождения, количество попыток, время на прохождение, назначения)
             изменить нельзя.
@@ -27,9 +27,9 @@
           <h3 class="section-title">Параметры</h3>
 
           <div class="form-grid">
-            <Input v-model="formData.openAt" type="date" label="Дата открытия" required />
+            <DatePicker v-model="formData.openAt" label="Дата открытия" required />
 
-            <Input v-model="formData.closeAt" type="date" label="Дата закрытия" required />
+            <DatePicker v-model="formData.closeAt" label="Дата закрытия" required />
 
             <Input
               v-model="formData.timeLimitMinutes"
@@ -225,18 +225,19 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from "vue";
-import { updateAssessment } from "../api/assessments";
-import { getReferences, getUsers } from "../api/users";
-import { getAdminTheory, publishTheory } from "../api/theory";
-import Card from "./ui/Card.vue";
-import Input from "./ui/Input.vue";
-import Textarea from "./ui/Textarea.vue";
-import Button from "./ui/Button.vue";
-import Preloader from "./ui/Preloader.vue";
+import { updateAssessment } from "@/api/assessments";
+import { getReferences, getUsers } from "@/api/users";
+import { getAdminTheory, publishTheory } from "@/api/theory";
+import Card from "@/components/ui/Card.vue";
+import Input from "@/components/ui/Input.vue";
+import Textarea from "@/components/ui/Textarea.vue";
+import Button from "@/components/ui/Button.vue";
+import Preloader from "@/components/ui/Preloader.vue";
+import DatePicker from "@/components/ui/DatePicker.vue";
 import AssessmentTheoryBuilder from "./AssessmentTheoryBuilder.vue";
-import { useToast } from "../composables/useToast";
-import { createEmptyTheory, mapVersionToTheoryData, buildTheoryPayload, validateTheoryData, hasTheoryBlocks } from "../utils/theory";
-import { formatBranchLabel } from "../utils/branch";
+import { useToast } from "@/composables/useToast";
+import { createEmptyTheory, mapVersionToTheoryData, buildTheoryPayload, validateTheoryData, hasTheoryBlocks } from "@/utils/theory";
+import { formatBranchLabel } from "@/utils/branch";
 
 const props = defineProps({
   assessment: {
@@ -580,7 +581,7 @@ const handleSubmit = async () => {
     }
     if (question.questionType === "matching") {
       const allPairsFilled = question.options.every(
-        (opt) => opt.text && opt.text.trim().length > 0 && opt.matchText && opt.matchText.trim().length > 0
+        (opt) => opt.text && opt.text.trim().length > 0 && opt.matchText && opt.matchText.trim().length > 0,
       );
       if (!allPairsFilled) {
         showToast("Для сопоставления необходимо заполнить все пары", "warning");

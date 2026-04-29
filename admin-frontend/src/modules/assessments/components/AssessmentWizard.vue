@@ -156,7 +156,12 @@
                           <input type="checkbox" v-model="option.isCorrect" />
                         </template>
                         <template v-else>
-                          <input type="radio" :name="`question-${qIndex}`" :checked="option.isCorrect" @change="() => setCorrectOption(qIndex, oIndex)" />
+                          <input
+                            type="radio"
+                            :name="`question-${qIndex}`"
+                            :checked="option.isCorrect"
+                            @change="() => setCorrectOption(qIndex, oIndex)"
+                          />
                         </template>
                         <span>Правильный</span>
                       </label>
@@ -239,26 +244,8 @@
         <h3 class="step-title">Параметры и сроки</h3>
 
         <div class="form-row">
-          <Input
-            v-model="formData.openAt"
-            type="date"
-            label="Дата открытия"
-            min="1900-01-01"
-            :max="maxDate"
-            required
-            :error="errors.openAt"
-            @blur="validateDateField('openAt')"
-          />
-          <Input
-            v-model="formData.closeAt"
-            type="date"
-            label="Дата закрытия"
-            min="1900-01-01"
-            :max="maxDate"
-            required
-            :error="errors.closeAt"
-            @blur="validateDateField('closeAt')"
-          />
+          <DatePicker v-model="formData.openAt" label="Дата открытия" required :error="errors.openAt" />
+          <DatePicker v-model="formData.closeAt" label="Дата закрытия" required :error="errors.closeAt" />
         </div>
 
         <div class="form-row">
@@ -344,6 +331,7 @@ import Preloader from "@/components/ui/Preloader.vue";
 import Input from "@/components/ui/Input.vue";
 import Select from "@/components/ui/Select.vue";
 import Textarea from "@/components/ui/Textarea.vue";
+import DatePicker from "@/components/ui/DatePicker.vue";
 import AssessmentTheoryBuilder from "./AssessmentTheoryBuilder.vue";
 import { getAdminTheory, publishTheory } from "@/api/theory";
 import { createEmptyTheory, validateTheoryData, buildTheoryPayload, hasTheoryBlocks, mapVersionToTheoryData } from "@/utils/theory";
@@ -455,13 +443,17 @@ const formatDateForInput = (value) => {
 };
 
 const mapAssessmentQuestionToForm = (question) => {
-  const questionType = question.question_type || question.questionType || (question.correct_text_answer || question.correctTextAnswer ? "text" : "single");
+  const questionType =
+    question.question_type || question.questionType || (question.correct_text_answer || question.correctTextAnswer ? "text" : "single");
   const correctText = question.correct_text_answer || question.correctTextAnswer || "";
-  const options = questionType === "text" ? [] : (question.options || []).map((opt) => ({
-    text: opt.option_text || opt.text || "",
-    matchText: opt.match_text || opt.matchText || "",
-    isCorrect: opt.is_correct === 1 || opt.isCorrect === true,
-  }));
+  const options =
+    questionType === "text"
+      ? []
+      : (question.options || []).map((opt) => ({
+          text: opt.option_text || opt.text || "",
+          matchText: opt.match_text || opt.matchText || "",
+          isCorrect: opt.is_correct === 1 || opt.isCorrect === true,
+        }));
 
   return {
     text: question.question_text || question.text || "",
@@ -586,7 +578,7 @@ watch(
       theoryError.value = "";
     }
   },
-  { immediate: false }
+  { immediate: false },
 );
 
 const MAX_YEAR_OFFSET = 100;
@@ -612,7 +604,7 @@ const isQuestionValid = (question) => {
     !question.options.every((opt) =>
       question.questionType === "matching"
         ? opt.text && opt.text.trim().length > 0 && opt.matchText && opt.matchText.trim().length > 0
-        : opt.text && opt.text.trim().length > 0
+        : opt.text && opt.text.trim().length > 0,
     )
   ) {
     return false;
@@ -858,8 +850,7 @@ const handleQuestionTypeChange = (qIndex, type) => {
   }
   if (!Array.isArray(question.options) || question.options.length < 2) {
     const cachedOptions = cache[type]?.options;
-    question.options =
-      cachedOptions && cachedOptions.length ? cachedOptions.map((opt) => ({ ...opt })) : createDefaultOptions();
+    question.options = cachedOptions && cachedOptions.length ? cachedOptions.map((opt) => ({ ...opt })) : createDefaultOptions();
   }
   question.correctTextAnswer = "";
   if (type === "single") {
@@ -1044,7 +1035,7 @@ const submitAssessment = async () => {
         questionBankId: question.id,
         text: question.question_text || question.text || "",
         questionType,
-        correctTextAnswer: questionType === "text" ? (question.correct_text_answer || question.correctTextAnswer || "") : "",
+        correctTextAnswer: questionType === "text" ? question.correct_text_answer || question.correctTextAnswer || "" : "",
         options:
           questionType === "text"
             ? []
@@ -1060,16 +1051,11 @@ const submitAssessment = async () => {
       ...formData.value,
       openAt: dateToISOWithMidnight(formData.value.openAt),
       closeAt: dateToISOWithMidnight(formData.value.closeAt),
-      questions:
-        questionsMode.value === "bank"
-          ? (selectedBankQuestions.value || []).map(transformBankQuestion)
-          : getCustomQuestionsPayload(),
+      questions: questionsMode.value === "bank" ? (selectedBankQuestions.value || []).map(transformBankQuestion) : getCustomQuestionsPayload(),
     };
 
-    const result = isEditMode.value
-      ? await updateAssessment(props.initialAssessment.id, assessmentData)
-      : await createAssessment(assessmentData);
-    const createdAssessmentId = isEditMode.value ? props.initialAssessment.id : result?.assessmentId ?? result?.assessment?.id;
+    const result = isEditMode.value ? await updateAssessment(props.initialAssessment.id, assessmentData) : await createAssessment(assessmentData);
+    const createdAssessmentId = isEditMode.value ? props.initialAssessment.id : (result?.assessmentId ?? result?.assessment?.id);
 
     if (theoryEnabled.value && hasTheoryBlocks(theoryData.value) && createdAssessmentId) {
       try {

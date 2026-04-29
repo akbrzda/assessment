@@ -109,11 +109,11 @@
 
 <script setup>
 import { ref, watch } from "vue";
-import { getUserReport } from "../api/analytics";
-import Modal from "./ui/Modal.vue";
-import Preloader from "./ui/Preloader.vue";
-import LineChart from "./charts/LineChart.vue";
-import { useToast } from "../composables/useToast";
+import { getUserReport } from "@/api/analytics";
+import Modal from "@/components/ui/Modal.vue";
+import Preloader from "@/components/ui/Preloader.vue";
+import LineChart from "@/components/charts/LineChart.vue";
+import { useToast } from "@/composables/useToast";
 
 const props = defineProps({
   modelValue: {

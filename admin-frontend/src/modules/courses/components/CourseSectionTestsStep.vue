@@ -334,10 +334,10 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { BookOpen, ChevronDown, Circle, CircleCheckBig, ClipboardList, Clock3, Info, LoaderCircle, Plus, Trash2, X } from "lucide-vue-next";
-import { getAssessmentById, createAssessment, updateAssessment } from "../api/assessments";
-import { updateCourseSection } from "../api/courses";
-import { useToast } from "../composables/useToast";
-import { Input, Textarea } from "./ui";
+import { getAssessmentById, createAssessment, updateAssessment } from "@/api/assessments";
+import { updateCourseSection } from "@/api/courses";
+import { useToast } from "@/composables/useToast";
+import { Input, Textarea } from "@/components/ui";
 
 const props = defineProps({
   course: {

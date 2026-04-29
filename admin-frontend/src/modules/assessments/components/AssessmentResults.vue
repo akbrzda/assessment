@@ -65,9 +65,9 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import { getAssessmentResults } from "../api/assessments";
-import Preloader from "./ui/Preloader.vue";
-import { useToast } from "../composables/useToast";
+import { getAssessmentResults } from "@/api/assessments";
+import Preloader from "@/components/ui/Preloader.vue";
+import { useToast } from "@/composables/useToast";
 
 const props = defineProps({
   assessmentId: {

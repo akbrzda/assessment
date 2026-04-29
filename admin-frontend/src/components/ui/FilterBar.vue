@@ -120,24 +120,12 @@
               </button>
             </div>
             <div class="flex flex-col gap-2 px-1">
-              <div class="flex items-center gap-2">
-                <span class="text-xs text-muted-foreground w-6 shrink-0">С</span>
-                <input
-                  type="date"
-                  class="flex-1 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground bg-background outline-none focus:border-accent-blue"
-                  :value="modelValue[def.keyFrom] || ''"
-                  @input="onDateInput(def.keyFrom, $event.target.value)"
-                />
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs text-muted-foreground w-6 shrink-0">По</span>
-                <input
-                  type="date"
-                  class="flex-1 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground bg-background outline-none focus:border-accent-blue"
-                  :value="modelValue[def.keyTo] || ''"
-                  @input="onDateInput(def.keyTo, $event.target.value)"
-                />
-              </div>
+              <DatePicker
+                :model-value="modelValue[def.keyFrom] || null"
+                placeholder="Начало"
+                @update:model-value="onDateInput(def.keyFrom, $event)"
+              />
+              <DatePicker :model-value="modelValue[def.keyTo] || null" placeholder="Конец" @update:model-value="onDateInput(def.keyTo, $event)" />
             </div>
             <div class="flex gap-1.5 px-1 pt-2 justify-end">
               <button
@@ -208,20 +196,9 @@
         </template>
         <template v-else-if="def.type === 'daterange'">
           <label class="text-xs font-medium text-muted-foreground">{{ def.label }}</label>
-          <div class="flex items-center gap-2">
-            <input
-              type="date"
-              class="flex-1 px-3 py-2.5 border border-border rounded-xl bg-background text-foreground text-sm outline-none"
-              :value="modelValue[def.keyFrom] || ''"
-              @input="onDateInput(def.keyFrom, $event.target.value)"
-            />
-            <span class="text-muted-foreground">—</span>
-            <input
-              type="date"
-              class="flex-1 px-3 py-2.5 border border-border rounded-xl bg-background text-foreground text-sm outline-none"
-              :value="modelValue[def.keyTo] || ''"
-              @input="onDateInput(def.keyTo, $event.target.value)"
-            />
+          <div class="flex flex-col gap-2">
+            <DatePicker :model-value="modelValue[def.keyFrom] || null" placeholder="Начало" @update:model-value="onDateInput(def.keyFrom, $event)" />
+            <DatePicker :model-value="modelValue[def.keyTo] || null" placeholder="Конец" @update:model-value="onDateInput(def.keyTo, $event)" />
           </div>
         </template>
       </div>
@@ -262,6 +239,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import Icon from "./Icon.vue";
+import DatePicker from "./DatePicker.vue";
 
 const props = defineProps({
   modelValue: {

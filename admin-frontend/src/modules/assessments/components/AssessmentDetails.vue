@@ -336,14 +336,14 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { getAssessmentDetails, exportAssessmentToExcel } from "../api/assessments";
-import Card from "./ui/Card.vue";
-import Button from "./ui/Button.vue";
-import Badge from "./ui/Badge.vue";
-import Preloader from "./ui/Preloader.vue";
-import Icon from "./ui/Icon.vue";
-import { useToast } from "../composables/useToast";
-import { formatBranchLabel } from "../utils/branch";
+import { getAssessmentDetails, exportAssessmentToExcel } from "@/api/assessments";
+import Card from "@/components/ui/Card.vue";
+import Button from "@/components/ui/Button.vue";
+import Badge from "@/components/ui/Badge.vue";
+import Preloader from "@/components/ui/Preloader.vue";
+import Icon from "@/components/ui/Icon.vue";
+import { useToast } from "@/composables/useToast";
+import { formatBranchLabel } from "@/utils/branch";
 
 const props = defineProps({
   assessmentId: {

@@ -1,12 +1,12 @@
 <template>
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-modal p-4">
+    <div class="bg-card rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
       <!-- Заголовок -->
-      <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-        <h3 class="text-xl font-semibold text-gray-900">
+      <div class="sticky top-0 bg-card border-b border-border px-6 py-4 flex justify-between items-center">
+        <h3 class="text-xl font-semibold text-foreground">
           {{ isEditing ? "Редактировать правило" : "Новое правило" }}
         </h3>
-        <button @click="$emit('close')" class="text-gray-400 hover:text-gray-600">
+        <button @click="$emit('close')" class="text-muted-foreground hover:text-foreground transition-colors">
           <Icon name="X" :size="24" aria-hidden="true" />
         </button>
       </div>
@@ -16,25 +16,25 @@
         <!-- Основные поля -->
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1"> Код правила <span class="text-red-500">*</span> </label>
+            <label class="block text-sm font-medium text-foreground mb-1"> Код правила <span class="text-destructive">*</span> </label>
             <input
               v-model="formData.code"
               type="text"
               required
               :disabled="isEditing"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
+              class="w-full px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground placeholder:text-muted-foreground disabled:bg-muted disabled:cursor-not-allowed"
               placeholder="base_score"
             />
-            <p class="mt-1 text-xs text-gray-500">Уникальный идентификатор (только английские буквы, цифры, _)</p>
+            <p class="mt-1 text-xs text-muted-foreground">Уникальный идентификатор (только английские буквы, цифры, _)</p>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1"> Название <span class="text-red-500">*</span> </label>
+            <label class="block text-sm font-medium text-foreground mb-1"> Название <span class="text-destructive">*</span> </label>
             <input
               v-model="formData.name"
               type="text"
               required
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              class="w-full px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground placeholder:text-muted-foreground"
               placeholder="Базовые очки"
             />
           </div>
@@ -42,11 +42,11 @@
 
         <div class="grid grid-cols-3 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1"> Тип правила <span class="text-red-500">*</span> </label>
+            <label class="block text-sm font-medium text-foreground mb-1"> Тип правила <span class="text-destructive">*</span> </label>
             <select
               v-model="formData.ruleType"
               required
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              class="w-full px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground"
             >
               <option value="points">Очки</option>
               <option value="badge">Бейдж</option>
@@ -54,113 +54,98 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Приоритет</label>
+            <label class="block text-sm font-medium text-foreground mb-1">Приоритет</label>
             <input
               v-model.number="formData.priority"
               type="number"
               min="0"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              class="w-full px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground"
             />
-            <p class="mt-1 text-xs text-gray-500">Меньше = выше</p>
+            <p class="mt-1 text-xs text-muted-foreground">Меньше = выше</p>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Статус</label>
+            <label class="block text-sm font-medium text-foreground mb-1">Статус</label>
             <div class="flex items-center h-10">
-              <input v-model="formData.isActive" type="checkbox" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" />
-              <label class="ml-2 text-sm text-gray-700">Активно</label>
+              <input v-model="formData.isActive" type="checkbox" class="h-4 w-4 text-primary focus:ring-ring border-input rounded" />
+              <label class="ml-2 text-sm text-foreground">Активно</label>
             </div>
           </div>
         </div>
 
         <!-- Период действия -->
         <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Активно с</label>
-            <input
-              v-model="formData.activeFrom"
-              type="datetime-local"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Активно до</label>
-            <input
-              v-model="formData.activeTo"
-              type="datetime-local"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
+          <DatePicker v-model="formData.activeFrom" label="Активно с" />
+          <DatePicker v-model="formData.activeTo" label="Активно до" />
         </div>
 
         <!-- Условия (Condition) -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Условия применения</label>
-          <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+          <label class="block text-sm font-medium text-foreground mb-2">Условия применения</label>
+          <div class="bg-muted/40 p-4 rounded-lg space-y-3">
             <div>
-              <label class="text-xs text-gray-600">Событие</label>
-              <select v-model="conditionForm.event" class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+              <label class="text-xs text-muted-foreground">Событие</label>
+              <select v-model="conditionForm.event" class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground">
                 <option value="attempt">Завершение попытки</option>
                 <option value="answer">Ответ на вопрос</option>
               </select>
             </div>
             <div class="grid grid-cols-2 gap-3">
               <label class="flex items-center">
-                <input v-model="conditionForm.passed" type="checkbox" class="rounded border-gray-300 text-indigo-600" />
-                <span class="ml-2 text-sm">Тест пройден</span>
+                <input v-model="conditionForm.passed" type="checkbox" class="rounded border-input text-primary" />
+                <span class="ml-2 text-sm text-foreground">Тест пройден</span>
               </label>
               <label class="flex items-center">
-                <input v-model="conditionForm.perfect" type="checkbox" class="rounded border-gray-300 text-indigo-600" />
-                <span class="ml-2 text-sm">Идеальный результат</span>
+                <input v-model="conditionForm.perfect" type="checkbox" class="rounded border-input text-primary" />
+                <span class="ml-2 text-sm text-foreground">Идеальный результат</span>
               </label>
             </div>
             <div v-if="conditionForm.event === 'answer'">
               <label class="flex items-center">
-                <input v-model="conditionForm.answer_correct" type="checkbox" class="rounded border-gray-300 text-indigo-600" />
-                <span class="ml-2 text-sm">Ответ верный</span>
+                <input v-model="conditionForm.answer_correct" type="checkbox" class="rounded border-input text-primary" />
+                <span class="ml-2 text-sm text-foreground">Ответ верный</span>
               </label>
             </div>
             <div class="grid grid-cols-3 gap-3">
               <div>
-                <label class="text-xs text-gray-600">Мин. балл (%)</label>
+                <label class="text-xs text-muted-foreground">Мин. балл (%)</label>
                 <input
                   v-model.number="conditionForm.min_score"
                   type="number"
                   min="0"
                   max="100"
-                  class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                  class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
                 />
               </div>
               <div>
-                <label class="text-xs text-gray-600">Макс. балл (%)</label>
+                <label class="text-xs text-muted-foreground">Макс. балл (%)</label>
                 <input
                   v-model.number="conditionForm.max_score"
                   type="number"
                   min="0"
                   max="100"
-                  class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                  class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
                 />
               </div>
               <div>
-                <label class="text-xs text-gray-600">Макс. время (ratio)</label>
+                <label class="text-xs text-muted-foreground">Макс. время (ratio)</label>
                 <input
                   v-model.number="conditionForm.max_time_ratio"
                   type="number"
                   step="0.01"
                   min="0"
                   max="1"
-                  class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                  class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
                 />
               </div>
             </div>
             <div>
-              <label class="text-xs text-gray-600">Мин. серия</label>
+              <label class="text-xs text-muted-foreground">Мин. серия</label>
               <input
                 v-model.number="conditionForm.min_streak"
                 type="number"
                 min="0"
-                class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
               />
             </div>
           </div>
@@ -168,32 +153,41 @@
 
         <!-- Формула -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Формула начисления</label>
-          <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+          <label class="block text-sm font-medium text-foreground mb-2">Формула начисления</label>
+          <div class="bg-muted/40 p-4 rounded-lg space-y-3">
             <div v-if="formData.ruleType === 'points'">
               <div>
-                <label class="text-xs text-gray-600">Режим</label>
-                <select v-model="formulaForm.mode" class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                <label class="text-xs text-muted-foreground">Режим</label>
+                <select v-model="formulaForm.mode" class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground">
                   <option value="fixed">Фиксированное значение</option>
                   <option value="percent_of_score">Процент от балла</option>
                   <option value="multiplier">Множитель</option>
                 </select>
               </div>
               <div class="mt-2">
-                <label class="text-xs text-gray-600">Значение</label>
-                <input v-model.number="formulaForm.value" type="number" step="0.01" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                <label class="text-xs text-muted-foreground">Значение</label>
+                <input
+                  v-model.number="formulaForm.value"
+                  type="number"
+                  step="0.01"
+                  class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
+                />
               </div>
               <div v-if="formulaForm.mode === 'percent_of_score'" class="mt-2">
-                <label class="text-xs text-gray-600">Максимальный лимит (cap)</label>
-                <input v-model.number="formulaForm.cap" type="number" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                <label class="text-xs text-muted-foreground">Максимальный лимит (cap)</label>
+                <input
+                  v-model.number="formulaForm.cap"
+                  type="number"
+                  class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
+                />
               </div>
             </div>
             <div v-else>
-              <label class="text-xs text-gray-600">Код бейджа</label>
+              <label class="text-xs text-muted-foreground">Код бейджа</label>
               <input
                 v-model="formulaForm.badge_code"
                 type="text"
-                class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
                 placeholder="perfect_run"
               />
             </div>
@@ -202,32 +196,32 @@
 
         <!-- Scope (опционально) -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2"> Область применения (необязательно) </label>
-          <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+          <label class="block text-sm font-medium text-foreground mb-2">Область применения (необязательно)</label>
+          <div class="bg-muted/40 p-4 rounded-lg space-y-3">
             <div>
-              <label class="text-xs text-gray-600">ID филиалов (через запятую)</label>
+              <label class="text-xs text-muted-foreground">ID филиалов (через запятую)</label>
               <input
                 v-model="scopeForm.branchIdsStr"
                 type="text"
-                class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
                 placeholder="1,2,3"
               />
             </div>
             <div>
-              <label class="text-xs text-gray-600">ID должностей (через запятую)</label>
+              <label class="text-xs text-muted-foreground">ID должностей (через запятую)</label>
               <input
                 v-model="scopeForm.positionIdsStr"
                 type="text"
-                class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
                 placeholder="1,2"
               />
             </div>
             <div>
-              <label class="text-xs text-gray-600">ID аттестаций (через запятую)</label>
+              <label class="text-xs text-muted-foreground">ID аттестаций (через запятую)</label>
               <input
                 v-model="scopeForm.assessmentIdsStr"
                 type="text"
-                class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
                 placeholder="10,15"
               />
             </div>
@@ -235,14 +229,18 @@
         </div>
 
         <!-- Кнопки -->
-        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button type="button" @click="$emit('close')" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+        <div class="flex justify-end gap-3 pt-4 border-t border-border">
+          <button
+            type="button"
+            @click="$emit('close')"
+            class="px-4 py-2 border border-border rounded-lg text-foreground hover:bg-muted/50 transition-colors"
+          >
             Отмена
           </button>
           <button
             type="submit"
             :disabled="saving"
-            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {{ saving ? "Сохранение..." : "Сохранить" }}
           </button>
@@ -256,7 +254,8 @@
 import { ref, computed, watch } from "vue";
 import { useToast } from "@/composables/useToast";
 import gamificationRulesApi from "@/api/gamificationRules";
-import Icon from "./ui/Icon.vue";
+import Icon from "@/components/ui/Icon.vue";
+import DatePicker from "@/components/ui/DatePicker.vue";
 
 const props = defineProps({
   rule: {
@@ -344,7 +343,7 @@ watch(
     } else if (conditionForm.value.answer_correct === null || conditionForm.value.answer_correct === undefined) {
       conditionForm.value.answer_correct = true;
     }
-  }
+  },
 );
 
 function parseIds(str) {

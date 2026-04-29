@@ -82,13 +82,13 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from "vue";
-import { getQuestionById, createQuestion, updateQuestion } from "../api/questionBank";
-import Preloader from "./ui/Preloader.vue";
-import Input from "./ui/Input.vue";
-import Select from "./ui/Select.vue";
-import Button from "./ui/Button.vue";
-import Textarea from "./ui/Textarea.vue";
-import { useToast } from "../composables/useToast";
+import { getQuestionById, createQuestion, updateQuestion } from "@/api/questionBank";
+import Preloader from "@/components/ui/Preloader.vue";
+import Input from "@/components/ui/Input.vue";
+import Select from "@/components/ui/Select.vue";
+import Button from "@/components/ui/Button.vue";
+import Textarea from "@/components/ui/Textarea.vue";
+import { useToast } from "@/composables/useToast";
 
 const props = defineProps({
   questionId: {

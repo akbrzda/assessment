@@ -7,8 +7,8 @@
         <Card class="filters-card">
           <div class="filters-grid">
             <Select v-model="filters.period" :options="periodOptions" label="Период" @change="handlePeriodChange" />
-            <Input v-if="isCustomPeriod" v-model="filters.dateFrom" type="date" label="Дата от" />
-            <Input v-if="isCustomPeriod" v-model="filters.dateTo" type="date" label="Дата до" />
+            <DatePicker v-if="isCustomPeriod" v-model="filters.dateFrom" label="Дата от" />
+            <DatePicker v-if="isCustomPeriod" v-model="filters.dateTo" label="Дата до" />
             <Select v-model="filters.branchId" :options="branchOptions" label="Филиал" @change="handleBranchChange" />
             <Select v-model="filters.positionId" :options="positionOptions" label="Должность" @change="handlePositionChange" />
           </div>
@@ -266,6 +266,7 @@ import Icon from "@/components/ui/Icon.vue";
 import Button from "@/components/ui/Button.vue";
 import Select from "@/components/ui/Select.vue";
 import Input from "@/components/ui/Input.vue";
+import DatePicker from "@/components/ui/DatePicker.vue";
 import { formatBranchLabel } from "@/utils/branch";
 
 const router = useRouter();

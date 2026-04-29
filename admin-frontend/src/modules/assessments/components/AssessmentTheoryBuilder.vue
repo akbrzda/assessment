@@ -127,14 +127,14 @@
 import { computed } from "vue";
 import draggable from "vuedraggable";
 import { GripVertical } from "lucide-vue-next";
-import Input from "./ui/Input.vue";
-import Select from "./ui/Select.vue";
-import Textarea from "./ui/Textarea.vue";
-import FullscreenTextarea from "./ui/FullscreenTextarea.vue";
-import Button from "./ui/Button.vue";
-import { cloneTheoryData, createTheoryBlock } from "../utils/theory";
-import { normalizeVideoUrl } from "../utils/videoUrl";
-import { calculateReadingSeconds, formatReadingTime, sumReadingSeconds } from "../utils/readingTime";
+import Input from "@/components/ui/Input.vue";
+import Select from "@/components/ui/Select.vue";
+import Textarea from "@/components/ui/Textarea.vue";
+import FullscreenTextarea from "@/components/ui/FullscreenTextarea.vue";
+import Button from "@/components/ui/Button.vue";
+import { cloneTheoryData, createTheoryBlock } from "@/utils/theory";
+import { normalizeVideoUrl } from "@/utils/videoUrl";
+import { calculateReadingSeconds, formatReadingTime, sumReadingSeconds } from "@/utils/readingTime";
 
 const props = defineProps({
   modelValue: {

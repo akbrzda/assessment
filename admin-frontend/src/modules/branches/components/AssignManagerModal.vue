@@ -37,13 +37,13 @@
 
 <script setup>
 import { ref, watch, onMounted, computed } from "vue";
-import { getBranches, getManagers, assignManagerToBranches } from "../api/branches";
-import Modal from "./ui/Modal.vue";
-import Preloader from "./ui/Preloader.vue";
-import Select from "./ui/Select.vue";
-import Button from "./ui/Button.vue";
-import { useToast } from "../composables/useToast";
-import { formatBranchLabel } from "../utils/branch";
+import { getBranches, getManagers, assignManagerToBranches } from "@/api/branches";
+import Modal from "@/components/ui/Modal.vue";
+import Preloader from "@/components/ui/Preloader.vue";
+import Select from "@/components/ui/Select.vue";
+import Button from "@/components/ui/Button.vue";
+import { useToast } from "@/composables/useToast";
+import { formatBranchLabel } from "@/utils/branch";
 
 const props = defineProps({
   modelValue: {

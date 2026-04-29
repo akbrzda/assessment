@@ -188,9 +188,9 @@
 <script setup>
 import { computed, reactive, ref, watch } from "vue";
 import { ChevronDown, ChevronRight, Info } from "lucide-vue-next";
-import { createAssessment, getAssessmentById, updateAssessment } from "../api/assessments";
-import { updateCourse } from "../api/courses";
-import { useToast } from "../composables/useToast";
+import { createAssessment, getAssessmentById, updateAssessment } from "@/api/assessments";
+import { updateCourse } from "@/api/courses";
+import { useToast } from "@/composables/useToast";
 
 const props = defineProps({
   course: {

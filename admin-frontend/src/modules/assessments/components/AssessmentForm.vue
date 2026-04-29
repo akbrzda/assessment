@@ -11,26 +11,8 @@
         <Textarea v-model="form.description" label="Описание" :rows="3" />
 
         <div class="form-grid-2">
-          <Input
-            v-model="form.openAt"
-            type="date"
-            label="Дата открытия"
-            min="1900-01-01"
-            :max="maxDate"
-            required
-            :error="errors.openAt"
-            @blur="validateDateField('openAt')"
-          />
-          <Input
-            v-model="form.closeAt"
-            type="date"
-            label="Дата закрытия"
-            min="1900-01-01"
-            :max="maxDate"
-            required
-            :error="errors.closeAt"
-            @blur="validateDateField('closeAt')"
-          />
+          <DatePicker v-model="form.openAt" label="Дата открытия" required :error="errors.openAt" />
+          <DatePicker v-model="form.closeAt" label="Дата закрытия" required :error="errors.closeAt" />
         </div>
 
         <div class="form-grid-3">
@@ -147,16 +129,17 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from "vue";
-import { getAssessmentById, createAssessment, updateAssessment } from "../api/assessments";
-import { getReferences } from "../api/users";
-import { validateDate, validateDateRange, dateToISOWithMidnight } from "../utils/dateValidation";
-import Preloader from "./ui/Preloader.vue";
-import Input from "./ui/Input.vue";
-import Select from "./ui/Select.vue";
-import Button from "./ui/Button.vue";
-import Textarea from "./ui/Textarea.vue";
-import { useToast } from "../composables/useToast";
-import { formatBranchLabel } from "../utils/branch";
+import { getAssessmentById, createAssessment, updateAssessment } from "@/api/assessments";
+import { getReferences } from "@/api/users";
+import { validateDate, validateDateRange, dateToISOWithMidnight } from "@/utils/dateValidation";
+import Preloader from "@/components/ui/Preloader.vue";
+import Input from "@/components/ui/Input.vue";
+import Select from "@/components/ui/Select.vue";
+import Button from "@/components/ui/Button.vue";
+import Textarea from "@/components/ui/Textarea.vue";
+import DatePicker from "@/components/ui/DatePicker.vue";
+import { useToast } from "@/composables/useToast";
+import { formatBranchLabel } from "@/utils/branch";
 
 const props = defineProps({
   assessmentId: {

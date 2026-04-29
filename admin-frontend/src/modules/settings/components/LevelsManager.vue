@@ -99,14 +99,14 @@
 
 <script setup>
 import { ref, onMounted, computed } from "vue";
-import levelsApi from "../api/levels";
-import Card from "./ui/Card.vue";
-import Modal from "./ui/Modal.vue";
-import Button from "./ui/Button.vue";
-import Input from "./ui/Input.vue";
-import Textarea from "./ui/Textarea.vue";
-import Icon from "./ui/Icon.vue";
-import { useToast } from "../composables/useToast";
+import levelsApi from "@/api/levels";
+import Card from "@/components/ui/Card.vue";
+import Modal from "@/components/ui/Modal.vue";
+import Button from "@/components/ui/Button.vue";
+import Input from "@/components/ui/Input.vue";
+import Textarea from "@/components/ui/Textarea.vue";
+import Icon from "@/components/ui/Icon.vue";
+import { useToast } from "@/composables/useToast";
 
 const levels = ref([]);
 const stats = ref([]);

@@ -2,10 +2,10 @@
   <div class="gamification-rules-manager">
     <!-- Заголовок и кнопка добавления -->
     <div class="flex justify-between items-center mb-6">
-      <h2 class="text-2xl font-bold text-gray-900">Правила геймификации</h2>
+      <h2 class="text-2xl font-bold text-foreground">Правила геймификации</h2>
       <button
         @click="openCreateModal"
-        class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+        class="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
       >
         <Icon name="Plus" :size="20" aria-hidden="true" />
         Добавить правило
@@ -13,18 +13,18 @@
     </div>
 
     <!-- Фильтры -->
-    <div class="bg-white p-4 rounded-lg shadow-sm mb-4 flex gap-4">
+    <div class="bg-card p-4 rounded-lg shadow-sm mb-4 flex gap-4">
       <div class="flex-1">
         <input
           v-model="filters.search"
           type="text"
           placeholder="Поиск по названию или коду..."
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          class="w-full px-4 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground placeholder:text-muted-foreground"
         />
       </div>
       <select
         v-model="filters.ruleType"
-        class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+        class="px-4 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground"
       >
         <option value="">Все типы</option>
         <option value="points">Очки</option>
@@ -32,7 +32,7 @@
       </select>
       <select
         v-model="filters.isActive"
-        class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+        class="px-4 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground"
       >
         <option value="">Все статусы</option>
         <option value="true">Активные</option>
@@ -41,69 +41,72 @@
     </div>
 
     <!-- Таблица правил -->
-    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+    <div class="bg-card rounded-lg shadow-sm overflow-hidden">
       <div v-if="loading" class="p-8 text-center">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-        <p class="mt-2 text-gray-600">Загрузка...</p>
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <p class="mt-2 text-muted-foreground">Загрузка...</p>
       </div>
 
-      <div v-else-if="error" class="p-8 text-center text-red-600">
+      <div v-else-if="error" class="p-8 text-center text-destructive">
         <p>{{ error }}</p>
-        <button @click="loadRules" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Повторить</button>
+        <button @click="loadRules" class="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">Повторить</button>
       </div>
 
-      <table v-else-if="filteredRules.length > 0" class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
+      <table v-else-if="filteredRules.length > 0" class="min-w-full divide-y divide-border">
+        <thead class="bg-muted/40">
           <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Код</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Название</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Тип</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Приоритет</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Период</th>
-            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Код</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Название</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Тип</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Приоритет</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Статус</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Период</th>
+            <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Действия</th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="rule in filteredRules" :key="rule.id" class="hover:bg-gray-50">
+        <tbody class="bg-card divide-y divide-border">
+          <tr v-for="rule in filteredRules" :key="rule.id" class="hover:bg-muted/30">
             <td class="px-6 py-4 whitespace-nowrap">
-              <code class="text-sm font-mono text-gray-900">{{ rule.code }}</code>
+              <code class="text-sm font-mono text-foreground">{{ rule.code }}</code>
             </td>
             <td class="px-6 py-4">
-              <div class="text-sm font-medium text-gray-900">{{ rule.name }}</div>
+              <div class="text-sm font-medium text-foreground">{{ rule.name }}</div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <span
                 :class="[
                   'px-2 py-1 text-xs font-medium rounded-full',
-                  rule.ruleType === 'points' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800',
+                  rule.ruleType === 'points' ? 'bg-accent-blue-soft text-accent-blue' : 'bg-accent-purple-soft text-accent-purple',
                 ]"
               >
                 {{ rule.ruleType === "points" ? "Очки" : "Бейдж" }}
               </span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
               {{ rule.priority }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <span
-                :class="['px-2 py-1 text-xs font-medium rounded-full', rule.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800']"
+                :class="[
+                  'px-2 py-1 text-xs font-medium rounded-full',
+                  rule.isActive ? 'bg-accent-green-soft text-accent-green' : 'bg-muted text-muted-foreground',
+                ]"
               >
                 {{ rule.isActive ? "Активно" : "Неактивно" }}
               </span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
               <div v-if="rule.activeFrom || rule.activeTo">
                 <div v-if="rule.activeFrom">С: {{ formatDate(rule.activeFrom) }}</div>
                 <div v-if="rule.activeTo">До: {{ formatDate(rule.activeTo) }}</div>
               </div>
-              <span v-else class="text-gray-400">Всегда</span>
+              <span v-else class="text-muted-foreground/60">Всегда</span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-              <button @click="openEditModal(rule)" class="text-indigo-600 hover:text-indigo-900 mr-3" title="Редактировать">
+              <button @click="openEditModal(rule)" class="text-primary hover:text-primary/80 mr-3" title="Редактировать">
                 <Icon name="Pencil" :size="20" aria-hidden="true" />
               </button>
-              <button @click="confirmDelete(rule)" class="text-red-600 hover:text-red-900" title="Удалить">
+              <button @click="confirmDelete(rule)" class="text-destructive hover:text-destructive/80" title="Удалить">
                 <Icon name="Trash2" :size="20" aria-hidden="true" />
               </button>
             </td>
@@ -111,9 +114,9 @@
         </tbody>
       </table>
 
-      <div v-else class="p-8 text-center text-gray-500">
+      <div v-else class="p-8 text-center text-muted-foreground">
         <p>Правила не найдены</p>
-        <button @click="openCreateModal" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+        <button @click="openCreateModal" class="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
           Создать первое правило
         </button>
       </div>
@@ -129,7 +132,7 @@ import { ref, computed, onMounted } from "vue";
 import { useToast } from "@/composables/useToast";
 import gamificationRulesApi from "@/api/gamificationRules";
 import GamificationRuleForm from "./GamificationRuleForm.vue";
-import Icon from "./ui/Icon.vue";
+import Icon from "@/components/ui/Icon.vue";
 
 const { showSuccess, showError } = useToast();
 

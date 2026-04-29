@@ -12,8 +12,8 @@
     <!-- Фильтры -->
     <Card class="filters-card">
       <div class="filters-grid">
-        <Input v-model="filters.dateFrom" label="Дата от" type="date" />
-        <Input v-model="filters.dateTo" label="Дата до" type="date" />
+        <DatePicker v-model="filters.dateFrom" label="Дата от" />
+        <DatePicker v-model="filters.dateTo" label="Дата до" />
         <Select v-model="filters.branchId" label="Филиал" :options="branchOptions" />
         <Select v-model="filters.positionId" label="Должность" :options="positionOptions" />
       </div>
@@ -203,6 +203,7 @@ import Button from "@/components/ui/Button.vue";
 import Input from "@/components/ui/Input.vue";
 import Select from "@/components/ui/Select.vue";
 import Preloader from "@/components/ui/Preloader.vue";
+import DatePicker from "@/components/ui/DatePicker.vue";
 import SkeletonTable from "@/components/ui/SkeletonTable.vue";
 import BarChart from "@/components/charts/BarChart.vue";
 import LineChart from "@/components/charts/LineChart.vue";

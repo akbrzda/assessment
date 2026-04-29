@@ -103,10 +103,10 @@
 
 <script setup>
 import { ref, watch } from "vue";
-import { getAssessmentReport } from "../api/analytics";
-import Modal from "./ui/Modal.vue";
-import Preloader from "./ui/Preloader.vue";
-import { useToast } from "../composables/useToast";
+import { getAssessmentReport } from "@/api/analytics";
+import Modal from "@/components/ui/Modal.vue";
+import Preloader from "@/components/ui/Preloader.vue";
+import { useToast } from "@/composables/useToast";
 
 const props = defineProps({
   modelValue: {

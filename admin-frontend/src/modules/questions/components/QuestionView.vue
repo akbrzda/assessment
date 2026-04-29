@@ -59,10 +59,10 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import { getQuestionById } from "../api/questionBank";
-import Preloader from "./ui/Preloader.vue";
-import Icon from "./ui/Icon.vue";
-import { useToast } from "../composables/useToast";
+import { getQuestionById } from "@/api/questionBank";
+import Preloader from "@/components/ui/Preloader.vue";
+import Icon from "@/components/ui/Icon.vue";
+import { useToast } from "@/composables/useToast";
 
 const props = defineProps({
   questionId: {

@@ -10,6 +10,7 @@
       :disabled="disabled"
       :readonly="readonly"
       :required="required"
+      :maxlength="maxLength || undefined"
       :rows="rows"
       :class="
         cn(
@@ -19,16 +20,30 @@
           'disabled:cursor-not-allowed disabled:opacity-50',
           'read-only:bg-muted read-only:cursor-default',
           error && 'border-destructive focus:ring-destructive/30',
+          success && !error && 'border-accent-green focus:ring-accent-green/30',
         )
       "
       @input="$emit('update:modelValue', $event.target.value)"
     ></textarea>
-    <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
-    <p v-else-if="hint" class="text-xs text-muted-foreground">{{ hint }}</p>
+
+    <div class="flex items-start justify-between gap-2">
+      <div class="flex-1">
+        <p v-if="error" class="text-xs text-destructive">
+          {{ error }}
+          <span v-if="showCounter && maxLength" class="ml-1">{{ charCount }} / {{ maxLength }}</span>
+        </p>
+        <p v-else-if="success" class="text-xs text-accent-green">{{ success }}</p>
+        <p v-else-if="hint" class="text-xs text-muted-foreground">{{ hint }}</p>
+      </div>
+      <span v-if="showCounter && maxLength && !error" :class="['text-xs shrink-0', isNearLimit ? 'text-destructive' : 'text-muted-foreground']"
+        >{{ charCount }} / {{ maxLength }}</span
+      >
+    </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from "vue";
 import { cn } from "@/lib/utils";
 
 const props = defineProps({
@@ -37,11 +52,17 @@ const props = defineProps({
   placeholder: String,
   error: String,
   hint: String,
+  success: String,
   disabled: Boolean,
   readonly: Boolean,
   required: Boolean,
   rows: { type: Number, default: 3 },
+  maxLength: { type: Number, default: null },
+  showCounter: { type: Boolean, default: false },
 });
 
 defineEmits(["update:modelValue"]);
+
+const charCount = computed(() => (props.modelValue || "").length);
+const isNearLimit = computed(() => props.maxLength && charCount.value >= props.maxLength * 0.9);
 </script>

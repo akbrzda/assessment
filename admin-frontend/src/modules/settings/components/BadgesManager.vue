@@ -144,16 +144,16 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from "vue";
-import badgesApi from "../api/badges";
-import Card from "./ui/Card.vue";
-import Modal from "./ui/Modal.vue";
-import Button from "./ui/Button.vue";
-import Input from "./ui/Input.vue";
-import Select from "./ui/Select.vue";
-import Textarea from "./ui/Textarea.vue";
-import Icon from "./ui/Icon.vue";
+import badgesApi from "@/api/badges";
+import Card from "@/components/ui/Card.vue";
+import Modal from "@/components/ui/Modal.vue";
+import Button from "@/components/ui/Button.vue";
+import Input from "@/components/ui/Input.vue";
+import Select from "@/components/ui/Select.vue";
+import Textarea from "@/components/ui/Textarea.vue";
+import Icon from "@/components/ui/Icon.vue";
 import { API_BASE_URL } from "@/env";
-import { useToast } from "../composables/useToast";
+import { useToast } from "@/composables/useToast";
 
 const apiBaseUrl = API_BASE_URL || "http://localhost:3001/api";
 const apiUrl = apiBaseUrl.replace("/api", "");

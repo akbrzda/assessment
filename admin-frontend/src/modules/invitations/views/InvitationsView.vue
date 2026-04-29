@@ -443,13 +443,13 @@ const getStatusVariant = (status) => {
 const statusBadgeClass = (status) => {
   switch (status) {
     case "active":
-      return "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300";
+      return "bg-accent-green-soft text-accent-green";
     case "used":
-      return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
+      return "bg-accent-blue-soft text-accent-blue";
     case "expired":
-      return "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300";
+      return "bg-destructive/10 text-destructive";
     default:
-      return "bg-gray-100 text-gray-600 dark:bg-gray-800/60 dark:text-gray-300";
+      return "bg-muted text-muted-foreground";
   }
 };
 

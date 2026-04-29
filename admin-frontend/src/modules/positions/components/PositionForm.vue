@@ -49,11 +49,11 @@
 
 <script setup>
 import { onMounted, ref, watch } from "vue";
-import { createPosition, getPositionById, updatePosition } from "../api/positions";
-import Preloader from "./ui/Preloader.vue";
-import Input from "./ui/Input.vue";
-import Button from "./ui/Button.vue";
-import { useToast } from "../composables/useToast";
+import { createPosition, getPositionById, updatePosition } from "@/api/positions";
+import Preloader from "@/components/ui/Preloader.vue";
+import Input from "@/components/ui/Input.vue";
+import Button from "@/components/ui/Button.vue";
+import { useToast } from "@/composables/useToast";
 
 const props = defineProps({
   positionId: {

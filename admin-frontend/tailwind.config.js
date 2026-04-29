@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Montserrat", "sans-serif"],
+        sans: ["Inter", "sans-serif"],
       },
       colors: {
         background: "hsl(var(--background))",
@@ -55,18 +55,30 @@ export default {
         "accent-purple-soft": "hsl(var(--accent-purple-soft))",
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-        xl: "calc(var(--radius) + 4px)",
-        "2xl": "calc(var(--radius) + 8px)",
+        sm: "4px",
+        md: "6px",
+        lg: "8px",
+        xl: "12px",
+        "2xl": "16px",
+        full: "9999px",
       },
       boxShadow: {
-        sm: "0 2px 8px rgba(0, 0, 0, 0.05)",
-        DEFAULT: "0 4px 12px rgba(0, 0, 0, 0.08)",
-        md: "0 8px 20px rgba(0, 0, 0, 0.1)",
-        lg: "0 12px 28px rgba(0, 0, 0, 0.12)",
-        modal: "0 20px 60px rgba(0, 0, 0, 0.3)",
+        sm: "0 1px 2px rgba(17, 24, 39, 0.05)",
+        DEFAULT: "0 1px 3px rgba(17, 24, 39, 0.1), 0 1px 2px rgba(17, 24, 39, 0.1)",
+        md: "0 4px 6px rgba(17, 24, 39, 0.1), 0 2px 4px rgba(17, 24, 39, 0.1)",
+        lg: "0 10px 15px rgba(17, 24, 39, 0.1), 0 4px 6px rgba(17, 24, 39, 0.1)",
+        xl: "0 20px 25px rgba(17, 24, 39, 0.1), 0 8px 10px rgba(17, 24, 39, 0.1)",
+        "2xl": "0 25px 50px rgba(17, 24, 39, 0.25)",
+        modal: "0 25px 50px rgba(17, 24, 39, 0.25)",
+      },
+      zIndex: {
+        dropdown: "1000",
+        sticky: "1020",
+        fixed: "1030",
+        "modal-backdrop": "1040",
+        modal: "1050",
+        popover: "1060",
+        toast: "1070",
       },
       animation: {
         "skeleton-pulse": "skeleton-pulse 1.8s ease-in-out infinite",

@@ -9,10 +9,7 @@
       leave-to-class="opacity-0"
     >
       <div v-if="isVisible" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click="handleOverlayClick">
-        <div
-          :class="cn('bg-background rounded-xl shadow-modal max-h-[90vh] overflow-y-auto w-full animate-in fade-in-0 zoom-in-95', sizeClass)"
-          @click.stop
-        >
+        <div :class="cn('bg-background rounded-xl shadow-modal max-h-[90vh] overflow-y-auto w-full', sizeClass)" @click.stop>
           <div v-if="title || closable" class="flex items-center justify-between px-6 py-4 border-b border-border bg-muted">
             <h2 v-if="title" class="text-xl font-semibold text-foreground m-0">{{ title }}</h2>
             <button

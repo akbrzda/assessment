@@ -56,12 +56,12 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import { getCategories, createCategory, updateCategory, deleteCategory } from "../api/questionBank";
-import Preloader from "./ui/Preloader.vue";
-import Input from "./ui/Input.vue";
-import Button from "./ui/Button.vue";
-import Textarea from "./ui/Textarea.vue";
-import { useToast } from "../composables/useToast";
+import { getCategories, createCategory, updateCategory, deleteCategory } from "@/api/questionBank";
+import Preloader from "@/components/ui/Preloader.vue";
+import Input from "@/components/ui/Input.vue";
+import Button from "@/components/ui/Button.vue";
+import Textarea from "@/components/ui/Textarea.vue";
+import { useToast } from "@/composables/useToast";
 
 const emit = defineEmits(["updated"]);
 

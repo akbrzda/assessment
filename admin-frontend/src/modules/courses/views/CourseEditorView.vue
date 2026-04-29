@@ -58,13 +58,7 @@
               <span class="field-counter">{{ (form.shortDescription || "").length }}/200</span>
             </div>
 
-            <Input
-              v-model="form.tagsInput"
-              label="Теги"
-              placeholder="Введите тег и нажмите Enter"
-              @keydown.enter.prevent="confirmTagInput"
-              @keydown.comma.prevent="confirmTagInput"
-            />
+            <TagsInput v-model="form.tags" label="Теги" placeholder="Введите тег и нажмите Enter..." />
 
             <Select v-model="form.difficulty" label="Уровень сложности" placeholder="Выберите уровень" :options="difficultyOptions" />
             <Select v-model="form.courseLanguage" label="Язык курса" placeholder="Выберите язык" :options="languageOptions" />
@@ -661,9 +655,7 @@
                 </ul>
               </div>
 
-              <div class="preview-info-note">
-                После публикации вы сможете редактировать курс. Изменения будут сразу доступны обучающимся.
-              </div>
+              <div class="preview-info-note">После публикации вы сможете редактировать курс. Изменения будут сразу доступны обучающимся.</div>
             </section>
           </aside>
         </div>
@@ -705,7 +697,7 @@
 
           <div class="add-assignment">
             <Input v-model="newAssignmentUserId" label="ID пользователя" type="number" min="1" placeholder="Введите ID" />
-            <Input v-model="newAssignmentDeadlineAt" label="Индивидуальный дедлайн" type="datetime-local" />
+            <DatePicker v-model="newAssignmentDeadlineAt" label="Индивидуальный дедлайн" />
             <Button :loading="addingAssignment" icon="plus" @click="handleAddAssignment">Добавить</Button>
           </div>
 
@@ -754,7 +746,6 @@
           </table>
         </div>
       </Card>
-
     </template>
     <Modal v-model="assessmentEditorOpen" size="xl" :title="assessmentEditorTitle">
       <AssessmentForm :assessment-id="assessmentEditorAssessmentId" @submit="handleAssessmentEditorSubmit" @cancel="assessmentEditorOpen = false" />
@@ -767,7 +758,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import draggable from "vuedraggable";
 import { Check, ChevronUp, Eye, FileText, GripVertical, Info, MoreVertical, Pencil, Search, Trash2, Upload, X } from "lucide-vue-next";
-import { Badge, Button, Card, Input, Modal, Preloader, Select, Textarea, WysiwygEditor } from "@/components/ui";
+import { Badge, Button, Card, Input, TagsInput, Modal, Preloader, Select, Textarea, WysiwygEditor, DatePicker } from "@/components/ui";
 import AssessmentForm from "@/modules/assessments/components/AssessmentForm.vue";
 import CourseFinalAssessmentStep from "@/modules/courses/components/CourseFinalAssessmentStep.vue";
 import CourseSectionTestsStep from "@/modules/courses/components/CourseSectionTestsStep.vue";
@@ -854,7 +845,7 @@ const form = ref({
   courseLanguage: "ru",
   coverUrl: "",
   category: "",
-  tagsInput: "",
+  tags: [],
   finalAssessmentId: "",
   availabilityMode: "unlimited",
   availabilityDays: "",
@@ -910,22 +901,6 @@ const categoryOptions = [
   { value: "management", label: "Управление" },
   { value: "other", label: "Другое" },
 ];
-
-const parsedTags = computed(() => {
-  return String(form.value.tagsInput || "")
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean);
-});
-
-const confirmTagInput = () => {
-  // теги сохраняются как строка через запятую
-};
-
-const removeTag = (index) => {
-  const tags = parsedTags.value.filter((_, i) => i !== index);
-  form.value.tagsInput = tags.join(", ");
-};
 
 const setLocalCoverPreview = (file) => {
   if (localCoverPreviewUrl.value) {
@@ -1365,7 +1340,7 @@ const applyCourseToForm = (courseItem) => {
     courseLanguage: courseItem.courseLanguage || "ru",
     coverUrl: courseItem.coverUrl || "",
     category: courseItem.category || "",
-    tagsInput: Array.isArray(courseItem.tags) ? courseItem.tags.join(", ") : "",
+    tags: Array.isArray(courseItem.tags) ? courseItem.tags : [],
     finalAssessmentId: courseItem.finalAssessmentId ? String(courseItem.finalAssessmentId) : "",
     availabilityMode: courseItem.availabilityMode || "unlimited",
     availabilityDays: courseItem.availabilityDays ? String(courseItem.availabilityDays) : "",
@@ -1387,7 +1362,7 @@ const loadCourse = async () => {
       courseLanguage: "ru",
       coverUrl: "",
       category: "",
-      tagsInput: "",
+      tags: [],
       finalAssessmentId: "",
       availabilityMode: "unlimited",
       availabilityDays: "",
@@ -1554,7 +1529,7 @@ const saveCourse = async (options = {}) => {
     title: form.value.title.trim(),
     description: form.value.description.trim(),
     category: form.value.category.trim() || null,
-    tags: parseTags(form.value.tagsInput),
+    tags: form.value.tags.slice(0, 20),
     finalAssessmentId: sanitizeOptionalNumber(form.value.finalAssessmentId),
     availabilityMode: form.value.availabilityMode || "unlimited",
     availabilityDays: form.value.availabilityMode === "relative_days" ? sanitizeOptionalNumber(form.value.availabilityDays) : null,
@@ -1594,7 +1569,12 @@ const saveCourse = async (options = {}) => {
       }
     }
     if (!silentSuccess) {
-      showToast(isEdit ? "\u041a\u0443\u0440\u0441 \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d" : "\u041a\u0443\u0440\u0441 \u0441\u043e\u0437\u0434\u0430\u043d", "success");
+      showToast(
+        isEdit
+          ? "\u041a\u0443\u0440\u0441 \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d"
+          : "\u041a\u0443\u0440\u0441 \u0441\u043e\u0437\u0434\u0430\u043d",
+        "success",
+      );
     }
 
     // Не показываем полный прелоадер при редактировании: это выглядит как перезагрузка страницы.

@@ -116,12 +116,12 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import { getBranchById, createBranch, updateBranch, getManagers, assignManager, removeManager } from "../api/branches";
-import Preloader from "./ui/Preloader.vue";
-import Input from "./ui/Input.vue";
-import Button from "./ui/Button.vue";
-import Select from "./ui/Select.vue";
-import { useToast } from "../composables/useToast";
+import { getBranchById, createBranch, updateBranch, getManagers, assignManager, removeManager } from "@/api/branches";
+import Preloader from "@/components/ui/Preloader.vue";
+import Input from "@/components/ui/Input.vue";
+import Button from "@/components/ui/Button.vue";
+import Select from "@/components/ui/Select.vue";
+import { useToast } from "@/composables/useToast";
 
 const props = defineProps({
   branchId: {

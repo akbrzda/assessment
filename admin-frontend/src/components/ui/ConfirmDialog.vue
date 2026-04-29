@@ -81,10 +81,10 @@ const iconName = computed(
 const iconBgClass = computed(
   () =>
     ({
-      warning: "bg-amber-500/10 text-amber-600",
-      danger: "bg-red-500/10 text-red-600",
-      info: "bg-blue-500/10 text-blue-600",
-      success: "bg-emerald-500/10 text-emerald-600",
+      warning: "bg-accent-orange-soft text-accent-orange",
+      danger: "bg-destructive/10 text-destructive",
+      info: "bg-accent-blue-soft text-accent-blue",
+      success: "bg-accent-green-soft text-accent-green",
     })[props.variant],
 );
 

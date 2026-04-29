@@ -34,23 +34,12 @@
       </PopoverTrigger>
 
       <PopoverPortal>
-        <PopoverContent
-          :class="
-            cn(
-              'z-50 w-auto rounded-xl border border-border bg-card p-3 shadow-md',
-              'data-[state=open]:animate-in data-[state=closed]:animate-out',
-              'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-              'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
-              'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
-            )
-          "
-          :side-offset="6"
-          align="start"
-        >
+        <PopoverContent :class="cn('z-[9999] w-auto rounded-xl border border-border bg-card p-3 shadow-lg')" :side-offset="6" align="start">
           <CalendarRoot
             v-model="calendarValue"
             v-slot="{ months, weekDays }"
             :locale="'ru-RU'"
+            :week-starts-on="1"
             :fixed-weeks="false"
             @update:model-value="onCalendarSelect"
           >
@@ -86,7 +75,7 @@
                           :month="month.value"
                           :class="
                             cn(
-                              'inline-flex h-8 w-8 items-center justify-center rounded-lg text-sm transition',
+                              'inline-flex h-8 w-8 items-center justify-center rounded-lg text-sm transition select-none',
                               'hover:bg-accent hover:text-accent-foreground',
                               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                               'data-[selected]:bg-primary data-[selected]:text-primary-foreground data-[selected]:hover:bg-primary data-[selected]:font-semibold',
@@ -95,7 +84,8 @@
                               'data-[disabled]:pointer-events-none data-[disabled]:opacity-30',
                             )
                           "
-                        />
+                          >{{ day.day }}</CalendarCellTrigger
+                        >
                       </CalendarCell>
                     </CalendarGridRow>
                   </CalendarGridBody>
