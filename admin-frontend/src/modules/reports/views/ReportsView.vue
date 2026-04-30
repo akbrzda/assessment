@@ -23,8 +23,7 @@
       </div>
     </Card>
 
-    <SkeletonTable v-if="loading" :rows="6" />
-    <div v-else class="reports-content">
+    <div class="reports-content">
       <!-- Общая статистика -->
       <div class="stats-grid">
         <Card class="stat-card blue" padding="none">
@@ -204,7 +203,6 @@ import Input from "@/components/ui/Input.vue";
 import Select from "@/components/ui/Select.vue";
 import Preloader from "@/components/ui/Preloader.vue";
 import DatePicker from "@/components/ui/DatePicker.vue";
-import SkeletonTable from "@/components/ui/SkeletonTable.vue";
 import BarChart from "@/components/charts/BarChart.vue";
 import LineChart from "@/components/charts/LineChart.vue";
 import ComboChart from "@/components/charts/ComboChart.vue";

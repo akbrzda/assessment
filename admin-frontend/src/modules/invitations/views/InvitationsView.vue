@@ -24,9 +24,7 @@
 
     <!-- Content -->
     <Card padding="none" class="invitations-card">
-      <SkeletonTable v-if="loading" :rows="6" />
-
-      <div v-else-if="paginatedInvitations.length === 0" class="empty-state">
+      <div v-if="paginatedInvitations.length === 0" class="empty-state">
         <p>Приглашения не найдены. Создайте первое приглашение, чтобы подключить управляющего.</p>
       </div>
 
@@ -178,7 +176,6 @@ import { ref, computed, onMounted, watch } from "vue";
 import { listInvitations, createInvitation, updateInvitation, deleteInvitation } from "@/api/invitations";
 import { getReferences } from "@/api/users";
 import Preloader from "@/components/ui/Preloader.vue";
-import SkeletonTable from "@/components/ui/SkeletonTable.vue";
 import Modal from "@/components/ui/Modal.vue";
 import Card from "@/components/ui/Card.vue";
 import Button from "@/components/ui/Button.vue";
@@ -622,7 +619,7 @@ onMounted(loadData);
 
 .invitation-code:hover {
   background-color: var(--accent-blue);
-  color: white;
+  opacity: 0.8;
 }
 
 .copy-btn {

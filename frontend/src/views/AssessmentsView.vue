@@ -28,18 +28,7 @@
         </button>
       </div>
 
-      <div v-if="isCoursesLoading" class="courses-list">
-        <div v-for="n in 4" :key="n" class="sk-course-card">
-          <div class="sk-course-icon"></div>
-          <div class="sk-course-body">
-            <div class="sk-line sk-line--title"></div>
-            <div class="sk-line sk-line--meta"></div>
-            <div class="sk-line sk-line--progress"></div>
-          </div>
-        </div>
-      </div>
-
-      <div v-else-if="coursesError" class="error-state">
+      <div v-if="coursesError" class="error-state">
         <h3 class="title-small mb-8">Не удалось загрузить курсы</h3>
         <p class="body-small text-secondary mb-12">{{ coursesError }}</p>
         <button class="btn btn-primary btn-full" type="button" @click="retryCourses">Повторить</button>
@@ -465,63 +454,5 @@ export default {
   font-size: 12px;
   font-weight: 600;
   color: var(--success);
-}
-
-/* ── Skeleton ── */
-@keyframes sk-shimmer {
-  0% {
-    background-position: -300px 0;
-  }
-  100% {
-    background-position: 300px 0;
-  }
-}
-
-.sk-course-card {
-  border: 1px solid var(--divider);
-  border-radius: 16px;
-  background: var(--bg-secondary);
-  padding: 14px;
-  display: grid;
-  grid-template-columns: 54px 1fr;
-  gap: 12px;
-  align-items: center;
-}
-
-.sk-course-icon,
-.sk-line {
-  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--divider) 50%, var(--bg-secondary) 75%);
-  background-size: 600px 100%;
-  animation: sk-shimmer 1.4s infinite linear;
-  border-radius: 8px;
-}
-
-.sk-course-icon {
-  width: 54px;
-  height: 54px;
-  border-radius: 14px;
-  flex-shrink: 0;
-}
-
-.sk-course-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sk-line--title {
-  width: 70%;
-  height: 15px;
-}
-
-.sk-line--meta {
-  width: 40%;
-  height: 12px;
-}
-
-.sk-line--progress {
-  width: 100%;
-  height: 4px;
-  border-radius: 4px;
 }
 </style>

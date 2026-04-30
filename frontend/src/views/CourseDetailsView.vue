@@ -1,33 +1,9 @@
 <template>
   <div class="page-container">
     <div class="container">
-      <!-- Скелетон при загрузке -->
-      <template v-if="isLoading">
-        <div class="sk-title"></div>
-        <div class="sk-subtitle"></div>
-        <div class="sk-subtitle sk-subtitle--short"></div>
 
-        <div class="sk-progress-block">
-          <div class="sk-progress-row">
-            <div class="sk-line sk-line--label"></div>
-            <div class="sk-line sk-line--percent"></div>
-          </div>
-          <div class="sk-bar"></div>
-          <div class="sk-line sk-line--meta"></div>
-        </div>
 
-        <div class="sk-line sk-line--section-title"></div>
-
-        <div class="sections-list">
-          <div v-for="n in 4" :key="n" class="sk-section-card">
-            <div class="sk-circle"></div>
-            <div class="sk-line sk-line--section-name"></div>
-            <div class="sk-line sk-line--count"></div>
-          </div>
-        </div>
-      </template>
-
-      <template v-else-if="course">
+      <template v-if="course">
         <section class="course-header">
           <h1 class="course-title">{{ course.title }}</h1>
           <p v-if="course.description" class="course-description">{{ course.description }}</p>
@@ -844,116 +820,5 @@ export default {
   border-radius: 12px;
   width: min(92vw, 420px);
   padding: 20px;
-}
-
-/* ——— Скелетон ——— */
-@keyframes sk-shimmer {
-  0% {
-    background-position: -300px 0;
-  }
-  100% {
-    background-position: 300px 0;
-  }
-}
-
-.sk-title,
-.sk-subtitle,
-.sk-bar,
-.sk-circle,
-.sk-line,
-.sk-section-card {
-  background: linear-gradient(90deg, #e8e8e8 25%, #f5f5f5 50%, #e8e8e8 75%);
-  background-size: 600px 100%;
-  animation: sk-shimmer 1.4s infinite linear;
-  border-radius: 8px;
-}
-
-.sk-title {
-  height: 28px;
-  width: 75%;
-  margin: 12px 0 10px;
-}
-
-.sk-subtitle {
-  height: 14px;
-  width: 90%;
-  margin-bottom: 8px;
-}
-
-.sk-subtitle--short {
-  width: 60%;
-  margin-bottom: 24px;
-}
-
-.sk-progress-block {
-  margin-bottom: 24px;
-}
-
-.sk-progress-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.sk-bar {
-  height: 8px;
-  width: 100%;
-  border-radius: 4px;
-  margin-bottom: 8px;
-}
-
-.sk-line {
-  border-radius: 6px;
-}
-
-.sk-line--label {
-  height: 16px;
-  width: 110px;
-}
-
-.sk-line--percent {
-  height: 16px;
-  width: 40px;
-}
-
-.sk-line--meta {
-  height: 14px;
-  width: 80px;
-}
-
-.sk-line--section-title {
-  height: 18px;
-  width: 100px;
-  margin-bottom: 14px;
-}
-
-.sk-section-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 62px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: #eeeeee;
-}
-
-.sk-circle {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #d8d8d8;
-  flex-shrink: 0;
-  animation: sk-shimmer 1.4s infinite linear;
-  background-size: 600px 100%;
-}
-
-.sk-line--section-name {
-  flex: 1;
-  height: 16px;
-}
-
-.sk-line--count {
-  width: 30px;
-  height: 14px;
 }
 </style>

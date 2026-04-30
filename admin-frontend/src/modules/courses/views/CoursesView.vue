@@ -31,10 +31,9 @@
     </div>
 
     <!-- Загрузка -->
-    <SkeletonCards v-if="loading" :count="6" :cols="3" />
 
     <!-- Пустое состояние -->
-    <div v-else-if="courses.length === 0" class="empty-state">
+    <div v-if="courses.length === 0" class="empty-state">
       <p>Курсы не найдены</p>
     </div>
 
@@ -298,7 +297,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { Badge, Button, Icon, Preloader, SkeletonCards, FilterBar, Select } from "@/components/ui";
+import { Badge, Button, Icon, Preloader, FilterBar, Select } from "@/components/ui";
 import AnalyticsSummaryCards from "@/components/courses/AnalyticsSummaryCards.vue";
 import { archiveCourse, deleteCourse, getCourses, getCourseAnalyticsFunnel } from "@/api/courses";
 import { useToast } from "@/composables/useToast";
@@ -732,7 +731,7 @@ const getAuthorInitials = (name) => {
 
 .course-card {
   background: var(--bg-primary);
-  border: 1px solid var(--divider);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 16px;
   display: flex;

@@ -16,42 +16,6 @@
       <p class="user-position">{{ user?.position }}</p>
     </div>
 
-    <!-- Статистика: skeleton при загрузке -->
-    <div class="stats-row">
-      <template v-if="isStatsLoading">
-        <div class="stat-item">
-          <span class="sk-stat-val"></span>
-          <span class="sk-stat-lbl"></span>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <span class="sk-stat-val"></span>
-          <span class="sk-stat-lbl"></span>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <span class="sk-stat-val"></span>
-          <span class="sk-stat-lbl"></span>
-        </div>
-      </template>
-      <template v-else>
-        <div class="stat-item">
-          <span class="stat-value">{{ statsData.courses }}</span>
-          <span class="stat-label">Курсы</span>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <span class="stat-value">{{ statsData.completed }}</span>
-          <span class="stat-label">Завершено</span>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <span class="stat-value">{{ statsData.certificates }}</span>
-          <span class="stat-label">Сертификаты</span>
-        </div>
-      </template>
-    </div>
-
     <!-- Меню -->
     <div class="menu-card">
       <button class="menu-item" @click="handleAchievements">
@@ -402,35 +366,5 @@ export default {
 
 .menu-label--logout {
   color: var(--error);
-}
-
-/* ── Skeleton статистики ── */
-@keyframes sk-shimmer {
-  0% {
-    background-position: -300px 0;
-  }
-  100% {
-    background-position: 300px 0;
-  }
-}
-
-.sk-stat-val,
-.sk-stat-lbl {
-  display: block;
-  border-radius: 6px;
-  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--divider) 50%, var(--bg-secondary) 75%);
-  background-size: 600px 100%;
-  animation: sk-shimmer 1.4s infinite linear;
-}
-
-.sk-stat-val {
-  width: 36px;
-  height: 22px;
-  margin-bottom: 6px;
-}
-
-.sk-stat-lbl {
-  width: 48px;
-  height: 12px;
 }
 </style>

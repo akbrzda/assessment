@@ -1,24 +1,9 @@
 <template>
   <div class="page-container">
     <div class="container">
-      <!-- Skeleton -->
-      <div v-if="isLoading" class="topic-skeleton">
-        <div class="sk-title"></div>
-        <div class="sk-title sk-title--short"></div>
-        <div class="sk-progress-card">
-          <div class="sk-progress-head">
-            <div class="sk-label"></div>
-            <div class="sk-percent"></div>
-          </div>
-          <div class="sk-bar"></div>
-          <div class="sk-count"></div>
-        </div>
-        <div class="sk-section-label"></div>
-        <div class="sk-item" v-for="n in 3" :key="n"></div>
-      </div>
 
       <!-- Ошибка -->
-      <div v-else-if="errorText" class="card error-state">
+      <div v-if="errorText" class="card error-state">
         <h3 class="title-small mb-8">Не удалось загрузить тему</h3>
         <p class="body-small text-secondary mb-12">{{ errorText }}</p>
         <button class="btn btn-primary btn-full" type="button" @click="loadSection">Повторить</button>
@@ -248,89 +233,5 @@ export default {
   font-size: 17px;
   font-weight: 600;
   color: var(--text-primary);
-}
-
-/* ── Skeleton ── */
-@keyframes sk-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
-}
-
-.topic-skeleton {
-  padding-top: 8px;
-}
-
-.sk-title,
-.sk-label,
-.sk-percent,
-.sk-bar,
-.sk-count,
-.sk-section-label,
-.sk-item {
-  background: var(--divider);
-  border-radius: 8px;
-  animation: sk-pulse 1.6s ease-in-out infinite;
-}
-
-.sk-title {
-  height: 32px;
-  margin-bottom: 8px;
-}
-
-.sk-title--short {
-  width: 55%;
-  margin-bottom: 20px;
-}
-
-.sk-progress-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--divider);
-  border-radius: 16px;
-  padding: 14px 16px;
-  margin-bottom: 20px;
-}
-
-.sk-progress-head {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.sk-label {
-  height: 16px;
-  width: 100px;
-}
-
-.sk-percent {
-  height: 16px;
-  width: 36px;
-}
-
-.sk-bar {
-  height: 6px;
-  border-radius: 999px;
-  margin-bottom: 8px;
-}
-
-.sk-count {
-  height: 13px;
-  width: 100px;
-}
-
-.sk-section-label {
-  height: 18px;
-  width: 80px;
-  margin-bottom: 12px;
-}
-
-.sk-item {
-  height: 52px;
-  border-radius: 14px;
-  margin-bottom: 8px;
 }
 </style>

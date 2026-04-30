@@ -1,7 +1,7 @@
 <template>
   <div class="user-details-page">
     <div class="user-details-back">
-      <button type="button" class="back-btn" @click="goBack">← Назад к списку</button>
+      <Button type="button" class="back-btn" @click="goBack" icon="arrow-left"> Назад к списку </Button>
     </div>
 
     <Card v-if="loading" class="user-details-card">
@@ -28,13 +28,23 @@
           </div>
         </div>
         <div class="user-head-side">
-          <div class="kv-row"><span>Логин</span><strong>{{ profile.user?.login || "—" }}</strong></div>
-          <div class="kv-row"><span>Дата создания</span><strong>{{ formatDateTime(profile.user?.created_at) }}</strong></div>
+          <div class="kv-row">
+            <span>Логин</span><strong>{{ profile.user?.login || "—" }}</strong>
+          </div>
+          <div class="kv-row">
+            <span>Дата создания</span><strong>{{ formatDateTime(profile.user?.created_at) }}</strong>
+          </div>
         </div>
       </Card>
 
       <div class="profile-tabs">
-        <button v-for="tab in tabs" :key="tab.key" type="button" :class="['profile-tab', { active: activeTab === tab.key }]" @click="activeTab = tab.key">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          type="button"
+          :class="['profile-tab', { active: activeTab === tab.key }]"
+          @click="activeTab = tab.key"
+        >
           {{ tab.label }}
         </button>
       </div>
@@ -44,14 +54,24 @@
           <h3>Контактные данные</h3>
           <div class="kv-row"><span>Телефон</span><strong>—</strong></div>
           <div class="kv-row"><span>Email</span><strong>—</strong></div>
-          <div class="kv-row"><span>Telegram</span><strong>{{ profile.user?.telegram_id || "—" }}</strong></div>
+          <div class="kv-row">
+            <span>Telegram</span><strong>{{ profile.user?.telegram_id || "—" }}</strong>
+          </div>
         </Card>
         <Card class="info-card">
           <h3>Рабочая информация</h3>
-          <div class="kv-row"><span>Должность</span><strong>{{ profile.user?.position_name || "—" }}</strong></div>
-          <div class="kv-row"><span>Роль</span><strong>{{ getRoleLabel(profile.user?.role_name) }}</strong></div>
-          <div class="kv-row"><span>Филиал</span><strong>{{ profile.user?.branch_name || "—" }}</strong></div>
-          <div class="kv-row"><span>Уровень</span><strong>{{ profile.user?.level || 1 }}</strong></div>
+          <div class="kv-row">
+            <span>Должность</span><strong>{{ profile.user?.position_name || "—" }}</strong>
+          </div>
+          <div class="kv-row">
+            <span>Роль</span><strong>{{ getRoleLabel(profile.user?.role_name) }}</strong>
+          </div>
+          <div class="kv-row">
+            <span>Филиал</span><strong>{{ profile.user?.branch_name || "—" }}</strong>
+          </div>
+          <div class="kv-row">
+            <span>Уровень</span><strong>{{ profile.user?.level || 1 }}</strong>
+          </div>
         </Card>
 
         <Card v-if="invitationLink" class="activity-card">
@@ -177,9 +197,9 @@ const userCourses = ref([]);
 const activeTab = ref("general");
 const tabs = [
   { key: "general", label: "Общая информация" },
+  { key: "courses", label: "Курсы" },
   { key: "assessments", label: "Аттестации" },
   { key: "achievements", label: "Достижения" },
-  { key: "courses", label: "Курсы" },
 ];
 
 const fullName = computed(() => `${profile.value?.user?.first_name || ""} ${profile.value?.user?.last_name || ""}`.trim() || "Пользователь");
@@ -315,42 +335,188 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.user-details-page { display: flex; flex-direction: column; gap: 16px; }
-.back-btn { border: none; background: transparent; color: #4f46e5; font-size: 16px; cursor: pointer; padding: 0; }
-.user-head-card { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
-.user-head-main { display: flex; gap: 16px; align-items: center; }
-.avatar { width: 88px; height: 88px; border-radius: 50%; background: #e5e7eb; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 26px; }
-.user-name { margin: 0 0 8px; font-size: 40px; line-height: 1.05; }
-.user-meta-row { display: flex; align-items: center; gap: 14px; }
-.status-inline { color: #16a34a; font-size: 15px; display: inline-flex; gap: 8px; align-items: center; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; }
-.user-submeta { margin-top: 10px; color: hsl(var(--muted-foreground)); display: flex; gap: 8px; }
-.user-head-side { display: flex; flex-direction: column; gap: 12px; justify-content: center; }
-.kv-row { display: flex; justify-content: space-between; gap: 16px; font-size: 15px; }
-.kv-row span { color: hsl(var(--muted-foreground)); }
-.profile-tabs { display: flex; gap: 8px; border-bottom: 1px solid hsl(var(--border)); }
-.profile-tab { border: none; background: transparent; height: 42px; padding: 0 12px; color: hsl(var(--muted-foreground)); cursor: pointer; border-bottom: 2px solid transparent; }
-.profile-tab.active { color: #4338ca; border-bottom-color: #4f46e5; }
-.grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.info-card h3 { margin: 0 0 12px; }
-.activity-card { grid-column: 1 / -1; }
-.activity-table { width: 100%; border-collapse: collapse; }
-.activity-table th, .activity-table td { border-bottom: 1px solid hsl(var(--border)); text-align: left; padding: 10px; font-size: 14px; }
-.badges-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
-.badge-item { border: 1px solid hsl(var(--border)); border-radius: 10px; padding: 12px; text-align: center; }
-.badge-icon { font-size: 28px; }
-.badge-name { margin-top: 6px; font-weight: 600; }
-.badge-date { margin-top: 4px; color: hsl(var(--muted-foreground)); font-size: 12px; }
-.empty-text { color: hsl(var(--muted-foreground)); margin: 0; }
-.invite-profile-row { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-.invite-profile-actions { display: flex; align-items: center; gap: 8px; max-width: 70%; }
-.invite-profile-actions code { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-.invite-profile-hint { margin: 10px 0 0; font-size: 13px; color: hsl(var(--muted-foreground)); }
+.user-details-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.back-btn {
+  border: none;
+  background: transparent;
+  color: #4f46e5;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0;
+}
+.user-head-card {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 24px;
+}
+.user-head-main {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.avatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 26px;
+}
+.user-name {
+  margin: 0 0 8px;
+  font-size: 40px;
+  line-height: 1.05;
+}
+.user-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.status-inline {
+  color: #16a34a;
+  font-size: 15px;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #16a34a;
+}
+.user-submeta {
+  margin-top: 10px;
+  color: hsl(var(--muted-foreground));
+  display: flex;
+  gap: 8px;
+}
+.user-head-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+}
+.kv-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 15px;
+}
+.kv-row span {
+  color: hsl(var(--muted-foreground));
+}
+.profile-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.profile-tab {
+  border: none;
+  background: transparent;
+  height: 42px;
+  padding: 0 12px;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.profile-tab.active {
+  color: #4338ca;
+  border-bottom-color: #4f46e5;
+}
+.grid-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.info-card h3 {
+  margin: 0 0 12px;
+}
+.activity-card {
+  grid-column: 1 / -1;
+}
+.activity-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.activity-table th,
+.activity-table td {
+  border-bottom: 1px solid hsl(var(--border));
+  text-align: left;
+  padding: 10px;
+  font-size: 14px;
+}
+.badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.badge-item {
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+.badge-icon {
+  font-size: 28px;
+}
+.badge-name {
+  margin-top: 6px;
+  font-weight: 600;
+}
+.badge-date {
+  margin-top: 4px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.empty-text {
+  color: hsl(var(--muted-foreground));
+  margin: 0;
+}
+.invite-profile-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.invite-profile-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 70%;
+}
+.invite-profile-actions code {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.invite-profile-hint {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: hsl(var(--muted-foreground));
+}
 
 @media (max-width: 1024px) {
-  .user-head-card { grid-template-columns: 1fr; }
-  .grid-two { grid-template-columns: 1fr; }
-  .invite-profile-row { flex-direction: column; }
-  .invite-profile-actions { max-width: 100%; width: 100%; }
+  .user-head-card {
+    grid-template-columns: 1fr;
+  }
+  .grid-two {
+    grid-template-columns: 1fr;
+  }
+  .invite-profile-row {
+    flex-direction: column;
+  }
+  .invite-profile-actions {
+    max-width: 100%;
+    width: 100%;
+  }
 }
 </style>

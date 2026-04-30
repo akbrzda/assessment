@@ -19,10 +19,10 @@
         <Button v-if="authStore.isSuperAdmin" icon="plus" size="md" @click="openCreateModal" class="users-primary-action">
           Добавить пользователя
         </Button>
-        <Button icon="file-chart-column" variant="secondary" size="md" @click="handleExportExcel">Экспорт Excel</Button>
         <Button v-if="authStore.isSuperAdmin || authStore.isManager" icon="user-plus" variant="secondary" size="md" @click="openInviteModal">
           Пригласить сотрудника
         </Button>
+        <Button icon="file-chart-column" variant="secondary" size="md" @click="handleExportExcel">Экспорт Excel</Button>
       </div>
     </div>
 
@@ -50,9 +50,7 @@
     </div>
 
     <Card class="users-card" padding="none">
-      <SkeletonTable v-if="loading" :rows="8" />
-
-      <div v-else-if="visibleUsers.length === 0" class="empty-state">
+      <div v-if="visibleUsers.length === 0" class="empty-state">
         <p>Пользователи не найдены</p>
       </div>
 
@@ -281,9 +279,9 @@
 
     <!-- Profile modal -->
     <Modal :show="showProfileModal" :title="`Профиль: ${selectedUser?.first_name} ${selectedUser?.last_name}`" @close="closeModals" size="lg">
-      <SkeletonTable v-if="profileLoading" :rows="4" />
+ 
 
-      <div v-else-if="userProfile" class="user-profile">
+      <div v-if="userProfile" class="user-profile">
         <!-- Основная информация -->
         <div class="profile-header">
           <div class="profile-avatar">{{ selectedUser?.first_name?.charAt(0) }}{{ selectedUser?.last_name?.charAt(0) }}</div>
@@ -501,7 +499,6 @@ import Select from "@/components/ui/Select.vue";
 import Badge from "@/components/ui/Badge.vue";
 import Modal from "@/components/ui/Modal.vue";
 import Preloader from "@/components/ui/Preloader.vue";
-import SkeletonTable from "@/components/ui/SkeletonTable.vue";
 import UserForm from "@/modules/users/components/UserForm.vue";
 import UserPermissionsManager from "@/modules/users/components/UserPermissionsManager.vue";
 import Icon from "@/components/ui/Icon.vue";

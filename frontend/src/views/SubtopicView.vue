@@ -1,15 +1,8 @@
 <template>
   <div class="page-container subtopic-page">
     <div class="subtopic-shell">
-      <div v-if="isLoading" class="subtopic-skeleton">
-        <div class="sk-badge-row">
-          <div class="sk-badge"></div>
-          <div class="sk-caption"></div>
-        </div>
-        <div class="sk-line" v-for="n in 8" :key="n"></div>
-      </div>
-
-      <div v-else-if="errorText" class="subtopic-error">
+     
+      <div v-if="errorText" class="subtopic-error">
         <h3 class="title-small">Не удалось загрузить подтему</h3>
         <p class="body-medium text-secondary">{{ errorText }}</p>
         <button class="btn btn-primary" type="button" @click="init">Повторить</button>
@@ -454,54 +447,6 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.subtopic-skeleton {
-  padding-top: 8px;
-}
-
-.sk-badge,
-.sk-caption,
-.sk-line {
-  border-radius: 10px;
-  background: #e7e9f4;
-  animation: sk-pulse 1.3s ease-in-out infinite;
-}
-
-.sk-badge-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.sk-badge {
-  width: 78px;
-  height: 32px;
-}
-
-.sk-caption {
-  width: 190px;
-  height: 32px;
-}
-
-.sk-line {
-  width: 100%;
-  height: 14px;
-  margin-bottom: 10px;
-}
-
-.sk-line:nth-child(2n) {
-  width: 80%;
-}
-
-@keyframes sk-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.56;
-  }
 }
 
 @media (max-width: 760px) {

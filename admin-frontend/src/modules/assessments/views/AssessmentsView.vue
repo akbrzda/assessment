@@ -23,9 +23,7 @@
 
     <!-- Контент -->
     <Card padding="none" class="assessments-card">
-      <SkeletonTable v-if="loading" :rows="6" />
-
-      <div v-else-if="assessments.length === 0" class="empty-state">
+      <div v-if="assessments.length === 0" class="empty-state">
         <div class="empty-state-icon"></div>
         <p class="empty-state-title">Аттестации не найдены</p>
         <p v-if="filters.search || filters.status || filters.branch">Попробуйте изменить фильтры поиска</p>
@@ -188,7 +186,6 @@ import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { getAssessments, deleteAssessment } from "@/api/assessments";
 import Preloader from "@/components/ui/Preloader.vue";
-import SkeletonTable from "@/components/ui/SkeletonTable.vue";
 import Card from "@/components/ui/Card.vue";
 import Button from "@/components/ui/Button.vue";
 import Badge from "@/components/ui/Badge.vue";
