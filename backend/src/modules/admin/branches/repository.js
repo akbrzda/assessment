@@ -45,7 +45,13 @@ async function listBranches({ search }) {
   }
 
   query += " AND (mr.name IN ('manager', 'superadmin') OR mr.name IS NULL)";
-  query += " GROUP BY b.id ORDER BY b.id ASC";
+  query += `
+    GROUP BY b.id
+    HAVING b.is_visible_in_miniapp = 1
+      OR COUNT(DISTINCT u.id) > 0
+      OR COUNT(DISTINCT aa.id) > 0
+    ORDER BY b.id ASC
+  `;
 
   const [rows] = await pool.query(query, params);
   return rows;

@@ -1,68 +1,62 @@
 <template>
   <div class="users-view">
-    <!-- Header -->
-    <div class="page-header">
-      <div>
-        <p class="page-subtitle">{{ stats.total }} пользователей • суперадминов {{ stats.superadmin }}, управляющих {{ stats.manager }}</p>
+    <div class="users-page-header">
+      <div class="users-page-title-wrap">
+        <h1 class="users-page-title">Управление пользователями</h1>
+        <p class="users-page-stats">
+          Всего: {{ stats.total }} пользователя
+          <span>•</span>
+          Суперадминов: {{ stats.superadmin }}
+          <span>•</span>
+          Управляющих: {{ stats.manager }}
+          <span>•</span>
+          Сотрудников: {{ stats.employee }}
+          <span>•</span>
+          Ожидают приглашения: {{ stats.awaiting }}
+        </p>
       </div>
-      <div class="header-actions">
-        <Button icon="file-chart-column" variant="ghost" size="sm" @click="handleExportExcel" class="hide-mobile">Экспорт Excel</Button>
-        <Button v-if="authStore.isSuperAdmin || authStore.isManager" icon="user-plus" variant="secondary" @click="openInviteModal">
-          <span class="hide-mobile">Пригласить сотрудника</span>
-          <span class="show-mobile">Пригласить</span>
+      <div class="users-page-actions">
+        <Button v-if="authStore.isSuperAdmin" icon="plus" size="md" @click="openCreateModal" class="users-primary-action">
+          Добавить пользователя
         </Button>
-        <Button v-if="authStore.isSuperAdmin" icon="plus" @click="openCreateModal">
-          <span class="hide-mobile">Добавить пользователя</span>
-          <span class="show-mobile">Добавить</span>
+        <Button icon="file-chart-column" variant="secondary" size="md" @click="handleExportExcel">Экспорт Excel</Button>
+        <Button v-if="authStore.isSuperAdmin || authStore.isManager" icon="user-plus" variant="secondary" size="md" @click="openInviteModal">
+          Пригласить сотрудника
         </Button>
       </div>
     </div>
 
-    <!-- Filters -->
-    <Card class="filters-card">
-      <div class="filters-grid">
-        <Input v-model="filters.search" placeholder="Поиск по имени или логину..." @input="handleSearch" />
+    <Card class="users-filters-card">
+      <div class="users-filters-grid">
+        <Input v-model="filters.search" type="search" placeholder="Поиск по имени, логину или email..." @input="handleSearch" />
         <Select v-model="filters.branch" :options="branchOptions" placeholder="Все филиалы" @change="handleFilterChange" />
         <Select v-model="filters.position" :options="positionOptions" placeholder="Все должности" @change="handleFilterChange" />
         <Select v-model="filters.role" :options="roleOptions" placeholder="Все роли" @change="handleFilterChange" />
-        <Select v-model="filters.level" :options="levelOptions" placeholder="Все уровни" @change="handleFilterChange" />
-        <Button variant="secondary" fullWidth @click="resetFilters" icon="refresh-ccw">Сбросить</Button>
-      </div>
-
-      <!-- Активные фильтры -->
-      <div v-if="activeFilters.length > 0" class="active-filters">
-        <span v-for="filter in activeFilters" :key="filter.key" class="filter-tag">
-          {{ filter.label }}
-          <button @click="removeFilter(filter.key)" class="filter-tag-remove">x</button>
-        </span>
+        <Button variant="secondary" @click="resetFilters" icon="refresh-ccw">Сбросить</Button>
       </div>
     </Card>
-    <Card class="users-card" padding="none">
-      <div class="bulk-actions">
-        <span class="bulk-selected">Выбрано: {{ selectedUserIds.length }}</span>
-        <Select
-          v-model="bulkActionType"
-          :options="[
-            { value: 'role', label: 'Назначить роль' },
-            { value: 'branch', label: 'Перевести в филиал' },
-            { value: 'export', label: 'Экспортировать CSV' },
-          ]"
-          placeholder="Массовое действие"
-        />
-        <Select v-if="bulkActionType === 'role'" v-model="bulkRoleId" :options="roleOptions" placeholder="Выберите роль" />
-        <Select v-if="bulkActionType === 'branch'" v-model="bulkBranchId" :options="branchOptions" placeholder="Выберите филиал" />
-        <Button size="sm" :loading="actionLoading" @click="runBulkAction">Применить</Button>
-      </div>
 
+    <div class="users-tabs">
+      <button
+        v-for="tab in userTabs"
+        :key="tab.key"
+        type="button"
+        :class="['users-tab', { 'users-tab-active': activeUserTab === tab.key }]"
+        @click="activeUserTab = tab.key"
+      >
+        {{ tab.label }}
+        <span class="users-tab-count">{{ tab.count }}</span>
+      </button>
+    </div>
+
+    <Card class="users-card" padding="none">
       <SkeletonTable v-if="loading" :rows="8" />
 
-      <div v-else-if="users.length === 0" class="empty-state">
+      <div v-else-if="visibleUsers.length === 0" class="empty-state">
         <p>Пользователи не найдены</p>
       </div>
 
       <div v-else>
-        <div class="list-meta">Показано {{ users.length }} из {{ totalUsers }}</div>
-        <!-- Desktop table -->
         <div class="table-wrapper hide-mobile">
           <table class="users-table">
             <thead>
@@ -70,42 +64,47 @@
                 <th>
                   <input type="checkbox" :checked="allUsersSelected" @change="toggleSelectAllUsers" />
                 </th>
-                <th>ID</th>
-                <th>ФИО</th>
+                <th>Пользователь</th>
                 <th>Логин</th>
                 <th>Должность</th>
-                <th>Филиал</th>
                 <th>Роль</th>
-                <th>Очки</th>
+                <th>Филиал</th>
+                <th>Статус</th>
                 <th>Создан</th>
                 <th class="actions-col">Действия</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="user in users" :key="user.id">
+              <tr v-for="user in visibleUsers" :key="user.id">
                 <td>
                   <input type="checkbox" :checked="selectedUserIds.includes(user.id)" @change="toggleUserSelection(user.id)" />
                 </td>
-                <td class="id-cell">{{ user.id }}</td>
-                <td class="name-cell clickable" @click="openProfileModal(user)">
+                <td class="name-cell clickable" @click="openProfilePage(user)">
                   <div class="name-primary">{{ user.first_name }} {{ user.last_name }}</div>
-                  <div class="name-secondary" v-if="user.telegram_id">TG: {{ user.telegram_id }}</div>
+                  <div class="name-secondary">{{ user.login || "—" }}</div>
                 </td>
                 <td>{{ user.login || "—" }}</td>
                 <td>{{ user.position_name || "—" }}</td>
-                <td>{{ user.branch_name || "—" }}</td>
                 <td>
-                  <Badge :variant="getRoleBadgeVariant(user.role_name)" size="sm" rounded>
+                  <Badge :variant="getRoleBadgeVariant(user.role_name)" size="sm" rounded class="users-role-badge">
                     {{ getRoleLabel(user.role_name) }}
                   </Badge>
                 </td>
-                <td>{{ user.points ?? 0 }}</td>
+                <td>{{ user.branch_name || "—" }}</td>
+                <td>
+                  <span :class="['status-pill', `status-pill-${getUserStatus(user).key}`]">
+                    <span class="status-dot"></span>
+                    {{ getUserStatus(user).label }}
+                  </span>
+                </td>
                 <td class="date-cell">{{ formatDate(user.created_at) }}</td>
                 <td class="actions-cell">
                   <div class="actions-buttons">
                     <Button
                       v-if="canEditUser(user)"
-                      class="action-btn action-btn-edit"
+                      class="action-btn"
+                      variant="ghost"
+                      size="sm"
                       icon="pencil"
                       title="Редактировать"
                       @click="openEditModal(user)"
@@ -113,8 +112,10 @@
                     <Button
                       v-if="authStore.isSuperAdmin"
                       class="action-btn action-btn-delete"
-                      title="Удалить"
+                      variant="ghost"
+                      size="sm"
                       icon="trash"
+                      title="Удалить"
                       @click="openDeleteModal(user)"
                     ></Button>
                   </div>
@@ -126,7 +127,7 @@
 
         <!-- Mobile cards -->
         <div class="mobile-cards show-mobile">
-          <div v-for="user in users" :key="user.id" class="user-card">
+          <div v-for="user in visibleUsers" :key="user.id" class="user-card">
             <div class="user-card-header">
               <div>
                 <h3 class="user-card-name">{{ user.first_name }} {{ user.last_name }}</h3>
@@ -193,19 +194,11 @@
     <Modal :show="Boolean(createdCredentials)" title="Учётные данные созданы" @close="createdCredentials = null">
       <div v-if="createdCredentials" class="credentials-card">
         <p class="credentials-name">{{ createdCredentials.name }}</p>
-        <div class="credentials-row">
-          <span class="credentials-label">Логин:</span>
-          <code class="credentials-value">{{ createdCredentials.login }}</code>
-          <Button size="sm" variant="ghost" icon="Copy" @click="copyText(createdCredentials.login)">Копировать</Button>
-        </div>
-        <div class="credentials-row">
-          <span class="credentials-label">Пароль:</span>
-          <code class="credentials-value">{{ createdCredentials.password }}</code>
-          <Button size="sm" variant="ghost" icon="Copy" @click="copyText(createdCredentials.password)">Копировать</Button>
-        </div>
-        <p class="credentials-hint">Сохраните и передайте эти данные пользователю. Пароль больше не будет показан.</p>
+        <p class="credentials-hint">Скопируйте сообщение и передайте пользователю:</p>
+        <pre class="credentials-message">{{ createdCredentials.message }}</pre>
       </div>
       <div class="modal-actions">
+        <Button variant="secondary" icon="Copy" @click="copyText(createdCredentials?.message)">Скопировать всё</Button>
         <Button @click="createdCredentials = null">Закрыть</Button>
       </div>
     </Modal>
@@ -443,14 +436,22 @@
     <!-- Invite employee modal -->
     <Modal :show="showInviteModal" title="Пригласить сотрудника" @close="closeInviteModal">
       <div v-if="inviteLink" class="invite-success">
-        <p class="invite-success-text">Приглашение создано. Отправьте ссылку сотруднику:</p>
-        <div class="invite-link-row">
-          <Input v-model="inviteLink" readonly label="Ссылка-приглашение" />
-          <Button size="sm" icon="Copy" variant="secondary" @click="copyInviteLink">Скопировать</Button>
+        <div class="invite-success-head">
+          <div class="invite-success-icon">✓</div>
+          <h3 class="invite-success-title">Приглашение создано!</h3>
+          <p class="invite-success-text">Сотрудник получит ссылку для доступа к системе.</p>
         </div>
-        <p class="invite-hint">После перехода по ссылке сотрудник увидит заполненные данные и подтвердит приглашение.</p>
-        <div class="modal-actions">
-          <Button @click="closeInviteModal">Готово</Button>
+        <div class="invite-link-block">
+          <p class="invite-link-label">Ссылка для приглашения</p>
+          <div class="invite-link-row">
+            <Input v-model="inviteLink" readonly />
+            <Button size="sm" icon="Copy" variant="secondary" @click="copyInviteLink">Скопировать</Button>
+          </div>
+        </div>
+        <p class="invite-hint">Ссылка активна 7 дней. Пока сотрудник не активировал профиль, он не появится в активных пользователях.</p>
+        <div class="invite-success-actions">
+          <Button variant="secondary" @click="closeInviteModal">Закрыть</Button>
+          <Button @click="openInvitedUserProfile">Перейти к пользователю</Button>
         </div>
       </div>
       <div v-else>
@@ -487,21 +488,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import apiClient from "@/utils/axios";
-import {
-  getUsers,
-  getReferences,
-  createUser,
-  updateUser,
-  deleteUser,
-  resetPassword,
-  resetAssessmentProgress,
-  bulkUpdateUserRole,
-  bulkTransferUsersToBranch,
-  bulkExportUsers,
-} from "@/api/users";
+import { getUsers, getReferences, createUser, updateUser, deleteUser, resetPassword, resetAssessmentProgress } from "@/api/users";
 import { createInvitation } from "@/api/invitations";
 import Card from "@/components/ui/Card.vue";
 import Button from "@/components/ui/Button.vue";
@@ -516,8 +507,10 @@ import UserPermissionsManager from "@/modules/users/components/UserPermissionsMa
 import Icon from "@/components/ui/Icon.vue";
 import { useToast } from "@/composables/useToast";
 import { formatBranchLabel } from "@/utils/branch";
+import { BOT_USERNAME } from "@/env";
 
 const authStore = useAuthStore();
+const router = useRouter();
 const loading = ref(false);
 const actionLoading = ref(false);
 const users = ref([]);
@@ -537,7 +530,6 @@ const filters = reactive({
   branch: "",
   position: "",
   role: "",
-  level: "",
 });
 
 const showCreateModal = ref(false);
@@ -551,6 +543,7 @@ const showInviteModal = ref(false);
 const inviteForm = ref({ firstName: "", lastName: "", phone: "", positionId: "", branchId: "" });
 const inviteErrors = ref({});
 const inviteLink = ref("");
+const inviteCreatedUserId = ref(null);
 
 const selectedUser = ref(null);
 const selectedAssessment = ref(null);
@@ -562,9 +555,8 @@ const generatedPassword = ref("");
 const passwordGenerating = ref(false);
 const passwordApplying = ref(false);
 const selectedUserIds = ref([]);
-const bulkActionType = ref("");
-const bulkRoleId = ref("");
-const bulkBranchId = ref("");
+const activeUserTab = ref("all");
+const isCreateCredentialsSynced = ref(false);
 
 const canEditUser = (user) => {
   // Superadmin может редактировать всех
@@ -597,10 +589,38 @@ const stats = computed(() => {
   const total = totalUsers.value;
   const superadmin = users.value.filter((user) => user.role_name === "superadmin").length;
   const manager = users.value.filter((user) => user.role_name === "manager").length;
-  return { total, superadmin, manager };
+  const employee = users.value.filter((user) => user.role_name === "employee").length;
+  const awaiting = users.value.filter((user) => !user.login).length;
+  return { total, superadmin, manager, employee, awaiting };
 });
+
+const getUserStatus = (user) => {
+  if (!user.login) {
+    return { key: "awaiting", label: "Ожидает" };
+  }
+  return { key: "active", label: "Активен" };
+};
+
+const userTabs = computed(() => [
+  { key: "all", label: "Все пользователи", count: stats.value.total },
+  { key: "superadmin", label: "Суперадмины", count: stats.value.superadmin },
+  { key: "manager", label: "Управляющие", count: stats.value.manager },
+  { key: "employee", label: "Сотрудники", count: stats.value.employee },
+  { key: "awaiting", label: "Ожидают приглашения", count: stats.value.awaiting },
+]);
+
+const visibleUsers = computed(() => {
+  if (activeUserTab.value === "all") {
+    return users.value;
+  }
+  if (activeUserTab.value === "awaiting") {
+    return users.value.filter((user) => !user.login);
+  }
+  return users.value.filter((user) => user.role_name === activeUserTab.value);
+});
+
 const totalPages = computed(() => Math.max(1, Math.ceil(totalUsers.value / pagination.value.perPage)));
-const allUsersSelected = computed(() => users.value.length > 0 && users.value.every((user) => selectedUserIds.value.includes(user.id)));
+const allUsersSelected = computed(() => visibleUsers.value.length > 0 && visibleUsers.value.every((user) => selectedUserIds.value.includes(user.id)));
 
 const branchOptions = computed(() => [
   ...references.value.branches.map((branch) => ({
@@ -623,37 +643,6 @@ const roleOptions = computed(() => [
   })),
 ]);
 
-const levelOptions = computed(() => [
-  { value: "1", label: "1 - Новичок" },
-  { value: "2", label: "2 - Специалист" },
-  { value: "3", label: "3 - Эксперт" },
-  { value: "4", label: "4 - Лидер" },
-  { value: "5", label: "5 - Мастер" },
-  { value: "6", label: "6 - Гуру" },
-]);
-
-const activeFilters = computed(() => {
-  const active = [];
-  if (filters.search) active.push({ key: "search", label: `Поиск: "${filters.search}"` });
-  if (filters.branch) {
-    const branch = references.value.branches.find((b) => String(b.id) === filters.branch);
-    if (branch) active.push({ key: "branch", label: `Филиал: ${formatBranchLabel(branch)}` });
-  }
-  if (filters.position) {
-    const position = references.value.positions.find((p) => String(p.id) === filters.position);
-    if (position) active.push({ key: "position", label: `Должность: ${position.name}` });
-  }
-  if (filters.role) {
-    const role = references.value.roles.find((r) => String(r.id) === filters.role);
-    if (role) active.push({ key: "role", label: `Роль: ${getRoleLabel(role.name)}` });
-  }
-  if (filters.level) {
-    const level = levelOptions.value.find((l) => l.value === filters.level);
-    if (level) active.push({ key: "level", label: `Уровень: ${level.label}` });
-  }
-  return active;
-});
-
 let searchTimeout = null;
 
 const loadReferences = async () => {
@@ -671,7 +660,6 @@ const buildFilters = () => {
   if (filters.branch) params.branch = filters.branch;
   if (filters.position) params.position = filters.position;
   if (filters.role) params.role = filters.role;
-  if (filters.level) params.level = filters.level;
   return params;
 };
 
@@ -699,7 +687,7 @@ const toggleSelectAllUsers = () => {
     selectedUserIds.value = [];
     return;
   }
-  selectedUserIds.value = users.value.map((user) => user.id);
+  selectedUserIds.value = visibleUsers.value.map((user) => user.id);
 };
 
 const toggleUserSelection = (userId) => {
@@ -708,60 +696,6 @@ const toggleUserSelection = (userId) => {
     return;
   }
   selectedUserIds.value = [...selectedUserIds.value, userId];
-};
-
-const runBulkAction = async () => {
-  if (!selectedUserIds.value.length) {
-    showToast("Выберите пользователей для массового действия", "warning");
-    return;
-  }
-
-  actionLoading.value = true;
-  try {
-    if (bulkActionType.value === "role") {
-      if (!bulkRoleId.value) {
-        showToast("Выберите роль для массового назначения", "warning");
-        return;
-      }
-      await bulkUpdateUserRole({
-        userIds: selectedUserIds.value,
-        roleId: Number(bulkRoleId.value),
-      });
-      showToast("Роль назначена выбранным пользователям", "success");
-    } else if (bulkActionType.value === "branch") {
-      if (!bulkBranchId.value) {
-        showToast("Выберите филиал для массового перевода", "warning");
-        return;
-      }
-      await bulkTransferUsersToBranch({
-        userIds: selectedUserIds.value,
-        branchId: Number(bulkBranchId.value),
-      });
-      showToast("Пользователи переведены в выбранный филиал", "success");
-    } else if (bulkActionType.value === "export") {
-      const blob = await bulkExportUsers({ userIds: selectedUserIds.value });
-      const url = window.URL.createObjectURL(new Blob([blob]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `users_bulk_${Date.now()}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      showToast("Экспорт сформирован", "success");
-    } else {
-      showToast("Выберите тип массового действия", "warning");
-      return;
-    }
-
-    await loadUsers();
-    selectedUserIds.value = [];
-  } catch (error) {
-    console.error("Ошибка массового действия", error);
-    showToast("Не удалось выполнить массовое действие", "error");
-  } finally {
-    actionLoading.value = false;
-  }
 };
 
 const handleSearch = () => {
@@ -783,19 +717,8 @@ const resetFilters = () => {
   filters.branch = "";
   filters.position = "";
   filters.role = "";
-  filters.level = "";
   pagination.value.page = 1;
   loadUsers();
-};
-
-const removeFilter = (key) => {
-  filters[key] = "";
-  pagination.value.page = 1;
-  if (key === "search") {
-    handleSearch();
-  } else {
-    loadUsers();
-  }
 };
 
 const goToPrevPage = () => {
@@ -814,22 +737,9 @@ const goToNextPage = () => {
   loadUsers();
 };
 
-const openProfileModal = async (user) => {
-  selectedUser.value = user;
-  showProfileModal.value = true;
-  profileLoading.value = true;
-  userProfile.value = null;
-
-  try {
-    const { data } = await apiClient.get(`/admin/users/${user.id}/stats`);
-    userProfile.value = normalizeUserProfile(data);
-  } catch (error) {
-    console.error("Ошибка загрузки профиля", error);
-    showToast("Не удалось загрузить профиль пользователя", "error");
-    showProfileModal.value = false;
-  } finally {
-    profileLoading.value = false;
-  }
+const openProfilePage = (user) => {
+  if (!user?.id) return;
+  router.push(`/users/${user.id}/profile`);
 };
 
 const handleExportExcel = async () => {
@@ -867,39 +777,39 @@ const formatScore = (score) => {
 
 // Транслитерация кириллицы в латиницу для логина
 const TRANSLITERATE_MAP = {
-  а: "a",
-  б: "b",
-  в: "v",
-  г: "g",
-  д: "d",
-  е: "e",
-  ё: "yo",
-  ж: "zh",
-  з: "z",
-  и: "i",
-  й: "j",
-  к: "k",
-  л: "l",
-  м: "m",
-  н: "n",
-  о: "o",
-  п: "p",
-  р: "r",
-  с: "s",
-  т: "t",
-  у: "u",
-  ф: "f",
-  х: "kh",
-  ц: "ts",
-  ч: "ch",
-  ш: "sh",
-  щ: "sch",
-  ъ: "",
-  ы: "y",
-  ь: "",
-  э: "e",
-  ю: "yu",
-  я: "ya",
+  "\u0430": "a",
+  "\u0431": "b",
+  "\u0432": "v",
+  "\u0433": "g",
+  "\u0434": "d",
+  "\u0435": "e",
+  "\u0451": "yo",
+  "\u0436": "zh",
+  "\u0437": "z",
+  "\u0438": "i",
+  "\u0439": "j",
+  "\u043a": "k",
+  "\u043b": "l",
+  "\u043c": "m",
+  "\u043d": "n",
+  "\u043e": "o",
+  "\u043f": "p",
+  "\u0440": "r",
+  "\u0441": "s",
+  "\u0442": "t",
+  "\u0443": "u",
+  "\u0444": "f",
+  "\u0445": "kh",
+  "\u0446": "ts",
+  "\u0447": "ch",
+  "\u0448": "sh",
+  "\u0449": "sch",
+  "\u044a": "",
+  "\u044b": "y",
+  "\u044c": "",
+  "\u044d": "e",
+  "\u044e": "yu",
+  "\u044f": "ya",
 };
 
 const transliterate = (text) => [...text.toLowerCase()].map((ch) => TRANSLITERATE_MAP[ch] ?? ch).join("");
@@ -912,14 +822,20 @@ const generateLogin = (lastName, firstName) => {
 };
 
 const createdCredentials = ref(null);
+const getAdminPanelLink = () => {
+  if (typeof window === "undefined" || !window.location?.origin) return "/admin";
+  return `${window.location.origin}/admin`;
+};
 
 const openCreateModal = () => {
   formData.value = defaultForm();
   createdCredentials.value = null;
+  isCreateCredentialsSynced.value = true;
   showCreateModal.value = true;
 };
 
 const openEditModal = (user) => {
+  isCreateCredentialsSynced.value = false;
   selectedUser.value = user;
   generatedPassword.value = "";
   formData.value = {
@@ -936,6 +852,15 @@ const openEditModal = (user) => {
   showEditModal.value = true;
 };
 
+const syncCreateCredentials = () => {
+  if (!showCreateModal.value || showEditModal.value || !isCreateCredentialsSynced.value) return;
+  const firstName = formData.value.firstName?.trim();
+  const lastName = formData.value.lastName?.trim();
+  if (!firstName || !lastName) return;
+
+  formData.value.login = generateLogin(lastName, firstName);
+  formData.value.password = generatePasswordFromForm();
+};
 const openResetPasswordModal = (user) => {
   selectedUser.value = user;
   newPassword.value = "";
@@ -964,6 +889,7 @@ const closeModals = () => {
   generatedPassword.value = "";
   passwordGenerating.value = false;
   passwordApplying.value = false;
+  isCreateCredentialsSynced.value = false;
   // createdCredentials сбрасывается только при закрытии credentials-модала
 };
 
@@ -982,17 +908,17 @@ const validateForm = () => {
 const handleCreate = async () => {
   if (!validateForm()) return;
 
-  // Автогенерация логина из фамилии и первой буквы имени
   const autoLogin = formData.value.login?.trim() || generateLogin(formData.value.lastName, formData.value.firstName);
-
-  // Автогенерация пароля, если не задан вручную
   const autoPassword = formData.value.password?.trim() || generatePasswordFromForm();
 
   actionLoading.value = true;
   try {
-    const { data } = await createUser({
-      firstName: formData.value.firstName.trim(),
-      lastName: formData.value.lastName.trim(),
+    const safeFirstName = formData.value.firstName.trim();
+    const safeLastName = formData.value.lastName.trim();
+
+    await createUser({
+      firstName: safeFirstName,
+      lastName: safeLastName,
       branchId: Number(formData.value.branchId),
       positionId: Number(formData.value.positionId),
       roleId: Number(formData.value.roleId),
@@ -1000,15 +926,20 @@ const handleCreate = async () => {
       password: autoPassword,
     });
 
-    await loadUsers();
-    closeModals();
+    const credentialsMessage = [
+      `Логин: ${autoLogin || "—"}`,
+      `Пароль: ${autoPassword || "—"}`,
+      `Ссылка на админ-панель: ${getAdminPanelLink()}`,
+    ].join("\n");
 
-    // Показываем сгенерированные учётные данные
+    await loadUsers();
     createdCredentials.value = {
-      name: `${formData.value.lastName.trim()} ${formData.value.firstName.trim()}`,
+      name: `${safeLastName} ${safeFirstName}`,
       login: autoLogin,
       password: autoPassword,
+      message: credentialsMessage,
     };
+    closeModals();
     showToast("Пользователь создан", "success");
   } catch (error) {
     console.error("Ошибка создания пользователя", error);
@@ -1108,7 +1039,7 @@ const handleResetProgress = async () => {
     await resetAssessmentProgress(selectedUser.value.id, selectedAssessment.value.id);
 
     // Обновляем профиль пользователя
-    await openProfileModal(selectedUser.value);
+    await openProfilePage(selectedUser.value);
 
     showResetProgressModal.value = false;
     selectedAssessment.value = null;
@@ -1338,6 +1269,7 @@ const applyGeneratedPassword = async () => {
     showToast(error.response?.data?.error || "Не удалось обновить пароль", "error");
   } finally {
     passwordApplying.value = false;
+    isCreateCredentialsSynced.value = false;
   }
 };
 
@@ -1351,6 +1283,7 @@ const openInviteModal = () => {
 const closeInviteModal = () => {
   showInviteModal.value = false;
   inviteLink.value = "";
+  inviteCreatedUserId.value = null;
   inviteErrors.value = {};
 };
 
@@ -1377,6 +1310,7 @@ const handleInviteCreate = async () => {
       branchId: Number(inviteForm.value.branchId),
     });
     const code = data?.invitation?.code;
+    inviteCreatedUserId.value = data?.invitation?.invited_user_id || null;
     if (code) {
       const botUsername = BOT_USERNAME || "";
       inviteLink.value = botUsername ? `https://t.me/${botUsername}?startapp=${code}` : `Код приглашения: ${code}`;
@@ -1411,6 +1345,23 @@ const copyText = async (text) => {
   }
 };
 
+const openInvitedUserProfile = () => {
+  const userId = Number(inviteCreatedUserId.value);
+  if (!Number.isInteger(userId) || userId <= 0) {
+    showToast("Пользователь приглашения еще не создан", "warning");
+    closeInviteModal();
+    return;
+  }
+  closeInviteModal();
+  router.push(`/users/${userId}/profile`);
+};
+
+watch(
+  () => [formData.value.firstName, formData.value.lastName, formData.value.branchId, formData.value.positionId, showCreateModal.value],
+  () => {
+    syncCreateCredentials();
+  },
+);
 onMounted(async () => {
   await loadReferences();
   await loadUsers();
@@ -1515,12 +1466,6 @@ onMounted(async () => {
 
 .users-card {
   overflow: visible;
-}
-
-.list-meta {
-  padding: 16px 16px 0;
-  font-size: 14px;
-  color: var(--text-secondary);
 }
 
 .pagination {
@@ -1869,46 +1814,6 @@ onMounted(async () => {
   display: flex;
   gap: 12px;
   align-items: center;
-}
-
-.active-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.filter-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  background: var(--color-background-mute);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  color: var(--color-text);
-  transition: all 0.2s;
-}
-
-.filter-tag:hover {
-  background: var(--color-background-soft);
-  border-color: var(--color-border-hover);
-}
-
-.filter-tag button {
-  padding: 0;
-  background: none;
-  border: none;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  transition: color 0.2s;
-}
-
-.filter-tag button:hover {
-  color: var(--color-danger);
 }
 
 .clickable {
@@ -2266,13 +2171,50 @@ onMounted(async () => {
 .invite-success {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
+}
+
+.invite-success-head {
+  text-align: center;
+}
+
+.invite-success-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 12px;
+  border-radius: 999px;
+  background: #22c55e;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.invite-success-title {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.invite-link-block {
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.invite-link-label {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
 }
 
 .invite-success-text {
   font-size: 15px;
   color: var(--text-primary);
-  margin: 0;
+  margin: 8px 0 0;
 }
 
 .invite-link-row {
@@ -2285,6 +2227,17 @@ onMounted(async () => {
   font-size: 13px;
   color: var(--text-secondary);
   margin: 0;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.invite-success-actions {
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .credentials-card {
@@ -2333,9 +2286,172 @@ onMounted(async () => {
   border-radius: 4px;
 }
 
+.credentials-message {
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid var(--divider);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .create-hint {
   font-size: 13px;
   color: var(--text-secondary);
   margin: 12px 0 0;
+}
+
+.users-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.users-page-title {
+  margin: 0;
+  font-size: 42px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+
+.users-page-stats {
+  margin: 10px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: hsl(var(--muted-foreground));
+  font-size: 15px;
+}
+
+.users-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.users-primary-action {
+  background: #4f46e5 !important;
+}
+
+.users-filters-card {
+  margin-bottom: 18px;
+  border-radius: 14px;
+}
+
+.users-filters-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.users-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 16px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.users-tab {
+  border: none;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  height: 42px;
+  padding: 0 14px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.users-tab-active {
+  color: #4338ca;
+  border-bottom-color: #4f46e5;
+}
+
+.users-tab-count {
+  margin-left: 8px;
+  font-size: 13px;
+}
+
+.users-table th {
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.users-table td {
+  font-size: 14px;
+}
+
+.name-primary {
+  font-size: 16px;
+}
+
+.name-secondary {
+  font-size: 13px;
+}
+
+.users-role-badge {
+  transform: translateY(1px);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #16a34a;
+}
+
+.status-pill-awaiting {
+  color: #ca8a04;
+}
+
+.status-pill-awaiting .status-dot {
+  background: #f59e0b;
+}
+
+.status-pill-active {
+  color: #16a34a;
+}
+
+@media (max-width: 1280px) {
+  .users-filters-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .users-page-header {
+    flex-direction: column;
+  }
+
+  .users-page-title {
+    font-size: 32px;
+  }
+
+  .users-filters-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .users-page-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 </style>

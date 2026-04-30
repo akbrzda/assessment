@@ -15,6 +15,13 @@ export const getUserById = async (id) => {
   return data;
 };
 
+export const getUserCourses = async (id) => {
+  const { data } = await apiClient.get(`/admin/users/${id}/courses`, {
+    cacheMaxAge: 120000,
+  });
+  return data;
+};
+
 export const createUser = async (payload) => {
   return mutateWithInvalidation(async () => {
     const { data } = await apiClient.post("/admin/users", payload);
@@ -109,6 +116,7 @@ export const globalSearch = async ({ query, limit = 8 }) => {
 export default {
   getUsers,
   getUserById,
+  getUserCourses,
   createUser,
   updateUser,
   deleteUser,

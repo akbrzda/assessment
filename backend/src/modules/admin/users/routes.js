@@ -34,6 +34,7 @@ router.post(
   usersController.bulkExportUsers,
 );
 router.get("/:id/stats", cacheMiddleware({ ttl: 120 }), usersController.getUserDetailedStats);
+router.get("/:id/courses", cacheMiddleware({ ttl: 120 }), usersController.getUserCourses);
 router.get("/:id", cacheMiddleware({ ttl: 120 }), usersController.getUserById);
 router.post(
   "/",

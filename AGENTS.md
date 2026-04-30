@@ -10,6 +10,17 @@
 
 ---
 
+# Encoding rules
+
+All source files in this repository must be read and written as UTF-8.
+
+When using PowerShell:
+
+- Do not use Get-Content / Set-Content without explicit encoding.
+- Use -Encoding UTF8 when reading or writing files.
+- Preserve existing file encoding and line endings.
+- Never rewrite files through ANSI, ASCII, CP1251, or CP1252 encoding.
+
 ## Project Awareness
 
 Before starting any task:

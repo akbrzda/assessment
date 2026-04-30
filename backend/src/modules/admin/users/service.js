@@ -5,6 +5,7 @@ const { pool } = require("../../../config/database");
 const assessmentModel = require("../../../models/assessmentModel");
 const referenceModel = require("../../../models/referenceModel");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
+const { listPublishedCoursesForUser } = require("../../courses/userCourseView.repository");
 
 const updateSchema = Joi.object({
   firstName: Joi.string().trim().min(2).max(64).required(),
@@ -294,11 +295,14 @@ async function deleteUser(req, res, next) {
 async function getUserDetailedStats(req, res, next) {
   try {
     const userId = Number(req.params.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({ error: "Некорректный ID пользователя" });
+    }
 
     // Основная информация
     const [users] = await pool.query(
       `SELECT 
-        u.id, u.telegram_id, u.first_name, u.last_name,
+        u.id, u.telegram_id, u.first_name, u.last_name, u.login,
         u.level, u.points, u.created_at,
         b.name as branch_name, p.name as position_name, r.name as role_name
       FROM users u
@@ -372,6 +376,16 @@ async function getUserDetailedStats(req, res, next) {
       [users[0].points]
     );
 
+    const [invitationRows] = await pool.query(
+      `SELECT id, code, created_at
+       FROM invitations
+       WHERE invited_user_id = ?
+         AND used_by IS NULL
+       ORDER BY id DESC
+       LIMIT 1`,
+      [userId],
+    );
+
     // Прогресс до следующего уровня
     const [levels] = await pool.query(
       `SELECT level_number, min_points 
@@ -393,11 +407,40 @@ async function getUserDetailedStats(req, res, next) {
       assessmentsSummary: assessmentSummary,
       badges,
       rank: rankData[0] || { user_rank: 0, total_users: 0 },
+      invitation: invitationRows[0] || null,
       nextLevel,
       progressToNextLevel: Math.min(100, Math.max(0, progressToNextLevel)),
     });
   } catch (error) {
     console.error("Get user detailed stats error:", error);
+    next(error);
+  }
+}
+
+async function getUserCourses(req, res, next) {
+  try {
+    const userId = Number(req.params.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({ error: "Некорректный ID пользователя" });
+    }
+
+    const [users] = await pool.query(
+      `SELECT id, position_id, branch_id
+       FROM users
+       WHERE id = ?
+       LIMIT 1`,
+      [userId],
+    );
+
+    if (!users || users.length === 0) {
+      return res.status(404).json({ error: "Пользователь не найден" });
+    }
+
+    const user = users[0];
+    const courses = await listPublishedCoursesForUser(userId, user.position_id || null, user.branch_id || null);
+
+    return res.json({ courses });
+  } catch (error) {
     next(error);
   }
 }
@@ -519,17 +562,6 @@ async function exportUsersToExcel(req, res, next) {
   }
 }
 
-module.exports = {
-  listUsers,
-  updateUser,
-  deleteUser,
-  createUser,
-  resetPassword,
-  getUserById,
-  getUserDetailedStats,
-  exportUsersToExcel,
-  resetAssessmentProgress,
-};
 
 /**
  * Сбросить прогресс пользователя по аттестации
@@ -962,6 +994,7 @@ module.exports = {
   resetPassword,
   getUserById,
   getUserDetailedStats,
+  getUserCourses,
   exportUsersToExcel,
   resetAssessmentProgress,
   bulkUpdateRole,

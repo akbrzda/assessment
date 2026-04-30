@@ -1,63 +1,86 @@
 <template>
   <div class="page-container">
-    <div class="container">
-      <!-- Page Header -->
-      <div class="page-header mb-24">
-        <h1 class="title-large">Приглашение</h1>
-        <p class="body-medium text-secondary">Подтвердите участие в системе аттестаций</p>
+    <div class="container invitation-page">
+      <div class="invite-hero">
+        <div>
+          <h1 class="title-large invite-title">Приглашение</h1>
+          <p class="body-medium invite-subtitle">Подтвердите участие в системе аттестаций</p>
+        </div>
+        <div class="invite-hero-art" aria-hidden="true">
+          <MailCheck />
+        </div>
       </div>
 
-      <!-- Ошибка: уже зарегистрирован -->
       <div v-if="alreadyRegisteredError" class="card empty-state">
         <div class="empty-icon">
           <XCircle />
         </div>
         <h3 class="title-small mb-8">Вы уже зарегистрированы</h3>
-        <p class="body-small text-secondary">Эта ссылка-приглашение вам недоступна, так как вы уже зарегистрированы в системе под другим аккаунтом.</p>
+        <p class="body-small text-secondary">Эта ссылка-приглашение недоступна, так как вы уже зарегистрированы в системе под другим аккаунтом.</p>
       </div>
 
-      <!-- Invitation Info -->
       <div v-else-if="invitation" class="card invitation-card">
-        <div class="invitation-header mb-16">
-          <div class="invitation-icon">
+        <div class="invitation-intro">
+          <div class="invitation-icon invitation-icon--violet">
             <Hand />
           </div>
-          <h2 class="title-medium">Вы приглашены!</h2>
+          <div>
+            <h2 class="title-medium invitation-intro-title">Вы приглашены!</h2>
+            <p class="body-medium text-secondary">Проверьте данные и подтвердите участие</p>
+          </div>
         </div>
 
         <div class="invitation-details">
           <div class="detail-item">
-            <span class="detail-label">ФИО:</span>
-            <span class="detail-value">{{ invitation.lastName }} {{ invitation.firstName }}</span>
-          </div>
-
-          <div v-if="invitation.phone" class="detail-item">
-            <span class="detail-label">Телефон:</span>
-            <span class="detail-value">{{ invitation.phone }}</span>
+            <div class="detail-icon detail-icon--violet">
+              <User />
+            </div>
+            <div class="detail-content">
+              <span class="detail-label">ФИО</span>
+              <span class="detail-value">{{ fullName }}</span>
+            </div>
           </div>
 
           <div v-if="invitation.positionName" class="detail-item">
-            <span class="detail-label">Должность:</span>
-            <span class="detail-value">{{ invitation.positionName }}</span>
+            <div class="detail-icon detail-icon--green">
+              <BriefcaseBusiness />
+            </div>
+            <div class="detail-content">
+              <span class="detail-label">Должность</span>
+              <span class="detail-value">{{ invitation.positionName }}</span>
+            </div>
           </div>
 
           <div class="detail-item">
-            <span class="detail-label">Филиал:</span>
-            <span class="detail-value">{{ invitation.branchName }}</span>
+            <div class="detail-icon detail-icon--orange">
+              <Building2 />
+            </div>
+            <div class="detail-content">
+              <span class="detail-label">Филиал</span>
+              <span class="detail-value">{{ invitation.branchName }}</span>
+            </div>
           </div>
         </div>
 
-        <p class="body-small text-secondary mb-16">Проверьте данные. Если всё верно — нажмите кнопку для подтверждения.</p>
+        <div class="invite-note">
+          <div class="detail-icon detail-icon--violet">
+            <ShieldCheck />
+          </div>
+          <div>
+            <p class="title-small invite-note-title">Проверьте данные</p>
+            <p class="body-medium text-secondary">Если всё верно — нажмите кнопку для подтверждения.</p>
+          </div>
+        </div>
 
         <div class="invitation-actions">
-          <button class="btn btn-primary btn-full" @click="acceptInvitation" :disabled="isLoading">
-            {{ isLoading ? "Принимаем..." : "Подтвердить и войти" }}
+          <button class="btn btn-primary btn-full invitation-button" @click="acceptInvitation" :disabled="isLoading">
+            <span>{{ isLoading ? "Принимаем..." : "Подтвердить и войти" }}</span>
+            <ArrowRight />
           </button>
         </div>
       </div>
 
-      <!-- No Invitation -->
-      <div v-else class="card empty-state">
+      <div v-else-if="!isLoading" class="card empty-state">
         <div class="empty-icon">
           <XCircle />
         </div>
@@ -71,14 +94,29 @@
 <script>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { Hand, XCircle } from "lucide-vue-next";
+import {
+  ArrowRight,
+  BriefcaseBusiness,
+  Building2,
+  Hand,
+  MailCheck,
+  ShieldCheck,
+  User,
+  XCircle,
+} from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 
 export default {
   name: "InvitationView",
   components: {
+    ArrowRight,
+    BriefcaseBusiness,
+    Building2,
     Hand,
+    MailCheck,
+    ShieldCheck,
+    User,
     XCircle,
   },
   setup() {
@@ -89,6 +127,14 @@ export default {
     const alreadyRegisteredError = ref(false);
     const invitation = computed(() => userStore.invitation);
     const isLoading = computed(() => userStore.isLoading);
+    const fullName = computed(() => {
+      if (!invitation.value) {
+        return "";
+      }
+
+      const parts = [invitation.value.lastName, invitation.value.firstName, invitation.value.middleName].filter(Boolean);
+      return parts.join(" ");
+    });
 
     async function acceptInvitation() {
       if (!invitation.value) {
@@ -124,6 +170,7 @@ export default {
     return {
       invitation,
       isLoading,
+      fullName,
       alreadyRegisteredError,
       acceptInvitation,
     };
@@ -132,30 +179,168 @@ export default {
 </script>
 
 <style scoped>
+.invitation-page {
+  padding-top: 12px;
+}
+
+.invite-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.invite-title {
+  margin-bottom: 8px;
+}
+
+.invite-subtitle {
+  max-width: 280px;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.invite-hero-art {
+  width: 124px;
+  height: 124px;
+  border-radius: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6355f5;
+  background:
+    radial-gradient(circle at 30% 15%, rgba(99, 85, 245, 0.28), transparent 55%),
+    linear-gradient(160deg, rgba(99, 85, 245, 0.15), rgba(99, 85, 245, 0.04));
+}
+
+.invite-hero-art svg {
+  width: 62px;
+  height: 62px;
+}
+
+.invitation-card {
+  padding: 20px;
+  border-radius: 20px;
+}
+
+.invitation-intro {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.invitation-intro-title {
+  margin-bottom: 4px;
+}
+
+.invitation-icon,
+.detail-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.invitation-icon svg,
+.detail-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.invitation-icon--violet,
+.detail-icon--violet {
+  color: #6355f5;
+  background: rgba(99, 85, 245, 0.11);
+}
+
+.detail-icon--green {
+  color: #24b67f;
+  background: rgba(36, 182, 127, 0.14);
+}
+
+.detail-icon--orange {
+  color: #f1a400;
+  background: rgba(241, 164, 0, 0.14);
+}
+
+.invitation-details {
+  margin: 4px 0 12px;
+}
+
 .detail-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border-color);
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--divider);
 }
 
 .detail-item:last-child {
   border-bottom: none;
 }
 
+.detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .detail-label {
+  font-size: 17px;
   font-weight: 500;
   color: var(--text-secondary);
 }
 
 .detail-value {
+  font-size: 21px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
+.invite-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(99, 85, 245, 0.06);
+}
+
+.invite-note-title {
+  margin-bottom: 4px;
+  font-size: 18px;
+}
+
 .invitation-actions {
-  margin-top: 24px;
+  margin-top: 10px;
+}
+
+.invitation-button {
+  min-height: 60px;
+  border-radius: 18px;
+  padding: 14px 22px;
+  justify-content: space-between;
+  background: linear-gradient(92deg, #6355f5 0%, #4f46e5 100%);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.invitation-button:disabled {
+  background: linear-gradient(92deg, #8a80f7 0%, #726be9 100%);
+}
+
+.invitation-button svg {
+  width: 22px;
+  height: 22px;
 }
 
 .empty-state {
@@ -177,21 +362,52 @@ export default {
   height: 48px;
 }
 
-.empty-actions {
-  margin-top: 24px;
-}
-
 @media (max-width: 480px) {
+  .invite-hero {
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .invite-hero-art {
+    width: 94px;
+    height: 94px;
+    border-radius: 20px;
+  }
+
+  .invite-hero-art svg {
+    width: 46px;
+    height: 46px;
+  }
+
+  .invite-subtitle {
+    font-size: 16px;
+  }
+
   .invitation-card,
   .empty-state {
-    margin: 0 12px;
-    padding: 24px 20px;
+    margin: 0;
+    padding: 16px;
   }
 
   .detail-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
+    gap: 10px;
+    padding: 14px 0;
+  }
+
+  .invitation-icon,
+  .detail-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 16px;
+  }
+
+  .detail-value {
+    font-size: 19px;
+  }
+
+  .invitation-button {
+    min-height: 54px;
+    font-size: 16px;
   }
 }
 </style>

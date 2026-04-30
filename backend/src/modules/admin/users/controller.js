@@ -24,6 +24,14 @@ async function getUserDetailedStats(req, res, next) {
   }
 }
 
+async function getUserCourses(req, res, next) {
+  try {
+    return await moduleService.getUserCourses(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function getUserById(req, res, next) {
   try {
     return await moduleService.getUserById(req, res, next);
@@ -100,6 +108,7 @@ module.exports = {
   listUsers,
   exportUsersToExcel,
   getUserDetailedStats,
+  getUserCourses,
   getUserById,
   createUser,
   updateUser,
