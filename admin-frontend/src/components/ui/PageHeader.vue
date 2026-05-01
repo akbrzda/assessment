@@ -4,6 +4,7 @@
       <div class="space-y-1">
         <h1 class="text-lg font-semibold text-foreground m-0">{{ title }}</h1>
         <p v-if="subtitle" class="text-sm text-muted-foreground m-0">{{ subtitle }}</p>
+        <slot name="subtitle" />
       </div>
       <div v-if="$slots.actions" class="flex w-full flex-wrap items-center gap-2 md:w-auto">
         <slot name="actions" />

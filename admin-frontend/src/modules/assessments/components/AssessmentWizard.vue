@@ -1,15 +1,34 @@
 <template>
   <div class="assessment-wizard">
-    <!-- Progress Steps -->
-    <div class="wizard-steps">
+    <!-- Шапка с навигацией -->
+    <div class="wizard-header">
+      <div class="wizard-header-left">
+        <Button variant="ghost" icon="arrow-left" size="sm" @click="emit('cancel')">К списку аттестаций</Button>
+      </div>
+      <div class="wizard-header-right">
+        <Button v-if="currentStep > 1" variant="secondary" @click="prevStep">Назад</Button>
+        <Button v-if="currentStep < steps.length" @click="nextStep" :disabled="!canProceed">Далее</Button>
+        <Button v-else @click="submitAssessment" :loading="submitting" :disabled="!isFormValid" icon="check">{{ submitLabel }}</Button>
+      </div>
+    </div>
+
+    <!-- Степпер прогресса -->
+    <div class="assessment-stepper">
       <div
         v-for="(step, index) in steps"
         :key="index"
-        class="wizard-step"
-        :class="{ active: currentStep === index + 1, completed: currentStep > index + 1 }"
+        class="stepper-item"
+        :class="{ 'stepper-active': currentStep === index + 1, 'stepper-completed': currentStep > index + 1 }"
       >
-        <div class="step-number">{{ index + 1 }}</div>
-        <div class="step-label">{{ step.label }}</div>
+        <div v-if="index > 0" class="stepper-connector"></div>
+        <div class="stepper-bubble">
+          <Check v-if="currentStep > index + 1" :size="14" :stroke-width="2.5" />
+          <span v-else>{{ index + 1 }}</span>
+        </div>
+        <div class="stepper-labels">
+          <span class="stepper-title">{{ step.label }}</span>
+          <span class="stepper-subtitle">{{ step.subtitle }}</span>
+        </div>
       </div>
     </div>
 
@@ -48,10 +67,7 @@
       <div v-else-if="currentStep === 3" class="step-content">
         <h3 class="step-title">Вопросы аттестации</h3>
 
-        <div class="questions-mode-tabs">
-          <button :class="{ active: questionsMode === 'bank' }" @click="questionsMode = 'bank'" class="mode-tab">Из банка вопросов</button>
-          <button :class="{ active: questionsMode === 'custom' }" @click="questionsMode = 'custom'" class="mode-tab">Создать свои</button>
-        </div>
+        <Tabs v-model="questionsMode" :tabs="questionsTabsConfig" head-only class="mb-6" />
 
         <!-- Выбор из банка -->
         <div v-if="questionsMode === 'bank'" class="bank-questions-section">
@@ -186,11 +202,7 @@
         <h3 class="step-title">Назначение участников</h3>
 
         <p class="hint">Выберите один или несколько способов назначения</p>
-        <div class="assignment-tabs">
-          <button :class="{ active: assignmentMode === 'branches' }" @click="assignmentMode = 'branches'" class="tab-button">По филиалам</button>
-          <button :class="{ active: assignmentMode === 'positions' }" @click="assignmentMode = 'positions'" class="tab-button">По должностям</button>
-          <button :class="{ active: assignmentMode === 'users' }" @click="assignmentMode = 'users'" class="tab-button">Выбрать сотрудников</button>
-        </div>
+        <Tabs v-model="assignmentMode" :tabs="assignmentTabsConfig" head-only class="mb-6" />
 
         <!-- По филиалам -->
         <!-- По филиалам -->
@@ -305,28 +317,19 @@
         </div>
       </div>
     </div>
-
-    <!-- Navigation -->
-    <div class="wizard-navigation">
-      <Button v-if="currentStep > 1" variant="secondary" @click="prevStep">Назад</Button>
-
-      <div class="spacer"></div>
-
-      <Button v-if="currentStep < steps.length" @click="nextStep" :disabled="!canProceed">Далее</Button>
-
-      <Button v-else @click="submitAssessment" :loading="submitting" :disabled="!isFormValid" icon="check">{{ submitLabel }}</Button>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from "vue";
+import { Check } from "lucide-vue-next";
 import { useAuthStore } from "@/stores/auth";
 import { createAssessment, updateAssessment } from "@/api/assessments";
 import { getReferences, getUsers } from "@/api/users";
 import { getQuestions, getCategories } from "@/api/questionBank";
 import { validateDate, validateDateRange, dateToISOWithMidnight } from "@/utils/dateValidation";
 import Button from "@/components/ui/Button.vue";
+import Tabs from "@/components/ui/Tabs.vue";
 import Preloader from "@/components/ui/Preloader.vue";
 import Input from "@/components/ui/Input.vue";
 import Select from "@/components/ui/Select.vue";
@@ -358,9 +361,26 @@ const submitting = ref(false);
 const currentStep = ref(1);
 const assignmentMode = ref("branches");
 const questionsMode = ref("bank");
+
+const questionsTabsConfig = [
+  { value: "bank", label: "Из банка вопросов" },
+  { value: "custom", label: "Создать свои" },
+];
+
+const assignmentTabsConfig = [
+  { value: "branches", label: "По филиалам" },
+  { value: "positions", label: "По должностям" },
+  { value: "users", label: "Выбрать сотрудников" },
+];
 const errors = ref({});
 
-const steps = [{ label: "Основная информация" }, { label: "Теория" }, { label: "Вопросы" }, { label: "Участники" }, { label: "Параметры" }];
+const steps = [
+  { label: "Основная информация", subtitle: "Название и описание" },
+  { label: "Теория", subtitle: "Материалы перед тестом" },
+  { label: "Вопросы", subtitle: "Банк или свои" },
+  { label: "Участники", subtitle: "Назначение" },
+  { label: "Параметры", subtitle: "Сроки и настройки" },
+];
 const questionTypeOptions = [
   { value: "single", label: "Одиночный" },
   { value: "multiple", label: "Множественный" },
@@ -1093,85 +1113,162 @@ onMounted(async () => {
 
 <style scoped>
 .assessment-wizard {
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-  min-height: 500px;
+  width: 100%;
+  --aw-accent: #6c5ce7;
+  --aw-accent-strong: #5b46f5;
+  --aw-surface: #ffffff;
+  --aw-border: #e4e7ee;
+  --aw-text: #1f2937;
+  --aw-text-muted: #667085;
+  --aw-text-soft: #98a2b3;
+  --aw-radius-lg: 14px;
+  --aw-radius-md: 10px;
+  --aw-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  color: var(--aw-text);
 }
 
-/* Steps Progress */
-.wizard-steps {
+/* ────────────────── Шапка с навигацией ────────────────── */
+.wizard-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  position: relative;
-  padding: 0 32px;
+  gap: 18px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
 }
 
-.wizard-steps::before {
-  content: "";
-  position: absolute;
-  top: 20px;
-  left: 10%;
-  right: 10%;
-  height: 2px;
-  background: var(--divider);
-  z-index: 0;
-}
-
-.wizard-step {
+.wizard-header-left,
+.wizard-header-right {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.wizard-header-left :deep(.button),
+.wizard-header-right :deep(.button) {
+  border-radius: var(--aw-radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 38px;
+  box-shadow: none;
+}
+
+.wizard-header-left :deep(.button-ghost) {
+  border: 1px solid var(--aw-border);
+  background: #fff;
+  color: #344054;
+}
+
+.wizard-header-right :deep(.button-primary) {
+  background: var(--aw-accent-strong);
+  color: #fff;
+}
+
+.wizard-header-right :deep(.button-primary:hover:not(.button-disabled)) {
+  background: #4f37e8;
+  opacity: 1;
+}
+
+.wizard-header-right :deep(.button-secondary) {
+  border: 1px solid var(--aw-border);
+  background: #fff;
+  color: #344054;
+}
+
+/* ────────────────── Степпер ────────────────── */
+.assessment-stepper {
+  display: flex;
+  align-items: center;
+  background: var(--aw-surface);
+  border: 1px solid var(--aw-border);
+  border-radius: var(--aw-radius-lg);
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  overflow-x: auto;
+  box-shadow: var(--aw-shadow);
+}
+
+.stepper-item {
+  display: flex;
   align-items: center;
   gap: 8px;
-  position: relative;
-  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  cursor: default;
 }
 
-.step-number {
-  width: 40px;
-  height: 40px;
+.stepper-connector {
+  flex: 0 0 28px;
+  height: 1px;
+  background: var(--aw-border);
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.stepper-item.stepper-completed .stepper-connector {
+  background: var(--aw-accent-strong);
+}
+
+.stepper-bubble {
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: var(--bg-secondary);
-  border: 2px solid var(--divider);
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-secondary);
-  transition: all 0.3s;
+  flex-shrink: 0;
+  border: 1px solid var(--aw-border);
+  background: #ffffff;
+  color: var(--aw-text-muted);
+  transition: all 0.2s;
 }
 
-.wizard-step.active .step-number {
-  background: var(--accent-blue);
-  border-color: var(--accent-blue);
-  color: white;
+.stepper-item.stepper-active .stepper-bubble {
+  border-color: var(--aw-accent-strong);
+  background: var(--aw-accent-strong);
+  color: #fff;
 }
 
-.wizard-step.completed .step-number {
-  background: var(--accent-green);
-  border-color: var(--accent-green);
-  color: white;
+.stepper-item.stepper-completed .stepper-bubble {
+  border-color: var(--aw-accent-strong);
+  background: var(--aw-accent-strong);
+  color: #fff;
 }
 
-.step-label {
+.stepper-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stepper-title {
   font-size: 14px;
-  color: var(--text-secondary);
-  text-align: center;
-  max-width: 120px;
+  font-weight: 600;
+  color: var(--aw-text);
+  white-space: nowrap;
 }
 
-.wizard-step.active .step-label {
-  color: var(--text-primary);
-  font-weight: 600;
+.stepper-subtitle {
+  font-size: 12px;
+  color: var(--aw-text-soft);
+  white-space: nowrap;
+}
+
+.stepper-item.stepper-active .stepper-title {
+  color: var(--aw-accent-strong);
 }
 
 /* Content */
 .wizard-content {
-  flex: 1;
-  padding: 32px;
-  background: var(--bg-primary);
-  border-radius: 12px;
-  border: 1px solid var(--divider);
+  background: var(--aw-surface);
+  border: 1px solid var(--aw-border);
+  border-radius: var(--aw-radius-lg);
+  padding: 28px 32px;
+  box-shadow: var(--aw-shadow);
   min-height: 400px;
 }
 
@@ -1182,15 +1279,15 @@ onMounted(async () => {
 }
 
 .step-title {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--aw-text);
   margin: 0;
 }
 
 .hint {
   font-size: 14px;
-  color: var(--text-secondary);
+  color: var(--aw-text-muted);
   margin: 0;
 }
 
@@ -1233,34 +1330,6 @@ onMounted(async () => {
 }
 
 /* Questions Mode */
-.questions-mode-tabs {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.mode-tab {
-  flex: 1;
-  padding: 12px 16px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--divider);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 15px;
-  color: var(--text-primary);
-  transition: all 0.2s;
-}
-
-.mode-tab:hover {
-  background: var(--bg-primary);
-}
-
-.mode-tab.active {
-  background: var(--accent-blue);
-  border-color: var(--accent-blue);
-  color: white;
-}
-
 /* Bank Questions */
 .bank-questions-section {
   display: flex;
@@ -1530,34 +1599,6 @@ onMounted(async () => {
 }
 
 /* Assignment */
-.assignment-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
-}
-
-.tab-button {
-  flex: 1;
-  padding: 12px 16px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--divider);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 15px;
-  color: var(--text-primary);
-  transition: all 0.2s;
-}
-
-.tab-button:hover {
-  background: var(--bg-primary);
-}
-
-.tab-button.active {
-  background: var(--accent-blue);
-  border-color: var(--accent-blue);
-  color: white;
-}
-
 .assignment-content {
   margin-top: 16px;
 }
@@ -1641,17 +1682,6 @@ onMounted(async () => {
 }
 
 /* Navigation */
-.wizard-navigation {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 24px;
-  border-top: 1px solid var(--divider);
-}
-
-.spacer {
-  flex: 1;
-}
 
 .empty-state {
   padding: 48px 32px;
@@ -1661,19 +1691,16 @@ onMounted(async () => {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .wizard-steps {
-    padding: 0;
+  .assessment-stepper {
+    padding: 12px;
   }
 
-  .step-label {
+  .stepper-subtitle {
+    display: none;
+  }
+
+  .stepper-title {
     font-size: 12px;
-    max-width: 80px;
-  }
-
-  .step-number {
-    width: 32px;
-    height: 32px;
-    font-size: 14px;
   }
 
   .wizard-content {
@@ -1682,10 +1709,6 @@ onMounted(async () => {
 
   .form-row {
     grid-template-columns: 1fr;
-  }
-
-  .assignment-tabs {
-    flex-direction: column;
   }
 }
 

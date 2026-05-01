@@ -34,7 +34,7 @@
       </TabsTrigger>
     </TabsList>
 
-    <div class="mt-4">
+    <div v-if="!headOnly" class="mt-4">
       <TabsContent v-for="tab in tabs" :key="tab.value" :value="tab.value" class="focus:outline-none">
         <slot :name="tab.value" />
       </TabsContent>
@@ -64,6 +64,7 @@ const props = defineProps({
     validator: (v) => ["pills", "underline"].includes(v),
   },
   fullWidth: Boolean,
+  headOnly: Boolean,
 });
 
 const emit = defineEmits(["update:modelValue"]);

@@ -183,17 +183,7 @@
         </Card>
       </div>
 
-      <!-- Вкладки -->
-      <div class="tabs-container">
-        <div class="tabs">
-          <button :class="{ active: activeTab === 'participants' }" @click="activeTab = 'participants'" class="tab-button">
-            Участники ({{ details.participants.length }})
-          </button>
-          <button :class="{ active: activeTab === 'questions' }" @click="activeTab = 'questions'" class="tab-button">
-            Вопросы ({{ details.questions.length }})
-          </button>
-        </div>
-      </div>
+      <Tabs v-model="activeTab" :tabs="detailsTabsConfig" head-only class="mb-4" />
 
       <!-- Участники -->
       <Card v-if="activeTab === 'participants'" padding="none">
@@ -281,9 +271,7 @@
           <div v-else-if="question.question_type === 'matching'" class="matching-answers">
             <h4>Правильные пары</h4>
             <div v-if="getCorrectPairs(question).length === 0" class="score-empty">—</div>
-            <div v-for="pair in getCorrectPairs(question)" :key="pair.key" class="pair-row">
-              {{ pair.left }} — {{ pair.right }}
-            </div>
+            <div v-for="pair in getCorrectPairs(question)" :key="pair.key" class="pair-row">{{ pair.left }} — {{ pair.right }}</div>
           </div>
 
           <div v-else class="options-list">
@@ -338,6 +326,7 @@ import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { getAssessmentDetails, exportAssessmentToExcel } from "@/api/assessments";
 import Card from "@/components/ui/Card.vue";
+import Tabs from "@/components/ui/Tabs.vue";
 import Button from "@/components/ui/Button.vue";
 import Badge from "@/components/ui/Badge.vue";
 import Preloader from "@/components/ui/Preloader.vue";
@@ -355,6 +344,11 @@ const props = defineProps({
 const loading = ref(false);
 const details = ref(null);
 const activeTab = ref("participants");
+
+const detailsTabsConfig = computed(() => [
+  { value: "participants", label: `Участники (${details.value?.participants.length ?? 0})` },
+  { value: "questions", label: `Вопросы (${details.value?.questions.length ?? 0})` },
+]);
 const { showToast } = useToast();
 const router = useRouter();
 
@@ -539,10 +533,7 @@ const formatMatchingPairs = (question, pairs) => {
     return "—";
   }
   return entries
-    .map(
-      ([leftId, rightId]) =>
-        `${getOptionText(question, Number(leftId))} — ${getOptionText(question, Number(rightId), true)}`
-    )
+    .map(([leftId, rightId]) => `${getOptionText(question, Number(leftId))} — ${getOptionText(question, Number(rightId), true)}`)
     .join("; ");
 };
 
@@ -743,37 +734,6 @@ onMounted(() => {
 }
 
 /* Tabs */
-.tabs-container {
-  border-bottom: 2px solid var(--divider);
-}
-
-.tabs {
-  display: flex;
-  gap: 16px;
-}
-
-.tab-button {
-  padding: 12px 24px;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  cursor: pointer;
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  transition: all 0.2s;
-}
-
-.tab-button:hover {
-  color: var(--text-primary);
-}
-
-.tab-button.active {
-  color: var(--accent-blue);
-  border-bottom-color: var(--accent-blue);
-}
-
 /* Table */
 .table-wrapper {
   overflow-x: auto;
@@ -993,24 +953,6 @@ onMounted(() => {
 
   .stats-grid {
     grid-template-columns: 1fr;
-  }
-
-  .tabs {
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .tab-button {
-    border-bottom: none;
-    border-left: 2px solid transparent;
-    margin-bottom: 0;
-    margin-left: -2px;
-    text-align: left;
-  }
-
-  .tab-button.active {
-    border-bottom-color: transparent;
-    border-left-color: var(--accent-blue);
   }
 
   .table-wrapper {

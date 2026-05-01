@@ -1,8 +1,10 @@
 import apiClient, { mutateWithInvalidation } from "../utils/axios";
 
-export const getUsers = async (filters = {}) => {
+export const getUsers = async (filters = {}, options = {}) => {
+  const { forceFresh = false } = options;
   const { data } = await apiClient.get("/admin/users", {
     params: filters,
+    cache: !forceFresh,
     cacheMaxAge: 60000, // 1 минута
   });
   return data;

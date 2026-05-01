@@ -5,29 +5,30 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    /* === shadcn neutral — светлая тема === */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 0 0% 9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 0 0% 9%;
     --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 40%;
-    --accent: 210 40% 95%;
-    --accent-foreground: 222 47% 11%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 95%;
+    --accent-foreground: 0 0% 9%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 191 96% 43%;
+    --border: 0 0% 91%;
+    --input: 0 0% 91%;
+    --ring: 221 83% 53%;
     --field-surface: 0 0% 100%;
-    --field-surface-hover: 210 40% 99%;
-    --field-surface-disabled: 210 28% 95%;
-    --field-border-strong: 214 30% 84%;
+    --field-surface-hover: 0 0% 99%;
+    --field-surface-disabled: 0 0% 95%;
+    --field-border-strong: 0 0% 84%;
     --field-border-error: 0 78% 56%;
     --field-border-success: 142 68% 42%;
     --field-border-warning: 35 92% 48%;
@@ -36,8 +37,9 @@
     --field-warning-bg: 43 100% 96%;
 
     /* Навигация */
-    --nav-active: 217 91% 95%;
-    --nav-active-text: 221 83% 45%;
+    /* Навигация — сохраняем бренд-синий для активных состояний */
+    --nav-active: 221 83% 95%;
+    --nav-active-text: 221 83% 40%;
 
     /* Акцентные цвета (в HSL) */
     --accent-blue: 199 96% 45%;
@@ -47,25 +49,29 @@
     --accent-orange: 31 90% 48%;
     --accent-orange-soft: 34 100% 95%;
     --accent-purple: 221 83% 53%;
-    --accent-purple-soft: 217 91% 95%;
+    --accent-purple-soft: 221 83% 95%;
     --radius-sm: 10px;
     --radius-md: 12px;
     --radius-lg: 16px;
-    --focus-ring: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / 0.35);
-    --elevation-soft: 0 1px 2px hsl(222 47% 11% / 0.08), 0 8px 20px hsl(221 39% 11% / 0.08);
-    --elevation-float: 0 2px 8px hsl(221 39% 11% / 0.14), 0 14px 32px hsl(221 39% 11% / 0.14);
+    --focus-ring: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--primary) / 0.3);
+
+    /* === Elevation — мягкие нейтральные тени === */
+    --elevation-soft: 0 1px 2px rgb(0 0 0 / 0.04), 0 2px 6px rgb(0 0 0 / 0.04);
+    --elevation-float: 0 4px 16px rgb(0 0 0 / 0.08), 0 1px 4px rgb(0 0 0 / 0.04);
     --surface-base: 0 0% 100%;
-    --surface-raised: 210 50% 99%;
+    --surface-raised: 0 0% 99%;
     --surface-floating: 0 0% 100%;
-    --state-hover: 217 88% 97%;
-    --state-active: 217 91% 95%;
-    --state-selected: 217 100% 93%;
-    --table-row-stripe: 213 47% 98%;
-    --table-row-hover: 217 100% 97%;
-    --table-row-selected: 217 100% 94%;
-    --table-header-bg: 214 45% 97%;
-    --sidebar-bg-start: 220 60% 99%;
-    --sidebar-bg-end: 220 55% 97%;
+
+    /* Состояния — нейтральные hover, selected остаётся бренд-синим */
+    --state-hover: 0 0% 97%;
+    --state-active: 0 0% 94%;
+    --state-selected: 221 83% 94%;
+    --table-row-stripe: 0 0% 99%;
+    --table-row-hover: 0 0% 97%;
+    --table-row-selected: 221 83% 94%;
+    --table-header-bg: 0 0% 97%;
+    --sidebar-bg-start: 0 0% 99%;
+    --sidebar-bg-end: 0 0% 98%;
     --sidebar-active-indicator: 221 83% 53%;
     --topbar-bg: 0 0% 100%;
     --motion-fast: 120ms;
@@ -74,32 +80,73 @@
     --density-table-row-compact: 0.6rem;
     --density-table-row-default: 0.875rem;
     --density-table-row-relaxed: 1.125rem;
+
+    /* === Timing === */
+    --duration-fast: 150ms;
+    --duration-normal: 250ms;
+    --duration-slow: 400ms;
+
+    /* === Easing === */
+    --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+    /* === Z-index layers === */
+    --z-dropdown: 100;
+    --z-sticky: 200;
+    --z-drawer: 300;
+    --z-modal: 400;
+    --z-toast: 500;
+    --z-tooltip: 600;
+
+    /* === Модальные тени — облегчённые === */
+    --shadow-modal: 0 8px 32px rgb(0 0 0 / 0.12), 0 2px 8px rgb(0 0 0 / 0.06);
+    --shadow-drawer: -2px 0 16px rgb(0 0 0 / 0.06);
+    --shadow-toast: 0 4px 16px rgb(0 0 0 / 0.08), 0 1px 4px rgb(0 0 0 / 0.04);
+
+    /* === Семантические алиасы для компонентов === */
+    --bg-primary: hsl(var(--card));
+    --bg-secondary: hsl(var(--secondary));
+    --text-primary: hsl(var(--foreground));
+    --text-secondary: hsl(var(--muted-foreground));
+    --divider: hsl(var(--border));
+    --accent-red: hsl(var(--destructive));
+
+    /* === Semantic feedback colors === */
+    --color-success-subtle: 142 76% 97%;
+    --color-info-subtle: 194 95% 94%;
+    --color-warning-subtle: 34 100% 95%;
+    --color-danger-subtle: 0 100% 98%;
+    --color-success-border: 142 68% 42%;
+    --color-info-border: 199 96% 45%;
+    --color-warning-border: 31 90% 48%;
+    --color-danger-border: 0 72% 51%;
   }
 
   .dark {
-    --background: 220 44% 9%;
-    --foreground: 214 32% 92%;
-    --card: 220 44% 12%;
-    --card-foreground: 214 32% 92%;
-    --popover: 220 43% 14%;
-    --popover-foreground: 214 32% 92%;
+    /* === shadcn neutral — тёмная тема === */
+    --background: 0 0% 9%;
+    --foreground: 0 0% 92%;
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 92%;
+    --popover: 0 0% 14%;
+    --popover-foreground: 0 0% 92%;
     --primary: 223 82% 64%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 219 35% 21%;
-    --secondary-foreground: 214 32% 92%;
-    --muted: 219 35% 21%;
-    --muted-foreground: 215 20% 72%;
-    --accent: 219 35% 24%;
-    --accent-foreground: 214 32% 92%;
+    --secondary: 0 0% 18%;
+    --secondary-foreground: 0 0% 92%;
+    --muted: 0 0% 18%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 0 0% 20%;
+    --accent-foreground: 0 0% 92%;
     --destructive: 0 68% 55%;
     --destructive-foreground: 0 0% 98%;
-    --border: 216 32% 28%;
-    --input: 216 32% 28%;
-    --ring: 191 91% 56%;
-    --field-surface: 220 44% 12%;
-    --field-surface-hover: 220 44% 14%;
-    --field-surface-disabled: 218 28% 18%;
-    --field-border-strong: 216 30% 36%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 223 82% 64%;
+    --field-surface: 0 0% 12%;
+    --field-surface-hover: 0 0% 14%;
+    --field-surface-disabled: 0 0% 18%;
+    --field-border-strong: 0 0% 32%;
     --field-border-error: 0 70% 60%;
     --field-border-success: 142 63% 54%;
     --field-border-warning: 35 92% 56%;
@@ -107,34 +154,53 @@
     --field-success-bg: 143 30% 18%;
     --field-warning-bg: 36 36% 18%;
 
-    --nav-active: 221 76% 24%;
+    /* Навигация — бренд-синий */
+    --nav-active: 221 76% 20%;
     --nav-active-text: 213 94% 76%;
 
     --accent-blue: 194 90% 62%;
-    --accent-blue-soft: 198 74% 19%;
+    --accent-blue-soft: 198 55% 15%;
     --accent-green: 142 69% 54%;
-    --accent-green-soft: 144 61% 16%;
+    --accent-green-soft: 144 45% 12%;
     --accent-orange: 34 89% 60%;
-    --accent-orange-soft: 31 75% 18%;
+    --accent-orange-soft: 31 55% 14%;
     --accent-purple: 223 82% 64%;
-    --accent-purple-soft: 223 49% 24%;
-    --focus-ring: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / 0.45);
-    --elevation-soft: 0 1px 2px hsl(220 44% 5% / 0.4), 0 12px 26px hsl(220 44% 5% / 0.35);
-    --elevation-float: 0 4px 14px hsl(220 44% 5% / 0.5), 0 20px 42px hsl(220 44% 5% / 0.45);
-    --surface-base: 220 44% 10%;
-    --surface-raised: 220 44% 12%;
-    --surface-floating: 220 43% 14%;
-    --state-hover: 223 39% 20%;
-    --state-active: 222 48% 24%;
-    --state-selected: 222 65% 28%;
-    --table-row-stripe: 220 38% 11%;
-    --table-row-hover: 223 39% 18%;
-    --table-row-selected: 222 66% 23%;
-    --table-header-bg: 220 34% 14%;
-    --sidebar-bg-start: 220 44% 9%;
-    --sidebar-bg-end: 222 44% 12%;
+    --accent-purple-soft: 223 40% 18%;
+    --focus-ring: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--primary) / 0.45);
+
+    /* === Elevation — мягкие тени для тёмной темы === */
+    --elevation-soft: 0 1px 2px rgb(0 0 0 / 0.24), 0 2px 8px rgb(0 0 0 / 0.16);
+    --elevation-float: 0 4px 16px rgb(0 0 0 / 0.3), 0 2px 6px rgb(0 0 0 / 0.18);
+    --surface-base: 0 0% 10%;
+    --surface-raised: 0 0% 12%;
+    --surface-floating: 0 0% 14%;
+    --state-hover: 0 0% 17%;
+    --state-active: 0 0% 20%;
+    --state-selected: 221 76% 22%;
+    --table-row-stripe: 0 0% 11%;
+    --table-row-hover: 0 0% 16%;
+    --table-row-selected: 221 76% 22%;
+    --table-header-bg: 0 0% 14%;
+    --sidebar-bg-start: 0 0% 9%;
+    --sidebar-bg-end: 0 0% 11%;
     --sidebar-active-indicator: 223 82% 64%;
-    --topbar-bg: 220 43% 12%;
+    --topbar-bg: 0 0% 12%;
+    --bg-primary: hsl(var(--card));
+    --bg-secondary: hsl(var(--secondary));
+    --text-primary: hsl(var(--foreground));
+    --text-secondary: hsl(var(--muted-foreground));
+    --divider: hsl(var(--border));
+    --accent-red: hsl(var(--destructive));
+
+    /* === Semantic feedback colors (dark) === */
+    --color-success-subtle: 144 45% 12%;
+    --color-info-subtle: 198 55% 15%;
+    --color-warning-subtle: 31 55% 14%;
+    --color-danger-subtle: 0 32% 16%;
+    --color-success-border: 142 63% 54%;
+    --color-info-border: 194 90% 62%;
+    --color-warning-border: 34 89% 60%;
+    --color-danger-border: 0 68% 55%;
   }
 
   * {
@@ -145,10 +211,7 @@
   }
 
   body {
-    background:
-      radial-gradient(circle at 10% 0%, hsl(var(--primary) / 0.05), transparent 30%),
-      radial-gradient(circle at 95% 10%, hsl(var(--ring) / 0.06), transparent 25%),
-      hsl(var(--background));
+    background: hsl(var(--background));
     color: hsl(var(--foreground));
     font-family:
       "Inter",
@@ -224,4 +287,271 @@
   .page-container {
     padding: 16px;
   }
+}
+
+/* === Системные анимации === */
+
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modal-leave {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+  }
+}
+
+@keyframes alert-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes success-icon-bounce {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes confirm-danger-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--destructive) / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 4px hsl(var(--destructive) / 0.15);
+  }
+}
+
+/* Shimmer-скелетон */
+.skeleton-shimmer {
+  background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--accent)) 50%, hsl(var(--muted)) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite linear;
+}
+
+/* Success icon */
+.animate-success-bounce {
+  animation: success-icon-bounce 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ===== REBRAND: Иконки метрик дашборда ===== */
+.admin-metric-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-metric-icon--blue {
+  background: hsl(var(--accent-blue-soft));
+  color: hsl(var(--accent-blue));
+}
+
+.admin-metric-icon--green {
+  background: hsl(var(--accent-green-soft));
+  color: hsl(var(--accent-green));
+}
+
+.admin-metric-icon--purple {
+  background: hsl(var(--accent-purple-soft));
+  color: hsl(var(--accent-purple));
+}
+
+.admin-metric-icon--orange {
+  background: hsl(var(--accent-orange-soft));
+  color: hsl(var(--accent-orange));
+}
+
+/* ===== REBRAND: Сетка внутри карточек ===== */
+.admin-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.admin-data-card {
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-md);
+  padding: 16px;
+  transition: box-shadow 0.18s ease;
+}
+
+.admin-data-card:hover {
+  box-shadow: var(--elevation-soft);
+}
+
+/* ===== REBRAND: Hover-подъём карточки ===== */
+.card-hover-lift {
+  transition:
+    transform 0.2s var(--ease-out-expo),
+    box-shadow 0.2s var(--ease-out-expo);
+}
+
+.card-hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--elevation-float);
+}
+
+/* ===== REBRAND: Статусные пиллы ===== */
+.status-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-pill-badge--active {
+  background: hsl(var(--accent-green-soft));
+  color: hsl(var(--accent-green));
+}
+
+.status-pill-badge--inactive {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+
+.status-pill-badge--warning {
+  background: hsl(var(--color-warning-subtle));
+  color: hsl(var(--accent-orange));
+}
+
+/* ===== REBRAND: Метрика (большой акцентный показатель) ===== */
+.kpi-primary-value {
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.kpi-secondary-value {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== REBRAND: Trend индикатор ===== */
+.trend-up {
+  color: hsl(var(--accent-green));
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.trend-down {
+  color: hsl(var(--destructive));
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.trend-neutral {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ===== REBRAND: Sticky Bulk Actions Bar ===== */
+.bulk-actions-bar {
+  position: sticky;
+  bottom: 24px;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  box-shadow: var(--shadow-toast);
+  width: fit-content;
+  margin: 0 auto;
+  animation: alert-enter 0.2s ease;
+}
+
+/* ===== REBRAND: Activity feed item типы ===== */
+.activity-type-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.activity-type-dot--success {
+  background: hsl(var(--accent-green-soft));
+  color: hsl(var(--accent-green));
+}
+
+.activity-type-dot--warning {
+  background: hsl(var(--color-warning-subtle));
+  color: hsl(var(--accent-orange));
+}
+
+.activity-type-dot--info {
+  background: hsl(var(--accent-blue-soft));
+  color: hsl(var(--accent-blue));
+}
+
+.activity-type-dot--purple {
+  background: hsl(var(--accent-purple-soft));
+  color: hsl(var(--accent-purple));
 }

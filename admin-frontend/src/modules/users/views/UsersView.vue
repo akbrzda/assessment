@@ -1,182 +1,155 @@
 <template>
   <div class="users-view">
-    <div class="users-page-header">
-      <div class="users-page-title-wrap">
-        <h1 class="users-page-title">Управление пользователями</h1>
-        <p class="users-page-stats">
-          Всего: {{ stats.total }} пользователя
-          <span>•</span>
-          Суперадминов: {{ stats.superadmin }}
-          <span>•</span>
-          Управляющих: {{ stats.manager }}
-          <span>•</span>
-          Сотрудников: {{ stats.employee }}
-          <span>•</span>
-          Ожидают приглашения: {{ stats.awaiting }}
-        </p>
-      </div>
-      <div class="users-page-actions">
-        <Button v-if="authStore.isSuperAdmin" icon="plus" size="md" @click="openCreateModal" class="users-primary-action">
-          Добавить пользователя
-        </Button>
+    <PageHeader title="Управление пользователями">
+      <template #subtitle>
+        <div class="flex flex-wrap gap-2 mt-1">
+          <Badge variant="default" size="sm">Всего: {{ stats.total }}</Badge>
+          <Badge variant="primary" size="sm">Суперадминов: {{ stats.superadmin }}</Badge>
+          <Badge variant="info" size="sm">Менеджеров: {{ stats.manager }}</Badge>
+          <Badge variant="success" size="sm">Сотрудников: {{ stats.employee }}</Badge>
+          <Badge v-if="stats.awaiting > 0" variant="warning" size="sm">Ожидают: {{ stats.awaiting }}</Badge>
+        </div>
+      </template>
+      <template #actions>
+        <Button v-if="authStore.isSuperAdmin" icon="plus" size="md" @click="openCreateModal"> Добавить пользователя </Button>
         <Button v-if="authStore.isSuperAdmin || authStore.isManager" icon="user-plus" variant="secondary" size="md" @click="openInviteModal">
           Пригласить сотрудника
         </Button>
         <Button icon="file-chart-column" variant="secondary" size="md" @click="handleExportExcel">Экспорт Excel</Button>
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
-    <Card class="users-filters-card">
-      <div class="users-filters-grid">
-        <Input v-model="filters.search" type="search" placeholder="Поиск по имени, логину или email..." @input="handleSearch" />
-        <Select v-model="filters.branch" :options="branchOptions" placeholder="Все филиалы" @change="handleFilterChange" />
-        <Select v-model="filters.position" :options="positionOptions" placeholder="Все должности" @change="handleFilterChange" />
-        <Select v-model="filters.role" :options="roleOptions" placeholder="Все роли" @change="handleFilterChange" />
-        <Button variant="secondary" @click="resetFilters" icon="refresh-ccw">Сбросить</Button>
-      </div>
-    </Card>
+    <FilterBar
+      v-model="filterBarModel"
+      search-key="search"
+      search-placeholder="Поиск по имени, логину или email..."
+      :filter-defs="filterDefs"
+      class="mb-4"
+      @change="onFilterChange"
+    />
 
-    <div class="users-tabs">
-      <button
-        v-for="tab in userTabs"
-        :key="tab.key"
-        type="button"
-        :class="['users-tab', { 'users-tab-active': activeUserTab === tab.key }]"
-        @click="activeUserTab = tab.key"
-      >
-        {{ tab.label }}
-        <span class="users-tab-count">{{ tab.count }}</span>
-      </button>
-    </div>
+    <Tabs v-model="activeUserTab" :tabs="userTabsConfig" head-only class="mb-4" />
 
-    <Card class="users-card" padding="none">
-      <div v-if="visibleUsers.length === 0" class="empty-state">
-        <p>Пользователи не найдены</p>
-      </div>
+    <DataTable
+      :total="totalUsers"
+      :page="pagination.page"
+      :limit="pagination.perPage"
+      :is-empty="visibleUsers.length === 0"
+      empty-type="filter"
+      empty-title="Пользователи не найдены"
+      @update:page="
+        pagination.page = $event;
+        loadUsers();
+      "
+      @update:limit="
+        pagination.perPage = $event;
+        pagination.page = 1;
+        loadUsers();
+      "
+    >
+      <template #head>
+        <TableHead>
+          <input type="checkbox" :checked="allUsersSelected" @change="toggleSelectAllUsers" />
+        </TableHead>
+        <TableHead>Пользователь</TableHead>
+        <TableHead>Логин</TableHead>
+        <TableHead>Должность</TableHead>
+        <TableHead>Роль</TableHead>
+        <TableHead>Филиал</TableHead>
+        <TableHead>Статус</TableHead>
+        <TableHead>Создан</TableHead>
+        <TableHead right>Действия</TableHead>
+      </template>
 
-      <div v-else>
-        <div class="table-wrapper hide-mobile">
-          <table class="users-table">
-            <thead>
-              <tr>
-                <th>
-                  <input type="checkbox" :checked="allUsersSelected" @change="toggleSelectAllUsers" />
-                </th>
-                <th>Пользователь</th>
-                <th>Логин</th>
-                <th>Должность</th>
-                <th>Роль</th>
-                <th>Филиал</th>
-                <th>Статус</th>
-                <th>Создан</th>
-                <th class="actions-col">Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="user in visibleUsers" :key="user.id">
-                <td>
-                  <input type="checkbox" :checked="selectedUserIds.includes(user.id)" @change="toggleUserSelection(user.id)" />
-                </td>
-                <td class="name-cell clickable" @click="openProfilePage(user)">
-                  <div class="name-primary">{{ user.first_name }} {{ user.last_name }}</div>
-                  <div class="name-secondary">{{ user.login || "—" }}</div>
-                </td>
-                <td>{{ user.login || "—" }}</td>
-                <td>{{ user.position_name || "—" }}</td>
-                <td>
-                  <Badge :variant="getRoleBadgeVariant(user.role_name)" size="sm" rounded class="users-role-badge">
-                    {{ getRoleLabel(user.role_name) }}
-                  </Badge>
-                </td>
-                <td>{{ user.branch_name || "—" }}</td>
-                <td>
-                  <span :class="['status-pill', `status-pill-${getUserStatus(user).key}`]">
-                    <span class="status-dot"></span>
-                    {{ getUserStatus(user).label }}
-                  </span>
-                </td>
-                <td class="date-cell">{{ formatDate(user.created_at) }}</td>
-                <td class="actions-cell">
-                  <div class="actions-buttons">
-                    <Button
-                      v-if="canEditUser(user)"
-                      class="action-btn"
-                      variant="ghost"
-                      size="sm"
-                      icon="pencil"
-                      title="Редактировать"
-                      @click="openEditModal(user)"
-                    ></Button>
-                    <Button
-                      v-if="authStore.isSuperAdmin"
-                      class="action-btn action-btn-delete"
-                      variant="ghost"
-                      size="sm"
-                      icon="trash"
-                      title="Удалить"
-                      @click="openDeleteModal(user)"
-                    ></Button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Mobile cards -->
-        <div class="mobile-cards show-mobile">
-          <div v-for="user in visibleUsers" :key="user.id" class="user-card">
-            <div class="user-card-header">
-              <div>
-                <h3 class="user-card-name">{{ user.first_name }} {{ user.last_name }}</h3>
-                <p class="user-card-subtitle">ID: {{ user.id }}</p>
-              </div>
-              <Badge :variant="getRoleBadgeVariant(user.role_name)" size="sm" rounded>
-                {{ getRoleLabel(user.role_name) }}
-              </Badge>
+      <template #body>
+        <TableRow v-for="user in visibleUsers" :key="user.id">
+          <TableCell>
+            <input type="checkbox" :checked="selectedUserIds.includes(user.id)" @change="toggleUserSelection(user.id)" />
+          </TableCell>
+          <TableCell>
+            <div class="cursor-pointer" @click="openProfilePage(user)">
+              <div class="font-semibold text-foreground">{{ user.first_name }} {{ user.last_name }}</div>
+              <div class="text-sm text-muted-foreground">{{ user.login || "—" }}</div>
             </div>
-
-            <div class="user-card-body">
-              <div class="user-card-row">
-                <span class="user-card-label">Логин:</span>
-                <span class="user-card-value">{{ user.login || "—" }}</span>
-              </div>
-              <div class="user-card-row">
-                <span class="user-card-label">Филиал:</span>
-                <span class="user-card-value">{{ user.branch_name || "—" }}</span>
-              </div>
-              <div class="user-card-row">
-                <span class="user-card-label">Должность:</span>
-                <span class="user-card-value">{{ user.position_name || "—" }}</span>
-              </div>
-              <div class="user-card-row">
-                <span class="user-card-label">Очки:</span>
-                <span class="user-card-value">{{ user.points ?? 0 }}</span>
-              </div>
-              <div class="user-card-row">
-                <span class="user-card-label">Создан:</span>
-                <span class="user-card-value">{{ formatDate(user.created_at) }}</span>
-              </div>
+          </TableCell>
+          <TableCell muted>{{ user.login || "—" }}</TableCell>
+          <TableCell muted>{{ user.position_name || "—" }}</TableCell>
+          <TableCell>
+            <Badge :variant="getRoleBadgeVariant(user.role_name)" size="sm">
+              {{ getRoleLabel(user.role_name) }}
+            </Badge>
+          </TableCell>
+          <TableCell muted>{{ user.branch_name || "—" }}</TableCell>
+          <TableCell>
+            <span :class="['status-pill', `status-pill-${getUserStatus(user).key}`]">
+              <span class="status-dot"></span>
+              {{ getUserStatus(user).label }}
+            </span>
+          </TableCell>
+          <TableCell muted>{{ formatDate(user.created_at) }}</TableCell>
+          <TableCell right>
+            <div class="flex items-center justify-end gap-1">
+              <Button
+                v-if="canEditUser(user)"
+                variant="ghost"
+                size="sm"
+                :icon-only="true"
+                icon="pencil"
+                title="Редактировать"
+                @click="openEditModal(user)"
+              />
+              <Button
+                v-if="authStore.isSuperAdmin"
+                variant="ghost"
+                size="sm"
+                :icon-only="true"
+                icon="trash"
+                title="Удалить"
+                @click="openDeleteModal(user)"
+              />
             </div>
+          </TableCell>
+        </TableRow>
+      </template>
 
-            <div class="user-card-actions">
-              <Button v-if="canEditUser(user)" size="sm" variant="secondary" icon="pencil" fullWidth @click="openEditModal(user)"
-                >Редактировать</Button
-              >
-              <Button v-if="authStore.isSuperAdmin" size="sm" variant="danger" icon="trash" fullWidth @click="openDeleteModal(user)">Удалить</Button>
+      <template #mobile>
+        <div v-for="user in visibleUsers" :key="user.id" class="p-4 space-y-3">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h3 class="font-semibold text-foreground cursor-pointer" @click="openProfilePage(user)">{{ user.first_name }} {{ user.last_name }}</h3>
+              <p class="text-sm text-muted-foreground">ID: {{ user.id }}</p>
             </div>
+            <Badge :variant="getRoleBadgeVariant(user.role_name)" size="sm">
+              {{ getRoleLabel(user.role_name) }}
+            </Badge>
+          </div>
+          <dl class="grid gap-2 text-sm border-t border-border pt-3">
+            <div class="flex justify-between">
+              <dt class="text-muted-foreground">Логин</dt>
+              <dd class="font-medium">{{ user.login || "—" }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-muted-foreground">Филиал</dt>
+              <dd class="font-medium">{{ user.branch_name || "—" }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-muted-foreground">Должность</dt>
+              <dd class="font-medium">{{ user.position_name || "—" }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-muted-foreground">Создан</dt>
+              <dd class="font-medium">{{ formatDate(user.created_at) }}</dd>
+            </div>
+          </dl>
+          <div class="flex gap-2">
+            <Button v-if="canEditUser(user)" size="sm" variant="secondary" icon="pencil" class="flex-1" @click="openEditModal(user)">
+              Редактировать
+            </Button>
+            <Button v-if="authStore.isSuperAdmin" size="sm" variant="danger" icon="trash" @click="openDeleteModal(user)" />
           </div>
         </div>
-
-        <div v-if="totalPages > 1" class="pagination">
-          <span class="pagination-info">Страница {{ pagination.page }} из {{ totalPages }}</span>
-          <div class="pagination-buttons">
-            <Button size="sm" variant="ghost" :disabled="pagination.page === 1" @click="goToPrevPage">Предыдущая</Button>
-            <Button size="sm" variant="ghost" :disabled="pagination.page === totalPages" @click="goToNextPage">Следующая</Button>
-          </div>
-        </div>
-      </div>
-    </Card>
+      </template>
+    </DataTable>
 
     <!-- Create modal -->
     <Modal :show="showCreateModal" title="Создать пользователя" @close="closeModals">
@@ -279,8 +252,6 @@
 
     <!-- Profile modal -->
     <Modal :show="showProfileModal" :title="`Профиль: ${selectedUser?.first_name} ${selectedUser?.last_name}`" @close="closeModals" size="lg">
- 
-
       <div v-if="userProfile" class="user-profile">
         <!-- Основная информация -->
         <div class="profile-header">
@@ -492,16 +463,9 @@ import { useAuthStore } from "@/stores/auth";
 import apiClient from "@/utils/axios";
 import { getUsers, getReferences, createUser, updateUser, deleteUser, resetPassword, resetAssessmentProgress } from "@/api/users";
 import { createInvitation } from "@/api/invitations";
-import Card from "@/components/ui/Card.vue";
-import Button from "@/components/ui/Button.vue";
-import Input from "@/components/ui/Input.vue";
-import Select from "@/components/ui/Select.vue";
-import Badge from "@/components/ui/Badge.vue";
-import Modal from "@/components/ui/Modal.vue";
-import Preloader from "@/components/ui/Preloader.vue";
+import { Button, Badge, PageHeader, FilterBar, DataTable, TableHead, TableRow, TableCell, Tabs, Input, Select, Modal, Icon } from "@/components/ui";
 import UserForm from "@/modules/users/components/UserForm.vue";
 import UserPermissionsManager from "@/modules/users/components/UserPermissionsManager.vue";
-import Icon from "@/components/ui/Icon.vue";
 import { useToast } from "@/composables/useToast";
 import { formatBranchLabel } from "@/utils/branch";
 import { BOT_USERNAME } from "@/env";
@@ -587,12 +551,12 @@ const stats = computed(() => {
   const superadmin = users.value.filter((user) => user.role_name === "superadmin").length;
   const manager = users.value.filter((user) => user.role_name === "manager").length;
   const employee = users.value.filter((user) => user.role_name === "employee").length;
-  const awaiting = users.value.filter((user) => !user.login).length;
+  const awaiting = users.value.filter((user) => !user.telegram_id).length;
   return { total, superadmin, manager, employee, awaiting };
 });
 
 const getUserStatus = (user) => {
-  if (!user.login) {
+  if (!user.telegram_id) {
     return { key: "awaiting", label: "Ожидает" };
   }
   return { key: "active", label: "Активен" };
@@ -606,18 +570,38 @@ const userTabs = computed(() => [
   { key: "awaiting", label: "Ожидают приглашения", count: stats.value.awaiting },
 ]);
 
+const userTabsConfig = computed(() => userTabs.value.map((t) => ({ value: t.key, label: t.label, badge: t.count })));
+
 const visibleUsers = computed(() => {
   if (activeUserTab.value === "all") {
     return users.value;
   }
   if (activeUserTab.value === "awaiting") {
-    return users.value.filter((user) => !user.login);
+    return users.value.filter((user) => !user.telegram_id);
   }
   return users.value.filter((user) => user.role_name === activeUserTab.value);
 });
 
 const totalPages = computed(() => Math.max(1, Math.ceil(totalUsers.value / pagination.value.perPage)));
 const allUsersSelected = computed(() => visibleUsers.value.length > 0 && visibleUsers.value.every((user) => selectedUserIds.value.includes(user.id)));
+
+const filterBarModel = computed({
+  get: () => ({ ...filters }),
+  set: (val) => {
+    Object.assign(filters, val);
+  },
+});
+
+const filterDefs = computed(() => [
+  { key: "branch", label: "Филиал", options: branchOptions.value, placeholder: "Все филиалы" },
+  { key: "position", label: "Должность", options: positionOptions.value, placeholder: "Все должности" },
+  { key: "role", label: "Роль", options: roleOptions.value, placeholder: "Все роли" },
+]);
+
+const onFilterChange = () => {
+  pagination.value.page = 1;
+  loadUsers();
+};
 
 const branchOptions = computed(() => [
   ...references.value.branches.map((branch) => ({
@@ -660,14 +644,18 @@ const buildFilters = () => {
   return params;
 };
 
-const loadUsers = async () => {
+const loadUsers = async (options = {}) => {
+  const { forceFresh = false } = options;
   loading.value = true;
   try {
-    const data = await getUsers({
-      ...buildFilters(),
-      page: pagination.value.page,
-      limit: pagination.value.perPage,
-    });
+    const data = await getUsers(
+      {
+        ...buildFilters(),
+        page: pagination.value.page,
+        limit: pagination.value.perPage,
+      },
+      { forceFresh },
+    );
     users.value = data.users || [];
     totalUsers.value = Number(data.total || 0);
     selectedUserIds.value = selectedUserIds.value.filter((id) => users.value.some((user) => user.id === id));
@@ -1004,8 +992,18 @@ const handleDelete = async () => {
 
   actionLoading.value = true;
   try {
-    await deleteUser(selectedUser.value.id);
-    await loadUsers();
+    const deletedUserId = Number(selectedUser.value.id);
+    await deleteUser(deletedUserId);
+
+    // Моментально обновляем локальный список, чтобы пользователь сразу исчезал из UI.
+    users.value = users.value.filter((user) => Number(user.id) !== deletedUserId);
+    totalUsers.value = Math.max(0, totalUsers.value - 1);
+    selectedUserIds.value = selectedUserIds.value.filter((id) => Number(id) !== deletedUserId);
+    if (users.value.length === 0 && pagination.value.page > 1) {
+      pagination.value.page -= 1;
+    }
+
+    await loadUsers({ forceFresh: true });
     closeModals();
     showToast("Пользователь удален", "success");
   } catch (error) {
@@ -1370,35 +1368,6 @@ onMounted(async () => {
   width: 100%;
 }
 
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 32px;
-}
-
-.page-heading {
-  font-size: 30px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.page-subtitle {
-  margin: 8px 0 0;
-  font-size: 15.2px;
-  color: var(--text-secondary);
-}
-
-.show-mobile {
-  display: none;
-}
-
-.filters-card {
-  margin-bottom: 32px;
-}
-
 .password-generator-card {
   margin-top: 24px;
   padding: 20px;
@@ -1452,253 +1421,6 @@ onMounted(async () => {
   font-size: 12px;
   color: var(--text-secondary);
   margin: 0;
-}
-
-.filters-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-  align-items: center;
-}
-
-.users-card {
-  overflow: visible;
-}
-
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px;
-  border-top: 1px solid var(--divider);
-}
-
-.pagination-info {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.pagination-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.table-wrapper {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.users-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.users-table thead {
-  border-bottom: 1px solid var(--divider);
-}
-
-.users-table th {
-  padding: 16px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-}
-
-.users-table tbody tr {
-  border-bottom: 1px solid var(--divider);
-  transition: background-color 0.2s ease;
-}
-
-.users-table td {
-  padding: 16px;
-  font-size: 15.2px;
-  color: var(--text-primary);
-  vertical-align: middle;
-  white-space: nowrap;
-}
-
-.id-cell {
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.name-cell {
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.name-cell:hover .name-primary {
-  color: var(--color-primary);
-}
-
-.name-cell .name-primary {
-  font-weight: 600;
-  transition: color 0.2s;
-}
-
-.name-cell .name-secondary {
-  font-size: 12.8px;
-  color: var(--text-secondary);
-  margin-top: 4px;
-}
-
-.level-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 36px;
-  height: 36px;
-  padding: 0 8px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  font-weight: 700;
-  font-size: 14px;
-  box-shadow: 0 2px 8px #667eea4d;
-  transition: all 0.2s;
-}
-
-.level-badge:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px #667eea66;
-}
-
-.date-cell {
-  color: var(--text-secondary);
-  font-size: 13.6px;
-}
-
-.actions-col {
-  text-align: right;
-}
-
-.actions-cell {
-  text-align: right;
-}
-
-.actions-buttons {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 6px;
-}
-
-.action-btn {
-  padding: 8px;
-  border: 1px solid transparent;
-  background: var(--color-background-soft);
-  cursor: pointer;
-  border-radius: 8px;
-  font-size: 17.6px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.action-btn-edit:hover {
-  background-color: #e3f2fd;
-  border-color: #2196f3;
-}
-
-.action-btn-secondary:hover {
-  background-color: #f3e5f5;
-  border-color: #9c27b0;
-}
-
-.action-btn-delete:hover {
-  background-color: #ffebee;
-  border-color: #f44336;
-}
-
-.action-btn-edit {
-  color: #2196f3;
-}
-
-.action-btn-secondary {
-  color: #9c27b0;
-}
-
-.action-btn-delete {
-  color: #f44336;
-}
-
-.mobile-cards {
-  display: none;
-  flex-direction: column;
-  gap: 16px;
-  padding: 16px;
-}
-
-.user-card {
-  background-color: var(--bg-secondary);
-  border-radius: 12px;
-  border: 1px solid var(--divider);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.user-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.user-card-name {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.user-card-subtitle {
-  margin: 4px 0 0;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.user-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.user-card-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.user-card-label {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.user-card-value {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.user-card-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.empty-state {
-  padding: 48px 24px;
-  text-align: center;
-  color: var(--text-secondary);
-  font-size: 16px;
 }
 
 .modal-actions {
@@ -1759,68 +1481,6 @@ onMounted(async () => {
   font-weight: 600;
   color: #b91c1c;
   margin: 0;
-}
-
-@media (max-width: 1280px) {
-  .filters-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 1024px) {
-  .filters-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 768px) {
-  .mobile-cards {
-    display: flex;
-  }
-  .page-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .hide-mobile {
-    display: none;
-  }
-
-  .show-mobile {
-    display: flex;
-    gap: 8px;
-  }
-
-  .filters-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .history-header {
-    display: none;
-  }
-
-  .history-line {
-    grid-template-columns: 1.6fr 1fr;
-    row-gap: 6px;
-  }
-}
-
-/* Новые стили для расширенного функционала */
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.clickable {
-  cursor: pointer;
-  transition: color 0.2s;
-}
-
-.clickable:hover {
-  color: var(--color-primary);
-  text-decoration: underline;
 }
 
 .user-profile {
@@ -2127,12 +1787,6 @@ onMounted(async () => {
   color: var(--color-text-secondary);
   font-size: 15px;
 }
-@media (min-width: 976px) {
-  .filters-grid .input-group {
-    grid-column-end: 6;
-    grid-column-start: 1;
-  }
-}
 .bulk-actions {
   display: grid;
   grid-template-columns: 140px minmax(200px, 1fr) minmax(200px, 1fr) minmax(200px, 1fr) auto;
@@ -2301,154 +1955,41 @@ onMounted(async () => {
   margin: 12px 0 0;
 }
 
-.users-page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.users-page-title {
-  margin: 0;
-  font-size: 42px;
-  line-height: 1.1;
-  font-weight: 700;
-}
-
-.users-page-stats {
-  margin: 10px 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  color: hsl(var(--muted-foreground));
-  font-size: 15px;
-}
-
-.users-page-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.users-primary-action {
-  background: #4f46e5 !important;
-}
-
-.users-filters-card {
-  margin-bottom: 18px;
-  border-radius: 14px;
-}
-
-.users-filters-grid {
-  display: grid;
-  grid-template-columns: 1.3fr 1fr 1fr 1fr auto;
-  gap: 12px;
-  align-items: center;
-}
-
-.users-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 8px 0 16px;
-  border-bottom: 1px solid hsl(var(--border));
-}
-
-.users-tab {
-  border: none;
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  height: 42px;
-  padding: 0 14px;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-}
-
-.users-tab-active {
-  color: #4338ca;
-  border-bottom-color: #4f46e5;
-}
-
-.users-tab-count {
-  margin-left: 8px;
-  font-size: 13px;
-}
-
-.users-table th {
-  font-size: 13px;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.users-table td {
-  font-size: 14px;
-}
-
-.name-primary {
-  font-size: 16px;
-}
-
-.name-secondary {
-  font-size: 13px;
-}
-
-.users-role-badge {
-  transform: translateY(1px);
-}
-
 .status-pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 500;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: hsl(var(--muted));
+  color: var(--text-secondary);
 }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 999px;
-  background: #16a34a;
+  background: currentColor;
+  flex-shrink: 0;
 }
 
 .status-pill-awaiting {
-  color: #ca8a04;
+  background: hsl(var(--color-warning-subtle));
+  color: hsl(var(--accent-orange));
 }
 
 .status-pill-awaiting .status-dot {
-  background: #f59e0b;
+  background: hsl(var(--accent-orange));
 }
 
 .status-pill-active {
-  color: #16a34a;
+  background: hsl(var(--accent-green-soft));
+  color: hsl(var(--accent-green));
 }
 
-@media (max-width: 1280px) {
-  .users-filters-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 768px) {
-  .users-page-header {
-    flex-direction: column;
-  }
-
-  .users-page-title {
-    font-size: 32px;
-  }
-
-  .users-filters-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .users-page-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
+.status-pill-active .status-dot {
+  background: hsl(var(--accent-green));
 }
 </style>

@@ -19,7 +19,10 @@
         <span class="text-muted-foreground/60 shrink-0">›</span>
         <RouterLink
           :to="crumb.path"
-          :class="['truncate transition', i === breadcrumbs.length - 1 ? 'font-semibold text-nav-active-text' : 'text-muted-foreground hover:text-foreground']"
+          :class="[
+            'truncate transition',
+            i === breadcrumbs.length - 1 ? 'font-semibold text-nav-active-text' : 'text-muted-foreground hover:text-foreground',
+          ]"
           >{{ crumb.label }}</RouterLink
         >
       </template>
@@ -36,7 +39,8 @@
           @input="handleSearchInput"
           @blur="hideSearch"
         />
-        <span class="pointer-events-none absolute right-2 rounded-md border border-border bg-muted/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+        <span
+          class="pointer-events-none absolute right-2 rounded-md border border-border bg-muted/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
           >⌘K</span
         >
         <div
@@ -58,12 +62,6 @@
           </template>
         </div>
       </div>
-
-      <RouterLink
-        to="/assessments/create"
-        class="hidden h-9 items-center rounded-lg border border-primary/30 bg-primary/10 px-3 text-sm font-medium text-primary transition hover:bg-primary/15 md:inline-flex"
-        >Создать</RouterLink
-      >
 
       <button
         type="button"

@@ -1,7 +1,7 @@
 <template>
   <div class="app-root">
     <router-view />
-    <Toaster rich-colors close-button position="top-right" />
+    <Toaster rich-colors close-button position="bottom-right" :duration="4000" />
   </div>
 </template>
 

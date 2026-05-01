@@ -1,140 +1,114 @@
 <template>
   <div class="questions-view">
-    <!-- Header -->
-    <div class="page-header">
-      <div class="header-buttons">
-        <Button icon="folder" variant="secondary" @click="showCategoryModal = true">
-          <span class="hide-mobile">Категории</span>
+    <PageHeader title="Банк вопросов">
+      <template #actions>
+        <Button variant="secondary" icon="folder" @click="showCategoryModal = true">
+          <span class="hidden sm:inline">Категории</span>
         </Button>
         <Button icon="plus" @click="goToCreate">
-          <span class="hide-mobile">Добавить вопрос</span>
-          <span class="show-mobile">Добавить</span>
+          <span class="hidden sm:inline">Добавить вопрос</span>
+          <span class="sm:hidden">Добавить</span>
         </Button>
-      </div>
+      </template>
+    </PageHeader>
+
+    <FilterBar
+      v-model="filters"
+      search-key="search"
+      search-placeholder="Поиск по тексту вопроса..."
+      :filter-defs="filterDefs"
+      class="mb-4"
+      @change="applyFilters"
+    />
+
+    <div class="flex items-center justify-end mb-6">
+      <label class="flex items-center gap-2 cursor-pointer text-sm text-foreground select-none">
+        <input type="checkbox" v-model="groupByAssessment" class="w-4 h-4 accent-primary" @change="applyFilters" />
+        Группировать по аттестациям
+      </label>
     </div>
 
-    <!-- Фильтры -->
-    <Card class="filters-card">
-      <div class="filters-grid">
-        <Input v-model="filters.search" placeholder="Поиск по тексту вопроса..." @input="applyFilters" />
+    <DataTable
+      :total="totalQuestions"
+      :page="pagination.page"
+      :limit="pagination.limit"
+      :is-empty="questions.length === 0"
+      :empty-type="hasActiveFilters ? 'filter' : 'first-time'"
+      empty-title="Вопросы не найдены"
+      @update:page="changePage($event)"
+      @update:limit="
+        pagination.limit = $event;
+        pagination.page = 1;
+        loadQuestions();
+      "
+    >
+      <template #head>
+        <TableHead>Вопрос</TableHead>
+        <TableHead>Категория</TableHead>
+        <TableHead>Тип</TableHead>
+        <TableHead>Вариантов</TableHead>
+        <TableHead>Автор</TableHead>
+        <TableHead>Дата создания</TableHead>
+        <TableHead right>Действия</TableHead>
+      </template>
 
-        <Select v-model="filters.category" :options="categoryOptions" placeholder="Все категории" @change="applyFilters" />
+      <template #body>
+        <TableRow v-for="question in questions" :key="question.id">
+          <TableCell>
+            <div class="max-w-[300px] line-clamp-2">{{ question.question_text }}</div>
+          </TableCell>
+          <TableCell>
+            <Badge variant="default" size="sm">{{ question.category_name || "Без категории" }}</Badge>
+          </TableCell>
+          <TableCell>
+            <Badge variant="secondary" size="sm">{{ getQuestionTypeLabel(question.question_type) }}</Badge>
+          </TableCell>
+          <TableCell muted>{{ question.question_type === "text" ? "—" : question.options_count }}</TableCell>
+          <TableCell muted>{{ question.first_name }} {{ question.last_name }}</TableCell>
+          <TableCell muted>{{ formatDate(question.created_at) }}</TableCell>
+          <TableCell right>
+            <div class="flex items-center justify-end gap-1">
+              <Button variant="ghost" size="sm" :icon-only="true" icon="eye" title="Просмотр" @click="goToDetails(question.id)" />
+              <Button variant="ghost" size="sm" :icon-only="true" icon="pencil" title="Редактировать" @click="goToEdit(question.id)" />
+              <Button variant="ghost" size="sm" :icon-only="true" icon="trash" title="Удалить" @click="confirmDelete(question)" />
+            </div>
+          </TableCell>
+        </TableRow>
+      </template>
 
-        <Select v-model="filters.type" :options="typeOptions" placeholder="Все типы" @change="applyFilters" />
-
-        <Button variant="secondary" @click="resetFilters" fullWidth icon="refresh-ccw">Сбросить</Button>
-      </div>
-
-      <!-- Переключатель группировки -->
-      <div class="grouping-toggle">
-        <label class="toggle-checkbox">
-          <input type="checkbox" v-model="groupByAssessment" @change="applyFilters" />
-          <span>Группировать по аттестациям</span>
-        </label>
-      </div>
-    </Card>
-
-    <!-- Список вопросов -->
-    <Card padding="none" class="questions-card">
-      <div v-if="questions.length === 0" class="empty-state">Вопросы не найдены</div>
-
-      <div v-else class="table-wrapper hide-mobile">
-        <div class="list-meta">Показано {{ questions.length }} из {{ totalQuestions }}</div>
-        <table class="questions-table">
-          <thead>
-            <tr>
-              <th>Вопрос</th>
-              <th>Категория</th>
-              <th>Тип</th>
-              <th>Вариантов</th>
-              <th>Автор</th>
-              <th>Дата создания</th>
-              <th class="actions-col">Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="question in questions" :key="question.id">
-              <td class="question-cell">
-                <div class="question-text">{{ question.question_text }}</div>
-              </td>
-              <td>
-                <Badge variant="default" size="sm" rounded>
-                  {{ question.category_name || "Без категории" }}
-                </Badge>
-              </td>
-              <td>
-                <Badge variant="secondary" size="sm" rounded>
-                  {{ getQuestionTypeLabel(question.question_type) }}
-                </Badge>
-              </td>
-              <td>{{ question.question_type === "text" ? "—" : question.options_count }}</td>
-              <td>{{ question.first_name }} {{ question.last_name }}</td>
-              <td class="date-cell">{{ formatDate(question.created_at) }}</td>
-              <td class="actions-cell">
-                <div class="actions-buttons">
-                  <Button @click="goToDetails(question.id)" class="action-btn action-btn-info" title="Просмотр" icon="eye"></Button>
-                  <Button @click="goToEdit(question.id)" class="action-btn action-btn-edit" title="Редактировать" icon="pencil"></Button>
-                  <Button @click="confirmDelete(question)" class="action-btn action-btn-delete" title="Удалить" icon="trash"></Button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Mobile cards -->
-      <div class="show-mobile mobile-cards">
-        <div v-for="question in questions" :key="question.id" class="question-card">
-          <div class="question-card-header">
-            <h3 class="question-card-title">{{ question.question_text }}</h3>
-            <div class="question-card-badges">
-              <Badge variant="default" size="sm" rounded>
-                {{ question.category_name || "Без категории" }}
-              </Badge>
-              <Badge variant="secondary" size="sm" rounded>
-                {{ getQuestionTypeLabel(question.question_type) }}
-              </Badge>
+      <template #mobile>
+        <div v-for="question in questions" :key="question.id" class="p-4 space-y-3">
+          <div>
+            <h3 class="font-semibold text-foreground break-words">{{ question.question_text }}</h3>
+            <div class="flex flex-wrap gap-2 mt-2">
+              <Badge variant="default" size="sm">{{ question.category_name || "Без категории" }}</Badge>
+              <Badge variant="secondary" size="sm">{{ getQuestionTypeLabel(question.question_type) }}</Badge>
             </div>
           </div>
-
-          <div class="question-card-body">
-            <div class="question-card-row">
-              <span class="question-card-label">Тип:</span>
-              <span class="question-card-value">{{ getQuestionTypeLabel(question.question_type) }}</span>
+          <dl class="grid gap-2 text-sm border-t border-border pt-3">
+            <div v-if="question.question_type !== 'text'" class="flex justify-between">
+              <dt class="text-muted-foreground">Вариантов</dt>
+              <dd class="font-medium">{{ question.options_count }}</dd>
             </div>
-            <div v-if="question.question_type !== 'text'" class="question-card-row">
-              <span class="question-card-label">Вариантов:</span>
-              <span class="question-card-value">{{ question.options_count }}</span>
+            <div class="flex justify-between">
+              <dt class="text-muted-foreground">Автор</dt>
+              <dd class="font-medium">{{ question.first_name }} {{ question.last_name }}</dd>
             </div>
-            <div class="question-card-row">
-              <span class="question-card-label">Автор:</span>
-              <span class="question-card-value">{{ question.first_name }} {{ question.last_name }}</span>
+            <div class="flex justify-between">
+              <dt class="text-muted-foreground">Дата создания</dt>
+              <dd class="font-medium">{{ formatDate(question.created_at) }}</dd>
             </div>
-            <div class="question-card-row">
-              <span class="question-card-label">Дата создания:</span>
-              <span class="question-card-value">{{ formatDate(question.created_at) }}</span>
-            </div>
-          </div>
-
-          <div class="question-card-actions">
-            <Button size="sm" variant="secondary" icon="eye" @click="goToDetails(question.id)" fullWidth>Просмотр</Button>
-            <Button size="sm" variant="secondary" icon="pencil" @click="goToEdit(question.id)" fullWidth>Редактировать</Button>
-            <Button size="sm" variant="danger" icon="trash" @click="confirmDelete(question)" fullWidth>Удалить</Button>
+          </dl>
+          <div class="flex gap-2">
+            <Button size="sm" variant="secondary" icon="eye" class="flex-1" @click="goToDetails(question.id)">Просмотр</Button>
+            <Button size="sm" variant="secondary" icon="pencil" class="flex-1" @click="goToEdit(question.id)">Редактировать</Button>
+            <Button size="sm" variant="danger" icon="trash" @click="confirmDelete(question)" />
           </div>
         </div>
-      </div>
+      </template>
+    </DataTable>
 
-      <div v-if="totalPages > 1" class="pagination">
-        <span class="pagination-info">Страница {{ pagination.page }} из {{ totalPages }}</span>
-        <div class="pagination-buttons">
-          <Button size="sm" variant="ghost" :disabled="pagination.page <= 1" @click="changePage(pagination.page - 1)"> Предыдущая </Button>
-          <Button size="sm" variant="ghost" :disabled="pagination.page >= totalPages" @click="changePage(pagination.page + 1)"> Следующая </Button>
-        </div>
-      </div>
-    </Card>
-
-    <!-- Модальное окно управления категориями -->
-    <Modal :show="showCategoryModal" @close="showCategoryModal = false" title="Управление категориями" size="lg">
+    <Modal :show="showCategoryModal" title="Управление категориями" size="lg" @close="showCategoryModal = false">
       <CategoryManager @updated="handleCategoryUpdate" />
     </Modal>
   </div>
@@ -144,13 +118,7 @@
 import { ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import { getQuestions, getCategories, deleteQuestion } from "@/api/questionBank";
-import Preloader from "@/components/ui/Preloader.vue";
-import Modal from "@/components/ui/Modal.vue";
-import Card from "@/components/ui/Card.vue";
-import Button from "@/components/ui/Button.vue";
-import Input from "@/components/ui/Input.vue";
-import Select from "@/components/ui/Select.vue";
-import Badge from "@/components/ui/Badge.vue";
+import { Button, Badge, PageHeader, FilterBar, DataTable, TableHead, TableRow, TableCell, Modal } from "@/components/ui";
 import CategoryManager from "@/modules/questions/components/CategoryManager.vue";
 import { useToast } from "@/composables/useToast";
 
@@ -188,6 +156,13 @@ const typeOptions = [
 ];
 
 const totalPages = computed(() => Math.max(1, Math.ceil(totalQuestions.value / pagination.value.limit)));
+
+const hasActiveFilters = computed(() => !!(filters.value.search || filters.value.category || filters.value.type));
+
+const filterDefs = computed(() => [
+  { key: "category", label: "Категория", options: categoryOptions.value, placeholder: "Все категории" },
+  { key: "type", label: "Тип", options: typeOptions, placeholder: "Все типы" },
+]);
 
 const getQuestionTypeLabel = (type) => {
   const option = typeOptions.find((opt) => opt.value === type);
@@ -230,12 +205,6 @@ const loadCategories = async () => {
 };
 
 const applyFilters = () => {
-  pagination.value.page = 1;
-  loadQuestions();
-};
-
-const resetFilters = () => {
-  filters.value = { search: "", category: "", type: "" };
   pagination.value.page = 1;
   loadQuestions();
 };
@@ -295,312 +264,5 @@ onMounted(async () => {
 <style scoped>
 .questions-view {
   width: 100%;
-}
-
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: end;
-  gap: 16px;
-  margin-bottom: 32px;
-}
-
-.page-heading {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.header-buttons {
-  display: flex;
-  gap: 12px;
-}
-
-.show-mobile {
-  display: none !important;
-}
-
-.filters-card {
-  margin-bottom: 32px;
-}
-
-.filters-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  gap: 16px;
-}
-
-/* Переключатель группировки */
-.grouping-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--divider);
-}
-
-.toggle-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--text-primary);
-}
-
-.toggle-checkbox input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent-blue);
-}
-
-/* Таблица */
-.questions-card {
-  margin-bottom: 32px;
-}
-
-.table-wrapper {
-  width: 100%;
-  overflow-x: auto;
-}
-
-.questions-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
-.questions-table thead {
-  border-bottom: 1px solid var(--divider);
-}
-
-.questions-table th {
-  padding: 16px;
-  text-align: left;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  font-size: 12px;
-  letter-spacing: 0.5px;
-}
-
-.questions-table td {
-  padding: 16px;
-  color: var(--text-primary);
-}
-
-.question-cell {
-  max-width: 300px;
-}
-
-.question-text {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
-}
-
-.date-cell {
-  white-space: nowrap;
-}
-
-.actions-col {
-  text-align: right;
-  width: 150px;
-}
-
-.actions-cell {
-  text-align: right;
-}
-
-.actions-buttons {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.action-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  background-color: var(--bg-secondary);
-  color: var(--text-secondary);
-  transition: all 0.15s ease;
-}
-
-.action-btn:hover {
-  background-color: var(--divider);
-  color: var(--text-primary);
-}
-
-.action-btn-delete:hover {
-  background-color: #d4183d;
-  color: white;
-}
-
-/* Mobile cards */
-.mobile-cards {
-  display: grid;
-  gap: 16px;
-  padding: 16px;
-}
-
-.question-card {
-  background: var(--surface-card);
-  border: 1px solid var(--divider);
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.question-card-header {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.question-card-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-  word-break: break-word;
-}
-
-.question-card-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.question-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px 0;
-  border-top: 1px solid var(--divider);
-  border-bottom: 1px solid var(--divider);
-}
-
-.question-card-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  font-size: 14px;
-}
-
-.question-card-label {
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.question-card-value {
-  color: var(--text-primary);
-  text-align: right;
-  flex: 1;
-}
-
-.question-card-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* Empty state */
-.empty-state {
-  padding: 32px 16px;
-  text-align: center;
-  color: var(--text-secondary);
-  font-size: 14px;
-}
-
-.list-meta {
-  padding: 12px 16px 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px;
-  border-top: 1px solid var(--divider);
-}
-
-.pagination-info {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.pagination-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-/* Responsive design */
-@media (max-width: 1024px) {
-  .hide-mobile {
-    display: none !important;
-  }
-
-  .show-mobile {
-    display: inline !important;
-  }
-
-  .filters-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .questions-table {
-    font-size: 13px;
-  }
-
-  .questions-table th,
-  .questions-table td {
-    padding: 12px;
-  }
-}
-
-@media (max-width: 768px) {
-  .page-heading {
-    font-size: 20px;
-  }
-
-  .filters-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .header-buttons {
-    flex-direction: column;
-  }
-
-  .page-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-
-@media (max-width: 480px) {
-  .page-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .grouping-toggle {
-    justify-content: flex-start;
-  }
 }
 </style>

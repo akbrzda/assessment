@@ -1,6 +1,5 @@
 <template>
   <div class="dashboard">
-
     <div class="dashboard-content">
       <div class="filters-section">
         <Card class="filters-card">
@@ -26,46 +25,27 @@
       </div>
 
       <!-- Карточки основных метрик -->
-      <div class="metrics-grid">
-        <Card class="metric-card" @click="navigateToAssessments">
-          <div class="metric-content">
-            <div class="metric-icon admin-metric-icon admin-metric-icon--blue"><Icon name="ClipboardList" size="32" aria-hidden="true" /></div>
-            <div class="metric-info">
-              <p class="metric-label">Активные аттестации</p>
-              <p class="metric-value">{{ metrics.activeAssessments }}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card class="metric-card">
-          <div class="metric-content">
-            <div class="metric-icon admin-metric-icon admin-metric-icon--green"><Icon name="Users" size="32" aria-hidden="true" /></div>
-            <div class="metric-info">
-              <p class="metric-label">Всего сотрудников</p>
-              <p class="metric-value">{{ metrics.totalUsers }}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card class="metric-card">
-          <div class="metric-content">
-            <div class="metric-icon admin-metric-icon admin-metric-icon--purple"><Icon name="Building2" size="32" aria-hidden="true" /></div>
-            <div class="metric-info">
-              <p class="metric-label">Филиалы</p>
-              <p class="metric-value">{{ metrics.totalBranches }}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card class="metric-card">
-          <div class="metric-content">
-            <div class="metric-icon admin-metric-icon admin-metric-icon--orange"><Icon name="briefcase-business" size="32" aria-hidden="true" /></div>
-            <div class="metric-info">
-              <p class="metric-label">Должности</p>
-              <p class="metric-value">{{ metrics.totalPositions }}</p>
-            </div>
-          </div>
-        </Card>
+      <div class="grid grid-cols-4 gap-4 max-[768px]:grid-cols-2 max-[480px]:grid-cols-1">
+        <StatCard
+          label="Активные аттестации"
+          :value="metrics.activeAssessments"
+          icon="ClipboardList"
+          color="blue"
+          :trend="kpiDeltas[0].percent"
+          trend-label="к прошлому периоду"
+          clickable
+          @click="navigateToAssessments"
+        />
+        <StatCard
+          label="Всего сотрудников"
+          :value="metrics.totalUsers"
+          icon="Users"
+          color="green"
+          :trend="kpiDeltas[1].percent"
+          trend-label="к прошлому периоду"
+        />
+        <StatCard label="Филиалы" :value="metrics.totalBranches" icon="Building2" color="purple" size="secondary" />
+        <StatCard label="Должности" :value="metrics.totalPositions" icon="briefcase-business" color="orange" size="secondary" />
       </div>
       <div class="dashboard-row-three">
         <Card title="Причины провалов" icon="AlertTriangle" class="failure-reasons-card">
@@ -108,9 +88,7 @@
               </div>
             </div>
           </div>
-          <div v-else class="empty-state">
-            <p>Нет данных о сотрудниках</p>
-          </div>
+          <EmptyState v-else type="custom" title="Нет данных о сотрудниках" />
         </Card>
       </div>
       <!-- Первая строка: Успешность, Топ сотрудников, График активности -->
@@ -160,6 +138,9 @@
         <Card title="Активность по аттестациям" icon="Activity" class="activities-card">
           <div v-if="latestActivities && latestActivities.length > 0" class="activities-list">
             <div v-for="activity in latestActivities" :key="activity.id" class="activity-item">
+              <div :class="['activity-type-dot', getActivityDotClass(activity.activity_type)]">
+                <Icon :name="getActivityIcon(activity.activity_type)" size="14" />
+              </div>
               <div class="activity-content">
                 <p class="activity-text">
                   <strong>{{ activity.user_name }}</strong>
@@ -170,9 +151,7 @@
               <p class="activity-time">{{ formatTime(activity.created_at) }}</p>
             </div>
           </div>
-          <div v-else class="empty-state">
-            <p>Нет активности</p>
-          </div>
+          <EmptyState v-else type="custom" title="Нет активности" />
         </Card>
       </div>
       <!-- Третья строка: KPI филиалов -->
@@ -205,9 +184,7 @@
               </div>
             </div>
           </div>
-          <div v-else class="empty-state">
-            <p>Нет данных по филиалам</p>
-          </div>
+          <EmptyState v-else type="custom" title="Нет данных по филиалам" />
         </Card>
       </div>
 
@@ -222,15 +199,8 @@ import { useAuthStore } from "@/stores/auth";
 import dashboardApi from "@/api/dashboard";
 import { getReferences } from "@/api/users";
 import { useToast } from "@/composables/useToast";
-import Preloader from "@/components/ui/Preloader.vue";
-import Card from "@/components/ui/Card.vue";
-import Badge from "@/components/ui/Badge.vue";
+import { Preloader, Card, Badge, Icon, Button, Select, Input, DatePicker, StatCard, EmptyState } from "@/components/ui";
 import LineChart from "@/components/charts/LineChart.vue";
-import Icon from "@/components/ui/Icon.vue";
-import Button from "@/components/ui/Button.vue";
-import Select from "@/components/ui/Select.vue";
-import Input from "@/components/ui/Input.vue";
-import DatePicker from "@/components/ui/DatePicker.vue";
 import { formatBranchLabel } from "@/utils/branch";
 
 const router = useRouter();
@@ -657,6 +627,25 @@ const getMedalEmoji = (index) => {
   return medals[index] || "";
 };
 
+const getActivityIcon = (type) => {
+  if (!type) return "activity";
+  const t = type.toLowerCase();
+  if (t.includes("завершил") || t.includes("сдал") || t.includes("passed")) return "check-circle";
+  if (t.includes("провалил") || t.includes("failed")) return "x-circle";
+  if (t.includes("начал") || t.includes("started")) return "play-circle";
+  if (t.includes("badge") || t.includes("значок") || t.includes("награда")) return "award";
+  return "activity";
+};
+
+const getActivityDotClass = (type) => {
+  if (!type) return "activity-type-dot--info";
+  const t = type.toLowerCase();
+  if (t.includes("завершил") || t.includes("сдал") || t.includes("passed")) return "activity-type-dot--success";
+  if (t.includes("провалил") || t.includes("failed")) return "activity-type-dot--warning";
+  if (t.includes("badge") || t.includes("значок") || t.includes("награда")) return "activity-type-dot--purple";
+  return "activity-type-dot--info";
+};
+
 const handleOnline = async () => {
   isOffline.value = false;
   showToast("Соединение восстановлено", "success");
@@ -773,9 +762,6 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
-.kpi-delta-item {
-}
-
 .kpi-delta-label {
   margin: 0 0 6px;
   color: var(--text-secondary);
@@ -809,9 +795,6 @@ onBeforeUnmount(() => {
 
 .failure-reasons-grid {
   gap: 12px;
-}
-
-.failure-reason-item {
 }
 
 .failure-reason-head {
@@ -866,9 +849,6 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
-.observability-item {
-}
-
 .observability-label {
   margin: 0 0 6px;
   color: var(--text-secondary);
@@ -880,67 +860,6 @@ onBeforeUnmount(() => {
   font-size: 18px;
   font-weight: 700;
   color: var(--text-primary);
-}
-
-/* Metrics Grid */
-.metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 24px;
-}
-
-.metric-card {
-  display: flex;
-  height: 115px;
-  align-items: center;
-}
-.metric-content {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.metric-icon {
-  font-size: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.metric-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.metric-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin: 0 0 8px 0;
-}
-
-.metric-value {
-  font-size: 32px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
-  line-height: 1;
-}
-
-.metric-value-blue {
-  color: var(--accent-blue);
-}
-
-.metric-value-green {
-  color: var(--accent-green);
-}
-
-.metric-value-purple {
-  color: var(--accent-purple);
-}
-
-.metric-value-orange {
-  color: var(--accent-orange);
 }
 
 /* Success Rate */
@@ -1235,24 +1154,23 @@ onBeforeUnmount(() => {
 .activities-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
   max-height: 500px;
   overflow-y: auto;
 }
 
 .activity-item {
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
+  gap: 12px;
   padding: 12px;
   background: var(--bg-secondary);
-  border-radius: 8px;
-  transition: all 0.2s ease;
-  gap: 8px;
+  border-radius: 10px;
+  transition: background 0.15s ease;
 }
 
 .activity-item:hover {
-  background: var(--accent-blue-soft);
+  background: hsl(var(--state-hover));
 }
 
 .activity-content {
@@ -1263,37 +1181,30 @@ onBeforeUnmount(() => {
 .activity-text {
   font-size: 14px;
   color: var(--text-primary);
-  margin: 0 0 4px 0;
+  margin: 0 0 3px 0;
   line-height: 1.4;
 }
 
 .activity-text strong {
   font-weight: 600;
-  color: var(--accent-blue);
+  color: hsl(var(--accent-blue));
 }
 
 .activity-meta {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.activity-time {
   font-size: 12px;
   color: var(--text-secondary);
   margin: 0;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Empty State */
-.empty-state {
-  padding: 32px 16px;
-  text-align: center;
-}
-
-.empty-state p {
+.activity-time {
+  font-size: 11px;
   color: var(--text-secondary);
   margin: 0;
+  white-space: nowrap;
+  padding-top: 2px;
 }
 
 /* Responsive */
@@ -1314,25 +1225,6 @@ onBeforeUnmount(() => {
 @media (max-width: 768px) {
   .page-heading {
     font-size: 24px;
-  }
-
-  .metrics-grid {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 16px;
-  }
-
-  .metric-icon {
-    font-size: 32px;
-    width: 48px;
-    height: 48px;
-  }
-
-  .metric-value {
-    font-size: 24px;
-  }
-
-  .metric-label {
-    font-size: 13px;
   }
 
   .success-rate-value {
@@ -1372,10 +1264,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 480px) {
-  .metrics-grid {
-    grid-template-columns: 1fr;
-  }
-
   .branch-score {
     font-size: 20px;
   }

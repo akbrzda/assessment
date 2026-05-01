@@ -54,7 +54,7 @@ const variantClasses = {
   // Статусные (соответствуют UI Kit)
   new: "bg-accent-green-soft text-accent-green border-accent-green/30",
   popular: "bg-transparent text-accent-blue border-accent-blue/45",
-  draft: "bg-muted/60 text-muted-foreground border-border/65",
+  draft: "bg-accent-blue-soft/60 text-accent-blue border-accent-blue/25",
   pending: "bg-accent-orange-soft text-accent-orange border-accent-orange/35",
   published: "bg-accent-green-soft text-accent-green border border-accent-green/30",
   archived: "bg-muted/65 text-muted-foreground border-border/65",

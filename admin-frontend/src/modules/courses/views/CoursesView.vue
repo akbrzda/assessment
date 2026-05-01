@@ -1,13 +1,11 @@
 <template>
   <div class="courses-view" @click="closeMenus">
     <!-- Заголовок страницы -->
-    <div class="page-header">
-      <div class="page-title-block">
-        <h1 class="page-title">Курсы</h1>
-        <p class="page-subtitle">Управляйте курсами, модулями и версиями</p>
-      </div>
-      <Button icon="plus" @click.stop="goToCreate">Создать курс</Button>
-    </div>
+    <PageHeader title="Курсы" subtitle="Управляйте курсами, модулями и версиями">
+      <template #actions>
+        <Button icon="plus" @click.stop="goToCreate">Создать курс</Button>
+      </template>
+    </PageHeader>
 
     <!-- Фильтры -->
     <FilterBar
@@ -19,23 +17,12 @@
     />
 
     <!-- Переключатель вида -->
-    <div class="view-tabs">
-      <button class="view-tab" :class="{ active: viewMode === 'cards' }" @click="viewMode = 'cards'">
-        <Icon name="layout-grid" :size="16" />
-        Карточки
-      </button>
-      <button class="view-tab" :class="{ active: viewMode === 'table' }" @click="viewMode = 'table'">
-        <Icon name="table-2" :size="16" />
-        Таблица
-      </button>
-    </div>
+    <Tabs v-model="viewMode" :tabs="viewTabsConfig" head-only />
 
     <!-- Загрузка -->
 
     <!-- Пустое состояние -->
-    <div v-if="courses.length === 0" class="empty-state">
-      <p>Курсы не найдены</p>
-    </div>
+    <EmptyState v-if="courses.length === 0" type="filter" title="Курсы не найдены" />
 
     <!-- Карточный режим -->
     <template v-else-if="viewMode === 'cards'">
@@ -204,21 +191,16 @@
         </div>
 
         <!-- Пагинация -->
-        <div class="pagination-bar">
-          <span class="total-count">Всего курсов: {{ courses.length }}</span>
-          <div class="page-controls">
-            <button class="page-nav-btn" :disabled="currentPage <= 1" @click="currentPage--">
-              <Icon name="chevron-left" :size="16" />
-            </button>
-            <button v-for="page in totalPages" :key="page" class="page-num-btn" :class="{ active: page === currentPage }" @click="currentPage = page">
-              {{ page }}
-            </button>
-            <button class="page-nav-btn" :disabled="currentPage >= totalPages" @click="currentPage++">
-              <Icon name="chevron-right" :size="16" />
-            </button>
-          </div>
-          <Select v-model="pageSize" :options="pageSizeOptions" size="sm" @update:model-value="currentPage = 1" />
-        </div>
+        <Pagination
+          :total="courses.length"
+          :page="currentPage"
+          :limit="pageSize"
+          @update:page="currentPage = $event"
+          @update:limit="
+            pageSize = $event;
+            currentPage = 1;
+          "
+        />
       </div>
     </template>
 
@@ -297,7 +279,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { Badge, Button, Icon, Preloader, FilterBar, Select } from "@/components/ui";
+import { Badge, Button, Icon, Preloader, FilterBar, Select, Tabs, PageHeader, EmptyState, Pagination } from "@/components/ui";
 import AnalyticsSummaryCards from "@/components/courses/AnalyticsSummaryCards.vue";
 import { archiveCourse, deleteCourse, getCourses, getCourseAnalyticsFunnel } from "@/api/courses";
 import { useToast } from "@/composables/useToast";
@@ -309,6 +291,11 @@ const loading = ref(false);
 const courses = ref([]);
 const funnel = ref([]);
 const viewMode = ref("cards");
+
+const viewTabsConfig = [
+  { value: "cards", label: "Карточки", icon: "layout-grid" },
+  { value: "table", label: "Таблица", icon: "table-2" },
+];
 const openMenuId = ref(null);
 const currentPage = ref(1);
 const pageSize = ref(10);
@@ -380,7 +367,7 @@ const hasUnpublishedChanges = (course) => {
 const getStatusVariant = (status) => {
   const variants = {
     published: "success",
-    draft: "secondary",
+    draft: "info",
     archived: "default",
   };
   return variants[status] || "default";
@@ -559,33 +546,6 @@ const getAuthorInitials = (name) => {
   gap: 20px;
 }
 
-/* ===== Заголовок страницы ===== */
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.page-title-block {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.page-subtitle {
-  margin: 0;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
 /* ===== Фильтры ===== */
 .filters-bar {
   display: flex;
@@ -680,48 +640,6 @@ const getAuthorInitials = (name) => {
   color: var(--text-primary);
 }
 
-/* ===== Переключатель вида ===== */
-.view-tabs {
-  display: flex;
-  gap: 4px;
-  align-self: flex-start;
-}
-
-.view-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background: none;
-  border: 1.5px solid transparent;
-  border-radius: 10px;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    color 0.15s,
-    background 0.15s;
-}
-
-.view-tab.active {
-  color: var(--accent-blue);
-  border-color: var(--accent-blue);
-}
-
-.view-tab:hover:not(.active) {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-/* ===== Пустое состояние ===== */
-.empty-state {
-  padding: 64px 32px;
-  text-align: center;
-  color: var(--text-secondary);
-}
-
 /* ===== Карточный режим ===== */
 .cards-grid {
   display: grid;
@@ -731,13 +649,42 @@ const getAuthorInitials = (name) => {
 
 .course-card {
   background: var(--bg-primary);
-  border: 1px solid var(--border);
+  border: 1px solid hsl(var(--border));
   border-radius: 16px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   position: relative;
+}
+
+.course-card:hover {
+  border-color: hsl(var(--primary) / 0.3);
+}
+
+/* Статус-индикатор слева на карточке */
+.course-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: transparent;
+  transition: background 0.2s ease;
+}
+
+.course-card:has(.status-badge[data-status="published"])::before {
+  background: hsl(var(--accent-green));
+}
+
+.course-card:has(.status-badge[data-status="draft"])::before {
+  background: hsl(var(--accent-blue));
+}
+
+.course-card:has(.status-badge[data-status="archived"])::before {
+  background: hsl(var(--muted-foreground));
 }
 
 /* Шапка карточки: иконка + заголовок + описание */
@@ -851,18 +798,23 @@ const getAuthorInitials = (name) => {
   flex: 1;
   padding: 8px 12px;
   font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-  background: var(--bg-secondary);
-  border: 1px solid var(--divider);
+  font-weight: 600;
+  color: hsl(var(--primary));
+  background: hsl(var(--accent-purple-soft));
+  border: 1px solid hsl(var(--primary) / 0.2);
   border-radius: 10px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
   text-align: center;
 }
 
 .card-edit-btn:hover {
-  background: var(--divider);
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
 }
 
 .menu-wrap {
@@ -973,7 +925,26 @@ const getAuthorInitials = (name) => {
 }
 
 .courses-table tbody tr:hover td {
-  background: var(--bg-secondary);
+  background: hsl(var(--table-row-hover));
+}
+
+/* Inline-кнопки появляются при hover строки */
+.courses-table tbody tr .icon-btn {
+  opacity: 0.4;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.courses-table tbody tr:hover .icon-btn {
+  opacity: 1;
+}
+
+.icon-btn:hover {
+  background: hsl(var(--state-hover));
+  color: hsl(var(--primary));
+  opacity: 1;
 }
 
 .cell-name {
@@ -998,8 +969,8 @@ const getAuthorInitials = (name) => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--accent-blue-soft);
-  color: var(--accent-blue);
+  background: hsl(var(--accent-blue-soft));
+  color: hsl(var(--accent-blue));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1046,72 +1017,6 @@ const getAuthorInitials = (name) => {
 .icon-btn:hover {
   background: var(--bg-secondary);
   color: var(--text-primary);
-}
-
-/* ===== Пагинация ===== */
-.pagination-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--divider);
-}
-
-.total-count {
-  font-size: 13px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.page-controls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.page-nav-btn,
-.page-num-btn {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--divider);
-  border-radius: 8px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.page-num-btn.active {
-  background: var(--accent-blue);
-  border-color: var(--accent-blue);
-  color: #fff;
-}
-
-.page-nav-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.page-nav-btn:not(:disabled):hover,
-.page-num-btn:not(.active):hover {
-  background: var(--bg-secondary);
-}
-
-.page-size-select {
-  padding: 6px 10px;
-  font-size: 13px;
-  color: var(--text-primary);
-  background: var(--bg-primary);
-  border: 1px solid var(--divider);
-  border-radius: 8px;
-  cursor: pointer;
-  outline: none;
 }
 
 /* ===== Секции аналитики ===== */
@@ -1199,7 +1104,7 @@ const getAuthorInitials = (name) => {
 
 .funnel-bar {
   width: 56px;
-  background: var(--accent-blue);
+  background: hsl(var(--accent-blue));
   border-radius: 4px 4px 0 0;
   transition: height 0.3s;
 }
@@ -1208,7 +1113,7 @@ const getAuthorInitials = (name) => {
 .funnel-bar-zero {
   width: 56px;
   height: 3px;
-  background: var(--accent-blue);
+  background: hsl(var(--accent-blue));
   border-radius: 2px;
 }
 
@@ -1243,7 +1148,7 @@ const getAuthorInitials = (name) => {
 
 .progress-fill {
   height: 100%;
-  background: var(--accent-blue);
+  background: hsl(var(--accent-blue));
   border-radius: 999px;
   transition: width 0.3s;
 }
@@ -1262,7 +1167,7 @@ const getAuthorInitials = (name) => {
 .funnel-link {
   font-size: 13px;
   font-weight: 500;
-  color: var(--accent-blue);
+  color: hsl(var(--accent-blue));
   text-decoration: none;
 }
 

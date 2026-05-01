@@ -1,182 +1,150 @@
 <template>
   <div class="assessments-view">
-    <!-- Header -->
-    <div class="page-header">
-      <Button v-if="authStore.isSuperAdmin || authStore.isManager" icon="plus" @click="goToCreate">
-        <span class="hide-mobile">Создать аттестацию</span>
-        <span class="show-mobile">Создать</span>
-      </Button>
-    </div>
-
-    <!-- Фильтры -->
-    <Card class="filters-card">
-      <div class="filters-grid">
-        <Input v-model="filters.search" placeholder="Поиск по названию..." @input="loadAssessments" />
-
-        <Select v-model="filters.status" :options="statusOptions" placeholder="Все статусы" @change="loadAssessments" />
-
-        <Select v-model="filters.branch" :options="branchOptions" placeholder="Все филиалы" @change="loadAssessments" />
-
-        <Button variant="secondary" @click="resetFilters" fullWidth icon="refresh-ccw">Сбросить</Button>
-      </div>
-    </Card>
-
-    <!-- Контент -->
-    <Card padding="none" class="assessments-card">
-      <div v-if="assessments.length === 0" class="empty-state">
-        <div class="empty-state-icon"></div>
-        <p class="empty-state-title">Аттестации не найдены</p>
-        <p v-if="filters.search || filters.status || filters.branch">Попробуйте изменить фильтры поиска</p>
-        <p v-else>Создайте первую аттестацию, чтобы начать оценку сотрудников</p>
-        <Button v-if="!filters.search && !filters.status && !filters.branch" @click="$router.push('/assessments/create')">
-          Создать аттестацию
+    <PageHeader title="Аттестации">
+      <template #actions>
+        <Button v-if="authStore.isSuperAdmin || authStore.isManager" icon="plus" @click="goToCreate">
+          <span class="hidden sm:inline">Создать аттестацию</span>
+          <span class="sm:hidden">Создать</span>
         </Button>
-      </div>
+      </template>
+    </PageHeader>
 
-      <div v-else>
-        <div class="list-meta">Показано {{ assessments.length }} из {{ totalAssessments }}</div>
-        <!-- Desktop Table -->
-        <div class="table-wrapper hide-mobile">
-          <table class="assessments-table">
-            <thead>
-              <tr>
-                <th>Название</th>
-                <th>Статус</th>
-                <th>Открытие</th>
-                <th>Закрытие</th>
-                <th>Назначено</th>
-                <th>Завершено / Назначено</th>
-                <th>Средний балл</th>
-                <th class="actions-col">Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="assessment in assessments" :key="assessment.id">
-                <td>
-                  <div class="assessment-title">{{ assessment.title }}</div>
-                  <div class="assessment-desc">{{ assessment.description || "Нет описания" }}</div>
-                </td>
-                <td>
-                  <Badge :variant="getStatusVariant(assessment.status)" size="sm" rounded>
-                    {{ getStatusLabel(assessment.status) }}
-                  </Badge>
-                </td>
-                <td class="dates-cell">
-                  <div>{{ formatDate(assessment.open_at) }}</div>
-                </td>
-                <td class="dates-cell">
-                  <div>{{ formatDate(assessment.close_at) }}</div>
-                </td>
-                <td>{{ assessment.assigned_users }} чел.</td>
-                <td>
-                  <span :class="completionRateClass(assessment)">
-                    {{ assessment.completed_attempts }} / {{ assessment.assigned_users }}
-                    <span v-if="assessment.assigned_users > 0" class="completion-pct">
-                      ({{ Math.round((assessment.completed_attempts / assessment.assigned_users) * 100) }}%)
-                    </span>
-                  </span>
-                </td>
-                <td class="score-cell">
-                  {{ formatAvgScore(assessment.avg_score) }}
-                </td>
-                <td class="actions-cell">
-                  <div class="actions-buttons">
-                    <Button @click="goToDetails(assessment.id)" class="action-btn action-btn-info" title="Детали" icon="chart-column"></Button>
-                    <Button
-                      v-if="canEditAssessment(assessment)"
-                      @click="goToEdit(assessment.id)"
-                      class="action-btn action-btn-edit"
-                      title="Редактировать"
-                      icon="pencil"
-                    ></Button>
-                    <Button
-                      v-if="assessment.status === 'pending'"
-                      @click="confirmDelete(assessment)"
-                      class="action-btn action-btn-delete"
-                      title="Удалить"
-                      icon="trash"
-                    ></Button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+    <FilterBar
+      v-model="filters"
+      search-key="search"
+      search-placeholder="Поиск по названию..."
+      :filter-defs="filterDefs"
+      class="mb-6"
+      @change="onFilterChange"
+    />
 
-        <!-- Mobile Cards -->
-        <div class="mobile-cards show-mobile">
-          <div v-for="assessment in assessments" :key="assessment.id" class="assessment-card">
-            <div class="assessment-card-header">
-              <div>
-                <h3 class="assessment-card-title">{{ assessment.title }}</h3>
-                <p class="assessment-card-desc">{{ assessment.description || "Нет описания" }}</p>
-              </div>
-              <Badge :variant="getStatusVariant(assessment.status)" size="sm" rounded>
-                {{ getStatusLabel(assessment.status) }}
-              </Badge>
-            </div>
+    <DataTable
+      :total="totalAssessments"
+      :page="pagination.page"
+      :limit="pagination.perPage"
+      :is-empty="assessments.length === 0"
+      :empty-type="hasActiveFilters ? 'filter' : 'first-time'"
+      empty-title="Аттестации не найдены"
+      :empty-description="hasActiveFilters ? 'Попробуйте изменить фильтры поиска' : 'Создайте первую аттестацию, чтобы начать оценку сотрудников'"
+      :empty-button-text="hasActiveFilters ? '' : 'Создать аттестацию'"
+      @update:page="
+        pagination.page = $event;
+        loadAssessments();
+      "
+      @update:limit="
+        pagination.perPage = $event;
+        pagination.page = 1;
+        loadAssessments();
+      "
+      @empty-action="$router.push('/assessments/create')"
+    >
+      <template #head>
+        <TableHead>Название</TableHead>
+        <TableHead>Статус</TableHead>
+        <TableHead>Открытие</TableHead>
+        <TableHead>Закрытие</TableHead>
+        <TableHead>Назначено</TableHead>
+        <TableHead>Завершено / Назначено</TableHead>
+        <TableHead>Средний балл</TableHead>
+        <TableHead right>Действия</TableHead>
+      </template>
 
-            <div class="assessment-card-body">
-              <div class="assessment-card-row">
-                <span class="assessment-card-label">Открытие:</span>
-                <span class="assessment-card-value">{{ formatDate(assessment.open_at) }}</span>
-              </div>
-              <div class="assessment-card-row">
-                <span class="assessment-card-label">Закрытие:</span>
-                <span class="assessment-card-value">{{ formatDate(assessment.close_at) }}</span>
-              </div>
-              <div class="assessment-card-row">
-                <span class="assessment-card-label">Назначено:</span>
-                <span class="assessment-card-value">{{ assessment.assigned_users }} чел.</span>
-              </div>
-              <div class="assessment-card-row">
-                <span class="assessment-card-label">Завершено:</span>
-                <span class="assessment-card-value">
-                  {{ assessment.completed_attempts }} / {{ assessment.assigned_users }}
-                  <span v-if="assessment.assigned_users > 0" class="completion-pct">
-                    ({{ Math.round((assessment.completed_attempts / assessment.assigned_users) * 100) }}%)
-                  </span>
-                </span>
-              </div>
-              <div class="assessment-card-row">
-                <span class="assessment-card-label">Средний балл:</span>
-                <span class="assessment-card-value score-value">
-                  {{ formatAvgScore(assessment.avg_score) }}
-                </span>
-              </div>
-            </div>
-
-            <div class="assessment-card-actions">
-              <Button size="sm" variant="secondary" icon="chart-column" @click="goToDetails(assessment.id)" fullWidth> Детали </Button>
-              <Button v-if="canEditAssessment(assessment)" size="sm" variant="primary" icon="pencil" @click="goToEdit(assessment.id)" fullWidth>
-                Редактировать
-              </Button>
+      <template #body>
+        <TableRow v-for="assessment in assessments" :key="assessment.id">
+          <TableCell>
+            <div class="font-semibold text-foreground">{{ assessment.title }}</div>
+            <div class="text-sm text-muted-foreground truncate max-w-[280px]">{{ assessment.description || "Нет описания" }}</div>
+          </TableCell>
+          <TableCell>
+            <Badge :variant="getStatusVariant(assessment.status)" size="sm">
+              {{ getStatusLabel(assessment.status) }}
+            </Badge>
+          </TableCell>
+          <TableCell muted>{{ formatDate(assessment.open_at) }}</TableCell>
+          <TableCell muted>{{ formatDate(assessment.close_at) }}</TableCell>
+          <TableCell>{{ assessment.assigned_users }} чел.</TableCell>
+          <TableCell>
+            <span :class="completionRateClass(assessment)">
+              {{ assessment.completed_attempts }} / {{ assessment.assigned_users }}
+              <span v-if="assessment.assigned_users > 0" class="text-muted-foreground text-xs">
+                ({{ Math.round((assessment.completed_attempts / assessment.assigned_users) * 100) }}%)
+              </span>
+            </span>
+          </TableCell>
+          <TableCell emphasized>{{ formatAvgScore(assessment.avg_score) }}</TableCell>
+          <TableCell right>
+            <div class="flex items-center justify-end gap-1">
+              <Button variant="ghost" size="sm" :icon-only="true" icon="chart-column" title="Детали" @click="goToDetails(assessment.id)" />
               <Button
                 v-if="canEditAssessment(assessment)"
+                variant="ghost"
                 size="sm"
-                variant="secondary"
-                icon="book-open-check"
-                @click="goToTheory(assessment.id)"
-                fullWidth
-              >
-                Теория
-              </Button>
-              <Button v-if="assessment.status === 'pending'" size="sm" variant="danger" icon="trash" @click="confirmDelete(assessment)" fullWidth>
-                Удалить
-              </Button>
+                :icon-only="true"
+                icon="pencil"
+                title="Редактировать"
+                @click="goToEdit(assessment.id)"
+              />
+              <Button
+                v-if="assessment.status === 'pending'"
+                variant="ghost"
+                size="sm"
+                :icon-only="true"
+                icon="trash"
+                title="Удалить"
+                @click="confirmDelete(assessment)"
+              />
             </div>
-          </div>
-        </div>
+          </TableCell>
+        </TableRow>
+      </template>
 
-        <div v-if="totalPages > 1" class="pagination">
-          <span class="pagination-info">Страница {{ pagination.page }} из {{ totalPages }}</span>
-          <div class="pagination-buttons">
-            <Button size="sm" variant="ghost" :disabled="pagination.page === 1" @click="goToPrevPage">Предыдущая</Button>
-            <Button size="sm" variant="ghost" :disabled="pagination.page === totalPages" @click="goToNextPage">Следующая</Button>
+      <template #mobile>
+        <div v-for="assessment in assessments" :key="assessment.id" class="p-4 space-y-3">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h3 class="font-semibold text-foreground">{{ assessment.title }}</h3>
+              <p class="text-sm text-muted-foreground mt-0.5 line-clamp-2">{{ assessment.description || "Нет описания" }}</p>
+            </div>
+            <Badge :variant="getStatusVariant(assessment.status)" size="sm" class="shrink-0">{{ getStatusLabel(assessment.status) }}</Badge>
+          </div>
+          <dl class="grid gap-2 text-sm border-t border-border pt-3">
+            <div class="flex justify-between">
+              <dt class="text-muted-foreground">Открытие</dt>
+              <dd class="font-medium">{{ formatDate(assessment.open_at) }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-muted-foreground">Закрытие</dt>
+              <dd class="font-medium">{{ formatDate(assessment.close_at) }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-muted-foreground">Назначено</dt>
+              <dd class="font-medium">{{ assessment.assigned_users }} чел.</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-muted-foreground">Завершено</dt>
+              <dd class="font-medium">
+                {{ assessment.completed_attempts }} / {{ assessment.assigned_users
+                }}<span v-if="assessment.assigned_users > 0" class="text-muted-foreground text-xs">
+                  ({{ Math.round((assessment.completed_attempts / assessment.assigned_users) * 100) }}%)</span
+                >
+              </dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-muted-foreground">Средний балл</dt>
+              <dd class="font-semibold text-accent-blue">{{ formatAvgScore(assessment.avg_score) }}</dd>
+            </div>
+          </dl>
+          <div class="flex gap-2 pt-1">
+            <Button size="sm" variant="secondary" icon="chart-column" class="flex-1" @click="goToDetails(assessment.id)">Детали</Button>
+            <Button v-if="canEditAssessment(assessment)" size="sm" variant="primary" icon="pencil" class="flex-1" @click="goToEdit(assessment.id)"
+              >Изменить</Button
+            >
+            <Button v-if="canEditAssessment(assessment)" size="sm" variant="secondary" icon="book-open-check" @click="goToTheory(assessment.id)" />
+            <Button v-if="assessment.status === 'pending'" size="sm" variant="danger" icon="trash" @click="confirmDelete(assessment)" />
           </div>
         </div>
-      </div>
-    </Card>
+      </template>
+    </DataTable>
   </div>
 </template>
 
@@ -185,12 +153,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { getAssessments, deleteAssessment } from "@/api/assessments";
-import Preloader from "@/components/ui/Preloader.vue";
-import Card from "@/components/ui/Card.vue";
-import Button from "@/components/ui/Button.vue";
-import Badge from "@/components/ui/Badge.vue";
-import Input from "@/components/ui/Input.vue";
-import Select from "@/components/ui/Select.vue";
+import { Button, Badge, PageHeader, FilterBar, DataTable, TableHead, TableRow, TableCell } from "@/components/ui";
 import { useToast } from "@/composables/useToast";
 import { formatBranchLabel } from "@/utils/branch";
 
@@ -228,6 +191,18 @@ const branchOptions = computed(() => [
     label: formatBranchLabel(branch),
   })),
 ]);
+
+const hasActiveFilters = computed(() => !!(filters.value.search || filters.value.status || filters.value.branch));
+
+const filterDefs = computed(() => [
+  { key: "status", label: "Статус", options: statusOptions.value, placeholder: "Все статусы" },
+  { key: "branch", label: "Филиал", options: branchOptions.value, placeholder: "Все филиалы" },
+]);
+
+const onFilterChange = () => {
+  pagination.value.page = 1;
+  loadAssessments();
+};
 
 const completionRateClass = (assessment) => {
   if (!assessment.assigned_users) return "";
@@ -268,22 +243,6 @@ const loadAssessments = async () => {
 const resetFilters = () => {
   filters.value = { search: "", status: "", branch: "" };
   pagination.value.page = 1;
-  loadAssessments();
-};
-
-const goToPrevPage = () => {
-  if (pagination.value.page <= 1) {
-    return;
-  }
-  pagination.value.page -= 1;
-  loadAssessments();
-};
-
-const goToNextPage = () => {
-  if (pagination.value.page >= totalPages.value) {
-    return;
-  }
-  pagination.value.page += 1;
   loadAssessments();
 };
 
@@ -371,337 +330,13 @@ onMounted(() => {
   width: 100%;
 }
 
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: end;
-  gap: 16px;
-  margin-bottom: 32px;
-}
-
-.page-heading {
-  font-size: 30px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.show-mobile {
-  display: none;
-}
-
-/* Filters */
-.filters-card {
-  margin-bottom: 32px;
-}
-
-.filters-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  gap: 8px;
-}
-
-.assessments-card {
-  overflow: visible;
-}
-
-.list-meta {
-  padding: 16px 16px 0;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px;
-  border-top: 1px solid var(--divider);
-}
-
-.pagination-info {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.pagination-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-/* Table */
-.table-wrapper {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.assessments-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.assessments-table thead {
-  border-bottom: 1px solid var(--divider);
-}
-
-.assessments-table th {
-  padding: 16px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-}
-
-.assessments-table tbody tr {
-  border-bottom: 1px solid var(--divider);
-  transition: background-color 0.2s ease;
-}
-
-.assessments-table td {
-  padding: 16px;
-  font-size: 15px;
-  color: var(--text-primary);
-}
-
-.assessment-title {
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-}
-
-.assessment-desc {
-  font-size: 14px;
-  color: var(--text-secondary);
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dates-cell {
-  font-size: 14px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.dates-cell div:first-child {
-  margin-bottom: 4px;
-}
-
-.score-cell {
-  font-weight: 600;
-  color: var(--accent-blue);
-}
-
-.actions-col {
-  text-align: right;
-}
-
-.actions-cell {
-  text-align: right;
-}
-
-.actions-buttons {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.action-btn {
-  padding: 8px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 18px;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-primary);
-}
-
-.action-btn:hover {
-  background-color: var(--bg-secondary);
-}
-
-.action-btn-info:hover {
-  background-color: var(--accent-blue-soft);
-}
-
-.action-btn-edit:hover {
-  background-color: var(--accent-blue-soft);
-}
-
-.action-btn-delete:hover {
-  background-color: #ff3b301f;
-}
-
-/* Mobile Cards */
-.mobile-cards {
-  display: none;
-  flex-direction: column;
-  gap: 16px;
-  padding: 16px;
-}
-
-.assessment-card {
-  background-color: var(--bg-secondary);
-  border-radius: 12px;
-  padding: 16px;
-  border: 1px solid var(--divider);
-}
-
-.assessment-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--divider);
-}
-
-.assessment-card-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 8px 0;
-}
-
-.assessment-card-desc {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
-  display: -webkit-box;
-  overflow: hidden;
-}
-
-.assessment-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.assessment-card-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.assessment-card-label {
-  font-size: 14px;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.assessment-card-value {
-  font-size: 14px;
-  color: var(--text-primary);
-  font-weight: 600;
-  text-align: right;
-}
-
-.score-value {
-  color: var(--accent-blue);
-}
-
-.assessment-card-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.empty-state {
-  padding: 64px 32px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.empty-state-icon {
-  font-size: 48px;
-  opacity: 0.4;
-}
-
-.empty-state-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.empty-state p {
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.completion-pct {
-  opacity: 0.75;
-  font-size: 0.9em;
-  margin-left: 2px;
-}
-
 .completion-high {
-  color: var(--accent-green, #22c55e);
+  color: hsl(var(--accent-green));
 }
 .completion-mid {
-  color: var(--accent-yellow, #f59e0b);
+  color: hsl(var(--accent-orange));
 }
 .completion-low {
-  color: var(--accent-red, #ef4444);
-}
-
-/* Responsive */
-@media (max-width: 1024px) {
-  .hide-mobile {
-    display: none !important;
-  }
-
-  .show-mobile {
-    display: inline !important;
-  }
-
-  .table-wrapper {
-    display: none !important;
-  }
-
-  .mobile-cards {
-    display: flex !important;
-  }
-
-  .filters-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .page-heading {
-    font-size: 24px;
-  }
-
-  .filters-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .assessment-card-actions {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 480px) {
-  .page-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
+  color: hsl(var(--destructive));
 }
 </style>

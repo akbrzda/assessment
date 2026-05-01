@@ -1,32 +1,44 @@
 <template>
   <Teleport to="body">
-    <Transition
-      enter-active-class="transition-all duration-200 ease-out"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition-all duration-150 ease-in"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div v-if="isVisible" class="fixed inset-0 z-50 flex items-center justify-center bg-black/58 p-4 backdrop-blur-[2px]" @click="handleOverlayClick">
+    <Transition name="modal">
+      <div
+        v-if="isVisible"
+        class="fixed inset-0 flex items-center justify-center p-4 backdrop-blur-[2px]"
+        :style="{ zIndex: 'var(--z-modal)', background: 'hsl(215 28% 8% / 0.6)' }"
+        role="dialog"
+        :aria-modal="true"
+        :aria-label="title"
+        @click="handleOverlayClick"
+        @keydown.esc="handleEsc"
+      >
         <div
-          :class="cn('bg-background rounded-[var(--radius-lg)] shadow-[var(--elevation-float)] max-h-[90vh] overflow-y-auto w-full border border-border/80', sizeClass)"
+          :class="cn('bg-background rounded-[var(--radius-lg)] max-h-[90vh] overflow-y-auto w-full border border-border/80 flex flex-col', sizeClass)"
+          :style="{ boxShadow: 'var(--shadow-modal)' }"
           @click.stop
         >
-          <div v-if="title || closable" class="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-muted/55">
-            <h2 v-if="title" class="text-xl font-semibold text-foreground m-0">{{ title }}</h2>
+          <!-- Шапка -->
+          <div v-if="title || closable" class="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-muted/40 shrink-0">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <Icon v-if="icon" :name="icon" :size="18" class="text-primary shrink-0" />
+              <h2 v-if="title" class="text-lg font-semibold text-foreground m-0 truncate">{{ title }}</h2>
+            </div>
             <button
               v-if="closable"
-              class="flex items-center justify-center w-8 h-8 rounded-[10px] text-muted-foreground hover:bg-accent hover:text-foreground transition-all duration-150 border-none bg-transparent cursor-pointer text-lg focus-visible:shadow-[var(--focus-ring)]"
+              class="flex items-center justify-center w-8 h-8 rounded-[10px] text-muted-foreground hover:bg-accent hover:text-foreground transition-all duration-150 border-none bg-transparent cursor-pointer shrink-0 ml-3 focus-visible:shadow-[var(--focus-ring)]"
+              aria-label="Закрыть"
               @click="close"
             >
-              ✕
+              <Icon name="X" :size="16" />
             </button>
           </div>
-          <div class="p-6">
+
+          <!-- Контент -->
+          <div class="p-6 flex-1">
             <slot />
           </div>
-          <div v-if="$slots.footer" class="px-6 py-4 border-t border-border bg-muted">
+
+          <!-- Футер -->
+          <div v-if="$slots.footer" class="px-6 py-4 border-t border-border/80 bg-muted/40 shrink-0">
             <slot name="footer" />
           </div>
         </div>
@@ -36,8 +48,9 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { cn } from "@/lib/utils";
+import Icon from "./Icon.vue";
 
 const props = defineProps({
   modelValue: {
@@ -49,6 +62,7 @@ const props = defineProps({
     default: false,
   },
   title: String,
+  icon: String,
   size: {
     type: String,
     default: "md",
@@ -84,8 +98,41 @@ const close = () => {
 };
 
 const handleOverlayClick = () => {
-  if (props.closeOnOverlay) {
-    close();
-  }
+  if (props.closeOnOverlay) close();
 };
+
+const handleEsc = () => {
+  if (props.closable) close();
+};
+
+// Блокировка скролла body пока модал открыт
+watch(isVisible, (val) => {
+  document.body.style.overflow = val ? "hidden" : "";
+});
 </script>
+
+<style scoped>
+.modal-enter-active {
+  transition: opacity var(--duration-normal) var(--ease-out-expo);
+}
+.modal-leave-active {
+  transition: opacity var(--duration-fast) ease-in;
+}
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-active > div,
+.modal-leave-active > div {
+  transition: transform var(--duration-normal) var(--ease-spring), opacity var(--duration-normal) var(--ease-out-expo);
+}
+.modal-enter-from > div {
+  transform: scale(0.96) translateY(10px);
+  opacity: 0;
+}
+.modal-leave-to > div {
+  transform: scale(0.97) translateY(6px);
+  opacity: 0;
+}
+</style>

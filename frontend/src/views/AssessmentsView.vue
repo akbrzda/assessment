@@ -275,30 +275,37 @@ export default {
 /* Фильтры */
 .filter-tabs {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   background: var(--bg-secondary);
-  border-radius: 10px;
-  padding: 3px;
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 4px;
 }
 
 .filter-tab {
   flex: 1;
-  padding: 7px 10px;
-  border: none;
+  padding: 8px 10px;
+  border: 1px solid transparent;
   background: none;
   color: var(--text-secondary);
   font-size: 14px;
   font-weight: 500;
-  border-radius: 8px;
+  border-radius: 9px;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
   white-space: nowrap;
 }
 
 .filter-tab.active {
-  background-color: var(--accent);
-  color: #ffffff;
+  background: var(--bg-primary);
+  border-color: var(--divider);
+  color: var(--text-primary);
   font-weight: 600;
+  box-shadow: 0 1px 2px rgba(12, 18, 32, 0.1);
 }
 
 /* Список курсов */

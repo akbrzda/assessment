@@ -29,7 +29,14 @@
           <div v-for="section in navSections" :key="section.id" class="space-y-1">
             <div v-if="!isCollapsed" class="nav-group-title">{{ section.title }}</div>
             <div class="flex flex-col gap-0.5">
-              <RouterLink v-for="item in section.items" :key="item.label" :to="item.to" class="nav-link" :title="item.label" @click="$emit('navigate')">
+              <RouterLink
+                v-for="item in section.items"
+                :key="item.label"
+                :to="item.to"
+                class="nav-link"
+                :title="item.label"
+                @click="$emit('navigate')"
+              >
                 <component :is="item.icon" :size="18" />
                 <span v-if="!isCollapsed" class="truncate">{{ item.label }}</span>
               </RouterLink>
@@ -40,12 +47,7 @@
 
       <!-- Профиль пользователя внизу -->
       <div class="border-t border-border/60 p-3">
-        <div
-          :class="[
-            'flex items-center rounded-xl px-3 py-2 text-sm text-foreground',
-            isCollapsed ? 'justify-center' : 'gap-3',
-          ]"
-        >
+        <div :class="['flex items-center rounded-xl px-3 py-2 text-sm text-foreground', isCollapsed ? 'justify-center' : 'gap-3']">
           <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
             {{ initials }}
           </div>
@@ -142,9 +144,7 @@ const navSections = computed(() => {
     {
       id: "analytics",
       title: "Аналитика",
-      items: [
-        has("analytics") && { label: "Отчёты", to: "/reports", icon: BarChart3Icon },
-      ].filter(Boolean),
+      items: [has("analytics") && { label: "Отчёты", to: "/reports", icon: BarChart3Icon }].filter(Boolean),
     },
     {
       id: "admin",
@@ -157,16 +157,10 @@ const navSections = computed(() => {
     },
   ];
 
-  return sections
-    .map((s) => ({ ...s, items: s.items.filter((i) => i) }))
-    .filter((s) => s.items.length > 0);
+  return sections.map((s) => ({ ...s, items: s.items.filter((i) => i) })).filter((s) => s.items.length > 0);
 });
 
-const asideClasses = computed(() => [
-  "sidebar",
-  props.isOpen ? "is-open" : "is-closed",
-  props.isCollapsed ? "is-collapsed" : "",
-]);
+const asideClasses = computed(() => ["sidebar", props.isOpen ? "is-open" : "is-closed", props.isCollapsed ? "is-collapsed" : ""]);
 
 const handleLogout = async () => {
   await authStore.logout();
@@ -176,9 +170,7 @@ const handleLogout = async () => {
 <style scoped>
 .sidebar {
   @apply relative flex h-screen w-60 shrink-0 flex-col border-r border-border/60 pt-0 backdrop-blur transition-all duration-[var(--motion-base)] lg:sticky lg:top-0;
-  background:
-    linear-gradient(180deg, hsl(var(--sidebar-bg-start)) 0%, hsl(var(--sidebar-bg-end)) 100%),
-    hsl(var(--card));
+  background: linear-gradient(180deg, hsl(var(--sidebar-bg-start)) 0%, hsl(var(--sidebar-bg-end)) 100%), hsl(var(--card));
 }
 
 .sidebar.is-collapsed {
@@ -205,6 +197,7 @@ const handleLogout = async () => {
 
 .nav-link {
   @apply relative flex min-h-[40px] items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-[var(--motion-fast)] hover:bg-[hsl(var(--state-hover))] hover:text-foreground;
+  letter-spacing: 0.01em;
 }
 
 .nav-link::before {
@@ -217,11 +210,10 @@ const handleLogout = async () => {
 }
 
 .router-link-active {
-  @apply bg-nav-active text-nav-active-text font-semibold shadow-[var(--elevation-soft)];
+  @apply bg-nav-active text-nav-active-text font-semibold;
 }
 
 .router-link-active::before {
   background: hsl(var(--sidebar-active-indicator));
 }
 </style>
-    

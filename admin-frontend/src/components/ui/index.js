@@ -43,3 +43,5 @@ export { default as FileUpload } from "./FileUpload.vue";
 export { default as RangeSlider } from "./RangeSlider.vue";
 export { default as NumericStepper } from "./NumericStepper.vue";
 export { default as Rating } from "./Rating.vue";
+export { default as StatCard } from "./StatCard.vue";
+export { default as DataTable } from "./DataTable.vue";

@@ -69,14 +69,7 @@
 
         <div class="tests-layout">
           <div class="tests-content-card">
-            <div class="tests-tabs">
-              <button type="button" class="tests-tab" :class="{ 'tests-tab-active': activeTab === 'questions' }" @click="activeTab = 'questions'">
-                Вопросы
-              </button>
-              <button type="button" class="tests-tab" :class="{ 'tests-tab-active': activeTab === 'settings' }" @click="activeTab = 'settings'">
-                Настройки теста
-              </button>
-            </div>
+            <Tabs v-model="activeTab" :tabs="sectionTabsConfig" head-only class="mb-5" />
 
             <div v-if="activeDraft.loading" class="tests-loading-state">
               <LoaderCircle class="tests-spinning-icon" :size="18" :stroke-width="1.8" />
@@ -337,7 +330,7 @@ import { BookOpen, ChevronDown, Circle, CircleCheckBig, ClipboardList, Clock3, I
 import { getAssessmentById, createAssessment, updateAssessment } from "@/api/assessments";
 import { updateCourseSection } from "@/api/courses";
 import { useToast } from "@/composables/useToast";
-import { Input, Textarea } from "@/components/ui";
+import { Input, Textarea, Tabs } from "@/components/ui";
 
 const props = defineProps({
   course: {
@@ -352,6 +345,11 @@ const { showToast } = useToast();
 
 const selectedSectionId = ref(null);
 const activeTab = ref("questions");
+
+const sectionTabsConfig = [
+  { value: "questions", label: "Вопросы" },
+  { value: "settings", label: "Настройки теста" },
+];
 const drafts = ref({});
 const tempIdCounter = ref(0);
 
@@ -1099,8 +1097,7 @@ defineExpose({
 .tests-inline-action,
 .tests-question-remove,
 .tests-option-remove,
-.tests-type-pill,
-.tests-tab {
+.tests-type-pill {
   border: none;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1134,37 +1131,6 @@ defineExpose({
 .tests-content-card,
 .tests-summary-card {
   padding: 18px;
-}
-
-.tests-tabs {
-  display: flex;
-  gap: 18px;
-  border-bottom: 1px solid #eceef7;
-  margin-bottom: 20px;
-}
-
-.tests-tab {
-  position: relative;
-  padding: 0 2px 12px;
-  background: transparent;
-  color: #7d84a2;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.tests-tab-active {
-  color: #655cff;
-}
-
-.tests-tab-active::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 2px;
-  border-radius: 999px;
-  background: #655cff;
 }
 
 .tests-loading-state,

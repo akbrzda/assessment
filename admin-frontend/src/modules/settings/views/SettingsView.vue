@@ -9,11 +9,7 @@
     </div>
 
     <!-- Tabs -->
-    <div class="tabs-container">
-      <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id" :class="['tab-button', { active: activeTab === tab.id }]">
-        {{ tab.label }}
-      </button>
-    </div>
+    <Tabs v-model="activeTab" :tabs="tabsConfig" head-only class="mb-8" />
 
     <!-- Content -->
     <div class="settings-content">
@@ -176,6 +172,7 @@ import LevelsManager from "@/modules/settings/components/LevelsManager.vue";
 import GamificationRulesManager from "@/modules/gamification/components/GamificationRulesManager.vue";
 import GamificationDryRun from "@/modules/gamification/components/GamificationDryRun.vue";
 import Card from "@/components/ui/Card.vue";
+import Tabs from "@/components/ui/Tabs.vue";
 import Input from "@/components/ui/Input.vue";
 import Button from "@/components/ui/Button.vue";
 import Icon from "@/components/ui/Icon.vue";
@@ -184,10 +181,10 @@ import { useToast } from "@/composables/useToast";
 const { showToast, showSuccess, showError } = useToast();
 
 // Табы
-const tabs = [
-  { id: "general", label: "Общие" },
-  { id: "gamification", label: "Геймификация" },
-  { id: "environment", label: "Переменные окружения" },
+const tabsConfig = [
+  { value: "general", label: "Общие" },
+  { value: "gamification", label: "Геймификация" },
+  { value: "environment", label: "Переменные окружения" },
 ];
 
 const activeTab = ref("general");
@@ -330,38 +327,6 @@ onMounted(() => {
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 16px 0;
-}
-
-/* Tabs */
-.tabs-container {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 32px;
-  border-bottom: 2px solid var(--divider);
-  overflow-x: auto;
-}
-
-.tab-button {
-  padding: 12px 24px;
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.tab-button:hover {
-  color: var(--text-primary);
-}
-
-.tab-button.active {
-  color: var(--accent-blue);
-  border-bottom-color: var(--accent-blue);
 }
 
 /* Forms */
@@ -538,15 +503,6 @@ onMounted(() => {
 
   .env-columns {
     grid-template-columns: 1fr;
-  }
-
-  .tabs-container {
-    gap: 4px;
-  }
-
-  .tab-button {
-    padding: 10px 16px;
-    font-size: 14px;
   }
 }
 

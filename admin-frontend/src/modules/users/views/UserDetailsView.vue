@@ -18,7 +18,7 @@
               <Badge :variant="getRoleBadgeVariant(profile.user?.role_name)" size="sm" rounded>
                 {{ getRoleLabel(profile.user?.role_name) }}
               </Badge>
-              <span class="status-inline"><span class="dot"></span> Активен</span>
+              <span :class="['status-inline', `status-inline-${userStatusKey}`]"><span class="dot"></span> {{ userStatusLabel }}</span>
             </div>
             <div class="user-submeta">
               <span>{{ profile.user?.branch_name || "—" }}</span>
@@ -37,17 +37,7 @@
         </div>
       </Card>
 
-      <div class="profile-tabs">
-        <button
-          v-for="tab in tabs"
-          :key="tab.key"
-          type="button"
-          :class="['profile-tab', { active: activeTab === tab.key }]"
-          @click="activeTab = tab.key"
-        >
-          {{ tab.label }}
-        </button>
-      </div>
+      <Tabs v-model="activeTab" :tabs="tabsConfig" head-only class="my-4" />
 
       <div v-if="activeTab === 'general'" class="grid-two">
         <Card class="info-card">
@@ -181,7 +171,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import apiClient from "@/utils/axios";
-import { Badge, Button, Card, Preloader } from "@/components/ui";
+import { Badge, Button, Card, Preloader, Tabs } from "@/components/ui";
 import { useToast } from "@/composables/useToast";
 import { getUserCourses } from "@/api/users";
 import { BOT_USERNAME } from "@/env";
@@ -202,6 +192,8 @@ const tabs = [
   { key: "achievements", label: "Достижения" },
 ];
 
+const tabsConfig = tabs.map((t) => ({ value: t.key, label: t.label }));
+
 const fullName = computed(() => `${profile.value?.user?.first_name || ""} ${profile.value?.user?.last_name || ""}`.trim() || "Пользователь");
 const initials = computed(() => {
   const first = profile.value?.user?.first_name?.[0] || "";
@@ -215,6 +207,9 @@ const invitationLink = computed(() => {
   const botUsername = BOT_USERNAME || "";
   return botUsername ? `https://t.me/${botUsername}?startapp=${code}` : `Код приглашения: ${code}`;
 });
+
+const userStatusLabel = computed(() => (profile.value?.user?.telegram_id ? "Активен" : "Ожидает"));
+const userStatusKey = computed(() => (profile.value?.user?.telegram_id ? "active" : "awaiting"));
 
 const activityRows = computed(() => {
   const rows = (profile.value?.assessmentsSummary || []).slice(0, 5).map((item) => ({
@@ -380,17 +375,22 @@ onMounted(async () => {
   gap: 14px;
 }
 .status-inline {
-  color: #16a34a;
   font-size: 15px;
   display: inline-flex;
   gap: 8px;
   align-items: center;
 }
+.status-inline-active {
+  color: #16a34a;
+}
+.status-inline-awaiting {
+  color: #d97706;
+}
 .dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #16a34a;
+  background: currentColor;
 }
 .user-submeta {
   margin-top: 10px;
@@ -412,24 +412,6 @@ onMounted(async () => {
 }
 .kv-row span {
   color: hsl(var(--muted-foreground));
-}
-.profile-tabs {
-  display: flex;
-  gap: 8px;
-  border-bottom: 1px solid hsl(var(--border));
-}
-.profile-tab {
-  border: none;
-  background: transparent;
-  height: 42px;
-  padding: 0 12px;
-  color: hsl(var(--muted-foreground));
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-}
-.profile-tab.active {
-  color: #4338ca;
-  border-bottom-color: #4f46e5;
 }
 .grid-two {
   display: grid;
@@ -460,12 +442,46 @@ onMounted(async () => {
 }
 .badge-item {
   border: 1px solid hsl(var(--border));
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 14px;
+  padding: 16px 12px;
   text-align: center;
+  background: hsl(var(--card));
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.15s ease;
+  position: relative;
+  overflow: hidden;
 }
+
+.badge-item::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, hsl(var(--accent-purple-soft)), hsl(var(--accent-blue-soft)));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.badge-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px hsl(var(--primary) / 0.15);
+  border-color: hsl(var(--primary) / 0.4);
+}
+
+.badge-item:hover::before {
+  opacity: 1;
+}
+
+.badge-item > * {
+  position: relative;
+  z-index: 1;
+}
+
 .badge-icon {
-  font-size: 28px;
+  font-size: 36px;
+  display: block;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
 }
 .badge-name {
   margin-top: 6px;

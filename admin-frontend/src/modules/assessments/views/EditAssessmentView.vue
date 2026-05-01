@@ -8,13 +8,6 @@
     </div>
 
     <div v-else class="edit-container">
-      <!-- Заголовок -->
-      <div class="page-header">
-        <Button variant="ghost" icon="arrow-left" @click="goBack"> Назад </Button>
-        <h1 class="page-title">Редактировать аттестацию</h1>
-      </div>
-
-      <!-- Форма редактирования -->
       <AssessmentWizard v-if="assessment" mode="edit" :initial-assessment="assessment" @submit="handleSubmit" @cancel="goBack" />
     </div>
   </div>
@@ -80,27 +73,11 @@ onMounted(() => {
 <style scoped>
 .edit-assessment-view {
   width: 100%;
-  margin: 0 auto;
-}
-
-.page-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 32px;
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
 }
 
 .edit-container {
   display: flex;
   flex-direction: column;
-  gap: 32px;
 }
 
 .error-state {
@@ -112,11 +89,5 @@ onMounted(() => {
 .error-state p {
   margin: 0 0 16px 0;
   font-size: 18px;
-}
-
-@media (max-width: 768px) {
-  .page-title {
-    font-size: 22px;
-  }
 }
 </style>

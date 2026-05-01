@@ -1,7 +1,7 @@
 <template>
-  <div class="flex flex-col gap-2" data-filter-bar v-click-outside="closeAllDropdowns">
+  <div class="flex flex-col gap-2" data-filter-bar>
     <!-- Компактная строка фильтров -->
-    <div class="flex items-center gap-0.5 bg-surface border border-border rounded-2xl px-2 py-1.5 flex-nowrap overflow-x-auto scrollbar-none">
+    <div class="flex items-center gap-0.5 bg-card border border-border rounded-2xl px-2 py-1.5 flex-nowrap">
       <!-- Поиск -->
       <div class="flex items-center gap-1.5 flex-1 min-w-[160px] max-w-[240px] md:max-w-none md:flex-1 px-1.5 py-1">
         <Icon name="search" :size="15" class="text-muted-foreground shrink-0" />
@@ -32,7 +32,7 @@
               'flex items-center gap-1 px-2.5 py-1.5 rounded-xl border-none cursor-pointer text-sm whitespace-nowrap transition-all duration-150',
               modelValue[def.key] || openDropdown === def.key
                 ? 'bg-nav-active text-nav-active-text font-medium'
-                : 'bg-transparent text-muted-foreground hover:bg-nav-hover hover:text-foreground',
+                : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground',
             ]"
             @click.stop="toggleDropdown(def.key)"
           >
@@ -48,11 +48,11 @@
           <!-- Дропдаун -->
           <div
             v-if="openDropdown === def.key"
-            class="absolute top-[calc(100%+6px)] left-0 z-[200] bg-surface border border-border rounded-xl shadow-modal min-w-[180px] p-1.5"
+            class="absolute top-[calc(100%+6px)] left-0 z-[200] bg-card border border-border rounded-xl shadow-modal min-w-[180px] p-1.5"
           >
             <div class="flex flex-col gap-px">
               <button
-                class="flex items-center gap-2 px-2.5 py-2 rounded-lg border-none bg-transparent cursor-pointer text-foreground text-sm text-left w-full transition-colors hover:bg-nav-hover"
+                class="flex items-center gap-2 px-2.5 py-2 rounded-lg border-none bg-transparent cursor-pointer text-foreground text-sm text-left w-full transition-colors hover:bg-accent"
                 :class="{ 'text-nav-active-text font-medium': !modelValue[def.key] }"
                 @click="selectOption(def.key, '')"
               >
@@ -64,7 +64,7 @@
               <button
                 v-for="opt in def.options"
                 :key="opt.value"
-                class="flex items-center gap-2 px-2.5 py-2 rounded-lg border-none bg-transparent cursor-pointer text-foreground text-sm text-left w-full transition-colors hover:bg-nav-hover"
+                class="flex items-center gap-2 px-2.5 py-2 rounded-lg border-none bg-transparent cursor-pointer text-foreground text-sm text-left w-full transition-colors hover:bg-accent"
                 :class="{ 'text-nav-active-text font-medium': modelValue[def.key] === opt.value }"
                 @click="selectOption(def.key, opt.value)"
               >
@@ -87,7 +87,7 @@
               'flex items-center gap-1 px-2.5 py-1.5 rounded-xl border-none cursor-pointer text-sm whitespace-nowrap transition-all duration-150',
               modelValue[def.keyFrom] || modelValue[def.keyTo] || openDropdown === def.key
                 ? 'bg-nav-active text-nav-active-text font-medium'
-                : 'bg-transparent text-muted-foreground hover:bg-nav-hover hover:text-foreground',
+                : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground',
             ]"
             @click.stop="toggleDropdown(def.key)"
           >
@@ -103,13 +103,13 @@
 
           <div
             v-if="openDropdown === def.key"
-            class="absolute top-[calc(100%+6px)] left-0 z-[200] bg-surface border border-border rounded-xl shadow-modal min-w-[240px] p-1.5"
+            class="absolute top-[calc(100%+6px)] left-0 z-[200] bg-card border border-border rounded-xl shadow-modal min-w-[240px] p-1.5"
           >
             <div class="flex flex-col gap-px border-b border-border pb-1.5 mb-2">
               <button
                 v-for="preset in datePresets"
                 :key="preset.key"
-                class="flex items-center gap-2 px-2.5 py-2 rounded-lg border-none bg-transparent cursor-pointer text-foreground text-sm text-left w-full transition-colors hover:bg-nav-hover"
+                class="flex items-center gap-2 px-2.5 py-2 rounded-lg border-none bg-transparent cursor-pointer text-foreground text-sm text-left w-full transition-colors hover:bg-accent"
                 :class="{ 'text-nav-active-text font-medium': activeDatePreset(def) === preset.key }"
                 @click="applyDatePreset(def, preset)"
               >
@@ -148,7 +148,7 @@
       <!-- Кнопка сброса -->
       <button
         v-if="hasActiveFilters"
-        class="hidden md:flex items-center gap-1 px-2.5 py-1.5 border-none bg-transparent text-muted-foreground text-sm cursor-pointer rounded-xl whitespace-nowrap shrink-0 ml-0.5 transition-all hover:bg-nav-hover hover:text-foreground"
+        class="hidden md:flex items-center gap-1 px-2.5 py-1.5 border-none bg-transparent text-muted-foreground text-sm cursor-pointer rounded-xl whitespace-nowrap shrink-0 ml-0.5 transition-all hover:bg-accent hover:text-foreground"
         @click="resetAll"
       >
         <Icon name="rotate-ccw" :size="14" />
@@ -167,7 +167,7 @@
     </div>
 
     <!-- Мобильное раскрытое меню -->
-    <div v-if="mobileExpanded" class="md:hidden bg-surface border border-border rounded-2xl p-4 flex flex-col gap-3">
+    <div v-if="mobileExpanded" class="md:hidden bg-card border border-border rounded-2xl p-4 flex flex-col gap-3">
       <div v-if="modelValue[searchKey] !== undefined" class="flex flex-col gap-1.5">
         <label class="text-xs font-medium text-muted-foreground">Поиск</label>
         <div class="flex items-center gap-1.5 border border-border rounded-xl px-3 py-2">
@@ -349,9 +349,9 @@ function onDateInput(key, value) {
 }
 
 function getSelectedLabel(def) {
-  if (!props.modelValue[def.key]) return def.label;
+  if (!props.modelValue[def.key]) return def.label || def.placeholder || "";
   const opt = (def.options || []).find((o) => String(o.value) === String(props.modelValue[def.key]));
-  return opt ? opt.label : def.label;
+  return opt ? opt.label : def.label || def.placeholder || "";
 }
 
 function getDateRangeLabel(def) {
