@@ -101,8 +101,8 @@
     </div>
 
     <template #footer>
-      <button @click="handleExport" class="btn-primary">Экспорт в PDF</button>
-      <button @click="handleClose" class="btn-secondary">Закрыть</button>
+      <ActionButton action="close" @click="handleClose" />
+      <ActionButton action="export" label="Экспорт в PDF" icon-left="file" @click="handleExport" />
     </template>
   </Modal>
 </template>
@@ -112,6 +112,7 @@ import { ref, watch } from "vue";
 import { getUserReport } from "@/api/analytics";
 import Modal from "@/components/ui/Modal.vue";
 import Preloader from "@/components/ui/Preloader.vue";
+import ActionButton from "@/components/ui/ActionButton.vue";
 import LineChart from "@/components/charts/LineChart.vue";
 import { useToast } from "@/composables/useToast";
 

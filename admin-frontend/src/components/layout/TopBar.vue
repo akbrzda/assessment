@@ -47,7 +47,9 @@
           v-if="showSearchResults"
           class="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-border bg-card shadow-md"
         >
-          <div v-if="searchLoading" class="px-3 py-2.5 text-sm text-muted-foreground">Поиск...</div>
+          <div v-if="searchLoading" class="px-3 py-2.5 space-y-2">
+            <div v-for="row in 3" :key="row" class="skeleton-shimmer h-8 w-full rounded-lg"></div>
+          </div>
           <template v-else>
             <button
               v-for="item in flattenedSearchResults"

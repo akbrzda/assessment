@@ -2,20 +2,17 @@
   <div class="dashboard">
     <div class="dashboard-content">
       <div class="filters-section">
-        <Card class="filters-card">
+        <FilterBar
+          v-model="filters"
+          search-key="search"
+          search-placeholder="Поиск..."
+          :filter-defs="filterDefs"
+          @change="handleFiltersChange"
+        />
+        <Card v-if="isCustomPeriod" class="filters-card">
           <div class="filters-grid">
-            <Select v-model="filters.period" :options="periodOptions" label="Период" @change="handlePeriodChange" />
-            <DatePicker v-if="isCustomPeriod" v-model="filters.dateFrom" label="Дата от" />
-            <DatePicker v-if="isCustomPeriod" v-model="filters.dateTo" label="Дата до" />
-            <Select v-model="filters.branchId" :options="branchOptions" label="Филиал" @change="handleBranchChange" />
-            <Select v-model="filters.positionId" :options="positionOptions" label="Должность" @change="handlePositionChange" />
-          </div>
-          <div class="filters-actions">
-            <Button variant="secondary" icon="refresh-ccw" @click="handleResetFilters">Сбросить</Button>
-            <Button variant="primary" icon="filter" @click="handleApplyFilters">Применить</Button>
-            <Button variant="ghost" icon="refresh-cw" :disabled="loading || autoRefreshing" @click="manualRefresh">
-              {{ autoRefreshing ? "Автообновление…" : "Обновить" }}
-            </Button>
+            <DatePicker v-model="filters.dateFrom" label="Дата от" />
+            <DatePicker v-model="filters.dateTo" label="Дата до" />
           </div>
         </Card>
         <div v-if="isOffline" class="offline-banner">
@@ -24,17 +21,39 @@
         </div>
       </div>
 
+      <template v-if="skeletonVisible">
+        <div class="grid grid-cols-4 gap-4 max-[768px]:grid-cols-2 max-[480px]:grid-cols-1">
+          <SkeletonStatCard v-for="card in 4" :key="card" />
+        </div>
+        <div class="dashboard-row-three">
+          <SkeletonCard />
+          <SkeletonList :items="3" />
+        </div>
+        <div class="dashboard-row-three">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+        <div class="dashboard-row-three">
+          <SkeletonCard />
+          <SkeletonList :items="4" />
+        </div>
+        <div class="dashboard-row-full">
+          <SkeletonList :items="5" />
+        </div>
+      </template>
+
       <!-- Карточки основных метрик -->
+      <template v-else>
       <div class="grid grid-cols-4 gap-4 max-[768px]:grid-cols-2 max-[480px]:grid-cols-1">
         <StatCard
-          label="Активные аттестации"
-          :value="metrics.activeAssessments"
-          icon="ClipboardList"
+          label="Активные курсы"
+          :value="metrics.activeCourses"
+          icon="BookOpen"
           color="blue"
           :trend="kpiDeltas[0].percent"
           trend-label="к прошлому периоду"
           clickable
-          @click="navigateToAssessments"
+          @click="navigateToCourses"
         />
         <StatCard
           label="Всего сотрудников"
@@ -44,8 +63,18 @@
           :trend="kpiDeltas[1].percent"
           trend-label="к прошлому периоду"
         />
-        <StatCard label="Филиалы" :value="metrics.totalBranches" icon="Building2" color="purple" size="secondary" />
-        <StatCard label="Должности" :value="metrics.totalPositions" icon="briefcase-business" color="orange" size="secondary" />
+        <StatCard
+          label="Активные аттестации"
+          :value="metrics.activeAssessments"
+          icon="ClipboardList"
+          color="purple"
+          size="secondary"
+          :trend="kpiDeltas[2].percent"
+          trend-label="к прошлому периоду"
+          clickable
+          @click="navigateToAssessments"
+        />
+        <StatCard label="Филиалы" :value="metrics.totalBranches" icon="Building2" color="orange" size="secondary" />
       </div>
       <div class="dashboard-row-three">
         <Card title="Причины провалов" icon="AlertTriangle" class="failure-reasons-card">
@@ -187,6 +216,7 @@
           <EmptyState v-else type="custom" title="Нет данных по филиалам" />
         </Card>
       </div>
+      </template>
 
       <!-- Четвертая строка: Активность по аттестациям -->
     </div>
@@ -199,7 +229,8 @@ import { useAuthStore } from "@/stores/auth";
 import dashboardApi from "@/api/dashboard";
 import { getReferences } from "@/api/users";
 import { useToast } from "@/composables/useToast";
-import { Preloader, Card, Badge, Icon, Button, Select, Input, DatePicker, StatCard, EmptyState } from "@/components/ui";
+import { useSkeletonGate } from "@/composables/useSkeletonGate";
+import { Card, Badge, Icon, DatePicker, StatCard, EmptyState, FilterBar, SkeletonCard, SkeletonList, SkeletonStatCard } from "@/components/ui";
 import LineChart from "@/components/charts/LineChart.vue";
 import { formatBranchLabel } from "@/utils/branch";
 
@@ -208,6 +239,7 @@ const authStore = useAuthStore();
 const { showToast } = useToast();
 
 const loading = ref(true);
+const { skeletonVisible } = useSkeletonGate(loading, { minDuration: 420, delay: 80 });
 const autoRefreshing = ref(false);
 const isOffline = ref(typeof navigator !== "undefined" ? !navigator.onLine : false);
 
@@ -225,6 +257,7 @@ const references = ref({
 });
 
 const metrics = ref({
+  activeCourses: 0,
   activeAssessments: 0,
   totalUsers: 0,
   totalBranches: 0,
@@ -255,16 +288,22 @@ let refreshTimer = null;
 const sortedBranchKPI = computed(() => [...branchKPI.value].sort((a, b) => (b.success_rate || 0) - (a.success_rate || 0)));
 const kpiDeltas = computed(() => [
   {
-    key: "activeAssessments",
-    label: "Активные аттестации",
-    value: String(metrics.value.activeAssessments || 0),
-    percent: toNumber(metrics.value.activeAssessmentsTrend?.percent),
+    key: "activeCourses",
+    label: "Активные курсы",
+    value: String(metrics.value.activeCourses || 0),
+    percent: toNumber(metrics.value.activeCoursesTrend?.percent),
   },
   {
     key: "totalUsers",
     label: "Всего сотрудников",
     value: String(metrics.value.totalUsers || 0),
     percent: toNumber(metrics.value.totalUsersTrend?.percent),
+  },
+  {
+    key: "activeAssessments",
+    label: "Активные аттестации",
+    value: String(metrics.value.activeAssessments || 0),
+    percent: toNumber(metrics.value.activeAssessmentsTrend?.percent),
   },
   {
     key: "attempts",
@@ -319,15 +358,9 @@ const activityDatasets = computed(() => {
   ];
 });
 
-const branchOptions = computed(() => [
-  { value: "", label: "Все филиалы" },
-  ...references.value.branches.map((branch) => ({ value: String(branch.id), label: formatBranchLabel(branch) })),
-]);
+const branchOptions = computed(() => references.value.branches.map((branch) => ({ value: String(branch.id), label: formatBranchLabel(branch) })));
 
-const positionOptions = computed(() => [
-  { value: "", label: "Все должности" },
-  ...references.value.positions.map((position) => ({ value: String(position.id), label: position.name })),
-]);
+const positionOptions = computed(() => references.value.positions.map((position) => ({ value: String(position.id), label: position.name })));
 
 const periodOptions = [
   { value: "week", label: "Неделя" },
@@ -335,6 +368,27 @@ const periodOptions = [
   { value: "quarter", label: "Квартал" },
   { value: "custom", label: "Произвольный период" },
 ];
+
+const filterDefs = computed(() => [
+  {
+    key: "period",
+    label: "Период",
+    placeholder: "Период",
+    options: periodOptions,
+  },
+  {
+    key: "branchId",
+    label: "Филиал",
+    placeholder: "Все филиалы",
+    options: branchOptions.value,
+  },
+  {
+    key: "positionId",
+    label: "Должность",
+    placeholder: "Все должности",
+    options: positionOptions.value,
+  },
+]);
 
 const isCustomPeriod = computed(() => filters.value.period === "custom");
 
@@ -508,45 +562,14 @@ const stopAutoRefresh = () => {
   }
 };
 
-const handleApplyFilters = async () => {
-  await loadAllData();
-};
-
-const handleResetFilters = async () => {
-  filters.value = {
-    period: "week",
-    dateFrom: "",
-    dateTo: "",
-    branchId: "",
-    positionId: "",
-  };
-  await loadAllData();
-};
-
-const handlePeriodChange = async () => {
+const handleFiltersChange = async () => {
   if (!isCustomPeriod.value) {
     filters.value.dateFrom = "";
     filters.value.dateTo = "";
-    await loadAllData();
   }
-};
-
-const handleBranchChange = async () => {
   if (isCustomPeriod.value && (!filters.value.dateFrom || !filters.value.dateTo)) {
     return;
   }
-  await loadAllData();
-};
-
-const handlePositionChange = async () => {
-  if (isCustomPeriod.value && (!filters.value.dateFrom || !filters.value.dateTo)) {
-    return;
-  }
-  await loadAllData();
-};
-
-const manualRefresh = async () => {
-  if (loading.value) return;
   await loadAllData();
 };
 
@@ -620,6 +643,10 @@ const getDeltaClass = (value) => {
 
 const navigateToAssessments = () => {
   router.push("/assessments");
+};
+
+const navigateToCourses = () => {
+  router.push("/courses");
 };
 
 const getMedalEmoji = (index) => {

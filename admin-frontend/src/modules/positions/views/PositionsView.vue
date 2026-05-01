@@ -1,23 +1,23 @@
 <template>
   <div class="positions-view">
-    <div class="page-header">
-      <h2 class="page-heading">Управление должностями</h2>
-      <div class="header-buttons">
+    <PageHeader title="Управление должностями">
+      <template #actions>
+        <div class="header-buttons">
         <Button icon="plus" @click="openCreateModal">
           <span class="hide-mobile">Добавить должность</span>
           <span class="show-mobile">Добавить</span>
         </Button>
-      </div>
+        </div>
+      </template>
+    </PageHeader>
+
+    <FilterBar v-model="filters" search-key="search" search-placeholder="Поиск по названию..." :filter-defs="[]" class="mb-4" />
+
+    <div v-if="skeletonVisible" class="space-y-4">
+      <Skeleton class="h-12 w-full rounded-2xl" />
+      <SkeletonTable :rows="8" />
     </div>
-
-    <Card class="filters-card">
-      <div class="filters-grid">
-        <Input v-model="filters.search" placeholder="Поиск по названию..." @input="loadPositions" />
-        <Button variant="secondary" @click="resetFilters" fullWidth icon="refresh-ccw">Сбросить</Button>
-      </div>
-    </Card>
-
-    <Card padding="none" class="positions-card">
+    <Card v-else padding="none" class="positions-card">
 
       <div v-if="positions.length === 0" class="empty-state">
         <p>Должности не найдены</p>
@@ -25,40 +25,40 @@
 
       <div v-else>
         <div class="table-wrapper hide-mobile">
-          <table class="positions-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Название</th>
-                <th>Миниапп</th>
-                <th>Сотрудников</th>
-                <th>Аттестаций</th>
-                <th>Средний балл</th>
-                <th>Дата создания</th>
-                <th class="actions-col">Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="position in positions" :key="position.id" :class="{ 'hidden-position': !position.isVisibleInMiniapp }">
-                <td>{{ position.id }}</td>
-                <td class="position-name">{{ position.name }}</td>
-                <td>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Название</TableHead>
+                <TableHead>Миниапп</TableHead>
+                <TableHead>Сотрудников</TableHead>
+                <TableHead>Аттестаций</TableHead>
+                <TableHead>Средний балл</TableHead>
+                <TableHead>Дата создания</TableHead>
+                <TableHead right>Действия</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="position in positions" :key="position.id" :class="{ 'hidden-position': !position.isVisibleInMiniapp }">
+                <TableCell>{{ position.id }}</TableCell>
+                <TableCell emphasized class="position-name">{{ position.name }}</TableCell>
+                <TableCell>
                   <span class="miniapp-status" :class="position.isVisibleInMiniapp ? 'status-visible' : 'status-hidden'">
                     {{ position.isVisibleInMiniapp ? "Виден" : "Скрыт" }}
                   </span>
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
                   <Badge variant="primary" size="sm">{{ position.employees_count }}</Badge>
-                </td>
-                <td>{{ position.assessments_completed || 0 }}</td>
-                <td>
+                </TableCell>
+                <TableCell>{{ position.assessments_completed || 0 }}</TableCell>
+                <TableCell>
                   <span v-if="hasScore(position.avg_score)" :class="getScoreClass(position.avg_score)" class="score-value">
                     {{ formatScore(position.avg_score) }}
                   </span>
                   <span v-else class="no-data">—</span>
-                </td>
-                <td class="date-cell">{{ formatDate(position.created_at) }}</td>
-                <td class="actions-cell">
+                </TableCell>
+                <TableCell class="date-cell">{{ formatDate(position.created_at) }}</TableCell>
+                <TableCell right class="actions-cell">
                   <div class="actions-buttons">
                     <Button size="sm" variant="ghost" icon="pencil" title="Редактировать" @click="openEditModal(position.id)" />
                     <Button
@@ -70,10 +70,10 @@
                       @click="confirmDelete(position)"
                     />
                   </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </div>
 
         <div class="mobile-cards show-mobile">
@@ -130,18 +130,28 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { deletePosition, getPositions } from "@/api/positions";
-import Preloader from "@/components/ui/Preloader.vue";
 import Modal from "@/components/ui/Modal.vue";
 import Card from "@/components/ui/Card.vue";
 import Button from "@/components/ui/Button.vue";
 import Badge from "@/components/ui/Badge.vue";
-import Input from "@/components/ui/Input.vue";
+import FilterBar from "@/components/ui/FilterBar.vue";
+import PageHeader from "@/components/ui/PageHeader.vue";
+import Skeleton from "@/components/ui/Skeleton.vue";
+import SkeletonTable from "@/components/ui/SkeletonTable.vue";
+import Table from "@/components/ui/Table.vue";
+import TableBody from "@/components/ui/TableBody.vue";
+import TableHead from "@/components/ui/TableHead.vue";
+import TableHeader from "@/components/ui/TableHeader.vue";
+import TableCell from "@/components/ui/TableCell.vue";
+import TableRow from "@/components/ui/TableRow.vue";
 import PositionForm from "@/modules/positions/components/PositionForm.vue";
 import { useToast } from "@/composables/useToast";
+import { useSkeletonGate } from "@/composables/useSkeletonGate";
 
 const loading = ref(false);
+const { skeletonVisible } = useSkeletonGate(loading, { minDuration: 360, delay: 90 });
 const positions = ref([]);
 const filters = ref({ search: "" });
 const showFormModal = ref(false);
@@ -202,6 +212,13 @@ const resetFilters = () => {
   filters.value = { search: "" };
   loadPositions();
 };
+
+watch(
+  () => filters.value.search,
+  () => {
+    loadPositions();
+  },
+);
 
 const openCreateModal = () => {
   editingId.value = null;

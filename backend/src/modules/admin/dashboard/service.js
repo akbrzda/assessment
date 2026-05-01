@@ -89,6 +89,19 @@ exports.getMetrics = async (req, res) => {
       [prevDateTo, prevDateFrom]
     );
 
+    // Активные курсы (опубликованные) и тренд
+    const [activeCourses] = await pool.query(
+      `SELECT COUNT(*) as count FROM courses
+       WHERE status = 'published' AND published_at <= ?`,
+      [dateTo]
+    );
+
+    const [prevActiveCourses] = await pool.query(
+      `SELECT COUNT(*) as count FROM courses
+       WHERE status = 'published' AND published_at <= ?`,
+      [prevDateTo]
+    );
+
     // Всего сотрудников
     const usersWhereConditions = ["1=1"];
     const usersParams = [];
@@ -198,6 +211,8 @@ exports.getMetrics = async (req, res) => {
     res.json({
       activeAssessments: activeAssessments[0].count,
       activeAssessmentsTrend: calcTrend(activeAssessments[0].count, prevActiveAssessments[0].count),
+      activeCourses: activeCourses[0].count,
+      activeCoursesTrend: calcTrend(activeCourses[0].count, prevActiveCourses[0].count),
 
       totalUsers: totalUsers[0].count,
       totalUsersTrend: calcTrend(totalUsers[0].count, prevTotalUsers[0].count),

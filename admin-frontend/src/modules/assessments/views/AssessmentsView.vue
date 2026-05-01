@@ -14,11 +14,13 @@
       search-key="search"
       search-placeholder="Поиск по названию..."
       :filter-defs="filterDefs"
-      class="mb-6"
+      class="mb-4"
       @change="onFilterChange"
     />
 
     <DataTable
+      :loading="skeletonVisible"
+      :loading-rows="8"
       :total="totalAssessments"
       :page="pagination.page"
       :limit="pagination.perPage"
@@ -155,12 +157,14 @@ import { useAuthStore } from "@/stores/auth";
 import { getAssessments, deleteAssessment } from "@/api/assessments";
 import { Button, Badge, PageHeader, FilterBar, DataTable, TableHead, TableRow, TableCell } from "@/components/ui";
 import { useToast } from "@/composables/useToast";
+import { useSkeletonGate } from "@/composables/useSkeletonGate";
 import { formatBranchLabel } from "@/utils/branch";
 
 const router = useRouter();
 const authStore = useAuthStore();
 
 const loading = ref(false);
+const { skeletonVisible } = useSkeletonGate(loading, { minDuration: 360, delay: 90 });
 const assessments = ref([]);
 const totalAssessments = ref(0);
 const pagination = ref({

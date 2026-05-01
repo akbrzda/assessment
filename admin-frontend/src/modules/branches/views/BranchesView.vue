@@ -1,9 +1,8 @@
 <template>
   <div class="branches-view">
-    <!-- Header -->
-    <div class="page-header">
-      <h2 class="page-heading">Управление филиалами</h2>
-      <div class="header-buttons">
+    <PageHeader title="Управление филиалами">
+      <template #actions>
+        <div class="header-buttons">
         <Button icon="users" @click="openAssignManagerModal" variant="secondary">
           <span class="hide-mobile">Назначить управляющего</span>
           <span class="show-mobile">Управляющий</span>
@@ -12,20 +11,18 @@
           <span class="hide-mobile">Добавить филиал</span>
           <span class="show-mobile">Добавить</span>
         </Button>
-      </div>
-    </div>
+        </div>
+      </template>
+    </PageHeader>
 
-    <!-- Фильтры -->
-    <Card class="filters-card">
-      <div class="filters-grid">
-        <Input v-model="filters.search" placeholder="Поиск по названию филиала..." @input="loadBranches" />
-
-        <Button variant="secondary" @click="resetFilters" fullWidth icon="refresh-ccw">Сбросить</Button>
-      </div>
-    </Card>
+    <FilterBar v-model="filters" search-key="search" search-placeholder="Поиск по названию филиала..." :filter-defs="[]" class="mb-4" />
 
     <!-- Контент -->
-    <Card padding="none" class="branches-card">
+    <div v-if="skeletonVisible" class="space-y-4">
+      <Skeleton class="h-12 w-full rounded-2xl" />
+      <SkeletonTable :rows="8" />
+    </div>
+    <Card v-else padding="none" class="branches-card">
 
       <div v-if="branches.length === 0" class="empty-state">
         <p>Филиалы не найдены</p>
@@ -34,53 +31,53 @@
       <div v-else>
         <!-- Desktop Table -->
         <div class="table-wrapper hide-mobile">
-          <table class="branches-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Название</th>
-                <th>Город</th>
-                <th>Управляющий</th>
-                <th>Миниапп</th>
-                <th>Сотрудников</th>
-                <th>Аттестаций</th>
-                <th>Средний балл</th>
-                <th>Дата создания</th>
-                <th class="actions-col">Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Название</TableHead>
+                <TableHead>Город</TableHead>
+                <TableHead>Управляющий</TableHead>
+                <TableHead>Миниапп</TableHead>
+                <TableHead>Сотрудников</TableHead>
+                <TableHead>Аттестаций</TableHead>
+                <TableHead>Средний балл</TableHead>
+                <TableHead>Дата создания</TableHead>
+                <TableHead right>Действия</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow
                 v-for="branch in branches"
                 :key="branch.id"
                 :class="{ 'inactive-branch': !branch.managers, 'hidden-branch': !branch.isVisibleInMiniapp }"
               >
-                <td>{{ branch.id }}</td>
-                <td class="branch-name">{{ formatBranchLabel(branch) }}</td>
-                <td class="city-cell">{{ branch.city || "—" }}</td>
-                <td class="managers-cell">
+                <TableCell>{{ branch.id }}</TableCell>
+                <TableCell emphasized class="branch-name">{{ formatBranchLabel(branch) }}</TableCell>
+                <TableCell class="city-cell">{{ branch.city || "—" }}</TableCell>
+                <TableCell class="managers-cell">
                   <span v-if="branch.managers" class="managers-list">
                     {{ branch.managers }}
                   </span>
                   <span v-else class="no-manager">не назначен</span>
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
                   <span class="miniapp-status" :class="branch.isVisibleInMiniapp ? 'status-visible' : 'status-hidden'">
                     {{ branch.isVisibleInMiniapp ? "Виден" : "Скрыт" }}
                   </span>
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
                   <Badge variant="primary" size="sm">{{ branch.employees_count }}</Badge>
-                </td>
-                <td>{{ branch.assessments_completed || 0 }}</td>
-                <td>
+                </TableCell>
+                <TableCell>{{ branch.assessments_completed || 0 }}</TableCell>
+                <TableCell>
                   <span v-if="hasScore(branch.avg_score)" :class="getScoreClass(branch.avg_score)" class="score-value">
                     {{ formatScore(branch.avg_score) }}
                   </span>
                   <span v-else class="no-data">—</span>
-                </td>
-                <td class="date-cell">{{ formatDate(branch.created_at) }}</td>
-                <td class="actions-cell">
+                </TableCell>
+                <TableCell class="date-cell">{{ formatDate(branch.created_at) }}</TableCell>
+                <TableCell right class="actions-cell">
                   <div class="actions-buttons">
                     <Button size="sm" variant="ghost" @click="openEditModal(branch.id)" icon="pencil" title="Редактировать"></Button>
                     <Button
@@ -93,10 +90,10 @@
                     >
                     </Button>
                   </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </div>
 
         <!-- Mobile Cards -->
@@ -174,20 +171,30 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { getBranches, deleteBranch } from "@/api/branches";
-import Preloader from "@/components/ui/Preloader.vue";
 import Modal from "@/components/ui/Modal.vue";
 import Card from "@/components/ui/Card.vue";
 import Button from "@/components/ui/Button.vue";
 import Badge from "@/components/ui/Badge.vue";
-import Input from "@/components/ui/Input.vue";
+import FilterBar from "@/components/ui/FilterBar.vue";
+import PageHeader from "@/components/ui/PageHeader.vue";
+import Skeleton from "@/components/ui/Skeleton.vue";
+import SkeletonTable from "@/components/ui/SkeletonTable.vue";
+import Table from "@/components/ui/Table.vue";
+import TableBody from "@/components/ui/TableBody.vue";
+import TableHead from "@/components/ui/TableHead.vue";
+import TableHeader from "@/components/ui/TableHeader.vue";
+import TableCell from "@/components/ui/TableCell.vue";
+import TableRow from "@/components/ui/TableRow.vue";
 import BranchForm from "@/modules/branches/components/BranchForm.vue";
 import AssignManagerModal from "@/modules/branches/components/AssignManagerModal.vue";
 import { useToast } from "@/composables/useToast";
+import { useSkeletonGate } from "@/composables/useSkeletonGate";
 import { formatBranchLabel } from "@/utils/branch";
 
 const loading = ref(false);
+const { skeletonVisible } = useSkeletonGate(loading, { minDuration: 360, delay: 90 });
 const branches = ref([]);
 const filters = ref({
   search: "",
@@ -219,6 +226,13 @@ const resetFilters = () => {
   filters.value = { search: "" };
   loadBranches();
 };
+
+watch(
+  () => filters.value.search,
+  () => {
+    loadBranches();
+  },
+);
 
 const openCreateModal = () => {
   editingId.value = null;

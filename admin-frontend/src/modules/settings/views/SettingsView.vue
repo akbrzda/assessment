@@ -1,18 +1,18 @@
 <template>
   <div class="settings-view">
-    <!-- Header -->
-    <div class="page-header">
-      <div>
-        <h2 class="page-heading">Настройки системы</h2>
-        <p class="page-subtitle">Управление параметрами системы</p>
-      </div>
-    </div>
+    <PageHeader title="Настройки системы" subtitle="Управление параметрами системы" />
 
     <!-- Tabs -->
-    <Tabs v-model="activeTab" :tabs="tabsConfig" head-only class="mb-8" />
+    <Tabs v-model="activeTab" :tabs="tabsConfig" head-only class="mb-4" />
+
+    <div v-if="skeletonVisible" class="space-y-4">
+      <SkeletonPageHeader />
+      <Skeleton class="h-10 w-72 rounded-xl" />
+      <SkeletonForm :fields="5" />
+    </div>
 
     <!-- Content -->
-    <div class="settings-content">
+    <div v-else class="settings-content">
       <!-- Вкладка: Общие настройки -->
       <div v-if="activeTab === 'general'" class="settings-section">
         <h3 class="section-title">Общие настройки</h3>
@@ -176,7 +176,12 @@ import Tabs from "@/components/ui/Tabs.vue";
 import Input from "@/components/ui/Input.vue";
 import Button from "@/components/ui/Button.vue";
 import Icon from "@/components/ui/Icon.vue";
+import PageHeader from "@/components/ui/PageHeader.vue";
+import Skeleton from "@/components/ui/Skeleton.vue";
+import SkeletonForm from "@/components/ui/SkeletonForm.vue";
+import SkeletonPageHeader from "@/components/ui/SkeletonPageHeader.vue";
 import { useToast } from "@/composables/useToast";
+import { useSkeletonGate } from "@/composables/useSkeletonGate";
 
 const { showToast, showSuccess, showError } = useToast();
 
@@ -188,6 +193,8 @@ const tabsConfig = [
 ];
 
 const activeTab = ref("general");
+const settingsLoading = ref(true);
+const { skeletonVisible } = useSkeletonGate(settingsLoading, { minDuration: 320, delay: 80 });
 
 // Состояния настроек
 const gamificationSettings = ref({
@@ -205,6 +212,7 @@ const savingGamification = ref(false);
 // Загрузка настроек
 const loadSettings = async () => {
   try {
+    settingsLoading.value = true;
     const data = await settingsApi.getSettings();
     const settings = data.settingsList || [];
 
@@ -226,6 +234,8 @@ const loadSettings = async () => {
   } catch (error) {
     console.error("Ошибка загрузки настроек:", error);
     showToast("Не удалось загрузить настройки", "error");
+  } finally {
+    settingsLoading.value = false;
   }
 };
 

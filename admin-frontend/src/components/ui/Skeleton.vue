@@ -1,5 +1,5 @@
 <template>
-  <div :class="cn('skeleton-shimmer rounded-lg', $props.class)" :style="style" />
+  <div :class="cn('skeleton-shimmer rounded-lg', $props.class)" :style="style" aria-hidden="true" />
 </template>
 
 <script setup>

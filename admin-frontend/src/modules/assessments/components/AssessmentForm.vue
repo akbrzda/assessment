@@ -72,13 +72,13 @@
       <section class="form-section">
         <div class="section-header">
           <h3 class="section-heading">Вопросы <span class="required">*</span></h3>
-          <button type="button" @click="addQuestion" class="btn-add-question">+ Добавить вопрос</button>
+          <Button type="button" @click="addQuestion" variant="secondary" size="sm" icon="plus">Добавить вопрос</Button>
         </div>
 
         <div v-for="(question, qIndex) in form.questions" :key="qIndex" class="question-card">
           <div class="question-header">
             <h4 class="question-title">Вопрос {{ qIndex + 1 }}</h4>
-            <button type="button" @click="removeQuestion(qIndex)" class="btn-delete-question">Удалить</button>
+            <Button type="button" @click="removeQuestion(qIndex)" variant="danger" size="sm" icon="trash">Удалить</Button>
           </div>
 
           <div class="form-group">
@@ -89,7 +89,7 @@
           <div class="form-group">
             <div class="options-header">
               <label class="form-label">Варианты ответов (2-6)</label>
-              <button type="button" @click="addOption(qIndex)" :disabled="question.options.length >= 6" class="btn-add-option">+ Вариант</button>
+              <Button type="button" @click="addOption(qIndex)" :disabled="question.options.length >= 6" variant="ghost" size="sm" icon="plus">Вариант</Button>
             </div>
 
             <div class="options-list">
@@ -105,9 +105,16 @@
                   />
                   <span>Правильный</span>
                 </label>
-                <button type="button" @click="removeOption(qIndex, oIndex)" :disabled="question.options.length <= 2" class="btn-delete-option">
-                  ✕
-                </button>
+                <Button
+                  type="button"
+                  @click="removeOption(qIndex, oIndex)"
+                  :disabled="question.options.length <= 2"
+                  variant="danger"
+                  size="sm"
+                  icon="x"
+                  :icon-only="true"
+                  aria-label="Удалить вариант ответа"
+                />
               </div>
             </div>
           </div>
@@ -134,7 +141,6 @@ import { getReferences } from "@/api/users";
 import { validateDate, validateDateRange, dateToISOWithMidnight } from "@/utils/dateValidation";
 import Preloader from "@/components/ui/Preloader.vue";
 import Input from "@/components/ui/Input.vue";
-import Select from "@/components/ui/Select.vue";
 import Button from "@/components/ui/Button.vue";
 import Textarea from "@/components/ui/Textarea.vue";
 import DatePicker from "@/components/ui/DatePicker.vue";

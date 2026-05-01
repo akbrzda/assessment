@@ -6,9 +6,7 @@
         <h3 class="text-xl font-semibold text-foreground">
           {{ isEditing ? "Редактировать правило" : "Новое правило" }}
         </h3>
-        <button @click="$emit('close')" class="text-muted-foreground hover:text-foreground transition-colors">
-          <Icon name="X" :size="24" aria-hidden="true" />
-        </button>
+        <Button @click="$emit('close')" variant="ghost" icon="x" :icon-only="true" aria-label="Закрыть форму" />
       </div>
 
       <!-- Контент формы -->
@@ -230,20 +228,8 @@
 
         <!-- Кнопки -->
         <div class="flex justify-end gap-3 pt-4 border-t border-border">
-          <button
-            type="button"
-            @click="$emit('close')"
-            class="px-4 py-2 border border-border rounded-lg text-foreground hover:bg-muted/50 transition-colors"
-          >
-            Отмена
-          </button>
-          <button
-            type="submit"
-            :disabled="saving"
-            class="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {{ saving ? "Сохранение..." : "Сохранить" }}
-          </button>
+          <ActionButton action="cancel" @click="$emit('close')" />
+          <ActionButton action="save" type="submit" :loading="saving" :disabled="saving" />
         </div>
       </form>
     </div>
@@ -254,7 +240,8 @@
 import { ref, computed, watch } from "vue";
 import { useToast } from "@/composables/useToast";
 import gamificationRulesApi from "@/api/gamificationRules";
-import Icon from "@/components/ui/Icon.vue";
+import Button from "@/components/ui/Button.vue";
+import ActionButton from "@/components/ui/ActionButton.vue";
 import DatePicker from "@/components/ui/DatePicker.vue";
 
 const props = defineProps({

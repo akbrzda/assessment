@@ -30,13 +30,19 @@
 
     <Tabs v-model="activeUserTab" :tabs="userTabsConfig" head-only class="mb-4" />
 
-    <DataTable
-      :total="totalUsers"
-      :page="pagination.page"
-      :limit="pagination.perPage"
-      :is-empty="visibleUsers.length === 0"
-      empty-type="filter"
-      empty-title="Пользователи не найдены"
+    <UsersTable
+      :skeleton-visible="skeletonVisible"
+      :total-users="totalUsers"
+      :pagination="pagination"
+      :visible-users="visibleUsers"
+      :selected-user-ids="selectedUserIds"
+      :all-users-selected="allUsersSelected"
+      :can-edit-user="canEditUser"
+      :get-role-badge-variant="getRoleBadgeVariant"
+      :get-role-label="getRoleLabel"
+      :get-user-status="getUserStatus"
+      :format-date="formatDate"
+      :is-super-admin="authStore.isSuperAdmin"
       @update:page="
         pagination.page = $event;
         loadUsers();
@@ -46,110 +52,12 @@
         pagination.page = 1;
         loadUsers();
       "
-    >
-      <template #head>
-        <TableHead>
-          <input type="checkbox" :checked="allUsersSelected" @change="toggleSelectAllUsers" />
-        </TableHead>
-        <TableHead>Пользователь</TableHead>
-        <TableHead>Логин</TableHead>
-        <TableHead>Должность</TableHead>
-        <TableHead>Роль</TableHead>
-        <TableHead>Филиал</TableHead>
-        <TableHead>Статус</TableHead>
-        <TableHead>Создан</TableHead>
-        <TableHead right>Действия</TableHead>
-      </template>
-
-      <template #body>
-        <TableRow v-for="user in visibleUsers" :key="user.id">
-          <TableCell>
-            <input type="checkbox" :checked="selectedUserIds.includes(user.id)" @change="toggleUserSelection(user.id)" />
-          </TableCell>
-          <TableCell>
-            <div class="cursor-pointer" @click="openProfilePage(user)">
-              <div class="font-semibold text-foreground">{{ user.first_name }} {{ user.last_name }}</div>
-              <div class="text-sm text-muted-foreground">{{ user.login || "—" }}</div>
-            </div>
-          </TableCell>
-          <TableCell muted>{{ user.login || "—" }}</TableCell>
-          <TableCell muted>{{ user.position_name || "—" }}</TableCell>
-          <TableCell>
-            <Badge :variant="getRoleBadgeVariant(user.role_name)" size="sm">
-              {{ getRoleLabel(user.role_name) }}
-            </Badge>
-          </TableCell>
-          <TableCell muted>{{ user.branch_name || "—" }}</TableCell>
-          <TableCell>
-            <span :class="['status-pill', `status-pill-${getUserStatus(user).key}`]">
-              <span class="status-dot"></span>
-              {{ getUserStatus(user).label }}
-            </span>
-          </TableCell>
-          <TableCell muted>{{ formatDate(user.created_at) }}</TableCell>
-          <TableCell right>
-            <div class="flex items-center justify-end gap-1">
-              <Button
-                v-if="canEditUser(user)"
-                variant="ghost"
-                size="sm"
-                :icon-only="true"
-                icon="pencil"
-                title="Редактировать"
-                @click="openEditModal(user)"
-              />
-              <Button
-                v-if="authStore.isSuperAdmin"
-                variant="ghost"
-                size="sm"
-                :icon-only="true"
-                icon="trash"
-                title="Удалить"
-                @click="openDeleteModal(user)"
-              />
-            </div>
-          </TableCell>
-        </TableRow>
-      </template>
-
-      <template #mobile>
-        <div v-for="user in visibleUsers" :key="user.id" class="p-4 space-y-3">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <h3 class="font-semibold text-foreground cursor-pointer" @click="openProfilePage(user)">{{ user.first_name }} {{ user.last_name }}</h3>
-              <p class="text-sm text-muted-foreground">ID: {{ user.id }}</p>
-            </div>
-            <Badge :variant="getRoleBadgeVariant(user.role_name)" size="sm">
-              {{ getRoleLabel(user.role_name) }}
-            </Badge>
-          </div>
-          <dl class="grid gap-2 text-sm border-t border-border pt-3">
-            <div class="flex justify-between">
-              <dt class="text-muted-foreground">Логин</dt>
-              <dd class="font-medium">{{ user.login || "—" }}</dd>
-            </div>
-            <div class="flex justify-between">
-              <dt class="text-muted-foreground">Филиал</dt>
-              <dd class="font-medium">{{ user.branch_name || "—" }}</dd>
-            </div>
-            <div class="flex justify-between">
-              <dt class="text-muted-foreground">Должность</dt>
-              <dd class="font-medium">{{ user.position_name || "—" }}</dd>
-            </div>
-            <div class="flex justify-between">
-              <dt class="text-muted-foreground">Создан</dt>
-              <dd class="font-medium">{{ formatDate(user.created_at) }}</dd>
-            </div>
-          </dl>
-          <div class="flex gap-2">
-            <Button v-if="canEditUser(user)" size="sm" variant="secondary" icon="pencil" class="flex-1" @click="openEditModal(user)">
-              Редактировать
-            </Button>
-            <Button v-if="authStore.isSuperAdmin" size="sm" variant="danger" icon="trash" @click="openDeleteModal(user)" />
-          </div>
-        </div>
-      </template>
-    </DataTable>
+      @toggle-select-all="toggleSelectAllUsers"
+      @toggle-user-selection="toggleUserSelection"
+      @open-profile-page="openProfilePage"
+      @open-edit-modal="openEditModal"
+      @open-delete-modal="openDeleteModal"
+    />
 
     <!-- Create modal -->
     <Modal :show="showCreateModal" title="Создать пользователя" @close="closeModals">
@@ -250,139 +158,21 @@
       </div>
     </Modal>
 
-    <!-- Profile modal -->
-    <Modal :show="showProfileModal" :title="`Профиль: ${selectedUser?.first_name} ${selectedUser?.last_name}`" @close="closeModals" size="lg">
-      <div v-if="userProfile" class="user-profile">
-        <!-- Основная информация -->
-        <div class="profile-header">
-          <div class="profile-avatar">{{ selectedUser?.first_name?.charAt(0) }}{{ selectedUser?.last_name?.charAt(0) }}</div>
-          <div class="profile-info">
-            <div class="profile-name-row">
-              <h3 class="profile-name">{{ userProfile.user.first_name }} {{ userProfile.user.last_name }}</h3>
-              <Badge :variant="getRoleBadgeVariant(userProfile.user.role_name)" size="sm">
-                {{ getRoleLabel(userProfile.user.role_name) }}
-              </Badge>
-            </div>
-            <div class="profile-meta">
-              <span class="profile-badge">Уровень {{ userProfile.user.level }}</span>
-              <span class="profile-badge">{{ userProfile.user.points }} очков</span>
-            </div>
-            <div class="profile-details">
-              <span>{{ userProfile.user.branch_name || "—" }}</span>
-              <span>•</span>
-              <span>{{ userProfile.user.position_name || "—" }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Статистика -->
-        <div class="profile-stats">
-          <div class="stat-card">
-            <div class="stat-icon">
-              <Icon name="ClipboardList" />
-            </div>
-            <div class="stat-value">{{ userProfile.stats.total_assessments || 0 }}</div>
-            <div class="stat-label">Аттестаций</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">
-              <Icon name="square-check" />
-            </div>
-            <div class="stat-value">{{ userProfile.stats.completed_attempts || 0 }}</div>
-            <div class="stat-label">Завершено</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">
-              <Icon name="chart-line" />
-            </div>
-            <div class="stat-value">{{ formatScore(userProfile.stats.avg_score) }}%</div>
-            <div class="stat-label">Средний балл</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">
-              <Icon name="trophy" />
-            </div>
-            <div class="stat-value">{{ userProfile.rank.user_rank || "—" }}</div>
-            <div class="stat-label">Место в рейтинге</div>
-          </div>
-        </div>
-
-        <!-- Прогресс до следующего уровня -->
-        <div v-if="userProfile.nextLevel" class="profile-section">
-          <h3>Прогресс до следующего уровня</h3>
-          <div class="progress-container">
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: `${userProfile.progressToNextLevel}%` }"></div>
-            </div>
-            <p class="progress-text">
-              {{ Math.round(userProfile.progressToNextLevel) }}% • Осталось
-              {{ Math.max((userProfile.nextLevel.min_points || 0) - (userProfile.user.points || 0), 0) }} очков
-            </p>
-          </div>
-        </div>
-
-        <!-- Бейджи -->
-        <div class="profile-section">
-          <h3>Достижения {{ userProfile.badges && userProfile.badges.length > 0 ? `(${userProfile.badges.length})` : "" }}</h3>
-          <div v-if="userProfile.badges && userProfile.badges.length > 0" class="badges-grid">
-            <div v-for="badge in userProfile.badges" :key="badge.id" class="badge-item" :title="badge.description">
-              <div class="badge-icon">{{ badge.icon }}</div>
-              <div class="badge-name">{{ badge.name }}</div>
-              <div class="badge-date">{{ formatDate(badge.earned_at) }}</div>
-            </div>
-          </div>
-          <div v-else class="empty-badges">
-            <div class="empty-icon">
-              <Icon name="medal" size="96" />
-            </div>
-            <p>Пока нет заработанных достижений</p>
-          </div>
-        </div>
-
-        <!-- Сводка по аттестациям -->
-        <div class="profile-section">
-          <h3>
-            Аттестации
-            {{ userProfile.assessmentsSummary && userProfile.assessmentsSummary.length > 0 ? `(${userProfile.assessmentsSummary.length})` : "" }}
-          </h3>
-          <div v-if="userProfile.assessmentsSummary && userProfile.assessmentsSummary.length > 0" class="history-header">
-            <span>Аттестация</span>
-            <span>Дата</span>
-            <span>Лучший %</span>
-            <span>Попыток</span>
-            <span>Время</span>
-            <span>Статус</span>
-          </div>
-          <div v-if="userProfile.assessmentsSummary && userProfile.assessmentsSummary.length > 0" class="history-list">
-            <div v-for="summary in userProfile.assessmentsSummary" :key="summary.id" class="history-item">
-              <div class="history-info">
-                <div class="history-line">
-                  <span class="history-title">{{ summary.title }}</span>
-                  <span>{{ formatDateTime(summary.last_attempt_at) }}</span>
-                  <span>{{ formatScore(summary.best_score_percent) }}%</span>
-                  <span>{{ summary.attempts_count }}</span>
-                  <span>{{ formatTimeSpent(summary.time_spent_seconds) }}</span>
-                  <span>{{ formatAssessmentResult(summary) }}</span>
-                </div>
-              </div>
-              <div class="history-actions">
-                <Button size="sm" variant="ghost" icon="RotateCcw" title="Сбросить прогресс" @click="openResetProgressModal(summary)" />
-              </div>
-            </div>
-          </div>
-          <div v-else class="empty-history">
-            <div class="empty-icon">
-              <Icon name="ClipboardList" size="96" />
-            </div>
-            <p>Аттестаций нет</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal-actions">
-        <Button variant="secondary" @click="closeModals">Закрыть</Button>
-      </div>
-    </Modal>
+    <UserProfileModal
+      :show="showProfileModal"
+      :title="`Профиль: ${selectedUser?.first_name} ${selectedUser?.last_name}`"
+      :selected-user="selectedUser"
+      :user-profile="userProfile"
+      :get-role-badge-variant="getRoleBadgeVariant"
+      :get-role-label="getRoleLabel"
+      :format-score="formatScore"
+      :format-date="formatDate"
+      :format-date-time="formatDateTime"
+      :format-time-spent="formatTimeSpent"
+      :format-assessment-result="formatAssessmentResult"
+      @close="closeModals"
+      @reset-progress="openResetProgressModal"
+    />
 
     <!-- Reset progress modal -->
     <Modal :show="showResetProgressModal" title="Сбросить прогресс аттестации" @close="closeModals">
@@ -402,57 +192,19 @@
       </div>
     </Modal>
 
-    <!-- Invite employee modal -->
-    <Modal :show="showInviteModal" title="Пригласить сотрудника" @close="closeInviteModal">
-      <div v-if="inviteLink" class="invite-success">
-        <div class="invite-success-head">
-          <div class="invite-success-icon">✓</div>
-          <h3 class="invite-success-title">Приглашение создано!</h3>
-          <p class="invite-success-text">Сотрудник получит ссылку для доступа к системе.</p>
-        </div>
-        <div class="invite-link-block">
-          <p class="invite-link-label">Ссылка для приглашения</p>
-          <div class="invite-link-row">
-            <Input v-model="inviteLink" readonly />
-            <Button size="sm" icon="Copy" variant="secondary" @click="copyInviteLink">Скопировать</Button>
-          </div>
-        </div>
-        <p class="invite-hint">Ссылка активна 7 дней. Пока сотрудник не активировал профиль, он не появится в активных пользователях.</p>
-        <div class="invite-success-actions">
-          <Button variant="secondary" @click="closeInviteModal">Закрыть</Button>
-          <Button @click="openInvitedUserProfile">Перейти к пользователю</Button>
-        </div>
-      </div>
-      <div v-else>
-        <div class="form-container">
-          <div class="form-row">
-            <Input v-model="inviteForm.lastName" label="Фамилия" placeholder="Иванов" required :error="inviteErrors.lastName" />
-            <Input v-model="inviteForm.firstName" label="Имя" placeholder="Иван" required :error="inviteErrors.firstName" />
-          </div>
-          <Input v-model="inviteForm.phone" label="Номер телефона" placeholder="+7 (999) 000-00-00" :error="inviteErrors.phone" />
-          <Select
-            v-model.number="inviteForm.positionId"
-            label="Должность"
-            :options="positionOptions"
-            placeholder="Выберите должность"
-            required
-            :error="inviteErrors.positionId"
-          />
-          <Select
-            v-model.number="inviteForm.branchId"
-            label="Филиал (Город)"
-            :options="branchOptions"
-            placeholder="Выберите филиал"
-            required
-            :error="inviteErrors.branchId"
-          />
-        </div>
-        <div class="modal-actions">
-          <Button variant="secondary" @click="closeInviteModal">Отмена</Button>
-          <Button :loading="actionLoading" @click="handleInviteCreate">Создать приглашение</Button>
-        </div>
-      </div>
-    </Modal>
+    <UserInviteModal
+      :show="showInviteModal"
+      :invite-link="inviteLink"
+      :invite-form="inviteForm"
+      :invite-errors="inviteErrors"
+      :position-options="positionOptions"
+      :branch-options="branchOptions"
+      :action-loading="actionLoading"
+      @close="closeInviteModal"
+      @copy-link="copyInviteLink"
+      @open-profile="openInvitedUserProfile"
+      @create="handleInviteCreate"
+    />
   </div>
 </template>
 
@@ -463,16 +215,21 @@ import { useAuthStore } from "@/stores/auth";
 import apiClient from "@/utils/axios";
 import { getUsers, getReferences, createUser, updateUser, deleteUser, resetPassword, resetAssessmentProgress } from "@/api/users";
 import { createInvitation } from "@/api/invitations";
-import { Button, Badge, PageHeader, FilterBar, DataTable, TableHead, TableRow, TableCell, Tabs, Input, Select, Modal, Icon } from "@/components/ui";
+import { Badge, Button, FilterBar, Input, Modal, PageHeader, Tabs } from "@/components/ui";
 import UserForm from "@/modules/users/components/UserForm.vue";
 import UserPermissionsManager from "@/modules/users/components/UserPermissionsManager.vue";
+import UserInviteModal from "@/modules/users/components/users-view/UserInviteModal.vue";
+import UserProfileModal from "@/modules/users/components/users-view/UserProfileModal.vue";
+import UsersTable from "@/modules/users/components/users-view/UsersTable.vue";
 import { useToast } from "@/composables/useToast";
+import { useSkeletonGate } from "@/composables/useSkeletonGate";
 import { formatBranchLabel } from "@/utils/branch";
 import { BOT_USERNAME } from "@/env";
 
 const authStore = useAuthStore();
 const router = useRouter();
 const loading = ref(false);
+const { skeletonVisible } = useSkeletonGate(loading, { minDuration: 360, delay: 90 });
 const actionLoading = ref(false);
 const users = ref([]);
 const totalUsers = ref(0);
@@ -1483,310 +1240,6 @@ onMounted(async () => {
   margin: 0;
 }
 
-.user-profile {
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.profile-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 24px;
-  margin-bottom: 32px;
-  padding: 24px;
-  background: var(--color-background-soft);
-  border-radius: 16px;
-}
-
-.profile-avatar {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: var(--bg-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  font-weight: bold;
-  color: white;
-  flex-shrink: 0;
-}
-
-.profile-info {
-  flex: 1;
-}
-
-.profile-name-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 12px;
-}
-
-.profile-name {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--color-heading);
-}
-
-.profile-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.profile-badge {
-  padding: 6px 12px;
-  background: var(--color-background-mute);
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-}
-
-.profile-details {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-}
-
-.profile-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 16px;
-  margin-bottom: 32px;
-}
-
-.stat-card {
-  padding: 20px;
-  background: var(--color-background-soft);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  text-align: center;
-  transition: all 0.2s;
-}
-
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px #00000014;
-  border-color: var(--color-primary);
-}
-
-.stat-card .stat-icon {
-  font-size: 28px;
-  margin-bottom: 8px;
-}
-
-.stat-card .stat-value {
-  display: block;
-  font-size: 32px;
-  font-weight: bold;
-  color: var(--color-primary);
-  margin-bottom: 4px;
-}
-
-.stat-card .stat-label {
-  display: block;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-}
-
-.profile-section {
-  margin-bottom: 32px;
-}
-
-.profile-section h3 {
-  margin: 0 0 16px 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--color-heading);
-}
-
-.progress-container {
-  padding: 16px;
-  background: var(--color-background-soft);
-  border-radius: 12px;
-}
-
-.progress-bar {
-  height: 14px;
-  background: var(--color-background-mute);
-  border-radius: 7px;
-  overflow: hidden;
-  margin-bottom: 12px;
-  border: 1px solid var(--color-border);
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-  border-radius: 7px;
-  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-}
-
-.progress-fill::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(90deg, transparent, #ffffff33, transparent);
-  animation: shimmer 2s infinite;
-}
-
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-.progress-text {
-  font-size: 14px;
-  color: var(--color-text);
-  text-align: center;
-  font-weight: 500;
-  margin: 0;
-}
-
-.badges-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 16px;
-}
-
-.badge-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 20px;
-  background: var(--color-background-soft);
-  border: 2px solid var(--color-border);
-  border-radius: 12px;
-  text-align: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: default;
-}
-
-.badge-item:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 8px 24px #0000001f;
-  border-color: var(--color-primary);
-}
-
-.badge-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
-  filter: drop-shadow(0 2px 4px #0000001a);
-}
-
-.badge-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-heading);
-  margin-bottom: 6px;
-}
-
-.badge-date {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-}
-
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.history-item {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  padding: 20px;
-  background: var(--color-background-soft);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  transition: all 0.2s;
-}
-
-.history-item:hover {
-  background: var(--color-background-mute);
-  border-color: var(--color-primary);
-  transform: translateX(4px);
-}
-
-.history-info {
-  flex: 1;
-}
-
-.history-header {
-  display: grid;
-  grid-template-columns: 2fr 1fr 0.7fr 1.1fr 0.8fr 0.8fr;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 8px;
-  padding: 0 20px;
-}
-
-.history-line {
-  display: grid;
-  grid-template-columns: 2fr 1fr 0.7fr 1.1fr 0.8fr 0.8fr;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-  align-items: center;
-}
-
-.history-title {
-  font-weight: 600;
-  color: var(--color-heading);
-  font-size: 14px;
-}
-
-.history-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.empty-badges,
-.empty-history {
-  text-align: center;
-  padding: 48px 32px;
-  background: var(--color-background-soft);
-  border-radius: 12px;
-  border: 2px dashed var(--color-border);
-}
-
-.empty-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-badges p,
-.empty-history p {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: 15px;
-}
 .bulk-actions {
   display: grid;
   grid-template-columns: 140px minmax(200px, 1fr) minmax(200px, 1fr) minmax(200px, 1fr) auto;
@@ -1807,89 +1260,6 @@ onMounted(async () => {
   }
 }
 
-.form-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.invite-success {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.invite-success-head {
-  text-align: center;
-}
-
-.invite-success-icon {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 12px;
-  border-radius: 999px;
-  background: #22c55e;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  font-weight: 700;
-}
-
-.invite-success-title {
-  margin: 0;
-  font-size: 30px;
-  line-height: 1.1;
-  color: var(--text-primary);
-}
-
-.invite-link-block {
-  border: 1px solid var(--divider);
-  border-radius: 12px;
-  padding: 14px;
-}
-
-.invite-link-label {
-  margin: 0 0 8px;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.invite-success-text {
-  font-size: 15px;
-  color: var(--text-primary);
-  margin: 8px 0 0;
-}
-
-.invite-link-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.invite-hint {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
-  border-radius: 10px;
-  padding: 10px 12px;
-}
-
-.invite-success-actions {
-  margin-top: 4px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
 
 .credentials-card {
   display: flex;
@@ -1955,41 +1325,4 @@ onMounted(async () => {
   margin: 12px 0 0;
 }
 
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  background: hsl(var(--muted));
-  color: var(--text-secondary);
-}
-
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: currentColor;
-  flex-shrink: 0;
-}
-
-.status-pill-awaiting {
-  background: hsl(var(--color-warning-subtle));
-  color: hsl(var(--accent-orange));
-}
-
-.status-pill-awaiting .status-dot {
-  background: hsl(var(--accent-orange));
-}
-
-.status-pill-active {
-  background: hsl(var(--accent-green-soft));
-  color: hsl(var(--accent-green));
-}
-
-.status-pill-active .status-dot {
-  background: hsl(var(--accent-green));
-}
 </style>

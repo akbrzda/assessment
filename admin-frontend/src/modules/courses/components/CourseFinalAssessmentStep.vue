@@ -120,7 +120,7 @@
             <span>Вопросы берутся из тестов тем курса. Убедитесь, что тесты созданы и опубликованы.</span>
           </div>
 
-          <button class="final-preview-button" type="button" @click="previewQuestions">{{ CALC_BUTTON_TEXT }}</button>
+          <ActionButton action="confirm" class="final-preview-button" :label="CALC_BUTTON_TEXT" type="button" @click="previewQuestions" />
           <div v-if="questionsCalculation" class="final-calculation-result">
             <p>{{ CALC_SECTIONS_TEXT }}: {{ questionsCalculation.sectionsCount }}</p>
             <p>{{ CALC_QUESTIONS_TEXT }}: {{ questionsCalculation.questionsCount }}</p>
@@ -191,6 +191,7 @@ import { ChevronDown, ChevronRight, Info } from "lucide-vue-next";
 import { createAssessment, getAssessmentById, updateAssessment } from "@/api/assessments";
 import { updateCourse } from "@/api/courses";
 import { useToast } from "@/composables/useToast";
+import ActionButton from "@/components/ui/ActionButton.vue";
 
 const props = defineProps({
   course: {

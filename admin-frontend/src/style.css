@@ -120,6 +120,10 @@
     --color-info-border: 199 96% 45%;
     --color-warning-border: 31 90% 48%;
     --color-danger-border: 0 72% 51%;
+    --skeleton-bg: 0 0% 93%;
+    --skeleton-highlight: 0 0% 100%;
+    --skeleton-radius: 12px;
+    --skeleton-duration: 1.4s;
   }
 
   .dark {
@@ -201,6 +205,8 @@
     --color-info-border: 194 90% 62%;
     --color-warning-border: 34 89% 60%;
     --color-danger-border: 0 68% 55%;
+    --skeleton-bg: 0 0% 19%;
+    --skeleton-highlight: 0 0% 28%;
   }
 
   * {
@@ -224,6 +230,12 @@
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Единая шапка таблиц для всех экранов админки */
+  table thead,
+  table thead th {
+    background-color: hsl(var(--table-header-bg));
   }
 
   h1 {
@@ -362,9 +374,19 @@
 
 /* Shimmer-скелетон */
 .skeleton-shimmer {
-  background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--accent)) 50%, hsl(var(--muted)) 75%);
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--skeleton-radius);
+  background: hsl(var(--skeleton-bg));
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, hsl(var(--skeleton-highlight) / 0.65) 50%, transparent 100%);
   background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s infinite linear;
+  animation: skeleton-shimmer var(--skeleton-duration) infinite linear;
 }
 
 /* Success icon */

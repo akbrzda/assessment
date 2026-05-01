@@ -24,7 +24,7 @@
       <div class="w-px h-5 bg-border shrink-0 mx-1 hidden md:block" />
 
       <!-- Фильтры-дропдауны -->
-      <template v-for="def in filterDefs" :key="def.key">
+      <template v-for="(def, index) in filterDefs" :key="def.key">
         <!-- Select фильтр -->
         <div v-if="def.type === 'select' || !def.type" class="relative shrink-0 hidden md:block">
           <button
@@ -48,7 +48,10 @@
           <!-- Дропдаун -->
           <div
             v-if="openDropdown === def.key"
-            class="absolute top-[calc(100%+6px)] left-0 z-[200] bg-card border border-border rounded-xl shadow-modal min-w-[180px] p-1.5"
+            :class="[
+              'absolute top-[calc(100%+6px)] z-[200] bg-card border border-border rounded-xl shadow-modal min-w-[180px] max-w-[min(320px,calc(100vw-24px))] p-1.5',
+              getDropdownAlignmentClass(index),
+            ]"
           >
             <div class="flex flex-col gap-px">
               <button
@@ -103,7 +106,10 @@
 
           <div
             v-if="openDropdown === def.key"
-            class="absolute top-[calc(100%+6px)] left-0 z-[200] bg-card border border-border rounded-xl shadow-modal min-w-[240px] p-1.5"
+            :class="[
+              'absolute top-[calc(100%+6px)] z-[200] bg-card border border-border rounded-xl shadow-modal min-w-[240px] max-w-[min(360px,calc(100vw-24px))] p-1.5',
+              getDropdownAlignmentClass(index),
+            ]"
           >
             <div class="flex flex-col gap-px border-b border-border pb-1.5 mb-2">
               <button
@@ -279,6 +285,11 @@ const datePresets = [
   { key: "month", label: "За этот месяц" },
   { key: "custom", label: "Произвольный диапазон" },
 ];
+
+function getDropdownAlignmentClass(index) {
+  const shouldAlignRight = index >= Math.max(props.filterDefs.length - 2, 0);
+  return shouldAlignRight ? "right-0 left-auto" : "left-0 right-auto";
+}
 
 function getToday() {
   return new Date().toISOString().split("T")[0];

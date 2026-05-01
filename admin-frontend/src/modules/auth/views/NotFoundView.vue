@@ -16,15 +16,8 @@
       </div>
 
       <div class="flex gap-4 justify-center">
-        <button
-          @click="goBack"
-          class="px-6 py-3 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg transition-colors duration-200"
-        >
-          Назад
-        </button>
-        <button @click="goHome" class="px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors duration-200">
-          На главную
-        </button>
+        <ActionButton action="back" @click="goBack" />
+        <ActionButton action="confirm" label="На главную" @click="goHome" />
       </div>
     </div>
   </div>
@@ -33,6 +26,7 @@
 <script setup>
 import { useRouter, useRoute } from "vue-router";
 import { computed } from "vue";
+import ActionButton from "@/components/ui/ActionButton.vue";
 
 const router = useRouter();
 const route = useRoute();

@@ -1,529 +1,92 @@
 <template>
   <div class="course-editor-view">
-    <div class="course-editor-header">
-      <div class="course-editor-header-left">
-        <Button variant="ghost" icon="arrow-left" size="sm" @click="goBack">К списку курсов</Button>
-      </div>
-      <div class="course-editor-header-right">
-        <Button v-if="currentStep < wizardSteps.length" :loading="saving" :disabled="!canProceed" @click="goToNextStep">Далее</Button>
-        <Button v-else variant="secondary" :loading="saving" @click="saveFromHeader">Сохранить</Button>
-      </div>
-    </div>
+    <CourseEditorHeader
+      :current-step="currentStep"
+      :total-steps="wizardSteps.length"
+      :can-proceed="canProceed"
+      :saving="saving"
+      @back="goBack"
+      @next="goToNextStep"
+      @save="saveFromHeader"
+    />
 
     <Preloader v-if="loading" />
 
     <template v-else>
-      <div class="course-stepper">
-        <div
-          v-for="(step, index) in wizardSteps"
-          :key="step.id"
-          class="stepper-item"
-          :class="{
-            'stepper-active': currentStep === step.id,
-            'stepper-completed': currentStep > step.id,
-          }"
-          @click="goToStep(step.id)"
-        >
-          <div v-if="index > 0" class="stepper-connector"></div>
-          <div class="stepper-bubble">
-            <Check v-if="currentStep > step.id" :size="14" :stroke-width="2.5" />
-            <span v-else>{{ step.id }}</span>
-          </div>
-          <div class="stepper-labels">
-            <span class="stepper-title">{{ step.title }}</span>
-            <span class="stepper-subtitle">{{ step.subtitle }}</span>
-          </div>
-        </div>
-      </div>
+      <CourseEditorStepper :steps="wizardSteps" :current-step="currentStep" @step-click="goToStep" />
 
-      <div v-if="currentStep === 1" class="step1-layout">
-        <div class="step1-main">
-          <div class="step1-section-header">
-            <h2>Основная информация о курсе</h2>
-            <p>Заполните базовые данные курса и загрузите обложку.</p>
-          </div>
+      <CourseEditorBasicsStep
+        v-if="currentStep === 1"
+        :form="form"
+        :errors="errors"
+        :category-options="categoryOptions"
+        :difficulty-options="difficultyOptions"
+        :language-options="languageOptions"
+        :preview-stats="previewStats"
+        :cover-drag-over="coverDragOver"
+        :cover-file-input-ref="coverFileInputRef"
+        @cover-change="handleCoverFileChange"
+        @cover-drop="handleCoverDrop"
+        @cover-drag-over="coverDragOver = $event"
+        @trigger-cover-file-input="triggerCoverFileInput"
+        @remove-cover="removeCover"
+      />
 
-          <div class="step1-form-grid">
-            <Input v-model="form.title" label="Название курса" placeholder="Введите название курса" :error="errors.title" required />
-            <Select v-model="form.category" label="Категория" placeholder="Выберите категорию" :options="categoryOptions" />
-
-            <div class="field-with-counter">
-              <Textarea
-                v-model="form.shortDescription"
-                label="Краткое описание курса"
-                placeholder="Опишите цель и содержание курса"
-                :rows="2"
-                :maxlength="200"
-              />
-              <span class="field-counter">{{ (form.shortDescription || "").length }}/200</span>
-            </div>
-
-            <TagsInput v-model="form.tags" label="Теги" placeholder="Введите тег и нажмите Enter..." />
-
-            <Select v-model="form.difficulty" label="Уровень сложности" placeholder="Выберите уровень" :options="difficultyOptions" />
-            <Select v-model="form.courseLanguage" label="Язык курса" placeholder="Выберите язык" :options="languageOptions" />
-          </div>
-
-          <div class="cover-upload-row">
-            <input
-              ref="coverFileInputRef"
-              id="course-cover-file-input"
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              class="cover-file-input-hidden"
-              @change="handleCoverFileChange"
-            />
-            <label
-              class="cover-dropzone"
-              for="course-cover-file-input"
-              :class="{ 'cover-dropzone-hover': coverDragOver }"
-              @dragover.prevent="coverDragOver = true"
-              @dragleave.prevent="coverDragOver = false"
-              @drop.prevent="handleCoverDrop"
-            >
-              <Upload class="cover-dropzone-icon" :size="32" :stroke-width="1.5" />
-              <p>
-                Перетащите файл сюда или
-                <button type="button" class="cover-dropzone-link" @click.stop.prevent="triggerCoverFileInput">выберите файл</button>
-              </p>
-              <p class="cover-dropzone-hint">PNG, JPG или WEBP. Макс. размер 5 МБ</p>
-            </label>
-            <div v-if="form.coverUrl" class="cover-preview-box">
-              <img :src="form.coverUrl" alt="Обложка курса" class="cover-preview-img" />
-              <button type="button" class="cover-preview-remove" @mousedown.stop.prevent @click.stop.prevent="removeCover">
-                <Trash2 :size="16" :stroke-width="2" />
-                Удалить
-              </button>
-            </div>
-          </div>
-
-          <WysiwygEditor
-            v-model="form.description"
-            label="Описание курса"
-            placeholder="Подробное описание курса. Цели, задачи, результаты обучения..."
-            :min-height="140"
-            :show-counter="true"
-            :max-length="2000"
-          />
-        </div>
-
-        <div class="step1-sidebar">
-          <div class="course-info-card">
-            <h3 class="course-info-title">Информация о курсе</h3>
-            <div class="course-info-row">
-              <span class="course-info-label">Темы</span>
-              <span class="course-info-value">{{ previewStats.themesCount }}</span>
-            </div>
-            <div class="course-info-row">
-              <span class="course-info-label">Подтемы</span>
-              <span class="course-info-value">{{ previewStats.subtopicsCount }}</span>
-            </div>
-            <div class="course-info-row">
-              <span class="course-info-label">Материалы</span>
-              <span class="course-info-value">{{ previewStats.materialsCount }}</span>
-            </div>
-            <div class="course-info-row">
-              <span class="course-info-label">Тест для темы</span>
-              <span class="course-info-value" :class="previewStats.sectionTestsCount > 0 ? 'course-info-ok' : 'course-info-empty'">
-                {{ previewStats.sectionTestsCount > 0 ? previewStats.sectionTestsCount : "Не создан" }}
-              </span>
-            </div>
-            <div class="course-info-row">
-              <span class="course-info-label">Аттестация курса</span>
-              <span class="course-info-value" :class="form.finalAssessmentId ? 'course-info-ok' : 'course-info-empty'">
-                {{ form.finalAssessmentId ? "Настроена" : "Не настроена" }}
-              </span>
-            </div>
-          </div>
-
-          <div class="whats-next-card">
-            <div class="whats-next-icon">
-              <Info :size="18" :stroke-width="2" />
-            </div>
-            <div>
-              <p class="whats-next-title">Что дальше?</p>
-              <p class="whats-next-text">После сохранения курса вы сможете добавить темы, материалы и настроить проверку знаний.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <Card v-if="currentStep === 2 && isEditMode && course" class="sections-card structure-card">
-        <div class="structure-header">
-          <div>
-            <h2>Структура курса</h2>
-            <p>Добавьте темы и подтемы. Перетаскивайте элементы для изменения порядка.</p>
-          </div>
-        </div>
-
-        <div v-if="publicationErrorsForDisplay.length > 0" class="publication-errors">
-          <h3>Что нужно исправить перед публикацией</h3>
-          <ul>
-            <li v-for="(errorText, index) in publicationErrorsForDisplay" :key="`${index}-${errorText}`">
-              {{ errorText }}
-            </li>
-          </ul>
-        </div>
-
-        <div class="structure-toolbar">
-          <div class="structure-search">
-            <Search :size="16" :stroke-width="2" />
-            <Input v-model="structureSearchQuery" type="search" placeholder="Поиск по темам и подтемам" />
-          </div>
-          <button type="button" class="structure-secondary-action structure-secondary-action-disabled" disabled>
-            <Upload :size="16" :stroke-width="1.8" />
-            Импорт структуры
-          </button>
-          <button type="button" class="structure-primary-action" @click="showNewSectionForm = !showNewSectionForm">
-            <span>+</span>
-            Добавить тему
-          </button>
-        </div>
-
-        <div class="structure-layout">
-          <div class="structure-list-panel">
-            <div v-if="!visibleSections.length" class="empty-sections">
-              <p>Темы курса ещё не добавлены.</p>
-            </div>
-
-            <draggable
-              v-else
-              v-model="course.sections"
-              item-key="id"
-              handle=".section-drag-handle"
-              class="structure-sections-list"
-              @end="handleSectionsReorder"
-            >
-              <template #item="{ element: section }">
-                <div
-                  v-show="isSectionVisible(section)"
-                  class="structure-section"
-                  :class="{ 'structure-section-active': Number(activeSection?.id) === Number(section.id) }"
-                >
-                  <button type="button" class="structure-section-head" @click="selectSection(section.id)">
-                    <span
-                      v-if="(course.sections || []).length > 1"
-                      class="structure-drag section-drag-handle"
-                      title="Перетащите для изменения порядка"
-                      >⠿</span
-                    >
-                    <span class="structure-section-number">{{ section.orderIndex }}</span>
-                    <span class="structure-section-title">{{ section.title }}</span>
-                    <span class="structure-section-count">{{ (section.topics || []).length }} подтемы</span>
-                    <ChevronUp class="structure-chevron" :size="16" :stroke-width="2" />
-                  </button>
-
-                  <div v-if="Number(activeSection?.id) === Number(section.id)" class="structure-subtopics">
-                    <draggable
-                      v-if="section.topics?.length"
-                      v-model="section.topics"
-                      item-key="id"
-                      handle=".topic-drag-handle"
-                      class="structure-subtopics-list"
-                      @end="() => handleTopicsReorder(section)"
-                    >
-                      <template #item="{ element: topic }">
-                        <div class="structure-subtopic" :class="{ 'structure-subtopic-active': topicEditingId === topic.id }">
-                          <div class="structure-subtopic-row" @click="toggleTopicEdit(topic.id)">
-                            <span
-                              v-if="(section.topics || []).length > 1"
-                              class="structure-drag topic-drag-handle"
-                              title="Перетащите для изменения порядка"
-                              @click.stop
-                              >⠿</span
-                            >
-                            <FileText class="structure-doc-icon" :size="16" :stroke-width="1.8" />
-                            <span class="structure-subtopic-title">{{ section.orderIndex }}.{{ topic.orderIndex }} {{ topic.title }}</span>
-                            <button type="button" class="structure-kebab" @click.stop="toggleTopicEdit(topic.id)"><MoreVertical :size="16" /></button>
-                          </div>
-
-                          <div v-if="topicEditingId === topic.id && topicForms[topic.id]" class="structure-topic-editor">
-                            <div class="structure-topic-grid">
-                              <label class="structure-topic-field structure-topic-field-wide">
-                                <span>Название подтемы</span>
-                                <Input v-model="topicForms[topic.id].title" type="text" placeholder="Введите название подтемы" />
-                              </label>
-                            </div>
-
-                            <p v-if="topicErrors[topic.id]?.title" class="structure-inline-error">{{ topicErrors[topic.id]?.title }}</p>
-
-                            <div class="structure-topic-toggles">
-                              <label>
-                                <input v-model="topicForms[topic.id].hasMaterial" type="checkbox" />
-                                <span>Есть учебный материал</span>
-                              </label>
-                              <label>
-                                <input v-model="topicForms[topic.id].isRequired" type="checkbox" />
-                                <span>Обязательная подтема</span>
-                              </label>
-                            </div>
-
-                            <div class="structure-topic-actions">
-                              <button
-                                type="button"
-                                class="structure-topic-save"
-                                :disabled="updatingTopicId === topic.id"
-                                @click="saveTopic(topic.id)"
-                              >
-                                Сохранить
-                              </button>
-                              <button
-                                type="button"
-                                class="structure-topic-delete"
-                                :disabled="deletingTopicId === topic.id"
-                                @click="removeTopic(topic.id, topic.title)"
-                              >
-                                Удалить
-                              </button>
-                              <button
-                                v-if="topicForms[topic.id]?.hasMaterial"
-                                type="button"
-                                class="structure-topic-material"
-                                @click="openMaterialEditor(topic.id)"
-                              >
-                                {{ topicForms[topic.id]?.content ? "Редактировать материал" : "Добавить материал" }}
-                              </button>
-                              <button
-                                v-if="topicForms[topic.id]?.hasMaterial && !topicForms[topic.id]?.content"
-                                type="button"
-                                class="structure-topic-material"
-                                style="display: none"
-                              ></button>
-                            </div>
-                          </div>
-                        </div>
-                      </template>
-                    </draggable>
-                    <div v-else class="empty-topics">Подтем пока нет.</div>
-
-                    <button type="button" class="structure-add-subtopic-trigger" @click="toggleNewTopicForm(section.id)">
-                      <span>+</span>
-                      Добавить подтему
-                    </button>
-
-                    <div v-if="newTopics[section.id] && isNewTopicFormOpen(section.id)" class="structure-topic-create">
-                      <div class="structure-topic-create-title">Новая подтема</div>
-                      <div class="structure-topic-grid">
-                        <label class="structure-topic-field structure-topic-field-wide">
-                          <span>Название подтемы</span>
-                          <input v-model="newTopics[section.id].title" type="text" placeholder="Например, 1.1 Роль сервиса" />
-                        </label>
-                      </div>
-
-                      <p v-if="newTopicErrors[section.id]?.title" class="structure-inline-error">{{ newTopicErrors[section.id]?.title }}</p>
-
-                      <div class="structure-topic-toggles">
-                        <label>
-                          <input v-model="newTopics[section.id].hasMaterial" type="checkbox" />
-                          <span>Есть учебный материал</span>
-                        </label>
-                        <label>
-                          <input v-model="newTopics[section.id].isRequired" type="checkbox" />
-                          <span>Обязательная подтема</span>
-                        </label>
-                      </div>
-
-                      <div class="structure-topic-actions">
-                        <button
-                          type="button"
-                          class="structure-topic-save"
-                          :disabled="creatingTopicSectionId === section.id"
-                          @click="addTopic(section.id)"
-                        >
-                          Добавить подтему
-                        </button>
-                        <button type="button" class="structure-topic-cancel" @click="closeNewTopicForm">Отмена</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </template>
-            </draggable>
-
-            <div v-if="showNewSectionForm" class="new-section structure-new-section">
-              <div class="section-edit-grid">
-                <Input v-model="newSection.title" label="Название темы курса" :error="newSectionErrors.title" required />
-              </div>
-              <div class="new-section-actions">
-                <Button icon="plus" :loading="creatingSection" @click="addSection">Добавить тему</Button>
-              </div>
-            </div>
-
-            <button type="button" class="structure-add-area" @click="showNewSectionForm = true">
-              <span>+</span>
-              Добавить тему
-            </button>
-          </div>
-
-          <aside class="structure-detail-panel">
-            <template v-if="activeSection && activeSectionForm">
-              <div class="structure-detail-head">
-                <div class="structure-detail-head-title">
-                  <span class="structure-detail-eyebrow">Тема</span>
-                  <template v-if="sectionEditingId === activeSection.id">
-                    <input
-                      v-model="activeSectionForm.title"
-                      class="structure-title-input"
-                      type="text"
-                      placeholder="Название темы"
-                      @keydown.enter.prevent="saveSection(activeSection.id)"
-                      @keydown.esc.prevent="toggleSectionEdit(activeSection.id)"
-                    />
-                  </template>
-                  <template v-else>
-                    <h3>{{ activeSection.orderIndex }}. {{ activeSection.title }}</h3>
-                  </template>
-                </div>
-                <div class="structure-head-actions">
-                  <button
-                    v-if="sectionEditingId === activeSection.id"
-                    type="button"
-                    class="structure-save-button"
-                    :disabled="updatingSectionId === activeSection.id"
-                    @click="saveSection(activeSection.id)"
-                  >
-                    Сохранить
-                  </button>
-                  <button
-                    type="button"
-                    class="structure-edit-button"
-                    :disabled="updatingSectionId === activeSection.id"
-                    @click="toggleSectionEdit(activeSection.id)"
-                  >
-                    <Pencil class="structure-edit-icon" :size="16" :stroke-width="1.8" />
-                    {{ sectionEditingId === activeSection.id ? "Отмена" : "Изменить" }}
-                  </button>
-                </div>
-              </div>
-
-              <label class="structure-field">
-                <span>Краткое описание</span>
-                <textarea
-                  v-model="activeSectionForm.description"
-                  maxlength="500"
-                  placeholder="Базовые понятия о сервисе, его роли в ресторане и стандартах общения с гостями."
-                ></textarea>
-                <small>{{ (activeSectionForm.description || "").length }}/500</small>
-              </label>
-
-              <div class="structure-settings">
-                <h4>Настройки темы</h4>
-                <label class="structure-toggle">
-                  <span>
-                    <strong>Тема обязательна для изучения</strong>
-                    <small>Пользователь не сможет отметить тему как пройденную, пока не изучит все материалы</small>
-                  </span>
-                  <input v-model="activeSectionForm.isRequired" class="native-checkbox" type="checkbox" />
-                </label>
-                <label class="structure-toggle">
-                  <span>
-                    <strong>Тест темы настраивается отдельно</strong>
-                    <small>Создание и параметры теста перенесены на шаг «Тест для темы»</small>
-                  </span>
-                  <span class="structure-settings-note">Шаг 3</span>
-                </label>
-                <label class="structure-toggle">
-                  <span>
-                    <strong>Показывать тему в оглавлении</strong>
-                    <small>Тема будет отображаться в содержании курса</small>
-                  </span>
-                  <input class="native-checkbox" type="checkbox" checked />
-                </label>
-              </div>
-
-              <button
-                type="button"
-                class="structure-delete-button"
-                :disabled="deletingSectionId === activeSection.id"
-                @click="removeSection(activeSection.id, activeSection.title)"
-              >
-                <Trash2 :size="16" :stroke-width="1.8" />
-                Удалить тему
-              </button>
-            </template>
-          </aside>
-        </div>
-      </Card>
-      <div v-if="showMaterialStep && currentStep === 3 && isEditMode && course" class="materials-step-card">
-        <div class="materials-breadcrumbs">
-          <button type="button" @click="closeMaterialEditor(2)">‹ Структура курса</button>
-          <span>›</span>
-          <span>{{ activeMaterialSection?.orderIndex || "—" }}. {{ activeMaterialSection?.title || "Тема курса" }}</span>
-          <span>›</span>
-          <strong>{{ activeMaterialTopicTitle }}</strong>
-        </div>
-
-        <div class="materials-title-row">
-          <div>
-            <h2>Добавление материалов в подтему</h2>
-            <p>Добавьте текст, изображения, видео и ссылки. Материалы будут доступны обучающимся в том порядке, в котором вы их расположите.</p>
-          </div>
-          <button type="button" class="materials-preview-button">
-            <Eye :size="16" :stroke-width="1.8" />
-            Предпросмотр для ученика
-          </button>
-        </div>
-
-        <div class="materials-layout">
-          <section class="materials-editor-panel" ref="materialEditorPanelRef">
-            <div v-if="activeMaterialTopic && activeMaterialForm" class="materials-editor-card">
-              <div class="materials-form">
-                <div class="materials-content-field">
-                  <WysiwygEditor
-                    v-model="activeMaterialForm.content"
-                    label="Содержание"
-                    placeholder="Добавьте текст материала"
-                    :min-height="260"
-                    :show-counter="true"
-                    :max-length="5000"
-                  />
-                </div>
-
-                <div class="materials-tab-placeholder">
-                  <strong>Видео через iframe</strong>
-                  <p>Вставьте iframe-код плеера, если видео размещено на внешней платформе.</p>
-                  <label class="materials-field">
-                    <span>Iframe-код видео</span>
-                    <textarea v-model="materialIframeDraft" placeholder='<iframe src="https://example.com/embed/video"></iframe>' rows="4"></textarea>
-                  </label>
-                  <button type="button" class="materials-secondary-button" @click="appendMaterialIframe">Добавить iframe</button>
-                </div>
-
-                <div class="materials-settings">
-                  <h3>Дополнительные настройки</h3>
-                  <label class="materials-toggle">
-                    <span>Отображать материал как обязательный для изучения</span>
-                    <input v-model="activeMaterialForm.isRequired" type="checkbox" />
-                  </label>
-                </div>
-
-                <div class="materials-actions">
-                  <button type="button" class="materials-delete-button" @click="clearActiveMaterialContent">
-                    <Trash2 :size="16" :stroke-width="1.8" />
-                    Удалить материал
-                  </button>
-                  <div>
-                    <button type="button" class="materials-cancel-button" @click="closeMaterialEditor(2)">Отмена</button>
-                    <button
-                      type="button"
-                      class="materials-save-button"
-                      :disabled="updatingTopicId === activeMaterialTopic.id"
-                      @click="saveMaterialTopic"
-                    >
-                      Сохранить изменения
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div v-else class="materials-editor-empty">
-              <h3>Выберите подтему</h3>
-              <p>Материал можно добавить только к подтемам, где включена галочка «Есть учебный материал».</p>
-            </div>
-          </section>
-        </div>
-      </div>
+      <CourseEditorStructureStep
+        :current-step="currentStep"
+        :is-edit-mode="isEditMode"
+        :course="course"
+        :publication-errors-for-display="publicationErrorsForDisplay"
+        :structure-search-query="structureSearchQuery"
+        :visible-sections="visibleSections"
+        :active-section="activeSection"
+        :topic-editing-id="topicEditingId"
+        :topic-forms="topicForms"
+        :topic-errors="topicErrors"
+        :updating-topic-id="updatingTopicId"
+        :deleting-topic-id="deletingTopicId"
+        :new-topics="newTopics"
+        :new-topic-errors="newTopicErrors"
+        :creating-topic-section-id="creatingTopicSectionId"
+        :show-new-section-form="showNewSectionForm"
+        :new-section="newSection"
+        :new-section-errors="newSectionErrors"
+        :creating-section="creatingSection"
+        :active-section-form="activeSectionForm"
+        :section-editing-id="sectionEditingId"
+        :updating-section-id="updatingSectionId"
+        :deleting-section-id="deletingSectionId"
+        :is-section-visible="isSectionVisible"
+        :is-new-topic-form-open="isNewTopicFormOpen"
+        :show-material-step="showMaterialStep"
+        :active-material-section="activeMaterialSection"
+        :active-material-topic-title="activeMaterialTopicTitle"
+        :active-material-topic="activeMaterialTopic"
+        :active-material-form="activeMaterialForm"
+        :material-iframe-draft="materialIframeDraft"
+        @update:structure-search-query="structureSearchQuery = $event"
+        @toggle-new-section-form="showNewSectionForm = !showNewSectionForm"
+        @reorder-sections="handleSectionsReorder"
+        @select-section="selectSection"
+        @reorder-topics="handleTopicsReorder"
+        @toggle-topic-edit="toggleTopicEdit"
+        @save-topic="saveTopic"
+        @remove-topic="removeTopic"
+        @open-material-editor="openMaterialEditor"
+        @toggle-new-topic-form="toggleNewTopicForm"
+        @close-new-topic-form="closeNewTopicForm"
+        @add-topic="addTopic"
+        @add-section="addSection"
+        @show-new-section-form="showNewSectionForm = true"
+        @save-section="saveSection"
+        @toggle-section-edit="toggleSectionEdit"
+        @remove-section="removeSection"
+        @close-material-editor="closeMaterialEditor"
+        @append-iframe="appendMaterialIframe"
+        @clear-material-content="clearActiveMaterialContent"
+        @save-material-topic="saveMaterialTopic"
+        @update:material-iframe-draft="materialIframeDraft = $event"
+      />
 
       <Card v-if="currentStep === testsStepId && isEditMode && course" class="editor-card topic-tests-card" padding="none">
         <div class="step-card-header step-card-header-tight">
@@ -578,174 +141,47 @@
         </div>
       </Card>
 
-      <Card v-if="currentStep === previewStepId && isEditMode && course" class="preview-card">
-        <div class="step-card-header">
-          <h2>Шаг {{ previewStepId }}. Предпросмотр и публикация</h2>
-          <p>Проверьте структуру курса, итоговую аттестацию и готовность к публикации.</p>
-        </div>
+      <CourseEditorPreviewStep
+        :current-step="currentStep"
+        :preview-step-id="previewStepId"
+        :is-edit-mode="isEditMode"
+        :course="course"
+        :preview-sections="previewSections"
+        :active-preview-topic-id="activePreviewTopicId"
+        :active-preview-topic-with-section="activePreviewTopicWithSection"
+        :active-preview-topic-content="activePreviewTopicContent"
+        :get-status-label="getStatusLabel"
+        :publishing="publishing"
+        :publication-errors-for-display="publicationErrorsForDisplay"
+        :ready-checklist-done="readyChecklistDone"
+        :ready-checklist-total="readyChecklistTotal"
+        :ready-checklist-percent="readyChecklistPercent"
+        :publication-checklist="publicationChecklist"
+        @publish="handlePublish"
+        @update:active-preview-topic-id="activePreviewTopicId = $event"
+      />
 
-        <div class="preview-layout">
-          <div class="preview-content-layout">
-            <aside class="preview-structure-panel">
-              <h3 class="preview-panel-title">Структура курса</h3>
-              <div v-if="previewSections.length === 0" class="preview-empty-state">В курсе пока нет тем и подтем.</div>
-              <div v-else class="preview-structure-list">
-                <div v-for="section in previewSections" :key="section.id" class="preview-structure-section">
-                  <div class="preview-section-title">{{ section.orderIndex }}. {{ section.title }}</div>
-                  <button
-                    v-for="topic in section.topics"
-                    :key="topic.id"
-                    type="button"
-                    class="preview-topic-item"
-                    :class="{ 'preview-topic-item-active': Number(activePreviewTopicId) === Number(topic.id) }"
-                    @click="activePreviewTopicId = topic.id"
-                  >
-                    <span>{{ section.orderIndex }}.{{ topic.orderIndex }} {{ topic.title }}</span>
-                  </button>
-                </div>
-              </div>
-            </aside>
-
-            <section class="preview-material-panel">
-              <h3 class="preview-material-title">
-                <template v-if="activePreviewTopicWithSection">
-                  {{ activePreviewTopicWithSection.sectionOrderIndex }}.{{ activePreviewTopicWithSection.topic.orderIndex }}
-                  {{ activePreviewTopicWithSection.topic.title }}
-                </template>
-                <template v-else>Материал темы</template>
-              </h3>
-
-              <div v-if="activePreviewTopicContent" class="preview-material-text" v-html="activePreviewTopicContent"></div>
-              <div v-else class="preview-empty-state">Материал для выбранной подтемы пока не добавлен.</div>
-            </section>
-          </div>
-
-          <aside class="preview-sidebar">
-            <section class="preview-side-card">
-              <h3 class="preview-side-title">Публикация курса</h3>
-              <div class="preview-side-row">
-                <span class="preview-side-label">Статус курса</span>
-                <span class="preview-status-chip">{{ getStatusLabel(course.status) }}</span>
-              </div>
-              <div class="preview-info-note">
-                Курс ещё не опубликован. После публикации он станет доступен обучающимся в соответствии с назначениями.
-              </div>
-              <Button :loading="publishing" :disabled="publicationErrorsForDisplay.length > 0" @click="handlePublish">Опубликовать курс</Button>
-            </section>
-
-            <section class="preview-side-card">
-              <h3 class="preview-side-title">Готовность к публикации</h3>
-              <p class="preview-ready-counter">{{ readyChecklistDone }} из {{ readyChecklistTotal }} выполнено</p>
-              <div class="preview-ready-progress">
-                <span :style="{ width: `${readyChecklistPercent}%` }"></span>
-              </div>
-              <ul class="preview-ready-list">
-                <li v-for="item in publicationChecklist" :key="item.id" :class="{ 'preview-ready-item-done': item.done }">
-                  <span class="preview-ready-dot">{{ item.done ? "✓" : "•" }}</span>
-                  <span>{{ item.label }}</span>
-                </li>
-              </ul>
-
-              <div v-if="publicationErrorsForDisplay.length > 0" class="publication-errors">
-                <h3>Что нужно исправить перед публикацией</h3>
-                <ul>
-                  <li v-for="(errorText, index) in publicationErrorsForDisplay" :key="`preview-${index}-${errorText}`">
-                    {{ errorText }}
-                  </li>
-                </ul>
-              </div>
-
-              <div class="preview-info-note">После публикации вы сможете редактировать курс. Изменения будут сразу доступны обучающимся.</div>
-            </section>
-          </aside>
-        </div>
-      </Card>
-
-      <!-- Блок назначения курса -->
-      <Card v-if="currentStep === 1 && isEditMode && course" class="assignments-card">
-        <div class="assignments-header">
-          <h2>Назначение курса</h2>
-          <p>Если ни одна должность и ни один филиал не выбраны — курс виден всем.</p>
-        </div>
-
-        <div class="targets-grid">
-          <div class="targets-group">
-            <h3>Целевые должности</h3>
-            <div v-if="positionOptions.length === 0" class="targets-empty">Загрузка...</div>
-            <div v-else class="checkbox-list">
-              <label v-for="pos in positionOptions" :key="pos.id" class="checkbox-item">
-                <input type="checkbox" :value="pos.id" v-model="selectedPositionIds" />
-                <span>{{ pos.name }}</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="targets-group">
-            <h3>Целевые филиалы</h3>
-            <div v-if="branchOptions.length === 0" class="targets-empty">Загрузка...</div>
-            <div v-else class="checkbox-list">
-              <label v-for="branch in branchOptions" :key="branch.id" class="checkbox-item">
-                <input type="checkbox" :value="branch.id" v-model="selectedBranchIds" />
-                <span>{{ branch.name }}</span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div class="manual-assignments">
-          <h3>Ручные назначения</h3>
-
-          <div class="add-assignment">
-            <Input v-model="newAssignmentUserId" label="ID пользователя" type="number" min="1" placeholder="Введите ID" />
-            <DatePicker v-model="newAssignmentDeadlineAt" label="Индивидуальный дедлайн" />
-            <Button :loading="addingAssignment" icon="plus" @click="handleAddAssignment">Добавить</Button>
-          </div>
-
-          <div v-if="assignments.length === 0" class="targets-empty">Ручных назначений нет.</div>
-          <table v-else class="assignments-table">
-            <thead>
-              <tr>
-                <th>Пользователь</th>
-                <th>Должность</th>
-                <th>Филиал</th>
-                <th>Кем назначен</th>
-                <th>Когда</th>
-                <th>Дедлайн</th>
-                <th>Статус</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="a in assignments" :key="a.userId">
-                <td>{{ a.name }}</td>
-                <td>{{ a.positionTitle || "—" }}</td>
-                <td>{{ a.branchTitle || "—" }}</td>
-                <td>{{ a.assignedBy || "—" }}</td>
-                <td>{{ formatAssignedAt(a.assignedAt) }}</td>
-                <td>{{ formatAssignedAt(a.deadlineAt) }}</td>
-                <td>{{ a.status === "closed" ? "Закрыт" : "Активен" }}</td>
-                <td>
-                  <Button
-                    v-if="a.status !== 'closed'"
-                    size="sm"
-                    variant="secondary"
-                    icon="archive"
-                    :loading="closingAssignmentUserId === a.userId"
-                    @click="handleCloseAssignment(a.userId)"
-                  />
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    icon="trash"
-                    :loading="removingAssignmentUserId === a.userId"
-                    @click="handleRemoveAssignment(a.userId)"
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <CourseEditorAssignmentsCard
+        v-if="currentStep === 1 && isEditMode && course"
+        :position-options="positionOptions"
+        :branch-options="branchOptions"
+        :selected-position-ids="selectedPositionIds"
+        :selected-branch-ids="selectedBranchIds"
+        :assignments="assignments"
+        :new-assignment-user-id="newAssignmentUserId"
+        :new-assignment-deadline-at="newAssignmentDeadlineAt"
+        :adding-assignment="addingAssignment"
+        :closing-assignment-user-id="closingAssignmentUserId"
+        :removing-assignment-user-id="removingAssignmentUserId"
+        :format-assigned-at="formatAssignedAt"
+        @update:selected-position-ids="selectedPositionIds = $event"
+        @update:selected-branch-ids="selectedBranchIds = $event"
+        @update:new-assignment-user-id="newAssignmentUserId = $event"
+        @update:new-assignment-deadline-at="newAssignmentDeadlineAt = $event"
+        @add-assignment="handleAddAssignment"
+        @close-assignment="handleCloseAssignment"
+        @remove-assignment="handleRemoveAssignment"
+      />
     </template>
     <Modal v-model="assessmentEditorOpen" size="xl" :title="assessmentEditorTitle">
       <AssessmentForm :assessment-id="assessmentEditorAssessmentId" @submit="handleAssessmentEditorSubmit" @cancel="assessmentEditorOpen = false" />
@@ -756,10 +192,14 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import draggable from "vuedraggable";
-import { Check, ChevronUp, Eye, FileText, GripVertical, Info, MoreVertical, Pencil, Search, Trash2, Upload, X } from "lucide-vue-next";
-import { Badge, Button, Card, Input, TagsInput, Modal, Preloader, Select, Textarea, WysiwygEditor, DatePicker } from "@/components/ui";
+import { Badge, Button, Card, Modal, Preloader, Select } from "@/components/ui";
 import AssessmentForm from "@/modules/assessments/components/AssessmentForm.vue";
+import CourseEditorBasicsStep from "@/modules/courses/components/course-editor/CourseEditorBasicsStep.vue";
+import CourseEditorAssignmentsCard from "@/modules/courses/components/course-editor/CourseEditorAssignmentsCard.vue";
+import CourseEditorHeader from "@/modules/courses/components/course-editor/CourseEditorHeader.vue";
+import CourseEditorPreviewStep from "@/modules/courses/components/course-editor/CourseEditorPreviewStep.vue";
+import CourseEditorStepper from "@/modules/courses/components/course-editor/CourseEditorStepper.vue";
+import CourseEditorStructureStep from "@/modules/courses/components/course-editor/CourseEditorStructureStep.vue";
 import CourseFinalAssessmentStep from "@/modules/courses/components/CourseFinalAssessmentStep.vue";
 import CourseSectionTestsStep from "@/modules/courses/components/CourseSectionTestsStep.vue";
 import {
@@ -4580,143 +4020,6 @@ onMounted(async () => {
   font-size: 14px;
 }
 
-.assignments-card {
-  margin-top: 16px;
-  box-shadow: var(--course-shadow);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 304px;
-  gap: 18px;
-  align-items: start;
-  background: none;
-  border: none;
-}
-
-.assignments-card :deep(.card-content) {
-  background: var(--course-surface);
-  border: 1px solid var(--course-border);
-  border-radius: var(--course-radius-lg);
-}
-
-.assignments-header {
-  margin-bottom: 14px;
-}
-
-.assignments-header h2 {
-  margin: 0 0 4px;
-}
-
-.assignments-header p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 14px;
-}
-
-.targets-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-bottom: 16px;
-}
-
-.targets-group {
-  border-radius: 12px;
-  padding: 14px;
-  background: var(--surface, #fff);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-}
-
-.targets-group h3 {
-  margin: 0 0 12px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.targets-empty {
-  color: var(--text-secondary);
-  font-size: 14px;
-  padding: 8px 0;
-}
-
-.checkbox-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 180px;
-  overflow-y: auto;
-  border: 1px solid var(--divider);
-  border-radius: 10px;
-  background: var(--bg-primary);
-  padding: 10px;
-}
-
-.checkbox-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  cursor: pointer;
-  min-height: 28px;
-}
-
-.checkbox-item input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  cursor: pointer;
-}
-
-.manual-assignments h3 {
-  margin: 0 0 12px;
-  font-size: 15px;
-}
-
-.manual-assignments {
-  border-top: 1px solid var(--divider);
-  padding-top: 16px;
-}
-
-.manual-assignments h3 {
-  margin: 0 0 10px;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.add-assignment {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.add-assignment .input-wrapper {
-  width: 200px;
-}
-
-.assignments-table {
-  width: 100%;
-  border: 1px solid var(--divider);
-  border-radius: 10px;
-  overflow: hidden;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
-.assignments-table th,
-.assignments-table td {
-  padding: 8px 10px;
-  text-align: left;
-  border-bottom: 1px solid var(--divider);
-}
-
-.assignments-table th {
-  font-weight: 600;
-  color: var(--text-secondary);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  background: var(--bg-secondary);
-}
 
 .switch-label input {
   width: 16px;
@@ -4894,10 +4197,6 @@ onMounted(async () => {
   }
 
   .step1-form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .targets-grid {
     grid-template-columns: 1fr;
   }
 

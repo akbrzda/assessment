@@ -1,29 +1,31 @@
 <template>
   <div class="invitations-view">
-    <!-- Header -->
-    <div class="page-header">
-      <div>
+    <PageHeader title="Приглашения">
+      <template #subtitle>
         <p class="page-stats">Всего {{ stats.total }} • Активно {{ stats.active }} • Использовано {{ stats.used }}</p>
-      </div>
-      <Button icon="plus" @click="openCreateModal">
-        <span class="hide-mobile">Создать приглашение</span>
-        <span class="show-mobile">Создать</span>
-      </Button>
-    </div>
+      </template>
+      <template #actions>
+        <Button icon="plus" @click="openCreateModal">
+          <span class="hide-mobile">Создать приглашение</span>
+          <span class="show-mobile">Создать</span>
+        </Button>
+      </template>
+    </PageHeader>
 
-    <!-- Filters -->
-    <Card class="filters-card">
-      <div class="filters-grid">
-        <Input v-model="filters.search" placeholder="Имя, фамилия, филиал или код..." />
-
-        <Select v-model="filters.status" :options="statusOptions" placeholder="Все статусы" />
-
-        <Select v-model="filters.branch" :options="branchOptions" placeholder="Все филиалы" />
-      </div>
-    </Card>
+    <FilterBar
+      v-model="filters"
+      search-key="search"
+      search-placeholder="Имя, фамилия, филиал или код..."
+      :filter-defs="filterDefs"
+      class="mb-4"
+    />
 
     <!-- Content -->
-    <Card padding="none" class="invitations-card">
+    <div v-if="skeletonVisible" class="space-y-4">
+      <Skeleton class="h-12 w-full rounded-2xl" />
+      <SkeletonTable :rows="8" />
+    </div>
+    <Card v-else padding="none" class="invitations-card">
       <div v-if="paginatedInvitations.length === 0" class="empty-state">
         <p>Приглашения не найдены. Создайте первое приглашение, чтобы подключить управляющего.</p>
       </div>
@@ -31,38 +33,38 @@
       <div v-else>
         <!-- Desktop Table -->
         <div class="table-wrapper hide-mobile">
-          <table class="invitations-table">
-            <thead>
-              <tr>
-                <th>ФИО</th>
-                <th>Филиал</th>
-                <th>Статус</th>
-                <th>Создано</th>
-                <th>Код</th>
-                <th class="actions-col">Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="invitation in paginatedInvitations" :key="invitation.id">
-                <td>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ФИО</TableHead>
+                <TableHead>Филиал</TableHead>
+                <TableHead>Статус</TableHead>
+                <TableHead>Создано</TableHead>
+                <TableHead>Код</TableHead>
+                <TableHead right>Действия</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="invitation in paginatedInvitations" :key="invitation.id">
+                <TableCell>
                   <div class="invitation-name">{{ invitation.firstName }} {{ invitation.lastName }}</div>
                   <div class="invitation-creator">Создано: {{ invitation.createdBy }}</div>
-                </td>
-                <td>{{ invitation.branchName || "—" }}</td>
-                <td>
+                </TableCell>
+                <TableCell>{{ invitation.branchName || "—" }}</TableCell>
+                <TableCell>
                   <Badge :variant="getStatusVariant(invitation.status)" size="sm" rounded>
                     {{ statusLabel(invitation.status) }}
                   </Badge>
                   <div v-if="invitation.status === 'used' && invitation.usedByName" class="used-by">Принял: {{ invitation.usedByName }}</div>
-                </td>
-                <td class="date-cell">{{ formatDate(invitation.createdAt) }}</td>
-                <td>
+                </TableCell>
+                <TableCell class="date-cell">{{ formatDate(invitation.createdAt) }}</TableCell>
+                <TableCell>
                   <div class="code-cell">
                     <code class="invitation-code" :title="generateInviteLink(invitation.code)">{{ invitation.code }}</code>
                     <Button size="sm" variant="ghost" @click="copyLink(invitation.code)" icon="clipboard" title="Копировать ссылку"></Button>
                   </div>
-                </td>
-                <td class="actions-cell">
+                </TableCell>
+                <TableCell right class="actions-cell">
                   <div class="actions-buttons">
                     <Button
                       v-if="invitation.status === 'active'"
@@ -89,10 +91,10 @@
                     >
                     </Button>
                   </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </div>
 
         <!-- Mobile Cards -->
@@ -175,19 +177,29 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { listInvitations, createInvitation, updateInvitation, deleteInvitation } from "@/api/invitations";
 import { getReferences } from "@/api/users";
-import Preloader from "@/components/ui/Preloader.vue";
 import Modal from "@/components/ui/Modal.vue";
 import Card from "@/components/ui/Card.vue";
 import Button from "@/components/ui/Button.vue";
 import Badge from "@/components/ui/Badge.vue";
-import Input from "@/components/ui/Input.vue";
 import Select from "@/components/ui/Select.vue";
+import FilterBar from "@/components/ui/FilterBar.vue";
+import PageHeader from "@/components/ui/PageHeader.vue";
+import Skeleton from "@/components/ui/Skeleton.vue";
+import SkeletonTable from "@/components/ui/SkeletonTable.vue";
+import Table from "@/components/ui/Table.vue";
+import TableBody from "@/components/ui/TableBody.vue";
+import TableHead from "@/components/ui/TableHead.vue";
+import TableHeader from "@/components/ui/TableHeader.vue";
+import TableCell from "@/components/ui/TableCell.vue";
+import TableRow from "@/components/ui/TableRow.vue";
 import { BOT_USERNAME } from "@/env";
 import { useToast } from "@/composables/useToast";
 import { formatBranchLabel } from "@/utils/branch";
 import { useAuthStore } from "@/stores/auth";
+import { useSkeletonGate } from "@/composables/useSkeletonGate";
 
 const loading = ref(false);
+const { skeletonVisible } = useSkeletonGate(loading, { minDuration: 360, delay: 90 });
 const saving = ref(false);
 
 const references = ref({ branches: [] });
@@ -247,6 +259,21 @@ const branchOptions = computed(() => [
     value: String(b.id),
     label: formatBranchLabel(b),
   })),
+]);
+
+const filterDefs = computed(() => [
+  {
+    key: "status",
+    label: "Статус",
+    placeholder: "Все статусы",
+    options: statusOptions.value,
+  },
+  {
+    key: "branch",
+    label: "Филиал",
+    placeholder: "Все филиалы",
+    options: branchOptions.value,
+  },
 ]);
 
 const branchSelectOptions = computed(() => [

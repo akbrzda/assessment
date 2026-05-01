@@ -1,29 +1,40 @@
 <template>
   <div class="reports-view">
-    <!-- Заголовок и кнопки экспорта -->
-    <div class="page-header">
-      <h1 class="page-heading">Отчёты и аналитика</h1>
-      <div class="export-buttons">
-        <Button @click="handleExportExcel" :disabled="exporting" variant="ghost" icon="file-chart-column">Экспорт Excel </Button>
-        <Button @click="handleExportPDF" :disabled="exporting" variant="primary" icon="file">Экспорт PDF</Button>
-      </div>
+    <PageHeader title="Отчёты и аналитика">
+      <template #actions>
+        <div class="export-buttons">
+          <ActionButton action="export" label="Экспорт Excel" :disabled="exporting" icon-left="file-chart-column" @click="handleExportExcel" />
+          <ActionButton action="export" label="Экспорт PDF" :disabled="exporting" icon-left="file" @click="handleExportPDF" />
+        </div>
+      </template>
+    </PageHeader>
+
+    <FilterBar
+      v-model="filters"
+      search-key="search"
+      search-placeholder="Поиск..."
+      :filter-defs="filterDefs"
+      class="mb-4"
+    />
+    <div class="filter-actions mb-4">
+      <ActionButton action="reset" @click="resetFilters" />
+      <ActionButton action="apply" label="Применить фильтры" @click="loadData" />
     </div>
 
-    <!-- Фильтры -->
-    <Card class="filters-card">
-      <div class="filters-grid">
-        <DatePicker v-model="filters.dateFrom" label="Дата от" />
-        <DatePicker v-model="filters.dateTo" label="Дата до" />
-        <Select v-model="filters.branchId" label="Филиал" :options="branchOptions" />
-        <Select v-model="filters.positionId" label="Должность" :options="positionOptions" />
+    <div v-if="skeletonVisible" class="space-y-4">
+      <div class="stats-grid">
+        <SkeletonStatCard v-for="item in 4" :key="item" />
       </div>
-      <div class="filter-actions">
-        <Button @click="loadData" variant="primary">Применить фильтры</Button>
-        <Button variant="secondary" @click="resetFilters" icon="refresh-ccw">Сбросить</Button>
+      <div class="grid gap-4 md:grid-cols-2">
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
       </div>
-    </Card>
+      <SkeletonTable :rows="6" />
+    </div>
 
-    <div class="reports-content">
+    <div v-else class="reports-content">
       <!-- Общая статистика -->
       <div class="stats-grid">
         <Card class="stat-card blue" padding="none">
@@ -132,7 +143,7 @@
                 <td class="attempts-cell">{{ user.total_assessments }}</td>
                 <td class="score-cell">{{ formatUserScore(user.avg_score) }}%</td>
                 <td>
-                  <button @click="openUserReport(user.id)" class="action-btn" title="Посмотреть отчёт"></button>
+                  <Button @click="openUserReport(user.id)" variant="ghost" size="sm" icon="file-text" :icon-only="true" aria-label="Посмотреть отчёт" />
                 </td>
               </tr>
             </tbody>
@@ -172,7 +183,7 @@
               <span class="mobile-label">Средний балл</span>
               <span class="mobile-value score-cell">{{ formatUserScore(user.avg_score) }}%</span>
             </div>
-            <Button @click="openUserReport(user.id)" size="sm" class="mt-2">Отчёт</Button>
+            <Button @click="openUserReport(user.id)" size="sm" variant="secondary" icon="file-text" class="mt-2">Отчёт</Button>
           </div>
         </div>
       </Card>
@@ -199,18 +210,22 @@ import {
 import { getReferences } from "@/api/users";
 import Card from "@/components/ui/Card.vue";
 import Button from "@/components/ui/Button.vue";
-import Input from "@/components/ui/Input.vue";
-import Select from "@/components/ui/Select.vue";
-import Preloader from "@/components/ui/Preloader.vue";
-import DatePicker from "@/components/ui/DatePicker.vue";
+import ActionButton from "@/components/ui/ActionButton.vue";
+import FilterBar from "@/components/ui/FilterBar.vue";
+import PageHeader from "@/components/ui/PageHeader.vue";
+import SkeletonTable from "@/components/ui/SkeletonTable.vue";
+import SkeletonCard from "@/components/ui/SkeletonCard.vue";
+import SkeletonStatCard from "@/components/ui/SkeletonStatCard.vue";
 import BarChart from "@/components/charts/BarChart.vue";
 import LineChart from "@/components/charts/LineChart.vue";
 import ComboChart from "@/components/charts/ComboChart.vue";
 import UserReportModal from "@/modules/reports/components/UserReportModal.vue";
 import { useToast } from "@/composables/useToast";
+import { useSkeletonGate } from "@/composables/useSkeletonGate";
 import { formatBranchLabel } from "@/utils/branch";
 
 const loading = ref(false);
+const { skeletonVisible } = useSkeletonGate(loading, { minDuration: 360, delay: 90 });
 const exporting = ref(false);
 const { showToast } = useToast();
 const userReportModalOpen = ref(false);
@@ -290,6 +305,28 @@ const branchOptions = computed(() => [
 const positionOptions = computed(() => [
   { value: "", label: "Все должности" },
   ...references.value.positions.map((position) => ({ value: position.id, label: position.name })),
+]);
+
+const filterDefs = computed(() => [
+  {
+    key: "period",
+    type: "daterange",
+    label: "Период",
+    keyFrom: "dateFrom",
+    keyTo: "dateTo",
+  },
+  {
+    key: "branchId",
+    label: "Филиал",
+    placeholder: "Все филиалы",
+    options: branchOptions.value,
+  },
+  {
+    key: "positionId",
+    label: "Должность",
+    placeholder: "Все должности",
+    options: positionOptions.value,
+  },
 ]);
 
 const loadReferences = async () => {

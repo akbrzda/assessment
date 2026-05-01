@@ -47,7 +47,17 @@
 
       <!-- Профиль пользователя внизу -->
       <div class="border-t border-border/60 p-3">
-        <div :class="['flex items-center rounded-xl px-3 py-2 text-sm text-foreground', isCollapsed ? 'justify-center' : 'gap-3']">
+        <div
+          v-if="!authStore.user"
+          :class="['flex items-center rounded-xl px-3 py-2 text-sm text-foreground', isCollapsed ? 'justify-center' : 'gap-3']"
+        >
+          <div class="skeleton-shimmer h-8 w-8 rounded-full"></div>
+          <div v-if="!isCollapsed" class="flex-1 space-y-1">
+            <div class="skeleton-shimmer h-3 w-24 rounded"></div>
+            <div class="skeleton-shimmer h-3 w-20 rounded"></div>
+          </div>
+        </div>
+        <div v-else :class="['flex items-center rounded-xl px-3 py-2 text-sm text-foreground', isCollapsed ? 'justify-center' : 'gap-3']">
           <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
             {{ initials }}
           </div>

@@ -1,14 +1,18 @@
 <template>
   <div class="profile-view">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">Профиль</h1>
-        <p class="page-subtitle">Управление вашим профилем</p>
-      </div>
-    </div>
+    <PageHeader title="Профиль" subtitle="Управление вашим профилем" />
 
-    <Card v-if="loading" class="profile-card">
-      <Preloader />
+    <Card v-if="skeletonVisible" class="profile-card">
+      <div class="space-y-4">
+        <div class="flex items-center gap-4">
+          <Skeleton class="h-24 w-24 rounded-full" />
+          <div class="space-y-2 flex-1">
+            <Skeleton class="h-6 w-48" />
+            <Skeleton class="h-4 w-28" />
+          </div>
+        </div>
+        <SkeletonForm :fields="4" />
+      </div>
     </Card>
 
     <div v-else-if="profile" class="profile-content">
@@ -30,7 +34,7 @@
             </p>
           </div>
           <div class="profile-actions">
-            <Button v-if="!isEditing" @click="startEdit" icon="pencil" variant="primary"> Редактировать </Button>
+            <Button v-if="!isEditing" @click="startEdit" icon="pencil" variant="secondary"> Редактировать </Button>
             <template v-else>
               <Button @click="saveProfile" icon="check" variant="primary" :disabled="saving">
                 {{ saving ? "Сохранение..." : "Сохранить" }}
@@ -110,16 +114,18 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { Card, Button, Badge, Input, Icon, Preloader } from "@/components/ui";
+import { Card, Button, Badge, Input, Icon, PageHeader, Skeleton, SkeletonForm } from "@/components/ui";
 import profileApi from "@/api/profile";
 import { useToast } from "@/composables/useToast";
 import { useAuthStore } from "@/stores/auth";
+import { useSkeletonGate } from "@/composables/useSkeletonGate";
 
 const router = useRouter();
 const { showToast } = useToast();
 const authStore = useAuthStore();
 
 const loading = ref(true);
+const { skeletonVisible } = useSkeletonGate(loading, { minDuration: 320, delay: 80 });
 const saving = ref(false);
 const isEditing = ref(false);
 const profile = ref(null);

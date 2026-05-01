@@ -35,20 +35,17 @@
 
     <div v-if="!loading" class="actions">
       <div class="actions-left">
-        <button
+        <ActionButton
+          action="reset"
+          label="Сбросить до умолчаний"
           @click="resetToDefaults"
           :disabled="saving || !hasCustomPermissions"
-          class="btn btn-ghost"
           title="Сбросить все настройки до умолчаний роли"
-        >
-          Сбросить до умолчаний
-        </button>
+        />
       </div>
       <div v-if="hasChanges" class="actions-right">
-        <button @click="savePermissions" :disabled="saving" class="btn btn-primary">
-          {{ saving ? "Сохранение..." : "Сохранить права" }}
-        </button>
-        <button @click="cancelChanges" :disabled="saving" class="btn btn-secondary">Отменить</button>
+        <ActionButton action="cancel" label="Отменить" @click="cancelChanges" :disabled="saving" />
+        <ActionButton action="save" label="Сохранить права" @click="savePermissions" :disabled="saving" :loading="saving" />
       </div>
     </div>
   </div>
@@ -58,6 +55,7 @@
 import { ref, computed, watch } from "vue";
 import { getUserPermissions, updateUserPermissions } from "@/api/users";
 import { useToast } from "@/composables/useToast";
+import ActionButton from "@/components/ui/ActionButton.vue";
 
 const props = defineProps({
   userId: {

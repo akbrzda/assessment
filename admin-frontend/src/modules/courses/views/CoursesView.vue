@@ -3,7 +3,7 @@
     <!-- Заголовок страницы -->
     <PageHeader title="Курсы" subtitle="Управляйте курсами, модулями и версиями">
       <template #actions>
-        <Button icon="plus" @click.stop="goToCreate">Создать курс</Button>
+        <ActionButton action="create" label="Создать курс" @click.stop="goToCreate" />
       </template>
     </PageHeader>
 
@@ -13,16 +13,24 @@
       search-key="search"
       search-placeholder="Поиск по названию или описанию"
       :filter-defs="courseFilterDefs"
+      class="mb-4"
       @change="loadCourses"
     />
 
     <!-- Переключатель вида -->
-    <Tabs v-model="viewMode" :tabs="viewTabsConfig" head-only />
+    <Tabs v-model="viewMode" :tabs="viewTabsConfig" head-only class="mb-4" />
 
     <!-- Загрузка -->
 
+    <template v-if="skeletonVisible">
+      <div class="space-y-4">
+        <SkeletonCards :count="6" :cols="3" />
+        <SkeletonCard />
+      </div>
+    </template>
+
     <!-- Пустое состояние -->
-    <EmptyState v-if="courses.length === 0" type="filter" title="Курсы не найдены" />
+    <EmptyState v-else-if="courses.length === 0" type="filter" title="Курсы не найдены" />
 
     <!-- Карточный режим -->
     <template v-else-if="viewMode === 'cards'">
@@ -66,33 +74,37 @@
 
           <!-- Футер карточки -->
           <div class="card-footer">
-            <button class="card-edit-btn" @click="goToEdit(course.id)">Редактировать</button>
+            <ActionButton action="edit" size="sm" @click="goToEdit(course.id)" />
             <div class="menu-wrap" @click.stop>
-              <button class="menu-btn" @click="toggleMenu(course.id)">
-                <Icon name="more-horizontal" :size="18" />
-              </button>
+              <Button variant="ghost" size="sm" icon="more-horizontal" :icon-only="true" aria-label="Открыть меню действий" @click="toggleMenu(course.id)" />
               <div v-if="openMenuId === course.id" class="dropdown-menu">
-                <button class="dropdown-item" @click="goToEdit(course.id)"><Icon name="pencil" :size="14" /> Редактировать</button>
-                <button
+                <Button class="dropdown-item" variant="link" size="sm" icon="pencil" @click="goToEdit(course.id)">Редактировать</Button>
+                <Button
                   v-if="course.status === 'published'"
                   class="dropdown-item"
+                  variant="link"
+                  size="sm"
+                  icon="archive"
                   @click="
                     handleArchive(course);
                     openMenuId = null;
                   "
                 >
-                  <Icon name="archive" :size="14" /> Закрыть
-                </button>
-                <button
+                  Закрыть
+                </Button>
+                <Button
                   v-if="course.status !== 'published'"
                   class="dropdown-item danger"
+                  variant="link"
+                  size="sm"
+                  icon="trash"
                   @click="
                     handleDelete(course);
                     openMenuId = null;
                   "
                 >
-                  <Icon name="trash" :size="14" /> Удалить
-                </button>
+                  Удалить
+                </Button>
               </div>
             </div>
           </div>
@@ -104,36 +116,36 @@
     <template v-else>
       <div class="table-container">
         <div class="table-scroll">
-          <table class="courses-table">
-            <thead>
-              <tr>
-                <th>Название</th>
-                <th>Статус</th>
-                <th>Тем курса</th>
-                <th>Версия</th>
-                <th>Обновлен</th>
-                <th>Автор</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="course in paginatedCourses" :key="course.id">
-                <td>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Название</TableHead>
+                <TableHead>Статус</TableHead>
+                <TableHead>Тем курса</TableHead>
+                <TableHead>Версия</TableHead>
+                <TableHead>Обновлен</TableHead>
+                <TableHead>Автор</TableHead>
+                <TableHead>Действия</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="course in paginatedCourses" :key="course.id">
+                <TableCell>
                   <div class="cell-name">{{ course.title }}</div>
                   <div class="cell-desc">{{ course.description || "Без описания" }}</div>
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
                   <div class="status-cell-wrap">
                     <Badge :variant="getStatusVariant(course.status)" size="sm">
                       {{ getStatusLabel(course.status) }}
                     </Badge>
                     <div v-if="hasUnpublishedChanges(course)" class="draft-warning-chip draft-warning-chip-table">Есть несохраненные изменения</div>
                   </div>
-                </td>
-                <td>{{ course.sectionsCount }}</td>
-                <td>{{ course.version }}</td>
-                <td>{{ formatDate(course.updatedAt) }}</td>
-                <td>
+                </TableCell>
+                <TableCell>{{ course.sectionsCount }}</TableCell>
+                <TableCell>{{ course.version }}</TableCell>
+                <TableCell>{{ formatDate(course.updatedAt) }}</TableCell>
+                <TableCell>
                   <div class="author-cell">
                     <div class="author-avatar">{{ getAuthorInitials(course.authorName) }}</div>
                     <div>
@@ -141,53 +153,58 @@
                       <div class="author-role">Суперадмин</div>
                     </div>
                   </div>
-                </td>
-                <td @click.stop>
+                </TableCell>
+                <TableCell @click.stop>
                   <div class="row-actions">
-                    <button class="icon-btn" @click="goToEdit(course.id)">
-                      <Icon name="pencil" :size="16" />
-                    </button>
+                    <Button variant="ghost" size="sm" icon="pencil" :icon-only="true" aria-label="Редактировать курс" @click="goToEdit(course.id)" />
                     <div class="menu-wrap" @click.stop>
-                      <button class="icon-btn" @click="toggleMenu(course.id)">
-                        <Icon name="more-horizontal" :size="16" />
-                      </button>
+                      <Button variant="ghost" size="sm" icon="more-horizontal" :icon-only="true" aria-label="Открыть меню действий" @click="toggleMenu(course.id)" />
                       <div v-if="openMenuId === course.id" class="dropdown-menu table-dropdown">
-                        <button
+                        <Button
                           class="dropdown-item"
+                          variant="link"
+                          size="sm"
+                          icon="pencil"
                           @click="
                             goToEdit(course.id);
                             openMenuId = null;
                           "
                         >
-                          <Icon name="pencil" :size="14" /> Редактировать
-                        </button>
-                        <button
+                          Редактировать
+                        </Button>
+                        <Button
                           v-if="course.status === 'published'"
                           class="dropdown-item"
+                          variant="link"
+                          size="sm"
+                          icon="archive"
                           @click="
                             handleArchive(course);
                             openMenuId = null;
                           "
                         >
-                          <Icon name="archive" :size="14" /> Закрыть
-                        </button>
-                        <button
+                          Закрыть
+                        </Button>
+                        <Button
                           v-if="course.status !== 'published'"
                           class="dropdown-item danger"
+                          variant="link"
+                          size="sm"
+                          icon="trash"
                           @click="
                             handleDelete(course);
                             openMenuId = null;
                           "
                         >
-                          <Icon name="trash" :size="14" /> Удалить
-                        </button>
+                          Удалить
+                        </Button>
                       </div>
                     </div>
                   </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </div>
 
         <!-- Пагинация -->
@@ -237,37 +254,37 @@
 
       <!-- Таблица воронки -->
       <div class="table-scroll">
-        <table class="courses-table">
-          <thead>
-            <tr>
-              <th>Курс</th>
-              <th>Назначено</th>
-              <th>Завершили</th>
-              <th>Конверсия</th>
-              <th>Ср. балл</th>
-              <th>Ср. время</th>
-              <th>Прогресс</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in funnel" :key="row.courseId">
-              <td>{{ row.courseTitle }}</td>
-              <td>{{ row.assignedCount }}</td>
-              <td>{{ row.completedCount }}</td>
-              <td>{{ row.assignedCount > 0 ? Math.round((row.completedCount / row.assignedCount) * 100) : 0 }}%</td>
-              <td>{{ row.avgCourseScore }}%</td>
-              <td>{{ formatDuration(row.totalTimeSpentSeconds) }}</td>
-              <td>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Курс</TableHead>
+              <TableHead>Назначено</TableHead>
+              <TableHead>Завершили</TableHead>
+              <TableHead>Конверсия</TableHead>
+              <TableHead>Ср. балл</TableHead>
+              <TableHead>Ср. время</TableHead>
+              <TableHead>Прогресс</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="row in funnel" :key="row.courseId">
+              <TableCell>{{ row.courseTitle }}</TableCell>
+              <TableCell>{{ row.assignedCount }}</TableCell>
+              <TableCell>{{ row.completedCount }}</TableCell>
+              <TableCell>{{ row.assignedCount > 0 ? Math.round((row.completedCount / row.assignedCount) * 100) : 0 }}%</TableCell>
+              <TableCell>{{ row.avgCourseScore }}%</TableCell>
+              <TableCell>{{ formatDuration(row.totalTimeSpentSeconds) }}</TableCell>
+              <TableCell>
                 <div class="progress-cell">
                   <div class="progress-track">
                     <div class="progress-fill" :style="{ width: row.avgProgress + '%' }"></div>
                   </div>
                   <span class="progress-pct">{{ row.avgProgress }}%</span>
                 </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
       </div>
       <div class="funnel-link-row">
         <a href="#" class="funnel-link">Смотреть детальную статистику →</a>
@@ -277,17 +294,39 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { Badge, Button, Icon, Preloader, FilterBar, Select, Tabs, PageHeader, EmptyState, Pagination } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Icon,
+  FilterBar,
+  Select,
+  Tabs,
+  PageHeader,
+  EmptyState,
+  Pagination,
+  SkeletonCards,
+  SkeletonCard,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui";
+import ActionButton from "@/components/ui/ActionButton.vue";
 import AnalyticsSummaryCards from "@/components/courses/AnalyticsSummaryCards.vue";
 import { archiveCourse, deleteCourse, getCourses, getCourseAnalyticsFunnel } from "@/api/courses";
 import { useToast } from "@/composables/useToast";
+import { useSkeletonGate } from "@/composables/useSkeletonGate";
 
 const router = useRouter();
 const { showToast } = useToast();
+const COURSES_VIEW_MODE_STORAGE_KEY = "admin:courses:view-mode";
 
 const loading = ref(false);
+const { skeletonVisible } = useSkeletonGate(loading, { minDuration: 360, delay: 90 });
 const courses = ref([]);
 const funnel = ref([]);
 const viewMode = ref("cards");
@@ -296,6 +335,16 @@ const viewTabsConfig = [
   { value: "cards", label: "Карточки", icon: "layout-grid" },
   { value: "table", label: "Таблица", icon: "table-2" },
 ];
+
+const readSavedViewMode = () => {
+  const savedMode = localStorage.getItem(COURSES_VIEW_MODE_STORAGE_KEY);
+  if (!savedMode) {
+    return "cards";
+  }
+
+  const allowedModes = viewTabsConfig.map((tab) => tab.value);
+  return allowedModes.includes(savedMode) ? savedMode : "cards";
+};
 const openMenuId = ref(null);
 const currentPage = ref(1);
 const pageSize = ref(10);
@@ -469,6 +518,7 @@ const handleDelete = async (course) => {
 };
 
 onMounted(async () => {
+  viewMode.value = readSavedViewMode();
   await loadCourses();
   try {
     const response = await getCourseAnalyticsFunnel();
@@ -476,6 +526,10 @@ onMounted(async () => {
   } catch {
     // Воронка — не критичная функция, ошибку не показываем
   }
+});
+
+watch(viewMode, (nextMode) => {
+  localStorage.setItem(COURSES_VIEW_MODE_STORAGE_KEY, nextMode);
 });
 
 // Палитра иконок карточек

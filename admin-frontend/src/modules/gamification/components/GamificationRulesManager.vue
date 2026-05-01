@@ -3,13 +3,7 @@
     <!-- Заголовок и кнопка добавления -->
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-2xl font-bold text-foreground">Правила геймификации</h2>
-      <button
-        @click="openCreateModal"
-        class="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
-      >
-        <Icon name="Plus" :size="20" aria-hidden="true" />
-        Добавить правило
-      </button>
+      <ActionButton action="create" label="Добавить правило" @click="openCreateModal" />
     </div>
 
     <!-- Фильтры -->
@@ -49,7 +43,7 @@
 
       <div v-else-if="error" class="p-8 text-center text-destructive">
         <p>{{ error }}</p>
-        <button @click="loadRules" class="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">Повторить</button>
+        <Button @click="loadRules" variant="primary" class="mt-4">Повторить</Button>
       </div>
 
       <table v-else-if="filteredRules.length > 0" class="min-w-full divide-y divide-border">
@@ -103,12 +97,10 @@
               <span v-else class="text-muted-foreground/60">Всегда</span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-              <button @click="openEditModal(rule)" class="text-primary hover:text-primary/80 mr-3" title="Редактировать">
-                <Icon name="Pencil" :size="20" aria-hidden="true" />
-              </button>
-              <button @click="confirmDelete(rule)" class="text-destructive hover:text-destructive/80" title="Удалить">
-                <Icon name="Trash2" :size="20" aria-hidden="true" />
-              </button>
+              <div class="flex items-center justify-end gap-2">
+                <Button @click="openEditModal(rule)" variant="ghost" size="sm" icon="pencil" :icon-only="true" aria-label="Редактировать" />
+                <Button @click="confirmDelete(rule)" variant="danger" size="sm" icon="trash" :icon-only="true" aria-label="Удалить" />
+              </div>
             </td>
           </tr>
         </tbody>
@@ -116,9 +108,7 @@
 
       <div v-else class="p-8 text-center text-muted-foreground">
         <p>Правила не найдены</p>
-        <button @click="openCreateModal" class="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
-          Создать первое правило
-        </button>
+        <ActionButton action="create" label="Создать первое правило" @click="openCreateModal" class="mt-4" />
       </div>
     </div>
 
@@ -132,7 +122,8 @@ import { ref, computed, onMounted } from "vue";
 import { useToast } from "@/composables/useToast";
 import gamificationRulesApi from "@/api/gamificationRules";
 import GamificationRuleForm from "./GamificationRuleForm.vue";
-import Icon from "@/components/ui/Icon.vue";
+import Button from "@/components/ui/Button.vue";
+import ActionButton from "@/components/ui/ActionButton.vue";
 
 const { showSuccess, showError } = useToast();
 

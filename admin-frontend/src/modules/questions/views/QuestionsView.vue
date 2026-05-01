@@ -29,6 +29,8 @@
     </div>
 
     <DataTable
+      :loading="skeletonVisible"
+      :loading-rows="8"
       :total="totalQuestions"
       :page="pagination.page"
       :limit="pagination.limit"
@@ -121,9 +123,11 @@ import { getQuestions, getCategories, deleteQuestion } from "@/api/questionBank"
 import { Button, Badge, PageHeader, FilterBar, DataTable, TableHead, TableRow, TableCell, Modal } from "@/components/ui";
 import CategoryManager from "@/modules/questions/components/CategoryManager.vue";
 import { useToast } from "@/composables/useToast";
+import { useSkeletonGate } from "@/composables/useSkeletonGate";
 
 const router = useRouter();
 const loading = ref(false);
+const { skeletonVisible } = useSkeletonGate(loading, { minDuration: 360, delay: 90 });
 const questions = ref([]);
 const categories = ref([]);
 const totalQuestions = ref(0);

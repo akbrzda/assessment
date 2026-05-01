@@ -10,7 +10,7 @@
           <p class="details-subtitle">{{ details.assessment.description || "Нет описания" }}</p>
         </div>
         <div class="details-actions">
-          <Button v-if="canEditAssessment" icon="pencil" variant="primary" @click="goToEdit"> Редактировать </Button>
+          <Button v-if="canEditAssessment" icon="pencil" variant="secondary" @click="goToEdit"> Редактировать </Button>
           <Button icon="book-open" variant="secondary" @click="openTheory"> Теория </Button>
           <Button icon="file-chart-column" variant="secondary" @click="handleExport"> Экспорт в Excel </Button>
         </div>

@@ -61,10 +61,7 @@
             <p>Создайте тест для проверки знаний по теме «{{ activeSection.title }}».</p>
           </div>
 
-          <button type="button" class="tests-add-question-button" @click="addQuestion" :disabled="activeDraft.loading">
-            <Plus :size="16" :stroke-width="2" />
-            Добавить вопрос
-          </button>
+          <ActionButton action="create" label="Добавить вопрос" size="sm" @click="addQuestion" :disabled="activeDraft.loading" />
         </div>
 
         <div class="tests-layout">
@@ -89,9 +86,7 @@
                       <span class="tests-question-label">Вопрос {{ questionIndex + 1 }}</span>
                       <p class="tests-question-hint">Настройте текст, тип ответа и правильные значения.</p>
                     </div>
-                    <button type="button" class="tests-question-remove" @click="removeQuestion(questionIndex)">
-                      <Trash2 :size="16" :stroke-width="1.8" />
-                    </button>
+                    <Button type="button" class="tests-question-remove" variant="danger" size="sm" icon="trash" :icon-only="true" aria-label="Удалить вопрос" @click="removeQuestion(questionIndex)" />
                   </div>
 
                   <Textarea
@@ -130,10 +125,9 @@
                   <div v-else class="tests-options-block">
                     <div class="tests-options-header">
                       <span>Варианты ответов</span>
-                      <button type="button" class="tests-inline-action" :disabled="question.options.length >= 6" @click="addOption(questionIndex)">
-                        <Plus :size="14" :stroke-width="2" />
+                      <Button type="button" class="tests-inline-action" variant="ghost" size="sm" icon="plus" :disabled="question.options.length >= 6" @click="addOption(questionIndex)">
                         Вариант
-                      </button>
+                      </Button>
                     </div>
 
                     <div class="tests-options-list">
@@ -176,14 +170,17 @@
                           </label>
                         </template>
 
-                        <button
+                        <Button
                           type="button"
                           class="tests-option-remove"
+                          variant="danger"
+                          size="sm"
+                          icon="x"
+                          :icon-only="true"
+                          aria-label="Удалить вариант ответа"
                           :disabled="question.options.length <= 2"
                           @click="removeOption(questionIndex, optionIndex)"
-                        >
-                          <X :size="14" :stroke-width="2" />
-                        </button>
+                        />
                       </div>
                     </div>
                   </div>
@@ -326,11 +323,12 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import { BookOpen, ChevronDown, Circle, CircleCheckBig, ClipboardList, Clock3, Info, LoaderCircle, Plus, Trash2, X } from "lucide-vue-next";
+import { BookOpen, ChevronDown, Circle, CircleCheckBig, ClipboardList, Clock3, Info, LoaderCircle } from "lucide-vue-next";
 import { getAssessmentById, createAssessment, updateAssessment } from "@/api/assessments";
 import { updateCourseSection } from "@/api/courses";
 import { useToast } from "@/composables/useToast";
-import { Input, Textarea, Tabs } from "@/components/ui";
+import { Input, Textarea, Tabs, Button } from "@/components/ui";
+import ActionButton from "@/components/ui/ActionButton.vue";
 
 const props = defineProps({
   course: {
