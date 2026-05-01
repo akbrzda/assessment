@@ -8,11 +8,15 @@
     <!-- Drag & Drop зона -->
     <div
       v-if="!buttonOnly"
+      :aria-invalid="Boolean(error)"
+      :aria-describedby="messageId"
       :class="[
-        'relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-center transition-colors cursor-pointer',
-        isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-ring hover:bg-accent/30',
-        error && 'border-destructive',
-        disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
+        'relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-center transition-all duration-150 cursor-pointer',
+        isDragging
+          ? 'border-primary bg-primary/10 shadow-[0_0_0_3px_hsl(var(--primary)/0.2)]'
+          : 'border-[hsl(var(--field-border-strong))] bg-[hsl(var(--field-surface))] hover:border-ring hover:bg-[hsl(var(--field-surface-hover))]',
+        error && 'border-[hsl(var(--field-border-error))] bg-[hsl(var(--field-error-bg))]',
+        disabled && 'cursor-not-allowed pointer-events-none bg-[hsl(var(--field-surface-disabled))] opacity-100',
       ]"
       @dragover.prevent="isDragging = true"
       @dragleave.prevent="isDragging = false"
@@ -77,7 +81,7 @@
             <span v-else-if="file.status === 'success'" class="text-xs text-accent-green flex items-center gap-1">
               <Icon name="CircleCheck" :size="12" /> Загружено
             </span>
-            <span v-else-if="file.status === 'error'" class="text-xs text-destructive flex items-center gap-1">
+            <span v-else-if="file.status === 'error'" class="text-xs text-destructive flex items-center gap-1 font-medium">
               <Icon name="CircleX" :size="12" /> Ошибка
             </span>
           </div>
@@ -93,13 +97,16 @@
       </div>
     </div>
 
-    <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
-    <p v-else-if="hint" class="text-xs text-muted-foreground">{{ hint }}</p>
+    <p v-if="error" :id="messageId" class="text-xs text-destructive font-medium flex items-center gap-1.5">
+      <Icon name="CircleAlert" :size="12" class="shrink-0" />
+      {{ error }}
+    </p>
+    <p v-else-if="hint" :id="messageId" class="text-xs text-muted-foreground">{{ hint }}</p>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, useId } from "vue";
 import Icon from "./Icon.vue";
 
 const props = defineProps({
@@ -122,6 +129,8 @@ const emit = defineEmits(["update:modelValue", "add", "remove"]);
 const inputRef = ref(null);
 const isDragging = ref(false);
 const files = ref([]);
+const localId = typeof useId === "function" ? useId() : `upload-${Math.random().toString(36).slice(2, 9)}`;
+const messageId = computed(() => (props.error || props.hint ? `field-${localId}-message` : undefined));
 
 const triggerInput = () => inputRef.value?.click();
 

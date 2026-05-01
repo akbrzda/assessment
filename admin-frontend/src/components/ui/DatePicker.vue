@@ -1,40 +1,39 @@
 <template>
   <div class="flex flex-col gap-1.5">
-    <label v-if="label" class="text-sm font-medium text-foreground leading-none">
+    <label v-if="label" :for="datePickerId" class="text-sm font-medium text-foreground leading-none">
       {{ label }}
       <span v-if="required" class="text-destructive ml-0.5">*</span>
     </label>
 
-    <PopoverRoot v-model:open="isOpen">
-      <PopoverTrigger as-child>
-        <div
-          role="button"
-          tabindex="0"
+    <div ref="rootRef" class="relative">
+        <button
+          :id="datePickerId"
+          type="button"
+          :aria-invalid="Boolean(error)"
+          :aria-describedby="messageId"
+          :aria-expanded="isOpen ? 'true' : 'false'"
           :class="
             cn(
-              'flex h-9 w-full items-center gap-2 rounded-xl border border-input bg-background px-3 text-sm shadow-sm transition cursor-pointer',
-              'hover:border-ring focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0 focus:border-transparent',
-              disabled && 'cursor-not-allowed opacity-50',
+              'flex h-9 w-full items-center gap-2 rounded-xl border border-input bg-[hsl(var(--field-surface))] px-3 text-sm shadow-sm transition cursor-pointer',
+              'hover:border-[hsl(var(--field-border-strong))] hover:bg-[hsl(var(--field-surface-hover))] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0 focus:border-transparent',
+              disabled && 'cursor-not-allowed text-muted-foreground bg-[hsl(var(--field-surface-disabled))] opacity-100',
               !modelValue && 'text-muted-foreground',
-              error && 'border-destructive focus:ring-destructive/30',
+              error && 'border-[hsl(var(--field-border-error))] bg-[hsl(var(--field-error-bg))] focus:ring-[hsl(var(--field-border-error)/0.35)]',
             )
           "
           :aria-disabled="disabled"
-          @keydown.enter.prevent="!disabled && (isOpen = !isOpen)"
-          @keydown.space.prevent="!disabled && (isOpen = !isOpen)"
+          :disabled="disabled"
+          @click="toggleCalendar"
         >
           <CalendarIcon :size="15" class="shrink-0 text-muted-foreground" />
           <span class="flex-1 text-left truncate">
             {{ displayValue || placeholder || "Выберите дату..." }}
           </span>
-          <button v-if="modelValue && clearable" type="button" class="shrink-0 text-muted-foreground hover:text-foreground" @click.stop="clear">
+          <button v-if="modelValue && clearable" type="button" class="date-picker-clear-btn shrink-0 text-muted-foreground hover:text-foreground" @click.stop="clear">
             <XIcon :size="14" />
           </button>
-        </div>
-      </PopoverTrigger>
-
-      <PopoverPortal>
-        <PopoverContent :class="cn('z-[9999] w-auto rounded-xl border border-border bg-card p-3 shadow-lg')" :side-offset="6" align="start">
+        </button>
+        <div v-if="isOpen" :class="cn('absolute left-0 top-[calc(100%+6px)] z-[9999] w-auto rounded-xl border border-border bg-card p-3 shadow-lg')">
           <CalendarRoot
             v-model="calendarValue"
             v-slot="{ months, weekDays }"
@@ -93,22 +92,20 @@
               </div>
             </div>
           </CalendarRoot>
-        </PopoverContent>
-      </PopoverPortal>
-    </PopoverRoot>
+        </div>
+    </div>
 
-    <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
-    <p v-else-if="hint" class="text-xs text-muted-foreground">{{ hint }}</p>
+    <p v-if="error" :id="messageId" class="text-xs text-destructive font-medium flex items-center gap-1.5">
+      <CircleAlert :size="12" class="shrink-0" />
+      {{ error }}
+    </p>
+    <p v-else-if="hint" :id="messageId" class="text-xs text-muted-foreground">{{ hint }}</p>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, useId, onMounted, onUnmounted } from "vue";
 import {
-  PopoverRoot,
-  PopoverTrigger,
-  PopoverContent,
-  PopoverPortal,
   CalendarRoot,
   CalendarHeading,
   CalendarGrid,
@@ -121,7 +118,7 @@ import {
   CalendarNext,
   CalendarPrev,
 } from "reka-ui";
-import { CalendarIcon, ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon, X as XIcon } from "lucide-vue-next";
+import { CalendarIcon, ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon, CircleAlert, X as XIcon } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 import { CalendarDate, parseDate } from "@internationalized/date";
 
@@ -138,6 +135,10 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue"]);
 const isOpen = ref(false);
+const rootRef = ref(null);
+const localId = typeof useId === "function" ? useId() : `date-picker-${Math.random().toString(36).slice(2, 9)}`;
+const datePickerId = computed(() => `field-${localId}`);
+const messageId = computed(() => (props.error || props.hint ? `${datePickerId.value}-message` : undefined));
 
 const calendarValue = computed({
   get() {
@@ -180,5 +181,36 @@ const onCalendarSelect = (val) => {
   isOpen.value = false;
 };
 
+const toggleCalendar = () => {
+  if (props.disabled) return;
+  isOpen.value = !isOpen.value;
+};
+
 const clear = () => emit("update:modelValue", null);
+
+const handleClickOutside = (event) => {
+  if (!rootRef.value) return;
+  if (!rootRef.value.contains(event.target)) {
+    isOpen.value = false;
+  }
+};
+
+onMounted(() => {
+  document.addEventListener("pointerdown", handleClickOutside);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("pointerdown", handleClickOutside);
+});
 </script>
+
+<style scoped>
+.date-picker-clear-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+}
+</style>

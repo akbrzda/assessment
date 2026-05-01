@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col gap-1.5">
-    <label v-if="props.label" class="text-sm font-medium text-foreground leading-none">
+    <label v-if="props.label" :for="inputId" class="text-sm font-medium text-foreground leading-none">
       {{ props.label }}
       <span v-if="props.required" class="text-destructive ml-0.5">*</span>
     </label>
@@ -14,6 +14,7 @@
       </div>
 
       <input
+        :id="inputId"
         :value="props.modelValue"
         :type="currentType"
         :placeholder="props.placeholder"
@@ -22,14 +23,22 @@
         :required="props.required"
         :min="props.min"
         :max="props.max"
+        :aria-invalid="Boolean(props.error)"
+        :aria-describedby="messageId"
         :class="[
-          'flex w-full rounded-xl border border-input bg-background text-sm text-foreground shadow-sm',
+          'flex w-full rounded-[var(--radius-sm)] border border-input/90 bg-[hsl(var(--field-surface))] text-sm text-foreground shadow-[var(--elevation-soft)]',
           'placeholder:text-muted-foreground',
-          'focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors',
-          'disabled:cursor-not-allowed disabled:opacity-50',
+          'focus:outline-none focus:border-ring/65 transition-all duration-150',
+          'hover:border-[hsl(var(--field-border-strong))] hover:bg-[hsl(var(--field-surface-hover))]',
+          'focus-visible:shadow-[var(--focus-ring)]',
+          'disabled:cursor-not-allowed disabled:text-muted-foreground disabled:bg-[hsl(var(--field-surface-disabled))] disabled:opacity-100 disabled:shadow-none',
           'read-only:bg-muted read-only:cursor-default',
-          props.error ? 'border-destructive focus:ring-destructive/30' : '',
-          props.success && !props.error ? 'border-accent-green focus:ring-accent-green/30' : '',
+          props.error
+            ? 'border-[hsl(var(--field-border-error))] bg-[hsl(var(--field-error-bg))] focus:border-[hsl(var(--field-border-error))] focus-visible:shadow-[0_0_0_2px_hsl(var(--background)),0_0_0_4px_hsl(var(--field-border-error)/0.35)]'
+            : '',
+          props.success && !props.error
+            ? 'border-[hsl(var(--field-border-success))] bg-[hsl(var(--field-success-bg))] focus:border-[hsl(var(--field-border-success))] focus-visible:shadow-[0_0_0_2px_hsl(var(--background)),0_0_0_4px_hsl(var(--field-border-success)/0.35)]'
+            : '',
           sizeClass,
           paddingClass,
         ]"
@@ -53,9 +62,15 @@
       </div>
     </div>
 
-    <p v-if="props.error" class="text-xs text-destructive">{{ props.error }}</p>
-    <p v-else-if="props.success" class="text-xs text-accent-green">{{ props.success }}</p>
-    <p v-else-if="props.hint" class="text-xs text-muted-foreground flex items-center gap-1">
+    <p v-if="props.error" :id="messageId" class="text-xs font-medium text-destructive flex items-center gap-1.5">
+      <Icon name="CircleAlert" :size="12" class="shrink-0" />
+      {{ props.error }}
+    </p>
+    <p v-else-if="props.success" :id="messageId" class="text-xs font-medium text-accent-green flex items-center gap-1.5">
+      <Icon name="CircleCheck" :size="12" class="shrink-0" />
+      {{ props.success }}
+    </p>
+    <p v-else-if="props.hint" :id="messageId" class="text-xs text-muted-foreground flex items-center gap-1">
       <Icon v-if="props.hintIcon" name="Info" :size="12" class="shrink-0" />
       {{ props.hint }}
     </p>
@@ -63,8 +78,7 @@
 </template>
 
 <script setup>
-import { computed, ref, useSlots } from "vue";
-import { cn } from "@/lib/utils";
+import { computed, ref, useId, useSlots } from "vue";
 import Icon from "./Icon.vue";
 
 const props = defineProps({
@@ -92,6 +106,9 @@ defineEmits(["update:modelValue"]);
 
 const slots = useSlots();
 const showPassword = ref(false);
+const localId = typeof useId === "function" ? useId() : `input-${Math.random().toString(36).slice(2, 9)}`;
+const inputId = computed(() => `field-${localId}`);
+const messageId = computed(() => (props.error || props.success || props.hint ? `${inputId.value}-message` : undefined));
 
 const currentType = computed(() => {
   if (props.type === "password") return showPassword.value ? "text" : "password";

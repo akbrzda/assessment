@@ -8,13 +8,16 @@
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="isVisible" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click="handleOverlayClick">
-        <div :class="cn('bg-background rounded-xl shadow-modal max-h-[90vh] overflow-y-auto w-full', sizeClass)" @click.stop>
-          <div v-if="title || closable" class="flex items-center justify-between px-6 py-4 border-b border-border bg-muted">
+      <div v-if="isVisible" class="fixed inset-0 z-50 flex items-center justify-center bg-black/58 p-4 backdrop-blur-[2px]" @click="handleOverlayClick">
+        <div
+          :class="cn('bg-background rounded-[var(--radius-lg)] shadow-[var(--elevation-float)] max-h-[90vh] overflow-y-auto w-full border border-border/80', sizeClass)"
+          @click.stop
+        >
+          <div v-if="title || closable" class="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-muted/55">
             <h2 v-if="title" class="text-xl font-semibold text-foreground m-0">{{ title }}</h2>
             <button
               v-if="closable"
-              class="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors duration-200 border-none bg-transparent cursor-pointer text-lg"
+              class="flex items-center justify-center w-8 h-8 rounded-[10px] text-muted-foreground hover:bg-accent hover:text-foreground transition-all duration-150 border-none bg-transparent cursor-pointer text-lg focus-visible:shadow-[var(--focus-ring)]"
               @click="close"
             >
               ✕

@@ -1,5 +1,7 @@
 <template>
-  <header class="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border/60 bg-card/90 px-3 backdrop-blur sm:px-4 lg:px-6">
+  <header
+    class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-border/60 bg-[hsl(var(--topbar-bg)/0.92)] px-3 backdrop-blur sm:px-4 lg:px-6"
+  >
     <button
       type="button"
       class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-accent/40 hover:text-foreground"
@@ -9,7 +11,7 @@
       <component :is="MenuIcon" :size="20" />
     </button>
 
-    <nav class="flex flex-1 items-center gap-1.5 text-sm overflow-hidden" aria-label="Навигация">
+    <nav class="flex flex-1 items-center gap-1.5 overflow-hidden text-sm" aria-label="Навигация">
       <RouterLink to="/dashboard" class="text-muted-foreground transition hover:text-foreground shrink-0">
         <component :is="HomeIcon" :size="15" />
       </RouterLink>
@@ -17,29 +19,29 @@
         <span class="text-muted-foreground/60 shrink-0">›</span>
         <RouterLink
           :to="crumb.path"
-          :class="[
-            'truncate transition',
-            i === breadcrumbs.length - 1 ? 'font-medium text-nav-active-text' : 'text-muted-foreground hover:text-foreground',
-          ]"
+          :class="['truncate transition', i === breadcrumbs.length - 1 ? 'font-semibold text-nav-active-text' : 'text-muted-foreground hover:text-foreground']"
           >{{ crumb.label }}</RouterLink
         >
       </template>
     </nav>
 
     <div class="flex items-center gap-2">
-      <div class="relative hidden md:flex items-center">
-        <component :is="SearchIcon" :size="14" class="absolute left-2.5 text-muted-foreground pointer-events-none" />
+      <div class="relative hidden items-center md:flex">
+        <component :is="SearchIcon" :size="14" class="pointer-events-none absolute left-2.5 text-muted-foreground" />
         <input
           v-model="searchQuery"
           type="search"
-          class="h-8 w-56 rounded-lg border border-input bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:border-ring"
+          class="h-10 w-72 rounded-xl border border-input bg-background pl-8 pr-14 text-sm placeholder:text-muted-foreground transition-all duration-[var(--motion-fast)] focus:border-ring focus:outline-none focus-visible:shadow-[var(--focus-ring)]"
           placeholder="Поиск..."
           @input="handleSearchInput"
           @blur="hideSearch"
         />
+        <span class="pointer-events-none absolute right-2 rounded-md border border-border bg-muted/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+          >⌘K</span
+        >
         <div
           v-if="showSearchResults"
-          class="absolute top-full left-0 right-0 mt-1.5 rounded-xl border border-border bg-card shadow-md overflow-hidden z-50"
+          class="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-border bg-card shadow-md"
         >
           <div v-if="searchLoading" class="px-3 py-2.5 text-sm text-muted-foreground">Поиск...</div>
           <template v-else>
@@ -57,9 +59,15 @@
         </div>
       </div>
 
+      <RouterLink
+        to="/assessments/create"
+        class="hidden h-9 items-center rounded-lg border border-primary/30 bg-primary/10 px-3 text-sm font-medium text-primary transition hover:bg-primary/15 md:inline-flex"
+        >Создать</RouterLink
+      >
+
       <button
         type="button"
-        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:bg-accent/40 hover:text-foreground"
+        class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:bg-accent/40 hover:text-foreground"
         @click="toggleTheme"
       >
         <component :is="themeMode === 'dark' ? SunIcon : MoonIcon" :size="16" />

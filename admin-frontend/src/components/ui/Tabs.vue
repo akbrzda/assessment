@@ -1,23 +1,30 @@
 <template>
   <TabsRoot v-model="model" :class="rootClass">
-    <TabsList :class="['flex items-center gap-1', variant === 'underline' ? 'border-b border-border' : 'bg-muted rounded-xl p-1']">
+    <TabsList
+      :class="[
+        'flex items-center gap-1',
+        variant === 'underline'
+          ? 'border-b border-border/80 bg-transparent'
+          : 'rounded-[var(--radius-md)] border border-border/70 bg-muted/70 p-1 shadow-[var(--elevation-soft)]',
+      ]"
+    >
       <TabsTrigger
         v-for="tab in tabs"
         :key="tab.value"
         :value="tab.value"
         :disabled="tab.disabled"
         :class="[
-          'inline-flex items-center gap-1.5 text-sm font-medium transition-all duration-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed',
+          'inline-flex items-center gap-1.5 text-sm font-medium transition-all duration-150 focus:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed',
           variant === 'underline'
             ? [
                 'px-3 py-2.5 border-b-2 -mb-px rounded-none',
                 'border-transparent text-muted-foreground hover:text-foreground',
-                'data-[state=active]:border-primary data-[state=active]:text-foreground',
+                'data-[state=active]:border-primary data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:translate-y-[1px]',
               ]
             : [
-                'px-4 py-1.5 rounded-lg',
+                'px-4 py-1.5 rounded-[10px]',
                 'text-muted-foreground hover:text-foreground',
-                'data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm',
+                'data-[state=active]:bg-background data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-[var(--elevation-soft)]',
               ],
         ]"
       >

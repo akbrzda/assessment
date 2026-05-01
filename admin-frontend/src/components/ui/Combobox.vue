@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col gap-1.5">
-    <label v-if="label" class="text-sm font-medium text-foreground leading-none">
+    <label v-if="label" :for="comboboxId" class="text-sm font-medium text-foreground leading-none">
       {{ label }}
       <span v-if="required" class="text-destructive ml-0.5">*</span>
     </label>
@@ -16,12 +16,15 @@
     >
       <!-- Триггер-поле -->
       <ComboboxAnchor
+        :id="comboboxId"
+        :aria-invalid="Boolean(error)"
+        :aria-describedby="messageId"
         :class="[
-          'flex min-h-9 w-full items-center gap-1.5 flex-wrap rounded-xl border border-input bg-background px-3 text-sm shadow-sm transition',
+          'flex min-h-9 w-full items-center gap-1.5 flex-wrap rounded-xl border border-input bg-[hsl(var(--field-surface))] px-3 text-sm shadow-sm transition',
           'focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent',
-          'hover:border-ring',
-          disabled && 'cursor-not-allowed opacity-50',
-          error && 'border-destructive focus-within:ring-destructive/30',
+          'hover:border-[hsl(var(--field-border-strong))] hover:bg-[hsl(var(--field-surface-hover))]',
+          disabled && 'cursor-not-allowed bg-[hsl(var(--field-surface-disabled))] text-muted-foreground opacity-100',
+          error && 'border-[hsl(var(--field-border-error))] bg-[hsl(var(--field-error-bg))] focus-within:ring-[hsl(var(--field-border-error)/0.35)]',
           multiple && selectedItems.length && 'py-1.5',
           !multiple && 'py-0',
           sizeClass,
@@ -32,7 +35,7 @@
           <span
             v-for="item in selectedItems"
             :key="item.value"
-            class="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-0.5 text-xs font-medium text-accent-foreground"
+            class="inline-flex items-center gap-1 rounded-md border border-border bg-accent px-2 py-0.5 text-xs font-medium text-accent-foreground"
           >
             {{ item.label }}
             <button
@@ -110,13 +113,16 @@
       </ComboboxPortal>
     </ComboboxRoot>
 
-    <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
-    <p v-else-if="hint" class="text-xs text-muted-foreground">{{ hint }}</p>
+    <p v-if="error" :id="messageId" class="text-xs text-destructive font-medium flex items-center gap-1.5">
+      <Icon name="CircleAlert" :size="12" class="shrink-0" />
+      {{ error }}
+    </p>
+    <p v-else-if="hint" :id="messageId" class="text-xs text-muted-foreground">{{ hint }}</p>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, useId } from "vue";
 import {
   ComboboxRoot,
   ComboboxAnchor,
@@ -159,6 +165,9 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue", "change"]);
 
 const isOpen = ref(false);
+const localId = typeof useId === "function" ? useId() : `combobox-${Math.random().toString(36).slice(2, 9)}`;
+const comboboxId = computed(() => `field-${localId}`);
+const messageId = computed(() => (props.error || props.hint ? `${comboboxId.value}-message` : undefined));
 
 const onOpenChange = (val) => {
   isOpen.value = val;

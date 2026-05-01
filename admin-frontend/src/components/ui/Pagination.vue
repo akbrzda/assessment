@@ -1,7 +1,7 @@
 <template>
-  <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-t border-border">
-    <div class="text-sm text-muted-foreground">Страница {{ page }} из {{ totalPages }} &bull; Всего {{ total }}</div>
-    <div class="flex items-center gap-2">
+  <div class="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
+    <div class="text-sm text-muted-foreground">Страница {{ page }} из {{ totalPages }} • Всего {{ total }}</div>
+    <div class="flex flex-wrap items-center gap-2">
       <button
         class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-sm text-foreground transition hover:bg-accent disabled:pointer-events-none disabled:opacity-40"
         :disabled="page === 1"
@@ -18,10 +18,10 @@
           :class="[
             'inline-flex h-8 min-w-8 px-2 items-center justify-center rounded-lg border text-sm transition',
             p === page
-              ? 'border-primary bg-primary text-primary-foreground font-semibold'
+              ? 'border-primary bg-primary text-primary-foreground font-semibold shadow-[var(--elevation-soft)]'
               : p === '...'
                 ? 'border-transparent cursor-default text-muted-foreground'
-                : 'border-border bg-card text-foreground hover:bg-accent',
+                : 'border-border bg-card text-foreground hover:bg-accent/65',
           ]"
           :disabled="p === '...'"
           @click="p !== '...' && updatePage(p)"
@@ -40,18 +40,36 @@
       </button>
 
       <select
-        class="h-8 rounded-lg border border-border bg-card text-foreground text-sm px-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring transition"
+        class="h-8 cursor-pointer rounded-lg border border-border bg-card px-2 text-sm text-foreground transition focus:outline-none focus-visible:shadow-[var(--focus-ring)]"
         :value="limit"
         @change="updateLimit($event.target.value)"
       >
         <option v-for="option in limitOptions" :key="option" :value="option">{{ option }} / стр.</option>
       </select>
+
+      <form class="flex items-center gap-1.5" @submit.prevent="handleJump">
+        <input
+          v-model="jumpPage"
+          type="number"
+          min="1"
+          :max="totalPages"
+          class="h-8 w-16 rounded-lg border border-border bg-card px-2 text-sm text-foreground transition focus:outline-none focus-visible:shadow-[var(--focus-ring)]"
+          placeholder="№"
+          aria-label="Номер страницы"
+        />
+        <button
+          type="submit"
+          class="inline-flex h-8 items-center rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground transition hover:bg-accent/65"
+        >
+          Перейти
+        </button>
+      </form>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon } from "lucide-vue-next";
 
 const props = defineProps({
@@ -62,6 +80,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["update:page", "update:limit"]);
+const jumpPage = ref("");
 
 const totalPages = computed(() => Math.max(1, Math.ceil(props.total / (props.limit || 20))));
 
@@ -85,4 +104,18 @@ const updateLimit = (value) => {
   const n = Number(value);
   if (!isNaN(n) && n > 0) emit("update:limit", n);
 };
+
+const handleJump = () => {
+  const value = Number(jumpPage.value);
+  if (!Number.isFinite(value)) return;
+  updatePage(value);
+  jumpPage.value = "";
+};
+
+watch(
+  () => props.page,
+  () => {
+    jumpPage.value = "";
+  },
+);
 </script>

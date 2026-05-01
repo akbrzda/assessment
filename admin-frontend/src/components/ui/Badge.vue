@@ -39,25 +39,25 @@ defineProps({
   },
 });
 
-const badgeBase = "inline-flex items-center justify-center rounded-md font-medium whitespace-nowrap";
+const badgeBase = "inline-flex items-center justify-center rounded-full font-medium whitespace-nowrap border";
 
 const variantClasses = {
   // Базовые
-  default: "bg-muted text-foreground",
-  secondary: "bg-muted text-muted-foreground",
-  outline: "bg-transparent text-foreground border border-border",
-  primary: "bg-accent-blue text-white",
-  success: "bg-accent-green text-white",
-  warning: "bg-accent-orange text-white",
-  danger: "bg-destructive text-destructive-foreground",
-  info: "bg-accent-blue-soft text-accent-blue border border-accent-blue/30",
+  default: "bg-muted/70 text-foreground border-border/70",
+  secondary: "bg-muted/55 text-muted-foreground border-border/65",
+  outline: "bg-transparent text-foreground border-border/85",
+  primary: "bg-primary/15 text-primary border-primary/30",
+  success: "bg-accent-green-soft text-accent-green border-accent-green/30",
+  warning: "bg-accent-orange-soft text-accent-orange border-accent-orange/30",
+  danger: "bg-destructive/12 text-destructive border-destructive/35",
+  info: "bg-accent-blue-soft text-accent-blue border-accent-blue/30",
   // Статусные (соответствуют UI Kit)
-  new: "bg-accent-green text-white",
-  popular: "bg-transparent text-accent-blue border border-accent-blue",
-  draft: "bg-muted text-muted-foreground border border-border",
-  pending: "bg-accent-orange text-white",
+  new: "bg-accent-green-soft text-accent-green border-accent-green/30",
+  popular: "bg-transparent text-accent-blue border-accent-blue/45",
+  draft: "bg-muted/60 text-muted-foreground border-border/65",
+  pending: "bg-accent-orange-soft text-accent-orange border-accent-orange/35",
   published: "bg-accent-green-soft text-accent-green border border-accent-green/30",
-  archived: "bg-muted text-muted-foreground",
+  archived: "bg-muted/65 text-muted-foreground border-border/65",
   error: "bg-destructive/10 text-destructive border border-destructive/30",
   important: "bg-accent-orange-soft text-accent-orange border border-accent-orange/30",
 };

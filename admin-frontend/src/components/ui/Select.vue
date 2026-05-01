@@ -8,12 +8,16 @@
     <SelectRoot :model-value="normalizedModelValue" :disabled="disabled" @update:model-value="handleModelUpdate">
       <SelectTrigger
         :id="selectId"
+        :aria-invalid="Boolean(error)"
+        :aria-describedby="messageId"
         :class="[
-          'flex w-full items-center justify-between gap-2 rounded-xl border border-input bg-background px-3 text-sm text-foreground shadow-sm',
-          'focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors',
-          'hover:border-ring cursor-pointer',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          error ? 'border-destructive' : '',
+          'flex w-full items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-input/90 bg-[hsl(var(--field-surface))] px-3 text-sm text-foreground shadow-[var(--elevation-soft)]',
+          'focus:outline-none focus:border-ring/65 focus-visible:shadow-[var(--focus-ring)] transition-all duration-150',
+          'hover:border-[hsl(var(--field-border-strong))] hover:bg-[hsl(var(--field-surface-hover))] cursor-pointer',
+          'disabled:cursor-not-allowed disabled:text-muted-foreground disabled:bg-[hsl(var(--field-surface-disabled))] disabled:opacity-100 disabled:shadow-none',
+          error
+            ? 'border-[hsl(var(--field-border-error))] bg-[hsl(var(--field-error-bg))] focus:border-[hsl(var(--field-border-error))] focus-visible:shadow-[0_0_0_2px_hsl(var(--background)),0_0_0_4px_hsl(var(--field-border-error)/0.35)]'
+            : '',
           sizeClass,
         ]"
       >
@@ -23,7 +27,7 @@
 
       <SelectPortal>
         <SelectContent
-          class="z-[9999] w-[var(--reka-select-trigger-width)] overflow-hidden rounded-xl border border-border bg-card text-foreground shadow-lg"
+          class="z-[9999] w-[var(--reka-select-trigger-width)] overflow-hidden rounded-[var(--radius-md)] border border-border bg-card text-foreground shadow-[var(--elevation-float)]"
           position="popper"
           :side-offset="4"
         >
@@ -38,7 +42,7 @@
                   :key="opt.value"
                   :value="normalizeOptionValue(opt.value)"
                   :disabled="opt.disabled"
-                  class="relative flex w-full cursor-pointer select-none items-center rounded-lg py-2 pl-3 pr-8 text-sm outline-none hover:bg-accent focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:font-medium"
+                  class="relative flex w-full cursor-pointer select-none items-center rounded-[10px] py-2 pl-3 pr-8 text-sm outline-none hover:bg-accent/80 focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:bg-primary/10 data-[state=checked]:font-medium"
                 >
                   <SelectItemText>{{ opt.label }}</SelectItemText>
                   <SelectItemIndicator class="absolute right-2.5 flex items-center">
@@ -54,7 +58,7 @@
                 :key="opt.value"
                 :value="normalizeOptionValue(opt.value)"
                 :disabled="opt.disabled"
-                class="relative flex w-full cursor-pointer select-none items-center rounded-lg py-2 pl-3 pr-8 text-sm outline-none hover:bg-accent focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:font-medium"
+                class="relative flex w-full cursor-pointer select-none items-center rounded-[10px] py-2 pl-3 pr-8 text-sm outline-none hover:bg-accent/80 focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:bg-primary/10 data-[state=checked]:font-medium"
               >
                 <SelectItemText>{{ opt.label }}</SelectItemText>
                 <SelectItemIndicator class="absolute right-2.5 flex items-center">
@@ -67,8 +71,11 @@
       </SelectPortal>
     </SelectRoot>
 
-    <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
-    <p v-else-if="hint" class="text-xs text-muted-foreground">{{ hint }}</p>
+    <p v-if="error" :id="messageId" class="text-xs text-destructive font-medium flex items-center gap-1.5">
+      <Icon name="CircleAlert" :size="12" class="shrink-0" />
+      {{ error }}
+    </p>
+    <p v-else-if="hint" :id="messageId" class="text-xs text-muted-foreground">{{ hint }}</p>
   </div>
 </template>
 
@@ -122,6 +129,7 @@ const props = defineProps({
 
 const localId = typeof useId === "function" ? useId() : `select-${Math.random().toString(36).slice(2, 9)}`;
 const selectId = computed(() => props.id || localId);
+const messageId = computed(() => (props.error || props.hint ? `${selectId.value}-message` : undefined));
 const sizeClass = computed(() => ({ sm: "h-8 text-xs", md: "h-9", lg: "h-10 text-base" })[props.size]);
 const normalizedModelValue = computed(() => normalizeOptionValue(props.modelValue));
 

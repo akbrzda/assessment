@@ -5,73 +5,136 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 210 40% 98%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 262 83% 58%;
+    --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 92%;
+    --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
-    --muted: 220 14% 92%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 220 14% 90%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 40%;
+    --accent: 210 40% 95%;
     --accent-foreground: 222 47% 11%;
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 220 13% 87%;
-    --input: 220 13% 87%;
-    --ring: 262 83% 58%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 191 96% 43%;
+    --field-surface: 0 0% 100%;
+    --field-surface-hover: 210 40% 99%;
+    --field-surface-disabled: 210 28% 95%;
+    --field-border-strong: 214 30% 84%;
+    --field-border-error: 0 78% 56%;
+    --field-border-success: 142 68% 42%;
+    --field-border-warning: 35 92% 48%;
+    --field-error-bg: 0 100% 98%;
+    --field-success-bg: 142 70% 97%;
+    --field-warning-bg: 43 100% 96%;
 
     /* Навигация */
-    --nav-active: 262 83% 95%;
-    --nav-active-text: 262 83% 45%;
+    --nav-active: 217 91% 95%;
+    --nav-active-text: 221 83% 45%;
 
     /* Акцентные цвета (в HSL) */
-    --accent-blue: 199 100% 40%;
-    --accent-blue-soft: 199 100% 94%;
-    --accent-green: 160 84% 39%;
-    --accent-green-soft: 160 84% 93%;
-    --accent-orange: 38 92% 50%;
-    --accent-orange-soft: 38 92% 94%;
-    --accent-purple: 262 83% 58%;
-    --accent-purple-soft: 262 83% 95%;
+    --accent-blue: 199 96% 45%;
+    --accent-blue-soft: 194 95% 94%;
+    --accent-green: 142 71% 45%;
+    --accent-green-soft: 138 76% 97%;
+    --accent-orange: 31 90% 48%;
+    --accent-orange-soft: 34 100% 95%;
+    --accent-purple: 221 83% 53%;
+    --accent-purple-soft: 217 91% 95%;
+    --radius-sm: 10px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --focus-ring: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / 0.35);
+    --elevation-soft: 0 1px 2px hsl(222 47% 11% / 0.08), 0 8px 20px hsl(221 39% 11% / 0.08);
+    --elevation-float: 0 2px 8px hsl(221 39% 11% / 0.14), 0 14px 32px hsl(221 39% 11% / 0.14);
+    --surface-base: 0 0% 100%;
+    --surface-raised: 210 50% 99%;
+    --surface-floating: 0 0% 100%;
+    --state-hover: 217 88% 97%;
+    --state-active: 217 91% 95%;
+    --state-selected: 217 100% 93%;
+    --table-row-stripe: 213 47% 98%;
+    --table-row-hover: 217 100% 97%;
+    --table-row-selected: 217 100% 94%;
+    --table-header-bg: 214 45% 97%;
+    --sidebar-bg-start: 220 60% 99%;
+    --sidebar-bg-end: 220 55% 97%;
+    --sidebar-active-indicator: 221 83% 53%;
+    --topbar-bg: 0 0% 100%;
+    --motion-fast: 120ms;
+    --motion-base: 160ms;
+    --motion-complex: 220ms;
+    --density-table-row-compact: 0.6rem;
+    --density-table-row-default: 0.875rem;
+    --density-table-row-relaxed: 1.125rem;
   }
 
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 213 31% 91%;
-    --card: 222 47% 9%;
-    --card-foreground: 213 31% 91%;
-    --popover: 222 47% 11%;
-    --popover-foreground: 213 31% 91%;
-    --primary: 262 80% 70%;
+    --background: 220 44% 9%;
+    --foreground: 214 32% 92%;
+    --card: 220 44% 12%;
+    --card-foreground: 214 32% 92%;
+    --popover: 220 43% 14%;
+    --popover-foreground: 214 32% 92%;
+    --primary: 223 82% 64%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 222 47% 14%;
-    --secondary-foreground: 213 31% 91%;
-    --muted: 222 47% 14%;
-    --muted-foreground: 215 16% 57%;
-    --accent: 222 47% 16%;
-    --accent-foreground: 213 31% 91%;
-    --destructive: 0 63% 50%;
+    --secondary: 219 35% 21%;
+    --secondary-foreground: 214 32% 92%;
+    --muted: 219 35% 21%;
+    --muted-foreground: 215 20% 72%;
+    --accent: 219 35% 24%;
+    --accent-foreground: 214 32% 92%;
+    --destructive: 0 68% 55%;
     --destructive-foreground: 0 0% 98%;
-    --border: 222 47% 20%;
-    --input: 222 47% 20%;
-    --ring: 262 80% 70%;
+    --border: 216 32% 28%;
+    --input: 216 32% 28%;
+    --ring: 191 91% 56%;
+    --field-surface: 220 44% 12%;
+    --field-surface-hover: 220 44% 14%;
+    --field-surface-disabled: 218 28% 18%;
+    --field-border-strong: 216 30% 36%;
+    --field-border-error: 0 70% 60%;
+    --field-border-success: 142 63% 54%;
+    --field-border-warning: 35 92% 56%;
+    --field-error-bg: 0 32% 20%;
+    --field-success-bg: 143 30% 18%;
+    --field-warning-bg: 36 36% 18%;
 
-    --nav-active: 262 83% 15%;
-    --nav-active-text: 262 80% 75%;
+    --nav-active: 221 76% 24%;
+    --nav-active-text: 213 94% 76%;
 
-    --accent-blue: 199 100% 55%;
-    --accent-blue-soft: 199 100% 14%;
-    --accent-green: 160 84% 44%;
-    --accent-green-soft: 160 84% 12%;
-    --accent-orange: 38 92% 55%;
-    --accent-orange-soft: 38 92% 14%;
-    --accent-purple: 262 80% 70%;
-    --accent-purple-soft: 262 80% 14%;
+    --accent-blue: 194 90% 62%;
+    --accent-blue-soft: 198 74% 19%;
+    --accent-green: 142 69% 54%;
+    --accent-green-soft: 144 61% 16%;
+    --accent-orange: 34 89% 60%;
+    --accent-orange-soft: 31 75% 18%;
+    --accent-purple: 223 82% 64%;
+    --accent-purple-soft: 223 49% 24%;
+    --focus-ring: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / 0.45);
+    --elevation-soft: 0 1px 2px hsl(220 44% 5% / 0.4), 0 12px 26px hsl(220 44% 5% / 0.35);
+    --elevation-float: 0 4px 14px hsl(220 44% 5% / 0.5), 0 20px 42px hsl(220 44% 5% / 0.45);
+    --surface-base: 220 44% 10%;
+    --surface-raised: 220 44% 12%;
+    --surface-floating: 220 43% 14%;
+    --state-hover: 223 39% 20%;
+    --state-active: 222 48% 24%;
+    --state-selected: 222 65% 28%;
+    --table-row-stripe: 220 38% 11%;
+    --table-row-hover: 223 39% 18%;
+    --table-row-selected: 222 66% 23%;
+    --table-header-bg: 220 34% 14%;
+    --sidebar-bg-start: 220 44% 9%;
+    --sidebar-bg-end: 222 44% 12%;
+    --sidebar-active-indicator: 223 82% 64%;
+    --topbar-bg: 220 43% 12%;
   }
 
   * {
@@ -82,7 +145,10 @@
   }
 
   body {
-    background-color: hsl(var(--background));
+    background:
+      radial-gradient(circle at 10% 0%, hsl(var(--primary) / 0.05), transparent 30%),
+      radial-gradient(circle at 95% 10%, hsl(var(--ring) / 0.06), transparent 25%),
+      hsl(var(--background));
     color: hsl(var(--foreground));
     font-family:
       "Inter",
@@ -116,6 +182,11 @@
     font-size: 18px;
     line-height: 24px;
     font-weight: 600;
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
   }
 }
 

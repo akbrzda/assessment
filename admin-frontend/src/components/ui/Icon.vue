@@ -26,7 +26,7 @@ const props = defineProps({
   },
   strokeWidth: {
     type: [Number, String],
-    default: 2,
+    default: undefined,
   },
   color: {
     type: String,
@@ -39,6 +39,11 @@ const props = defineProps({
   ariaLabel: {
     type: String,
     default: "",
+  },
+  tone: {
+    type: String,
+    default: "default",
+    validator: (value) => ["default", "muted", "primary", "success", "warning", "danger", "disabled"].includes(value),
   },
 });
 
@@ -83,17 +88,37 @@ const numericSize = computed(() => {
 });
 
 const numericStrokeWidth = computed(() => {
-  const value = Number(props.strokeWidth);
-  return Number.isFinite(value) && value > 0 ? value : 2;
+  if (props.strokeWidth !== undefined && props.strokeWidth !== null && props.strokeWidth !== "") {
+    const value = Number(props.strokeWidth);
+    return Number.isFinite(value) && value > 0 ? value : 2;
+  }
+  return numericSize.value <= 16 ? 1.9 : 2.1;
 });
 
 const ariaHidden = computed(() => (props.ariaLabel ? "false" : "true"));
 
 const forwardedAttrs = computed(() => {
-  const { size, strokeWidth, color, absoluteStrokeWidth, ariaLabel, ...rest } = attrs;
+  const { size, strokeWidth, color, absoluteStrokeWidth, ariaLabel, tone, ...rest } = attrs;
   return {
     ...rest,
     "aria-label": props.ariaLabel || rest["aria-label"] || undefined,
   };
+});
+
+const toneColorMap = {
+  default: "currentColor",
+  muted: "hsl(var(--muted-foreground))",
+  primary: "hsl(var(--primary))",
+  success: "hsl(var(--accent-green))",
+  warning: "hsl(var(--accent-orange))",
+  danger: "hsl(var(--destructive))",
+  disabled: "hsl(var(--muted-foreground) / 0.55)",
+};
+
+const color = computed(() => {
+  if (props.color !== "currentColor") {
+    return props.color;
+  }
+  return toneColorMap[props.tone] || "currentColor";
 });
 </script>

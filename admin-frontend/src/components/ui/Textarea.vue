@@ -5,6 +5,7 @@
       <span v-if="required" class="text-destructive ml-0.5">*</span>
     </label>
     <textarea
+      :id="textareaId"
       :value="modelValue"
       :placeholder="placeholder"
       :disabled="disabled"
@@ -12,15 +13,18 @@
       :required="required"
       :maxlength="maxLength || undefined"
       :rows="rows"
+      :aria-invalid="Boolean(error)"
+      :aria-describedby="messageId"
       :class="
         cn(
-          'flex min-h-20 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm',
+          'flex min-h-20 w-full rounded-xl border border-input bg-[hsl(var(--field-surface))] px-3 py-2 text-sm text-foreground shadow-sm',
           'placeholder:text-muted-foreground',
           'focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition resize-vertical',
-          'disabled:cursor-not-allowed disabled:opacity-50',
+          'hover:border-[hsl(var(--field-border-strong))] hover:bg-[hsl(var(--field-surface-hover))]',
+          'disabled:cursor-not-allowed disabled:text-muted-foreground disabled:bg-[hsl(var(--field-surface-disabled))] disabled:opacity-100',
           'read-only:bg-muted read-only:cursor-default',
-          error && 'border-destructive focus:ring-destructive/30',
-          success && !error && 'border-accent-green focus:ring-accent-green/30',
+          error && 'border-[hsl(var(--field-border-error))] bg-[hsl(var(--field-error-bg))] focus:ring-[hsl(var(--field-border-error)/0.35)]',
+          success && !error && 'border-[hsl(var(--field-border-success))] bg-[hsl(var(--field-success-bg))] focus:ring-[hsl(var(--field-border-success)/0.35)]',
         )
       "
       @input="$emit('update:modelValue', $event.target.value)"
@@ -28,12 +32,16 @@
 
     <div class="flex items-start justify-between gap-2">
       <div class="flex-1">
-        <p v-if="error" class="text-xs text-destructive">
+        <p v-if="error" :id="messageId" class="text-xs text-destructive font-medium flex items-center gap-1.5">
+          <Icon name="CircleAlert" :size="12" class="shrink-0" />
           {{ error }}
           <span v-if="showCounter && maxLength" class="ml-1">{{ charCount }} / {{ maxLength }}</span>
         </p>
-        <p v-else-if="success" class="text-xs text-accent-green">{{ success }}</p>
-        <p v-else-if="hint" class="text-xs text-muted-foreground">{{ hint }}</p>
+        <p v-else-if="success" :id="messageId" class="text-xs text-accent-green font-medium flex items-center gap-1.5">
+          <Icon name="CircleCheck" :size="12" class="shrink-0" />
+          {{ success }}
+        </p>
+        <p v-else-if="hint" :id="messageId" class="text-xs text-muted-foreground">{{ hint }}</p>
       </div>
       <span v-if="showCounter && maxLength && !error" :class="['text-xs shrink-0', isNearLimit ? 'text-destructive' : 'text-muted-foreground']"
         >{{ charCount }} / {{ maxLength }}</span
@@ -43,8 +51,9 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, useId } from "vue";
 import { cn } from "@/lib/utils";
+import Icon from "./Icon.vue";
 
 const props = defineProps({
   modelValue: { type: String, default: "" },
@@ -62,6 +71,9 @@ const props = defineProps({
 });
 
 defineEmits(["update:modelValue"]);
+const localId = typeof useId === "function" ? useId() : `textarea-${Math.random().toString(36).slice(2, 9)}`;
+const textareaId = computed(() => `field-${localId}`);
+const messageId = computed(() => (props.error || props.success || props.hint ? `${textareaId.value}-message` : undefined));
 
 const charCount = computed(() => (props.modelValue || "").length);
 const isNearLimit = computed(() => props.maxLength && charCount.value >= props.maxLength * 0.9);

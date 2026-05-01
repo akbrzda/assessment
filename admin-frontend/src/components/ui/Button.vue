@@ -36,12 +36,18 @@ const props = defineProps({
 const emit = defineEmits(["click"]);
 
 const variantClasses = {
-  primary: "bg-primary text-primary-foreground hover:opacity-90 active:opacity-80",
-  secondary: "bg-muted text-foreground border border-border hover:bg-accent/60 active:bg-accent",
-  tertiary: "bg-transparent text-primary border border-primary hover:bg-primary/10 active:bg-primary/20",
-  danger: "bg-destructive text-destructive-foreground hover:opacity-90 active:opacity-80",
-  success: "bg-accent-green text-white hover:opacity-90 active:opacity-80",
-  ghost: "bg-transparent text-foreground hover:bg-accent/60 active:bg-accent",
+  primary:
+    "bg-gradient-to-b from-primary to-primary/90 text-primary-foreground shadow-[var(--elevation-soft)] hover:translate-y-[-1px] hover:shadow-[var(--elevation-float)] active:translate-y-0 active:brightness-95 focus-visible:shadow-[var(--focus-ring)]",
+  secondary:
+    "bg-secondary/75 text-foreground border border-border/90 shadow-[var(--elevation-soft)] hover:translate-y-[-1px] hover:border-ring/35 hover:bg-accent/80 active:translate-y-0 active:bg-accent focus-visible:shadow-[var(--focus-ring)]",
+  tertiary:
+    "bg-transparent text-primary border border-primary/45 hover:bg-primary/10 hover:border-primary/70 active:bg-primary/15 focus-visible:shadow-[var(--focus-ring)]",
+  danger:
+    "bg-gradient-to-b from-destructive to-destructive/90 text-destructive-foreground shadow-[var(--elevation-soft)] hover:translate-y-[-1px] hover:shadow-[var(--elevation-float)] active:translate-y-0 active:brightness-95 focus-visible:shadow-[var(--focus-ring)]",
+  success:
+    "bg-gradient-to-b from-accent-green to-accent-green/90 text-white shadow-[var(--elevation-soft)] hover:translate-y-[-1px] hover:shadow-[var(--elevation-float)] active:translate-y-0 active:brightness-95 focus-visible:shadow-[var(--focus-ring)]",
+  ghost:
+    "bg-transparent text-foreground border border-transparent hover:border-border hover:bg-accent/65 active:bg-accent focus-visible:shadow-[var(--focus-ring)]",
 };
 
 const sizeClasses = computed(() => {
@@ -56,7 +62,7 @@ const spinnerSize = computed(() => ({ sm: "h-3.5 w-3.5", md: "h-4 w-4", lg: "h-5
 
 const classes = computed(() =>
   cn(
-    "inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 whitespace-nowrap cursor-pointer border-none focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed",
+    "inline-flex items-center justify-center font-semibold rounded-[var(--radius-md)] transition-all duration-150 whitespace-nowrap cursor-pointer border-none focus:outline-none disabled:opacity-55 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none",
     variantClasses[props.variant],
     sizeClasses.value,
     props.fullWidth && "w-full",

@@ -16,17 +16,17 @@
       class="relative flex w-full touch-none select-none items-center"
       @update:model-value="onUpdate"
     >
-      <SliderTrack class="relative h-1.5 w-full grow overflow-hidden rounded-full bg-muted">
-        <SliderRange class="absolute h-full bg-primary" />
+      <SliderTrack class="relative h-2 w-full grow overflow-hidden rounded-full bg-muted/80">
+        <SliderRange class="absolute h-full bg-primary shadow-[0_0_0_1px_hsl(var(--primary)/0.2)]" />
       </SliderTrack>
 
       <SliderThumb
         v-for="(_, i) in sliderValue"
         :key="i"
         :class="[
-          'block h-5 w-5 rounded-full border-2 border-primary bg-background shadow-sm ring-offset-background',
+          'group block h-5 w-5 rounded-full border-2 border-primary bg-background shadow-sm ring-offset-background',
           'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-          'disabled:pointer-events-none disabled:opacity-50 cursor-grab active:cursor-grabbing',
+          'disabled:pointer-events-none disabled:opacity-50 cursor-grab active:cursor-grabbing hover:scale-105',
         ]"
       >
         <div
@@ -44,7 +44,10 @@
       <span>{{ max }}</span>
     </div>
 
-    <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
+    <p v-if="error" class="text-xs text-destructive font-medium flex items-center gap-1.5">
+      <Icon name="CircleAlert" :size="12" class="shrink-0" />
+      {{ error }}
+    </p>
     <p v-else-if="hint" class="text-xs text-muted-foreground">{{ hint }}</p>
   </div>
 </template>
@@ -52,6 +55,7 @@
 <script setup>
 import { computed } from "vue";
 import { SliderRoot, SliderTrack, SliderRange, SliderThumb } from "reka-ui";
+import Icon from "./Icon.vue";
 
 const props = defineProps({
   modelValue: {

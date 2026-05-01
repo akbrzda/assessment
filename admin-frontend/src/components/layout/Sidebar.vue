@@ -29,14 +29,7 @@
           <div v-for="section in navSections" :key="section.id" class="space-y-1">
             <div v-if="!isCollapsed" class="nav-group-title">{{ section.title }}</div>
             <div class="flex flex-col gap-0.5">
-              <RouterLink
-                v-for="item in section.items"
-                :key="item.label"
-                :to="item.to"
-                class="nav-link"
-                :title="item.label"
-                @click="$emit('navigate')"
-              >
+              <RouterLink v-for="item in section.items" :key="item.label" :to="item.to" class="nav-link" :title="item.label" @click="$emit('navigate')">
                 <component :is="item.icon" :size="18" />
                 <span v-if="!isCollapsed" class="truncate">{{ item.label }}</span>
               </RouterLink>
@@ -182,7 +175,10 @@ const handleLogout = async () => {
 
 <style scoped>
 .sidebar {
-  @apply relative flex h-screen w-60 shrink-0 flex-col border-r border-border/60 bg-card/90 pt-0 backdrop-blur transition-all duration-200 lg:sticky lg:top-0;
+  @apply relative flex h-screen w-60 shrink-0 flex-col border-r border-border/60 pt-0 backdrop-blur transition-all duration-[var(--motion-base)] lg:sticky lg:top-0;
+  background:
+    linear-gradient(180deg, hsl(var(--sidebar-bg-start)) 0%, hsl(var(--sidebar-bg-end)) 100%),
+    hsl(var(--card));
 }
 
 .sidebar.is-collapsed {
@@ -208,7 +204,12 @@ const handleLogout = async () => {
 }
 
 .nav-link {
-  @apply relative flex min-h-[38px] items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-muted-foreground transition hover:bg-accent/40 hover:text-foreground font-medium;
+  @apply relative flex min-h-[40px] items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-[var(--motion-fast)] hover:bg-[hsl(var(--state-hover))] hover:text-foreground;
+}
+
+.nav-link::before {
+  content: "";
+  @apply absolute bottom-1.5 left-0 top-1.5 w-[3px] rounded-r-full bg-transparent transition-colors duration-[var(--motion-fast)];
 }
 
 .sidebar.is-collapsed .nav-link {
@@ -216,7 +217,11 @@ const handleLogout = async () => {
 }
 
 .router-link-active {
-  @apply bg-nav-active text-nav-active-text font-semibold;
+  @apply bg-nav-active text-nav-active-text font-semibold shadow-[var(--elevation-soft)];
+}
+
+.router-link-active::before {
+  background: hsl(var(--sidebar-active-indicator));
 }
 </style>
     
