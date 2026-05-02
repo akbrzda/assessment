@@ -64,6 +64,7 @@
         :active-material-topic="activeMaterialTopic"
         :active-material-form="activeMaterialForm"
         :material-iframe-draft="materialIframeDraft"
+        :saving-material-topic-id="savingMaterialTopicId"
         @update:structure-search-query="structureSearchQuery = $event"
         @toggle-new-section-form="showNewSectionForm = !showNewSectionForm"
         @reorder-sections="handleSectionsReorder"
@@ -94,18 +95,47 @@
             <h2>Шаг {{ testsStepId }}. Тест для темы</h2>
             <p>Создайте отдельный тест для каждой темы курса и настройте его параметры по новому сценарию.</p>
           </div>
+          <label class="step-feature-toggle" :class="{ 'step-feature-toggle--on': sectionTestsEnabled }">
+            <input type="checkbox" v-model="sectionTestsEnabled" class="step-feature-toggle-input" />
+            <span class="step-feature-toggle-track"><span class="step-feature-toggle-thumb"></span></span>
+            <span class="step-feature-toggle-label">{{ sectionTestsEnabled ? "Включено" : "Отключено" }}</span>
+          </label>
         </div>
 
-        <CourseSectionTestsStep ref="sectionTestsStepRef" :course="course" @course-updated="handleCourseUpdatedFromTestsStep" />
+        <div v-if="!sectionTestsEnabled" class="step-disabled-state">
+          <p>Тесты тем отключены для этого курса. Слушатели смогут проходить материалы без промежуточных тестов.</p>
+          <button type="button" class="step-disabled-enable-btn" @click="sectionTestsEnabled = true">Включить тесты тем</button>
+        </div>
+        <CourseSectionTestsStep v-else ref="sectionTestsStepRef" :course="course" @course-updated="handleCourseUpdatedFromTestsStep" />
       </Card>
 
-      <CourseFinalAssessmentStep
-        v-if="currentStep === finalAssessmentStepId && isEditMode && course"
-        ref="finalAssessmentStepRef"
-        :course="course"
-        @assessment-saved="handleFinalAssessmentSaved"
-        @course-updated="handleCourseUpdatedFromFinalStep"
-      />
+      <div v-if="currentStep === finalAssessmentStepId && isEditMode && course">
+        <Card class="editor-card step-toggle-card" padding="none">
+          <div class="step-card-header step-card-header-tight step-card-header-no-border">
+            <div>
+              <h2>Шаг {{ finalAssessmentStepId }}. Аттестация курса</h2>
+              <p>Настройте итоговую аттестацию, по которой будет оцениваться прохождение всего курса.</p>
+            </div>
+            <label class="step-feature-toggle" :class="{ 'step-feature-toggle--on': finalAssessmentEnabled }">
+              <input type="checkbox" v-model="finalAssessmentEnabled" class="step-feature-toggle-input" />
+              <span class="step-feature-toggle-track"><span class="step-feature-toggle-thumb"></span></span>
+              <span class="step-feature-toggle-label">{{ finalAssessmentEnabled ? "Включено" : "Отключено" }}</span>
+            </label>
+          </div>
+        </Card>
+
+        <div v-if="!finalAssessmentEnabled" class="editor-card step-disabled-state">
+          <p>Итоговая аттестация отключена для этого курса. Курс будет считаться завершённым после прохождения всех материалов.</p>
+          <button type="button" class="step-disabled-enable-btn" @click="finalAssessmentEnabled = true">Включить аттестацию</button>
+        </div>
+        <CourseFinalAssessmentStep
+          v-else
+          ref="finalAssessmentStepRef"
+          :course="course"
+          @assessment-saved="handleFinalAssessmentSaved"
+          @course-updated="handleCourseUpdatedFromFinalStep"
+        />
+      </div>
 
       <Card v-if="false && currentStep === finalAssessmentStepId && isEditMode && course" class="editor-card final-assessment-card">
         <div class="step-card-header">
@@ -233,6 +263,7 @@ import { getAssessments } from "@/api/assessments";
 import { getPositions } from "@/api/positions";
 import { getBranches } from "@/api/branches";
 import { useToast } from "@/composables/useToast";
+import { loadCourseCategories } from "@/modules/courses/utils/courseCategories";
 
 const route = useRoute();
 const router = useRouter();
@@ -243,10 +274,14 @@ const saving = ref(false);
 const publishing = ref(false);
 const archiving = ref(false);
 const uploadingCover = ref(false);
+const coverRemoved = ref(false);
 const selectedCoverFile = ref(null);
 const localCoverPreviewUrl = ref("");
 const previewWarnings = ref([]);
 const tempIdCounter = ref(-1);
+
+const sectionTestsEnabled = ref(true);
+const finalAssessmentEnabled = ref(true);
 
 const sectionForms = ref({});
 const sectionErrors = ref({});
@@ -276,6 +311,7 @@ const activeMaterialTopicId = ref(null);
 const activePreviewTopicId = ref(null);
 const materialIframeDraft = ref("");
 const materialEditorPanelRef = ref(null);
+const savingMaterialTopicId = ref(null);
 
 const form = ref({
   title: "",
@@ -334,13 +370,7 @@ const difficultyOptions = [
 
 const languageOptions = [{ value: "ru", label: "Русский" }];
 
-const categoryOptions = [
-  { value: "service", label: "Сервис" },
-  { value: "standards", label: "Стандарты" },
-  { value: "safety", label: "Безопасность" },
-  { value: "management", label: "Управление" },
-  { value: "other", label: "Другое" },
-];
+const categoryOptions = ref(loadCourseCategories());
 
 const setLocalCoverPreview = (file) => {
   if (localCoverPreviewUrl.value) {
@@ -374,12 +404,17 @@ const removeCover = () => {
   clearLocalCoverPreview();
   form.value.coverUrl = "";
   selectedCoverFile.value = null;
+  coverRemoved.value = true;
   if (coverFileInputRef.value) {
     coverFileInputRef.value.value = "";
   }
 };
 
 const saveFromHeader = async () => {
+  if (currentStep.value === previewStepId.value) {
+    await handlePublish();
+    return;
+  }
   if (currentStep.value === finalAssessmentStepId.value && finalAssessmentStepRef.value?.savePendingChanges) {
     await finalAssessmentStepRef.value.savePendingChanges();
     return;
@@ -558,15 +593,20 @@ const activePreviewTopicWithSection = computed(() => {
 });
 
 const activePreviewTopicContent = computed(() => {
-  return activePreviewTopicWithSection.value?.topic?.content || "";
+  const topicId = activePreviewTopicWithSection.value?.topic?.id;
+  if (!topicId) {
+    return "";
+  }
+
+  return topicForms.value[topicId]?.content || activePreviewTopicWithSection.value?.topic?.content || "";
 });
 
 const publicationChecklist = computed(() => {
   const hasCourseTitle = Boolean(form.value.title?.trim());
   const hasSections = previewStats.value.themesCount > 0;
   const hasMaterials = previewStats.value.materialsCount > 0;
-  const hasSectionTests = previewStats.value.sectionTestsCount > 0;
-  const hasFinalAssessment = Boolean(form.value.finalAssessmentId);
+  const hasSectionTests = !sectionTestsEnabled.value || previewStats.value.sectionTestsCount > 0;
+  const hasFinalAssessment = !finalAssessmentEnabled.value || Boolean(form.value.finalAssessmentId);
   const hasNoErrors = publicationErrorsForDisplay.value.length === 0;
   const hasPreviewTopic = Boolean(activePreviewTopicWithSection.value);
 
@@ -574,8 +614,8 @@ const publicationChecklist = computed(() => {
     { id: "base", label: "Основная информация заполнена", done: hasCourseTitle },
     { id: "structure", label: "Структура курса создана", done: hasSections },
     { id: "materials", label: "Материалы добавлены", done: hasMaterials },
-    { id: "tests", label: "Тесты созданы для всех тем", done: hasSectionTests },
-    { id: "final", label: "Аттестация настроена", done: hasFinalAssessment },
+    { id: "tests", label: sectionTestsEnabled.value ? "Тесты созданы для всех тем" : "Тесты тем отключены", done: hasSectionTests },
+    { id: "final", label: finalAssessmentEnabled.value ? "Аттестация настроена" : "Итоговая аттестация отключена", done: hasFinalAssessment },
     { id: "requirements", label: "Минимальные требования выполнены", done: hasNoErrors },
     { id: "preview", label: "Предпросмотр пройден", done: hasPreviewTopic },
   ];
@@ -772,6 +812,7 @@ const loadBranches = async () => {
 
 const applyCourseToForm = (courseItem) => {
   clearLocalCoverPreview();
+  coverRemoved.value = false;
   form.value = {
     title: courseItem.title || "",
     shortDescription: courseItem.shortDescription || "",
@@ -946,6 +987,7 @@ const handleCoverUpload = async (overrideCourseId = null, silent = false) => {
       }
     }
     clearLocalCoverPreview();
+    coverRemoved.value = false;
     selectedCoverFile.value = null;
     if (!silent) {
       showToast("Обложка курса загружена", "success");
@@ -970,6 +1012,7 @@ const saveCourse = async (options = {}) => {
     description: form.value.description.trim(),
     category: form.value.category.trim() || null,
     tags: form.value.tags.slice(0, 20),
+    ...(coverRemoved.value && !selectedCoverFile.value ? { coverUrl: null } : {}),
     finalAssessmentId: sanitizeOptionalNumber(form.value.finalAssessmentId),
     availabilityMode: form.value.availabilityMode || "unlimited",
     availabilityDays: form.value.availabilityMode === "relative_days" ? sanitizeOptionalNumber(form.value.availabilityDays) : null,
@@ -1035,12 +1078,8 @@ const saveCourse = async (options = {}) => {
 
 const goToStep = async (stepId) => {
   if (stepId === currentStep.value) return;
-
   if (stepId > currentStep.value) {
-    const saved = await saveCurrentStepBeforeForwardNavigation();
-    if (!saved) {
-      return;
-    }
+    return;
   }
 
   if (showMaterialStep.value && currentStep.value === 3 && stepId !== 3) {
@@ -1198,7 +1237,12 @@ const clearActiveMaterialContent = () => {
 const saveMaterialTopic = async () => {
   const topicId = activeMaterialTopic.value?.id;
   if (!topicId || !activeMaterialForm.value) return;
-  await saveTopic(topicId, { keepEditorOpen: true, successMessage: "Материал сохранен" });
+  savingMaterialTopicId.value = Number(topicId);
+  try {
+    await saveTopic(topicId, { keepEditorOpen: true, successMessage: "Материал сохранен" });
+  } finally {
+    savingMaterialTopicId.value = null;
+  }
 };
 
 const isSectionVisible = (section) => {
@@ -1450,7 +1494,7 @@ const removeTopic = async (topicId, title) => {
 };
 
 const handlePublish = async () => {
-  if (!course.value || !window.confirm(`Опубликовать курс "${course.value.title}"?`)) {
+  if (!course.value) {
     return;
   }
 
@@ -1458,7 +1502,7 @@ const handlePublish = async () => {
   try {
     await publishCourse(course.value.id);
     showToast("Курс опубликован", "success");
-    await loadCourse();
+    router.push("/courses");
   } catch (error) {
     const validationErrors = error?.response?.data?.validationErrors;
     if (Array.isArray(validationErrors) && validationErrors.length > 0) {
@@ -1572,7 +1616,7 @@ const handleRemoveAssignment = async (userId) => {
 
 const formatAssignedAt = (iso) => {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }) + " UTC";
 };
 
 const formatDuration = (secondsValue) => {
@@ -1658,6 +1702,16 @@ watch(
   },
 );
 
+watch(sectionTestsEnabled, (val) => {
+  const id = courseId.value;
+  if (id) localStorage.setItem(`course-${id}-sectionTestsEnabled`, String(val));
+});
+
+watch(finalAssessmentEnabled, (val) => {
+  const id = courseId.value;
+  if (id) localStorage.setItem(`course-${id}-finalAssessmentEnabled`, String(val));
+});
+
 onBeforeUnmount(() => {
   clearLocalCoverPreview();
   window.removeEventListener("dragover", preventWindowFileDrop);
@@ -1670,10 +1724,124 @@ onMounted(async () => {
   loading.value = true;
   await Promise.all([loadAssessments(), loadPositions(), loadBranches(), loadCourse()]);
   loading.value = false;
+
+  const id = courseId.value;
+  if (id) {
+    const storedTests = localStorage.getItem(`course-${id}-sectionTestsEnabled`);
+    const storedFinal = localStorage.getItem(`course-${id}-finalAssessmentEnabled`);
+    if (storedTests !== null) sectionTestsEnabled.value = storedTests !== "false";
+    if (storedFinal !== null) finalAssessmentEnabled.value = storedFinal !== "false";
+  }
 });
 </script>
 
 <style scoped>
+/* ── Переключатель функции шага ─────────────── */
+.step-feature-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.step-feature-toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.step-feature-toggle-track {
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: #d0d5dd;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.step-feature-toggle--on .step-feature-toggle-track {
+  background: #6c5ce7;
+}
+
+.step-feature-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.18);
+  transition: transform 0.2s;
+}
+
+.step-feature-toggle--on .step-feature-toggle-thumb {
+  transform: translateX(16px);
+}
+
+.step-feature-toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #667085);
+  white-space: nowrap;
+}
+
+.step-feature-toggle--on .step-feature-toggle-label {
+  color: #6c5ce7;
+}
+
+/* ── Заглушка отключённого шага ─────────────── */
+.step-disabled-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-secondary, #667085);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.step-disabled-state p {
+  margin: 0;
+  max-width: 520px;
+}
+
+.step-disabled-enable-btn {
+  border: 1px solid #6c5ce7;
+  border-radius: 8px;
+  background: #f7f5ff;
+  color: #6c5ce7;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.step-disabled-enable-btn:hover {
+  background: #ede9fd;
+}
+
+.step-toggle-card {
+  margin-bottom: 8px;
+}
+
+.step-card-header-no-border {
+  border-bottom: none !important;
+}
+
+.step-disabled-state.editor-card {
+  border-radius: var(--course-radius-lg);
+  background: var(--course-surface);
+  border: 1px solid var(--course-border);
+}
+
 .course-editor-view {
   width: 100%;
   --course-accent: #6c5ce7;
@@ -4019,7 +4187,6 @@ onMounted(async () => {
   color: var(--materials-muted);
   font-size: 14px;
 }
-
 
 .switch-label input {
   width: 16px;

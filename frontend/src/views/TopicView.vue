@@ -3,7 +3,13 @@
     <div class="container">
 
       <!-- Ошибка -->
-      <div v-if="errorText" class="card error-state">
+      <div v-if="isLoading" class="topic-skeleton">
+        <SkeletonPageHeader />
+        <SkeletonBlock class="topic-skeleton__progress" />
+        <SkeletonList :items="4" />
+      </div>
+
+      <div v-else-if="errorText" class="card error-state">
         <h3 class="title-small mb-8">Не удалось загрузить тему</h3>
         <p class="body-small text-secondary mb-12">{{ errorText }}</p>
         <button class="btn btn-primary btn-full" type="button" @click="loadSection">Повторить</button>
@@ -60,12 +66,19 @@ import { useRoute, useRouter } from "vue-router";
 import { apiClient } from "../services/apiClient";
 import LockPopup from "../components/courses/LockPopup.vue";
 import SubtopicItem from "../components/courses/SubtopicItem.vue";
+import { getVisibleTopics } from "../utils/courseVisibility";
+import SkeletonBlock from "../components/skeleton/SkeletonBlock.vue";
+import SkeletonList from "../components/skeleton/SkeletonList.vue";
+import SkeletonPageHeader from "../components/skeleton/SkeletonPageHeader.vue";
 
 export default {
   name: "TopicView",
   components: {
     LockPopup,
     SubtopicItem,
+    SkeletonBlock,
+    SkeletonList,
+    SkeletonPageHeader,
   },
   setup() {
     const route = useRoute();
@@ -82,7 +95,7 @@ export default {
 
     const courseId = computed(() => Number(route.params.courseId));
     const sectionId = computed(() => Number(route.params.sectionId));
-    const topics = computed(() => section.value?.topics || []);
+    const topics = computed(() => getVisibleTopics(section.value?.topics || []));
     const completedTopicsCount = computed(() => topics.value.filter((topic) => topic?.progress?.status === "completed").length);
     const sectionTitle = computed(() => {
       if (!section.value) return "Тема курса";
@@ -116,7 +129,14 @@ export default {
         return;
       }
 
-      router.push(`/courses/${courseId.value}/topics/${sectionId.value}/subtopics/${topic.id}`);
+      router.push({
+        name: "course-subtopic",
+        params: {
+          courseId: courseId.value,
+          sectionId: sectionId.value,
+          topicId: topic.id,
+        },
+      });
     }
 
     function openLockReason(topic) {
@@ -233,5 +253,16 @@ export default {
   font-size: 17px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.topic-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.topic-skeleton__progress {
+  height: 84px;
+  border-radius: 14px;
 }
 </style>

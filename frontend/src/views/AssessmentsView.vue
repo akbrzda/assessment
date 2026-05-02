@@ -28,16 +28,22 @@
         </button>
       </div>
 
-      <div v-if="coursesError" class="error-state">
+      <div v-if="isCoursesLoading" class="courses-skeleton">
+        <SkeletonPageHeader />
+        <SkeletonCard v-for="index in 4" :key="index" />
+      </div>
+
+      <div v-else-if="coursesError" class="error-state">
         <h3 class="title-small mb-8">Не удалось загрузить курсы</h3>
         <p class="body-small text-secondary mb-12">{{ coursesError }}</p>
         <button class="btn btn-primary btn-full" type="button" @click="retryCourses">Повторить</button>
       </div>
 
       <div v-else-if="filteredCourses.length" class="courses-list">
-        <button v-for="(course, index) in filteredCourses" :key="course.id" class="course-card" type="button" @click="openCourse(course.id)">
-          <div class="course-icon" :style="getCourseIconStyle(index)">
-            <component :is="getCourseIcon(course)" :size="24" class="course-icon-symbol" />
+        <button v-for="course in filteredCourses" :key="course.id" class="course-card" type="button" @click="openCourse(course.id)">
+          <div class="course-icon" :style="getCourseVisualStyle(course)">
+            <img v-if="course.coverUrl" :src="course.coverUrl" :alt="course.title" class="course-cover" loading="lazy" />
+            <component v-else :is="getCourseFallbackVisual(course.id).icon" class="course-icon-svg" :size="24" stroke-width="2" />
           </div>
           <div class="course-body">
             <h3 class="course-title">{{ course.title }}</h3>
@@ -70,17 +76,20 @@
 <script>
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { BookOpen, Clock3, Search, Trophy } from "lucide-vue-next";
+import { BookOpen, Search } from "lucide-vue-next";
 import { useTelegramStore } from "../stores/telegram";
 import { apiClient } from "../services/apiClient";
+import { getCourseFallbackVisual } from "../utils/courseVisuals";
+import SkeletonCard from "../components/skeleton/SkeletonCard.vue";
+import SkeletonPageHeader from "../components/skeleton/SkeletonPageHeader.vue";
 
 export default {
   name: "AssessmentsView",
   components: {
     BookOpen,
-    Clock3,
     Search,
-    Trophy,
+    SkeletonCard,
+    SkeletonPageHeader,
   },
   setup() {
     const router = useRouter();
@@ -97,14 +106,6 @@ export default {
       { key: "all", label: "Все курсы" },
       { key: "my", label: "Мои курсы" },
       { key: "completed", label: "Завершенные" },
-    ];
-
-    const iconSchemes = [
-      { background: "#EDE9FD" },
-      { background: "#DDFBE7" },
-      { background: "#FFF3E0" },
-      { background: "#E3F0FC" },
-      { background: "#FEE8ED" },
     ];
 
     const filteredCourses = computed(() => {
@@ -130,8 +131,11 @@ export default {
       searchInputRef.value?.focus();
     }
 
-    function getCourseIconStyle(index) {
-      return iconSchemes[index % iconSchemes.length];
+    function getCourseVisualStyle(course) {
+      if (course?.coverUrl) {
+        return {};
+      }
+      return { background: getCourseFallbackVisual(course?.id).background };
     }
 
     function getSectionsLabel(count) {
@@ -141,16 +145,12 @@ export default {
       return "тем";
     }
 
-    function getCourseIcon(course) {
-      if (course?.progress?.status === "completed") return Trophy;
-      const percent = Number(course?.progress?.progressPercent || 0);
-      if (percent >= 50) return Clock3;
-      return BookOpen;
-    }
-
     function openCourse(id) {
       telegramStore.hapticFeedback("impact", "light");
-      router.push(`/courses/${id}`);
+      router.push({
+        name: "course-details",
+        params: { id },
+      });
     }
 
     function normalizeCourse(item) {
@@ -159,6 +159,7 @@ export default {
         id: Number(item.id),
         title: item.title || "Курс",
         description: item.description || "",
+        coverUrl: item.coverUrl || item.cover_url || item.imageUrl || item.image || null,
         sectionsCount: Number(item.sectionsCount || 0),
         progress: {
           status: item.progress?.status || "not_started",
@@ -202,9 +203,9 @@ export default {
       coursesError,
       searchInputRef,
       focusSearch,
-      getCourseIconStyle,
+      getCourseVisualStyle,
       getSectionsLabel,
-      getCourseIcon,
+      getCourseFallbackVisual,
       openCourse,
       retryCourses,
     };
@@ -338,6 +339,7 @@ export default {
   width: 54px;
   height: 54px;
   border-radius: 14px;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -345,8 +347,14 @@ export default {
   flex-shrink: 0;
 }
 
-.course-icon-symbol {
-  color: var(--accent);
+.course-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.course-icon-svg {
+  color: rgba(15, 23, 42, 0.72);
 }
 
 .course-body {
@@ -424,6 +432,12 @@ export default {
 .error-state {
   text-align: center;
   padding: 40px 0;
+}
+
+.courses-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .empty-state {

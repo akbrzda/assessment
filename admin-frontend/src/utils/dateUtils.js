@@ -15,6 +15,7 @@ export function formatDate(date, includeTime = true) {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+      timeZone: "UTC",
     };
 
     if (includeTime) {
@@ -22,7 +23,7 @@ export function formatDate(date, includeTime = true) {
       options.minute = "2-digit";
     }
 
-    return dateObj.toLocaleString("ru-RU", options);
+    return dateObj.toLocaleString("ru-RU", options) + (includeTime ? " UTC" : "");
   } catch (error) {
     console.error("Ошибка форматирования даты:", error);
     return String(date);

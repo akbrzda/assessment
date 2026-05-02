@@ -133,18 +133,13 @@ const newAssignmentDeadlineAtModel = computed({
 .assignments-card {
   margin-top: 16px;
   box-shadow: var(--course-shadow);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 304px;
-  gap: 18px;
-  align-items: start;
-  background: none;
-  border: none;
 }
 
 .assignments-card :deep(.card-content) {
   background: var(--course-surface);
   border: 1px solid var(--course-border);
   border-radius: var(--course-radius-lg);
+  padding: 24px;
 }
 
 .assignments-header {
@@ -171,8 +166,9 @@ const newAssignmentDeadlineAtModel = computed({
 .targets-group {
   border-radius: 12px;
   padding: 14px;
-  background: var(--surface, #fff);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  border: 1px solid var(--divider);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 .targets-group h3 {
@@ -219,6 +215,7 @@ const newAssignmentDeadlineAtModel = computed({
 .manual-assignments {
   border-top: 1px solid var(--divider);
   padding-top: 16px;
+  margin-top: 8px;
 }
 
 .manual-assignments h3 {
@@ -228,8 +225,9 @@ const newAssignmentDeadlineAtModel = computed({
 }
 
 .add-assignment {
-  display: flex;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(180px, 240px) auto;
+  align-items: end;
   gap: 12px;
   margin-bottom: 14px;
 }
@@ -263,8 +261,15 @@ const newAssignmentDeadlineAtModel = computed({
   background: var(--bg-secondary);
 }
 
+.assignments-table tbody tr:hover td {
+  background: #fafcff;
+}
+
 @media (max-width: 1024px) {
   .targets-grid {
+    grid-template-columns: 1fr;
+  }
+  .add-assignment {
     grid-template-columns: 1fr;
   }
 }

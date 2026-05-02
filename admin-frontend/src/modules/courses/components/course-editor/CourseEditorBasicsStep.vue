@@ -109,7 +109,7 @@
 import { Info, Trash2, Upload } from "lucide-vue-next";
 import { Input, Select, TagsInput, Textarea, WysiwygEditor } from "@/components/ui";
 
-defineProps({
+const props = defineProps({
   form: { type: Object, required: true },
   errors: { type: Object, required: true },
   categoryOptions: { type: Array, required: true },
@@ -292,7 +292,8 @@ const emit = defineEmits(["cover-change", "cover-drop", "cover-drag-over", "trig
 .cover-preview-img {
   width: 100%;
   height: 140px;
-  object-fit: cover;
+  object-fit: contain;
+  background: #f8fafc;
   border-radius: 8px;
   border: 1px solid var(--course-border);
 }

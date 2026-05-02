@@ -1,8 +1,14 @@
 <template>
   <div class="page-container subtopic-page">
     <div class="subtopic-shell">
-     
-      <div v-if="errorText" class="subtopic-error">
+      <div v-if="isLoading" class="subtopic-skeleton">
+        <SkeletonBlock class="subtopic-skeleton__chip" />
+        <SkeletonBlock class="subtopic-skeleton__title" />
+        <SkeletonText :lines="8" />
+        <SkeletonBlock class="subtopic-skeleton__cta" />
+      </div>
+
+      <div v-else-if="errorText" class="subtopic-error">
         <h3 class="title-small">Не удалось загрузить подтему</h3>
         <p class="body-medium text-secondary">{{ errorText }}</p>
         <button class="btn btn-primary" type="button" @click="init">Повторить</button>
@@ -38,19 +44,39 @@ import { useRoute, useRouter } from "vue-router";
 import { ChevronRight } from "lucide-vue-next";
 import { apiClient } from "../services/apiClient";
 import { calculateReadingSeconds } from "../utils/readingTime";
+import { getVisibleTopics } from "../utils/courseVisibility";
+import SkeletonBlock from "../components/skeleton/SkeletonBlock.vue";
+import SkeletonText from "../components/skeleton/SkeletonText.vue";
 
 function sanitizeContent(html) {
   if (!html) return "";
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-    .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, "")
-    .replace(/javascript:/gi, "");
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+
+  doc.querySelectorAll("script").forEach((node) => node.remove());
+  doc.querySelectorAll("*").forEach((node) => {
+    for (const attr of [...node.attributes]) {
+      const attrName = attr.name.toLowerCase();
+      const attrValue = String(attr.value || "")
+        .trim()
+        .toLowerCase();
+      if (attrName.startsWith("on")) {
+        node.removeAttribute(attr.name);
+      } else if ((attrName === "href" || attrName === "src") && attrValue.startsWith("javascript:")) {
+        node.removeAttribute(attr.name);
+      }
+    }
+  });
+
+  return doc.body.innerHTML;
 }
 
 export default {
   name: "SubtopicView",
   components: {
     ChevronRight,
+    SkeletonBlock,
+    SkeletonText,
   },
   setup() {
     const route = useRoute();
@@ -70,7 +96,7 @@ export default {
     const sectionId = computed(() => Number(route.params.sectionId));
     const topicId = computed(() => Number(route.params.topicId));
 
-    const topics = computed(() => section.value?.topics || []);
+    const topics = computed(() => getVisibleTopics(section.value?.topics || []));
     const orderedTopics = computed(() =>
       [...topics.value].sort((a, b) => {
         const aOrder = Number(a?.orderIndex || 0);
@@ -156,7 +182,7 @@ export default {
         const response = await apiClient.getCourseSection(courseId.value, sectionId.value);
         section.value = response?.section || null;
 
-        const found = (section.value?.topics || []).find((t) => t.id === topicId.value);
+        const found = getVisibleTopics(section.value?.topics || []).find((t) => t.id === topicId.value);
         topic.value = found || null;
 
         if (!topic.value) {
@@ -206,16 +232,42 @@ export default {
       try {
         await apiClient.completeCourseTopic(courseId.value, topicId.value);
         if (nextTopic.value) {
-          router.push(`/courses/${courseId.value}/topics/${sectionId.value}/subtopics/${nextTopic.value.id}`);
+          await router.push({
+            name: "course-subtopic",
+            params: {
+              courseId: courseId.value,
+              sectionId: sectionId.value,
+              topicId: nextTopic.value.id,
+            },
+          });
         } else {
-          router.push(`/courses/${courseId.value}/topics/${sectionId.value}`);
+          await router.push({
+            name: "course-topic",
+            params: {
+              courseId: courseId.value,
+              sectionId: sectionId.value,
+            },
+          });
         }
       } catch (err) {
         if (err.status === 409) {
           if (nextTopic.value) {
-            router.push(`/courses/${courseId.value}/topics/${sectionId.value}/subtopics/${nextTopic.value.id}`);
+            await router.push({
+              name: "course-subtopic",
+              params: {
+                courseId: courseId.value,
+                sectionId: sectionId.value,
+                topicId: nextTopic.value.id,
+              },
+            });
           } else {
-            router.push(`/courses/${courseId.value}/topics/${sectionId.value}`);
+            await router.push({
+              name: "course-topic",
+              params: {
+                courseId: courseId.value,
+                sectionId: sectionId.value,
+              },
+            });
           }
         } else {
           errorText.value = err.message || "Не удалось завершить материал";
@@ -306,63 +358,63 @@ export default {
 }
 
 .topic-content {
-  color: #3f4a71;
-  font-size: 16px;
-  line-height: 1.56;
+  color: #000000;
+  font-size: 14px;
+  line-height: 1.6;
   margin-bottom: 18px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .topic-content :deep(h1) {
-  color: #111a44;
-  font-size: 26px;
-  line-height: 1.2;
+  margin: 0 0 12px;
+  line-height: 1.3;
   font-weight: 700;
-  margin: 0 0 18px;
-}
-
-.topic-content :deep(p) {
-  margin: 0 0 14px;
-  color: #3f4a71;
-}
-
-.topic-content :deep(p:first-of-type) {
-  color: #111a44;
-  font-size: 16px;
-}
-
-.topic-content :deep(p:not(:first-of-type)) {
-  color: #8b93b8;
-}
-
-.topic-content :deep(p:last-child) {
-  margin-bottom: 0;
 }
 
 .topic-content :deep(h2),
-.topic-content :deep(h3) {
-  color: #111a44;
-  margin: 20px 0 10px;
+.topic-content :deep(h3),
+.topic-content :deep(h4),
+.topic-content :deep(h5),
+.topic-content :deep(h6) {
+  margin: 0 0 12px;
+  line-height: 1.3;
   font-weight: 700;
+}
+
+.topic-content :deep(p) {
+  margin: 0 0 12px;
 }
 
 .topic-content :deep(ul),
 .topic-content :deep(ol) {
-  padding-left: 20px;
-  margin: 0 0 14px;
+  padding-left: 1.6em;
+  margin: 4px 0 12px;
+  list-style-position: outside;
 }
 
 .topic-content :deep(li) {
-  margin-bottom: 8px;
+  margin: 0 0 4px;
+  text-indent: 0;
+}
+
+.topic-content :deep(a) {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.topic-content :deep(img),
+.topic-content :deep(table),
+.topic-content :deep(pre) {
+  max-width: 100%;
 }
 
 .topic-content :deep(img),
 .topic-content :deep(iframe),
 .topic-content :deep(video) {
   width: 100%;
-  border-radius: 20px;
   display: block;
   margin: 12px 0;
-  background: #e7eaf5;
 }
 
 .empty-content {
@@ -447,6 +499,30 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.subtopic-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.subtopic-skeleton__chip {
+  width: 46%;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.subtopic-skeleton__title {
+  width: 62%;
+  height: 20px;
+}
+
+.subtopic-skeleton__cta {
+  height: 56px;
+  width: 130px;
+  border-radius: 16px;
 }
 
 @media (max-width: 760px) {

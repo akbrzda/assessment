@@ -5,7 +5,7 @@
     </div>
     <div class="course-editor-header-right">
       <Button v-if="currentStep < totalSteps" :loading="saving" :disabled="!canProceed" @click="emit('next')">Далее</Button>
-      <Button v-else variant="secondary" :loading="saving" @click="emit('save')">Сохранить</Button>
+      <Button v-else :loading="saving" @click="emit('save')">Опубликовать</Button>
     </div>
   </div>
 </template>

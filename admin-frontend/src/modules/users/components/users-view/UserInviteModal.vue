@@ -21,6 +21,9 @@
     </div>
     <div v-else>
       <div class="form-container">
+        <div v-if="inviteForm.existingUserId" class="invite-existing-note">
+          Создается приглашение для существующего пользователя админ-панели.
+        </div>
         <div class="form-row">
           <Input v-model="inviteForm.lastName" label="Фамилия" placeholder="Иванов" required :error="inviteErrors.lastName" />
           <Input v-model="inviteForm.firstName" label="Имя" placeholder="Иван" required :error="inviteErrors.firstName" />
@@ -164,5 +167,15 @@ const inviteLinkModel = computed({
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.invite-existing-note {
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #3730a3;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
 }
 </style>

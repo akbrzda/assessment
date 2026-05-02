@@ -3,7 +3,7 @@
     <div class="assessment-header">
       <div>
         <h3 class="title-small mb-8">{{ course.title }}</h3>
-        <p class="course-description">{{ course.description || "Описание курса пока не добавлено" }}</p>
+        <p class="course-description">{{ descriptionPreview }}</p>
       </div>
       <StatusBadge :status="course.progress.status" />
     </div>
@@ -45,6 +45,7 @@
 import { computed } from "vue";
 import ProgressBar from "./ProgressBar.vue";
 import StatusBadge from "./StatusBadge.vue";
+import { getRichTextPreview } from "../../utils/richText";
 
 export default {
   name: "CourseCard",
@@ -96,10 +97,13 @@ export default {
       return "Начать курс";
     });
 
+    const descriptionPreview = computed(() => getRichTextPreview(props.course?.description, "Описание курса пока не добавлено"));
+
     return {
       normalizedProgress,
       validityLabel,
       actionText,
+      descriptionPreview,
     };
   },
 };

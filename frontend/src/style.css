@@ -27,6 +27,10 @@ html {
   --accent-text-violet: #6d28d9;
   --accent-bg-warning: #fef3c7;
   --accent-text-warning: #d97706;
+  --skeleton-bg: #eceef3;
+  --skeleton-highlight: rgba(255, 255, 255, 0.72);
+  --skeleton-radius: 12px;
+  --skeleton-duration: 1.35s;
 }
 
 :root[data-theme="dark"],
@@ -51,6 +55,8 @@ html[data-theme="dark"] {
   --accent-text-violet: #9d94f5;
   --accent-bg-warning: #221a0d;
   --accent-text-warning: #ff9f0a;
+  --skeleton-bg: #2a2d39;
+  --skeleton-highlight: rgba(255, 255, 255, 0.12);
 }
 
 html {
@@ -408,6 +414,12 @@ body {
   }
   100% {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
   }
 }
 

@@ -3,6 +3,7 @@
     <!-- Заголовок страницы -->
     <PageHeader title="Курсы" subtitle="Управляйте курсами, модулями и версиями">
       <template #actions>
+        <ActionButton action="settings" label="Категории" @click.stop="categoryManagerOpen = true" />
         <ActionButton action="create" label="Создать курс" @click.stop="goToCreate" />
       </template>
     </PageHeader>
@@ -43,7 +44,7 @@
             </div>
             <div class="card-title-block">
               <h3 class="course-name">{{ course.title }}</h3>
-              <p class="course-desc">{{ course.description || "Без описания" }}</p>
+              <p class="course-desc">{{ getCourseDescriptionPreview(course.description) }}</p>
             </div>
           </div>
 
@@ -132,7 +133,7 @@
               <TableRow v-for="course in paginatedCourses" :key="course.id">
                 <TableCell>
                   <div class="cell-name">{{ course.title }}</div>
-                  <div class="cell-desc">{{ course.description || "Без описания" }}</div>
+                  <div class="cell-desc">{{ getCourseDescriptionPreview(course.description) }}</div>
                 </TableCell>
                 <TableCell>
                   <div class="status-cell-wrap">
@@ -147,9 +148,9 @@
                 <TableCell>{{ formatDate(course.updatedAt) }}</TableCell>
                 <TableCell>
                   <div class="author-cell">
-                    <div class="author-avatar">{{ getAuthorInitials(course.authorName) }}</div>
+                    <div class="author-avatar">СА</div>
                     <div>
-                      <div class="author-name">{{ course.authorName || "Суперадмин" }}</div>
+                      <div class="author-name">Суперадмин</div>
                       <div class="author-role">Суперадмин</div>
                     </div>
                   </div>
@@ -290,6 +291,30 @@
         <a href="#" class="funnel-link">Смотреть детальную статистику →</a>
       </div>
     </div>
+
+    <Modal v-model="categoryManagerOpen" title="Управление категориями" size="md">
+      <div class="category-manager">
+        <div class="category-manager-add">
+          <Input v-model="categoryDraft" label="Новая категория" placeholder="Например: Адаптация" />
+          <Button type="button" icon="plus" @click="handleAddCategory">Добавить</Button>
+        </div>
+
+        <div class="category-manager-list">
+          <div v-if="courseCategories.length === 0" class="category-manager-empty">Категорий пока нет.</div>
+          <div v-for="category in courseCategories" :key="category.value" class="category-manager-item">
+            <span>{{ category.label }}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              icon="trash"
+              :disabled="courseCategories.length <= 1"
+              @click="handleRemoveCategory(category.value)"
+            />
+          </div>
+        </div>
+      </div>
+    </Modal>
   </div>
 </template>
 
@@ -301,6 +326,8 @@ import {
   Button,
   Icon,
   FilterBar,
+  Input,
+  Modal,
   Select,
   Tabs,
   PageHeader,
@@ -320,31 +347,40 @@ import AnalyticsSummaryCards from "@/components/courses/AnalyticsSummaryCards.vu
 import { archiveCourse, deleteCourse, getCourses, getCourseAnalyticsFunnel } from "@/api/courses";
 import { useToast } from "@/composables/useToast";
 import { useSkeletonGate } from "@/composables/useSkeletonGate";
+import { loadCourseCategories, normalizeCategoryValue, saveCourseCategories } from "@/modules/courses/utils/courseCategories";
+import { getRichTextPreview } from "@/utils/richText";
 
 const router = useRouter();
 const { showToast } = useToast();
 const COURSES_VIEW_MODE_STORAGE_KEY = "admin:courses:view-mode";
+const VIEW_MODES = ["cards", "table"];
+
+const readSavedViewMode = () => {
+  try {
+    const savedMode = localStorage.getItem(COURSES_VIEW_MODE_STORAGE_KEY);
+    if (savedMode && VIEW_MODES.includes(savedMode)) {
+      return savedMode;
+    }
+  } catch (error) {
+    console.warn("Не удалось прочитать сохраненный режим отображения курсов", error);
+  }
+  return "cards";
+};
 
 const loading = ref(false);
 const { skeletonVisible } = useSkeletonGate(loading, { minDuration: 360, delay: 90 });
 const courses = ref([]);
 const funnel = ref([]);
-const viewMode = ref("cards");
+const viewMode = ref(readSavedViewMode());
+const categoryManagerOpen = ref(false);
+const categoryDraft = ref("");
+const courseCategories = ref(loadCourseCategories());
 
 const viewTabsConfig = [
   { value: "cards", label: "Карточки", icon: "layout-grid" },
   { value: "table", label: "Таблица", icon: "table-2" },
 ];
 
-const readSavedViewMode = () => {
-  const savedMode = localStorage.getItem(COURSES_VIEW_MODE_STORAGE_KEY);
-  if (!savedMode) {
-    return "cards";
-  }
-
-  const allowedModes = viewTabsConfig.map((tab) => tab.value);
-  return allowedModes.includes(savedMode) ? savedMode : "cards";
-};
 const openMenuId = ref(null);
 const currentPage = ref(1);
 const pageSize = ref(10);
@@ -518,7 +554,6 @@ const handleDelete = async (course) => {
 };
 
 onMounted(async () => {
-  viewMode.value = readSavedViewMode();
   await loadCourses();
   try {
     const response = await getCourseAnalyticsFunnel();
@@ -529,7 +564,14 @@ onMounted(async () => {
 });
 
 watch(viewMode, (nextMode) => {
-  localStorage.setItem(COURSES_VIEW_MODE_STORAGE_KEY, nextMode);
+  if (!VIEW_MODES.includes(nextMode)) {
+    return;
+  }
+  try {
+    localStorage.setItem(COURSES_VIEW_MODE_STORAGE_KEY, nextMode);
+  } catch (error) {
+    console.warn("Не удалось сохранить режим отображения курсов", error);
+  }
 });
 
 // Палитра иконок карточек
@@ -581,14 +623,42 @@ const closeMenus = () => {
   openMenuId.value = null;
 };
 
-const getAuthorInitials = (name) => {
-  if (!name) return "СА";
-  return name
-    .split(" ")
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase())
-    .join("");
+const getCourseDescriptionPreview = (description) => getRichTextPreview(description, "Без описания");
+
+const handleAddCategory = () => {
+  const rawLabel = String(categoryDraft.value || "").trim();
+  if (!rawLabel) return;
+
+  const normalizedValue = normalizeCategoryValue(rawLabel);
+  if (!normalizedValue) return;
+
+  const exists = courseCategories.value.some((item) => item.value === normalizedValue);
+  if (exists) {
+    showToast("Такая категория уже существует", "info");
+    return;
+  }
+
+  courseCategories.value = [...courseCategories.value, { value: normalizedValue, label: rawLabel }];
+  saveCourseCategories(courseCategories.value);
+  categoryDraft.value = "";
+  showToast("Категория добавлена", "success");
 };
+
+const handleRemoveCategory = (categoryValue) => {
+  if (courseCategories.value.length <= 1) {
+    showToast("Нельзя удалить последнюю категорию", "info");
+    return;
+  }
+
+  const nextCategories = courseCategories.value.filter((item) => item.value !== categoryValue);
+  if (!nextCategories.length) {
+    return;
+  }
+  courseCategories.value = nextCategories;
+  saveCourseCategories(courseCategories.value);
+  showToast("Категория удалена", "success");
+};
+
 </script>
 
 <style scoped>
@@ -1227,6 +1297,48 @@ const getAuthorInitials = (name) => {
 
 .funnel-link:hover {
   text-decoration: underline;
+}
+
+.category-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.category-manager-add {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+}
+
+.category-manager-add :deep(.input-wrapper) {
+  flex: 1;
+}
+
+.category-manager-list {
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.category-manager-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.category-manager-item:last-child {
+  border-bottom: none;
+}
+
+.category-manager-empty {
+  padding: 12px;
+  color: var(--text-secondary);
+  font-size: 14px;
 }
 
 @media (max-width: 1280px) {

@@ -2,11 +2,21 @@
   <div class="page-container">
     <div class="container">
 
+      <template v-if="isLoading">
+        <div class="course-skeleton">
+          <SkeletonPageHeader />
+          <SkeletonBlock class="course-skeleton__progress" />
+          <SkeletonList :items="4" />
+        </div>
+      </template>
 
-      <template v-if="course">
+      <template v-else-if="course">
         <section class="course-header">
+          <div v-if="course.coverUrl || course.cover_url" class="course-cover-wrap">
+            <img class="course-cover" :src="course.coverUrl || course.cover_url" alt="Обложка курса" />
+          </div>
           <h1 class="course-title">{{ course.title }}</h1>
-          <p v-if="course.description" class="course-description">{{ course.description }}</p>
+          <p v-if="courseDescription" class="course-description">{{ courseDescription }}</p>
         </section>
 
         <section class="course-progress">
@@ -33,9 +43,9 @@
               :key="section.id"
               class="section-card"
               :class="{
-                'is-locked': section.progress.locked,
+                'is-locked': isSectionLocked(section, sectionIndex),
                 'is-passed': section.progress.status === 'passed',
-                'is-active': !section.progress.locked && section.progress.status !== 'passed',
+                'is-active': !isSectionLocked(section, sectionIndex) && section.progress.status !== 'passed',
               }"
               type="button"
               @click="openSectionEntry(section)"
@@ -46,14 +56,18 @@
               </div>
               <span class="section-title">{{ section.title }}</span>
               <span class="section-right">
-                <Lock v-if="section.progress.locked" class="section-lock-icon" :size="18" />
+                <Lock v-if="isSectionLocked(section, sectionIndex)" class="section-lock-icon" :size="18" />
                 <span v-else class="section-count">{{ getSectionTopicsProgress(section) }}</span>
               </span>
             </button>
           </div>
         </section>
 
-        <div class="final-assessment-card" :class="{ 'is-available': course.finalAssessment.available, 'is-passed': isFinalAssessmentPassed }">
+        <div
+          v-if="isFinalAssessmentEnabled"
+          class="final-assessment-card"
+          :class="{ 'is-available': course.finalAssessment.available, 'is-passed': isFinalAssessmentPassed }"
+        >
           <div class="final-icon-wrap" :class="{ 'final-icon-wrap--passed': isFinalAssessmentPassed }">
             <GraduationCap class="final-icon" :size="26" />
           </div>
@@ -103,6 +117,11 @@ import { apiClient } from "../services/apiClient";
 import { useTelegramStore } from "../stores/telegram";
 import { useUserStore } from "../stores/user";
 import LockPopup from "../components/courses/LockPopup.vue";
+import { getVisibleTopics, sectionHasVisibleTopics } from "../utils/courseVisibility";
+import { getRichTextPreview } from "../utils/richText";
+import SkeletonBlock from "../components/skeleton/SkeletonBlock.vue";
+import SkeletonList from "../components/skeleton/SkeletonList.vue";
+import SkeletonPageHeader from "../components/skeleton/SkeletonPageHeader.vue";
 
 const COURSE_COMPLETION_STORAGE_KEY = "courseCompletionContext";
 
@@ -113,6 +132,9 @@ export default {
     Check,
     GraduationCap,
     Lock,
+    SkeletonBlock,
+    SkeletonList,
+    SkeletonPageHeader,
   },
   setup() {
     const route = useRoute();
@@ -140,6 +162,31 @@ export default {
     });
 
     const courseId = computed(() => Number(route.params.id));
+    const courseDescription = computed(() => getRichTextPreview(course.value?.description, ""));
+
+    function normalizeSectionTopics(section) {
+      if (!section) {
+        return section;
+      }
+
+      return {
+        ...section,
+        topics: getVisibleTopics(section.topics || []),
+      };
+    }
+
+    function normalizeCoursePayload(rawCourse) {
+      if (!rawCourse) {
+        return null;
+      }
+
+      const visibleSections = (rawCourse.sections || []).filter((section) => sectionHasVisibleTopics(section)).map((section) => normalizeSectionTopics(section));
+
+      return {
+        ...rawCourse,
+        sections: visibleSections,
+      };
+    }
 
     const isFinalAssessmentPassed = computed(() => {
       if (!course.value) return false;
@@ -148,6 +195,10 @@ export default {
       const finalId = course.value?.finalAssessment?.id;
       if (!finalId) return false;
       return getAssessmentSummary(finalId)?.passed === true;
+    });
+
+    const isFinalAssessmentEnabled = computed(() => {
+      return Boolean(course.value?.finalAssessment?.id);
     });
 
     const finalAssessmentBestScore = computed(() => {
@@ -237,6 +288,43 @@ export default {
       return `${completed}/${total}`;
     }
 
+    function isSectionCompletedByTopics(section) {
+      const topics = section?.topics || [];
+      if (!topics.length) {
+        return false;
+      }
+      return topics.every((topic) => topic?.progress?.status === "completed");
+    }
+
+    function isSectionLocked(section, sectionIndex) {
+      if (!section) {
+        return true;
+      }
+
+      if (!section?.progress?.locked) {
+        return false;
+      }
+
+      const sections = course.value?.sections || [];
+      for (let index = 0; index < sectionIndex; index += 1) {
+        const previousSection = sections[index];
+        if (!previousSection) {
+          continue;
+        }
+
+        const isRequired = previousSection.isRequired !== false;
+        if (!isRequired) {
+          continue;
+        }
+
+        if (!isSectionCompletedByTopics(previousSection)) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
     function openSectionLockReason(section = null) {
       lockSheet.value = {
         visible: true,
@@ -248,7 +336,13 @@ export default {
 
     function openSectionPage(section) {
       if (!section?.id) return;
-      router.push(`/courses/${courseId.value}/topics/${section.id}`);
+      router.push({
+        name: "course-topic",
+        params: {
+          courseId: courseId.value,
+          sectionId: section.id,
+        },
+      });
     }
 
     function openSectionEntry(section) {
@@ -256,7 +350,8 @@ export default {
         return;
       }
 
-      if (section.progress?.locked) {
+      const sectionIndex = (course.value?.sections || []).findIndex((item) => Number(item.id) === Number(section.id));
+      if (isSectionLocked(section, sectionIndex)) {
         openSectionLockReason(section);
         return;
       }
@@ -358,7 +453,8 @@ export default {
       }
 
       for (const section of course.value.sections || []) {
-        if (section.progress?.locked) {
+        const sectionIndex = (course.value?.sections || []).findIndex((item) => Number(item.id) === Number(section.id));
+        if (isSectionLocked(section, sectionIndex)) {
           continue;
         }
 
@@ -400,12 +496,25 @@ export default {
       }
 
       if (nextStep.type === "topic") {
-        router.push(`/courses/${courseId.value}/topics/${nextStep.sectionId}/subtopics/${nextStep.topicId}`);
+        router.push({
+          name: "course-subtopic",
+          params: {
+            courseId: courseId.value,
+            sectionId: nextStep.sectionId,
+            topicId: nextStep.topicId,
+          },
+        });
         return true;
       }
 
       if (nextStep.type === "section") {
-        router.push(`/courses/${courseId.value}/topics/${nextStep.sectionId}`);
+        router.push({
+          name: "course-topic",
+          params: {
+            courseId: courseId.value,
+            sectionId: nextStep.sectionId,
+          },
+        });
         return true;
       }
 
@@ -504,7 +613,7 @@ export default {
         }
 
         const [courseResponse, assessmentsResponse] = await Promise.all([apiClient.getCourseById(id), apiClient.listUserAssessments()]);
-        course.value = courseResponse?.course || null;
+        course.value = normalizeCoursePayload(courseResponse?.course || null);
 
         const nextMap = new Map();
         for (const item of assessmentsResponse?.assessments || []) {
@@ -538,6 +647,7 @@ export default {
       isLoading,
       isStarting,
       course,
+      courseDescription,
       courseId,
       lockSheet,
       stickyActionLabel,
@@ -547,10 +657,12 @@ export default {
       getSectionStatusText,
       getSectionSubtitle,
       getSectionTopicsProgress,
+      isSectionLocked,
       openSectionEntry,
       getFinalReasonText,
       getFinalActionText,
       openFinalAssessment,
+      isFinalAssessmentEnabled,
       isFinalAssessmentPassed,
       finalAssessmentBestScore,
       finalAssessmentResultLink,
@@ -566,6 +678,21 @@ export default {
 .course-header {
   margin-bottom: 20px;
   padding-top: 16px;
+}
+
+.course-cover-wrap {
+  margin-bottom: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--divider);
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.course-cover {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  display: block;
 }
 
 .course-title {
@@ -820,5 +947,16 @@ export default {
   border-radius: 12px;
   width: min(92vw, 420px);
   padding: 20px;
+}
+
+.course-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.course-skeleton__progress {
+  height: 88px;
+  border-radius: 14px;
 }
 </style>

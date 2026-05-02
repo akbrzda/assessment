@@ -5,15 +5,24 @@
       <span v-if="required" class="wysiwyg-required">*</span>
     </label>
 
-    <div class="wysiwyg-shell" :class="{ 'wysiwyg-shell-focused': isFocused, 'wysiwyg-shell-error': !!error }">
+    <div v-if="isFullscreen" class="wysiwyg-fullscreen-backdrop" @click="toggleFullscreen"></div>
+
+    <div class="wysiwyg-shell" :class="{ 'wysiwyg-shell-error': !!error, 'wysiwyg-shell-fullscreen': isFullscreen }">
+      <div v-if="isFullscreen" class="wysiwyg-fullscreen-header">
+        <div class="wysiwyg-fullscreen-title">{{ label || "Редактор материала" }}</div>
+        <button type="button" class="wysiwyg-fullscreen-close" @click="closeFullscreen">
+          <X class="wysiwyg-btn-icon" />
+          <span>Закрыть</span>
+        </button>
+      </div>
+
       <div class="wysiwyg-toolbar">
         <select
           class="wysiwyg-heading-select"
+          :value="activeHeading"
           title="Стиль заголовка"
           aria-label="Стиль заголовка"
-          :value="activeHeading"
-          @focus="saveSelectionRange"
-          @change="applyHeading($event.target.value)"
+          @change="setHeading($event.target.value)"
         >
           <option value="p">Текст</option>
           <option value="h1">Заголовок 1</option>
@@ -23,140 +32,122 @@
           <option value="h5">Заголовок 5</option>
           <option value="h6">Заголовок 6</option>
         </select>
+        <select
+          class="wysiwyg-heading-select"
+          :value="activeFontSize"
+          title="Размер текста"
+          aria-label="Размер текста"
+          @change="setFontSize($event.target.value)"
+        >
+          <option v-for="size in fontSizeOptions" :key="size.value" :value="size.value">{{ size.label }}</option>
+        </select>
         <span class="wysiwyg-divider"></span>
+
         <button
           type="button"
           class="wysiwyg-btn"
-          :class="{ 'wysiwyg-btn-active': activeStates.bold }"
+          :class="{ 'wysiwyg-btn-active': isActive('bold') }"
           title="Жирный"
           aria-label="Жирный"
-          @mousedown.prevent="exec('bold')"
+          @mousedown.prevent="run('toggleBold')"
         >
-          <b>B</b>
+          <Bold class="wysiwyg-btn-icon" />
         </button>
         <button
           type="button"
           class="wysiwyg-btn wysiwyg-btn-italic"
-          :class="{ 'wysiwyg-btn-active': activeStates.italic }"
+          :class="{ 'wysiwyg-btn-active': isActive('italic') }"
           title="Курсив"
           aria-label="Курсив"
-          @mousedown.prevent="exec('italic')"
+          @mousedown.prevent="run('toggleItalic')"
         >
-          <i>I</i>
+          <Italic class="wysiwyg-btn-icon" />
         </button>
         <button
           type="button"
           class="wysiwyg-btn"
-          :class="{ 'wysiwyg-btn-active': activeStates.underline }"
+          :class="{ 'wysiwyg-btn-active': isActive('underline') }"
           title="Подчеркнутый"
           aria-label="Подчеркнутый"
-          @mousedown.prevent="exec('underline')"
+          @mousedown.prevent="run('toggleUnderline')"
         >
-          <u>U</u>
+          <UnderlineIcon class="wysiwyg-btn-icon" />
         </button>
         <button
           type="button"
           class="wysiwyg-btn"
-          :class="{ 'wysiwyg-btn-active': activeStates.strikeThrough }"
+          :class="{ 'wysiwyg-btn-active': isActive('strike') }"
           title="Зачеркнутый"
           aria-label="Зачеркнутый"
-          @mousedown.prevent="exec('strikeThrough')"
+          @mousedown.prevent="run('toggleStrike')"
         >
-          <s>S</s>
+          <Strikethrough class="wysiwyg-btn-icon" />
         </button>
         <span class="wysiwyg-divider"></span>
+
         <button
           type="button"
           class="wysiwyg-btn"
-          :class="{ 'wysiwyg-btn-active': activeStates.unorderedList }"
+          :class="{ 'wysiwyg-btn-active': isActive('bulletList') }"
           title="Маркированный список"
           aria-label="Маркированный список"
-          @mousedown.prevent="exec('insertUnorderedList')"
+          @mousedown.prevent="run('toggleBulletList')"
         >
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M9 6h10M9 12h10M9 18h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-            <circle cx="5" cy="6" r="1.5" fill="currentColor" />
-            <circle cx="5" cy="12" r="1.5" fill="currentColor" />
-            <circle cx="5" cy="18" r="1.5" fill="currentColor" />
-          </svg>
+          <List class="wysiwyg-btn-icon" />
         </button>
         <button
           type="button"
           class="wysiwyg-btn"
-          :class="{ 'wysiwyg-btn-active': activeStates.orderedList }"
+          :class="{ 'wysiwyg-btn-active': isActive('orderedList') }"
           title="Нумерованный список"
           aria-label="Нумерованный список"
-          @mousedown.prevent="exec('insertOrderedList')"
+          @mousedown.prevent="run('toggleOrderedList')"
         >
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M10 6h10M10 12h10M10 18h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-            <path
-              d="M3.5 5.5h2M4.5 5.5v3M3.5 11.5h2M3.5 17.8c0-1.2 1.9-1.2 1.9-2.3 0-.5-.4-.9-.9-.9-.5 0-.9.3-1 .8"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </button>
-        <button type="button" class="wysiwyg-btn" title="Уменьшить отступ" aria-label="Уменьшить отступ" @mousedown.prevent="exec('outdent')">
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M9 6h11M9 12h11M9 18h11M3 12h4M5 10l-2 2 2 2"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </button>
-        <button type="button" class="wysiwyg-btn" title="Увеличить отступ" aria-label="Увеличить отступ" @mousedown.prevent="exec('indent')">
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M3 6h11M3 12h11M3 18h11M21 12h-4M19 10l2 2-2 2"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <ListOrdered class="wysiwyg-btn-icon" />
         </button>
         <span class="wysiwyg-divider"></span>
+
+        <button type="button" class="wysiwyg-btn" title="Ссылка" aria-label="Ссылка" @mousedown.prevent="setLink">
+          <LinkIcon class="wysiwyg-btn-icon" />
+        </button>
+        <button type="button" class="wysiwyg-btn" title="Убрать ссылку" aria-label="Убрать ссылку" @mousedown.prevent="run('unsetLink')">
+          <Unlink class="wysiwyg-btn-icon" />
+        </button>
+        <button type="button" class="wysiwyg-btn" title="Добавить изображение" aria-label="Добавить изображение" @mousedown.prevent="openImageUpload">
+          <ImagePlus class="wysiwyg-btn-icon" />
+        </button>
+        <button type="button" class="wysiwyg-btn" title="Добавить видео" aria-label="Добавить видео" @mousedown.prevent="openVideoUpload">
+          <Video class="wysiwyg-btn-icon" />
+        </button>
+        <button type="button" class="wysiwyg-btn" title="Очистить формат" aria-label="Очистить формат" @mousedown.prevent="clearFormatting">
+          <Eraser class="wysiwyg-btn-icon" />
+        </button>
+        <span class="wysiwyg-divider"></span>
+
+        <label class="wysiwyg-color" title="Цвет текста" aria-label="Цвет текста">
+          <input type="color" :value="currentColor" @input="setColor($event.target.value)" />
+        </label>
         <button
           type="button"
           class="wysiwyg-btn"
-          :class="{ 'wysiwyg-btn-active': activeStates.link }"
-          title="Добавить ссылку"
-          aria-label="Добавить ссылку"
-          @mousedown.prevent="insertLink"
+          :class="{ 'wysiwyg-btn-active': sourceMode }"
+          title="Исходный код"
+          aria-label="Исходный код"
+          @mousedown.prevent="toggleSourceMode"
         >
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M9 12a4 4 0 014-4h3a4 4 0 010 8h-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-            <path d="M15 12a4 4 0 01-4 4H8a4 4 0 010-8h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-          </svg>
+          <Code2 class="wysiwyg-btn-icon" />
         </button>
-        <button type="button" class="wysiwyg-btn" title="Убрать ссылку" aria-label="Убрать ссылку" @mousedown.prevent="exec('unlink')">
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M9 12a4 4 0 014-4h3a4 4 0 010 8h-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-            <path d="M15 12a4 4 0 01-4 4H8a4 4 0 010-8h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-            <path d="M5 5l14 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-          </svg>
+        <button
+          type="button"
+          class="wysiwyg-btn"
+          :class="{ 'wysiwyg-btn-active': isFullscreen }"
+          :title="isFullscreen ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'"
+          :aria-label="isFullscreen ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'"
+          @mousedown.prevent="toggleFullscreen"
+        >
+          <Minimize2 v-if="isFullscreen" class="wysiwyg-btn-icon" />
+          <Maximize2 v-else class="wysiwyg-btn-icon" />
         </button>
-        <button type="button" class="wysiwyg-btn" title="Добавить изображение" aria-label="Добавить изображение" @mousedown.prevent="insertImage">
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.8" />
-            <circle cx="9" cy="10" r="1.7" fill="currentColor" />
-            <path d="M5.5 17l4.5-4 3.5 3 2-2L19 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
-        <button type="button" class="wysiwyg-btn" title="Добавить видео" aria-label="Добавить видео" @mousedown.prevent="insertVideo">
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <rect x="3" y="5" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.8" />
-            <path d="M10 10.5l4 2.5-4 2.5v-5z" fill="currentColor" />
-            <path d="M17 10l4-2v8l-4-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
-        <button type="button" class="wysiwyg-btn" title="Очистить формат" aria-label="Очистить формат" @mousedown.prevent="clearFormatting">C</button>
 
         <input
           ref="imageInputRef"
@@ -174,19 +165,22 @@
         />
       </div>
 
-      <div
-        ref="editorRef"
-        class="wysiwyg-content"
+      <textarea
+        v-if="sourceMode"
+        v-model="sourceValue"
+        class="wysiwyg-source"
+        :class="{ 'wysiwyg-source-fullscreen': isFullscreen }"
         :style="{ minHeight: `${minHeight}px` }"
-        contenteditable="true"
-        :data-placeholder="placeholder"
-        @focus="isFocused = true"
-        @blur="handleBlur"
-        @input="handleInput"
-        @keyup="updateActiveStates"
-        @mouseup="updateActiveStates"
-        @paste="handlePaste"
-      ></div>
+        spellcheck="false"
+        @input="handleSourceInput"
+      />
+      <EditorContent
+        v-else-if="editor"
+        :editor="editor"
+        class="wysiwyg-content"
+        :class="{ 'wysiwyg-content-fullscreen': isFullscreen }"
+        :style="{ minHeight: `${minHeight}px` }"
+      />
     </div>
 
     <div v-if="showCounter" class="wysiwyg-meta">
@@ -199,293 +193,402 @@
 </template>
 
 <script setup>
-import { nextTick, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { Editor, EditorContent } from "@tiptap/vue-3";
+import { Node } from "@tiptap/core";
+import StarterKit from "@tiptap/starter-kit";
+import { TextStyle, FontSize } from "@tiptap/extension-text-style";
+import Color from "@tiptap/extension-color";
+import Underline from "@tiptap/extension-underline";
+import Link from "@tiptap/extension-link";
+import Image from "@tiptap/extension-image";
+import {
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
+  Strikethrough,
+  List,
+  ListOrdered,
+  Link as LinkIcon,
+  Unlink,
+  ImagePlus,
+  Video,
+  Eraser,
+  Code2,
+  Maximize2,
+  Minimize2,
+  X,
+} from "lucide-vue-next";
 import { uploadCourseMedia } from "../../api/courses";
 import { API_BASE_URL } from "../../env";
 
+const VideoNode = Node.create({
+  name: "video",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      src: { default: "" },
+      controls: { default: true },
+      preload: { default: "metadata" },
+      width: { default: null },
+      height: { default: null },
+    };
+  },
+  parseHTML() {
+    return [{ tag: "video[src]" }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["video", HTMLAttributes];
+  },
+});
+
+const IframeNode = Node.create({
+  name: "iframe",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      src: { default: "" },
+      width: { default: null },
+      height: { default: null },
+      frameborder: { default: "0" },
+      allowfullscreen: { default: "true" },
+      allow: {
+        default: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
+      },
+      referrerpolicy: { default: "strict-origin-when-cross-origin" },
+    };
+  },
+  parseHTML() {
+    return [{ tag: "iframe[src]" }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["iframe", HTMLAttributes];
+  },
+});
+
 const props = defineProps({
-  modelValue: {
-    type: String,
-    default: "",
-  },
-  label: {
-    type: String,
-    default: "",
-  },
-  placeholder: {
-    type: String,
-    default: "",
-  },
-  hint: {
-    type: String,
-    default: "",
-  },
-  error: {
-    type: String,
-    default: "",
-  },
-  required: {
-    type: Boolean,
-    default: false,
-  },
-  minHeight: {
-    type: Number,
-    default: 120,
-  },
-  maxLength: {
-    type: Number,
-    default: 0,
-  },
-  showCounter: {
-    type: Boolean,
-    default: false,
-  },
+  modelValue: { type: String, default: "" },
+  label: { type: String, default: "" },
+  placeholder: { type: String, default: "" },
+  hint: { type: String, default: "" },
+  error: { type: String, default: "" },
+  required: { type: Boolean, default: false },
+  minHeight: { type: Number, default: 120 },
+  maxLength: { type: Number, default: 0 },
+  showCounter: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["update:modelValue"]);
 
 const API_ORIGIN = (API_BASE_URL || "http://localhost:3001/api").replace(/\/api\/?$/, "");
-
-const editorRef = ref(null);
-const isFocused = ref(false);
-const charCount = ref(0);
 const imageInputRef = ref(null);
 const videoInputRef = ref(null);
-const savedSelectionRange = ref(null);
-const activeStates = ref({
-  bold: false,
-  italic: false,
-  underline: false,
-  strikeThrough: false,
-  unorderedList: false,
-  orderedList: false,
-  link: false,
+const sourceMode = ref(false);
+const isFullscreen = ref(false);
+const sourceValue = ref(props.modelValue || "");
+const currentColor = ref("#000000");
+const charCount = ref(0);
+const lastValidHtml = ref(props.modelValue || "<p></p>");
+const bodyScrollLockPadding = ref(0);
+
+const fontSizeOptions = [
+  { value: "", label: "Размер" },
+  { value: "12px", label: "12" },
+  { value: "14px", label: "14" },
+  { value: "16px", label: "16" },
+  { value: "18px", label: "18" },
+  { value: "20px", label: "20" },
+  { value: "24px", label: "24" },
+  { value: "28px", label: "28" },
+  { value: "32px", label: "32" },
+];
+
+const editor = ref(
+  new Editor({
+    content: props.modelValue || "",
+    extensions: [
+      StarterKit,
+      TextStyle,
+      FontSize,
+      Color,
+      Underline,
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+      }),
+      Image,
+      VideoNode,
+      IframeNode,
+    ],
+    editorProps: {
+      attributes: {
+        class: "wysiwyg-editor-content",
+      },
+    },
+    onUpdate: ({ editor: instance }) => {
+      if (sourceMode.value) {
+        return;
+      }
+      const plain = instance.getText() || "";
+      if (props.maxLength > 0 && plain.length > props.maxLength) {
+        instance.commands.setContent(lastValidHtml.value, false);
+        return;
+      }
+      const html = instance.getHTML();
+      lastValidHtml.value = html;
+      sourceValue.value = html;
+      charCount.value = plain.length;
+      emit("update:modelValue", html);
+    },
+    onCreate: ({ editor: instance }) => {
+      charCount.value = (instance.getText() || "").length;
+      sourceValue.value = instance.getHTML();
+      lastValidHtml.value = instance.getHTML();
+    },
+  }),
+);
+
+const activeHeading = computed(() => {
+  if (!editor.value) return "p";
+  if (editor.value.isActive("heading", { level: 1 })) return "h1";
+  if (editor.value.isActive("heading", { level: 2 })) return "h2";
+  if (editor.value.isActive("heading", { level: 3 })) return "h3";
+  if (editor.value.isActive("heading", { level: 4 })) return "h4";
+  if (editor.value.isActive("heading", { level: 5 })) return "h5";
+  if (editor.value.isActive("heading", { level: 6 })) return "h6";
+  return "p";
 });
-const activeHeading = ref("p");
 
-const getPlainTextLength = () => (editorRef.value?.innerText || "").replace(/\n+$/g, "").length;
+const activeFontSize = computed(() => {
+  const value = editor.value?.getAttributes("textStyle")?.fontSize;
+  return value || "";
+});
 
-const trimContentToLimit = () => {
-  if (!editorRef.value || props.maxLength <= 0) {
+const isActive = (name) => Boolean(editor.value?.isActive(name));
+
+const run = (command) => {
+  if (!editor.value || sourceMode.value) return;
+  editor.value.chain().focus()[command]().run();
+};
+
+const setHeading = (value) => {
+  if (!editor.value || sourceMode.value) return;
+  const chain = editor.value.chain().focus();
+  if (value === "p") {
+    chain.setParagraph().run();
     return;
   }
+  const level = Number(value.replace("h", ""));
+  chain.toggleHeading({ level }).run();
+};
 
-  const plainText = editorRef.value.innerText || "";
-  if (plainText.length <= props.maxLength) {
+const setFontSize = (value) => {
+  if (!editor.value || sourceMode.value) return;
+  const chain = editor.value.chain().focus();
+  if (!value) {
+    chain.unsetFontSize().run();
     return;
   }
-
-  const trimmed = plainText.slice(0, props.maxLength);
-  editorRef.value.innerText = trimmed;
+  chain.setFontSize(value).run();
 };
 
-const updateActiveStates = () => {
-  const block = document.queryCommandValue("formatBlock") || "p";
-  activeHeading.value = ["h1", "h2", "h3", "h4", "h5", "h6"].includes(block.toLowerCase()) ? block.toLowerCase() : "p";
-  activeStates.value = {
-    bold: document.queryCommandState("bold"),
-    italic: document.queryCommandState("italic"),
-    underline: document.queryCommandState("underline"),
-    strikeThrough: document.queryCommandState("strikeThrough"),
-    unorderedList: document.queryCommandState("insertUnorderedList"),
-    orderedList: document.queryCommandState("insertOrderedList"),
-    link: document.queryCommandState("createLink"),
-  };
+const setColor = (value) => {
+  currentColor.value = value || "#111827";
+  if (!editor.value || sourceMode.value) return;
+  editor.value.chain().focus().setColor(currentColor.value).run();
 };
 
-const syncEditorValue = (html) => {
-  if (!editorRef.value) return;
-  if (editorRef.value.innerHTML !== (html || "")) {
-    editorRef.value.innerHTML = html || "";
-  }
-  trimContentToLimit();
-  charCount.value = getPlainTextLength();
-  updateActiveStates();
+const clearFormatting = () => {
+  if (!editor.value || sourceMode.value) return;
+  editor.value.chain().focus().unsetAllMarks().clearNodes().run();
 };
 
-const handleInput = () => {
-  if (!editorRef.value) return;
-  trimContentToLimit();
-  charCount.value = getPlainTextLength();
-  updateActiveStates();
-  emit("update:modelValue", editorRef.value.innerHTML);
-};
-
-const handlePaste = (event) => {
-  if (props.maxLength <= 0 || !editorRef.value) {
+const setLink = () => {
+  if (!editor.value || sourceMode.value) return;
+  const previous = editor.value.getAttributes("link").href || "";
+  const url = window.prompt("Введите URL ссылки:", previous);
+  if (url === null) return;
+  if (!url) {
+    editor.value.chain().focus().unsetLink().run();
     return;
   }
-
-  const pastedText = event.clipboardData?.getData("text/plain") || "";
-  const currentLength = getPlainTextLength();
-  const availableChars = props.maxLength - currentLength;
-
-  if (availableChars <= 0) {
-    event.preventDefault();
-    return;
-  }
-
-  if (pastedText.length > availableChars) {
-    event.preventDefault();
-    const limitedText = pastedText.slice(0, availableChars);
-    document.execCommand("insertText", false, limitedText);
-  }
-};
-
-const handleBlur = () => {
-  isFocused.value = false;
-  if (!editorRef.value) return;
-  updateActiveStates();
-  emit("update:modelValue", editorRef.value.innerHTML);
-};
-
-const exec = (command) => {
-  editorRef.value?.focus();
-  document.execCommand(command, false, null);
-  updateActiveStates();
-};
-
-const saveSelectionRange = () => {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) {
-    savedSelectionRange.value = null;
-    return;
-  }
-
-  savedSelectionRange.value = selection.getRangeAt(0).cloneRange();
-};
-
-const restoreSelectionRange = () => {
-  if (!savedSelectionRange.value) {
-    return;
-  }
-
-  const selection = window.getSelection();
-  if (!selection) {
-    return;
-  }
-
-  selection.removeAllRanges();
-  selection.addRange(savedSelectionRange.value);
+  editor.value.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
 };
 
 const resolveMediaUrl = (url) => {
-  if (!url) {
-    return "";
-  }
-
-  if (/^https?:\/\//i.test(url)) {
-    return url;
-  }
-
-  if (!url.startsWith("/")) {
-    return `${API_ORIGIN}/${url}`;
-  }
-
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  if (!url.startsWith("/")) return `${API_ORIGIN}/${url}`;
   return `${API_ORIGIN}${url}`;
 };
 
-const setParagraph = () => {
-  editorRef.value?.focus();
-  document.execCommand("formatBlock", false, "p");
-  updateActiveStates();
-};
-
-const applyHeading = (tag) => {
-  restoreSelectionRange();
-  editorRef.value?.focus();
-  document.execCommand("formatBlock", false, tag);
-  updateActiveStates();
-  emit("update:modelValue", editorRef.value?.innerHTML || "");
-};
-
-const insertLink = () => {
-  const url = window.prompt("Введите URL ссылки:");
-  if (!url) return;
-  editorRef.value?.focus();
-  document.execCommand("createLink", false, url);
-  updateActiveStates();
-};
-
-const insertImage = () => {
-  saveSelectionRange();
+const openImageUpload = () => {
   imageInputRef.value?.click();
 };
 
-const insertVideo = () => {
-  saveSelectionRange();
+const openVideoUpload = () => {
   videoInputRef.value?.click();
 };
 
+const getVideoDimensionsFromFile = (file) =>
+  new Promise((resolve) => {
+    if (!file) {
+      resolve({ width: null, height: null });
+      return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    const probeVideo = document.createElement("video");
+    probeVideo.preload = "metadata";
+    probeVideo.src = objectUrl;
+
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl);
+      probeVideo.removeAttribute("src");
+    };
+
+    probeVideo.onloadedmetadata = () => {
+      const width = Number(probeVideo.videoWidth) || null;
+      const height = Number(probeVideo.videoHeight) || null;
+      cleanup();
+      resolve({ width, height });
+    };
+
+    probeVideo.onerror = () => {
+      cleanup();
+      resolve({ width: null, height: null });
+    };
+  });
+
 const handleImageFileChange = async (event) => {
   const file = event?.target?.files?.[0] || null;
-  if (!file || !editorRef.value) {
-    return;
-  }
+  if (!file || !editor.value) return;
 
   try {
     const response = await uploadCourseMedia(file, "image");
     const mediaUrl = resolveMediaUrl(response?.mediaUrl || "");
-    if (!mediaUrl) {
-      return;
-    }
-
-    editorRef.value.focus();
-    restoreSelectionRange();
-    document.execCommand("insertImage", false, mediaUrl);
-    handleInput();
+    if (!mediaUrl) return;
+    editor.value.chain().focus().setImage({ src: mediaUrl }).run();
   } catch (error) {
     console.error("Не удалось загрузить изображение:", error);
   } finally {
-    if (event?.target) {
-      event.target.value = "";
-    }
+    if (event?.target) event.target.value = "";
   }
 };
 
 const handleVideoFileChange = async (event) => {
   const file = event?.target?.files?.[0] || null;
-  if (!file || !editorRef.value) return;
+  if (!file || !editor.value) return;
 
   try {
+    const { width, height } = await getVideoDimensionsFromFile(file);
     const response = await uploadCourseMedia(file, "video");
     const mediaUrl = resolveMediaUrl(response?.mediaUrl || "");
-    if (!mediaUrl) {
-      return;
-    }
-
-    editorRef.value.focus();
-    restoreSelectionRange();
-    const safeUrl = mediaUrl.replace(/"/g, "&quot;");
-    const videoMarkup = `<video controls preload="metadata" src="${safeUrl}"></video>`;
-    document.execCommand("insertHTML", false, videoMarkup);
-    handleInput();
+    if (!mediaUrl) return;
+    editor.value
+      .chain()
+      .focus()
+      .insertContent({
+        type: "video",
+        attrs: {
+          src: mediaUrl,
+          controls: true,
+          preload: "metadata",
+          width,
+          height,
+        },
+      })
+      .run();
   } catch (error) {
     console.error("Не удалось загрузить видео:", error);
   } finally {
-    if (event?.target) {
-      event.target.value = "";
-    }
+    if (event?.target) event.target.value = "";
   }
 };
 
-const clearFormatting = () => {
-  editorRef.value?.focus();
-  document.execCommand("removeFormat", false, null);
-  document.execCommand("unlink", false, null);
-  updateActiveStates();
+const toggleSourceMode = () => {
+  sourceMode.value = !sourceMode.value;
+  if (sourceMode.value) {
+    sourceValue.value = editor.value?.getHTML() || props.modelValue || "";
+    return;
+  }
+  if (!editor.value) return;
+  editor.value.commands.setContent(sourceValue.value || "", false);
+  const plain = editor.value.getText() || "";
+  charCount.value = plain.length;
+  lastValidHtml.value = editor.value.getHTML();
+  emit("update:modelValue", lastValidHtml.value);
 };
+
+const handleSourceInput = () => {
+  emit("update:modelValue", sourceValue.value || "");
+};
+
+const toggleFullscreen = () => {
+  isFullscreen.value = !isFullscreen.value;
+};
+
+const closeFullscreen = () => {
+  isFullscreen.value = false;
+};
+
+const handleKeyDown = (event) => {
+  if (event?.key === "Escape" && isFullscreen.value) {
+    closeFullscreen();
+  }
+};
+
+watch(isFullscreen, (enabled) => {
+  if (typeof document === "undefined") return;
+
+  if (enabled) {
+    bodyScrollLockPadding.value = Math.max(window.innerWidth - document.documentElement.clientWidth, 0);
+    document.body.style.overflow = "hidden";
+    document.body.style.paddingRight = bodyScrollLockPadding.value > 0 ? `${bodyScrollLockPadding.value}px` : "";
+    return;
+  }
+
+  document.body.style.overflow = "";
+  document.body.style.paddingRight = "";
+});
+
+onMounted(() => {
+  if (typeof window === "undefined") return;
+  window.addEventListener("keydown", handleKeyDown);
+});
 
 watch(
   () => props.modelValue,
-  async (newValue) => {
-    await nextTick();
-    syncEditorValue(newValue);
+  (newValue) => {
+    const normalized = newValue || "";
+    if (sourceMode.value) {
+      if (sourceValue.value !== normalized) {
+        sourceValue.value = normalized;
+      }
+      return;
+    }
+    if (!editor.value) return;
+    const current = editor.value.getHTML();
+    if (current !== normalized) {
+      editor.value.commands.setContent(normalized, false);
+    }
+    lastValidHtml.value = normalized || "<p></p>";
+    charCount.value = (editor.value.getText() || "").length;
   },
 );
 
-onMounted(() => {
-  syncEditorValue(props.modelValue);
+onBeforeUnmount(() => {
+  if (typeof document !== "undefined") {
+    document.body.style.overflow = "";
+    document.body.style.paddingRight = "";
+  }
+  if (typeof window !== "undefined") {
+    window.removeEventListener("keydown", handleKeyDown);
+  }
+  editor.value?.destroy();
 });
 </script>
 
@@ -515,14 +618,65 @@ onMounted(() => {
   width: 100%;
   min-width: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   transition:
     border-color 0.15s,
     box-shadow 0.15s;
 }
 
-.wysiwyg-shell-focused {
-  border-color: #d0d5dd;
-  box-shadow: 0 0 0 3px rgba(16, 24, 40, 0.05);
+.wysiwyg-fullscreen-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 999;
+}
+
+.wysiwyg-shell-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.35);
+}
+
+.wysiwyg-fullscreen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--divider);
+  background: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 7;
+}
+
+.wysiwyg-fullscreen-title {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.wysiwyg-fullscreen-close {
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #344054;
+  height: 32px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.wysiwyg-fullscreen-close:hover {
+  background: #f8fafc;
 }
 
 .wysiwyg-shell-error {
@@ -540,6 +694,13 @@ onMounted(() => {
   border-radius: 12px 12px 0 0;
   overflow-x: auto;
   overflow-y: hidden;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.wysiwyg-shell-fullscreen .wysiwyg-toolbar {
+  top: 53px;
 }
 
 .wysiwyg-file-input {
@@ -547,13 +708,13 @@ onMounted(() => {
 }
 
 .wysiwyg-btn {
-  width: 26px;
-  height: 26px;
+  min-width: 28px;
+  height: 28px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
   color: #667085;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
@@ -563,6 +724,14 @@ onMounted(() => {
     background-color 0.15s,
     border-color 0.15s,
     color 0.15s;
+  padding: 0 6px;
+}
+
+.wysiwyg-btn-icon {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2;
+  flex-shrink: 0;
 }
 
 .wysiwyg-btn:hover {
@@ -581,24 +750,19 @@ onMounted(() => {
   color: #3f3f46;
 }
 
-.wysiwyg-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
 .wysiwyg-divider {
   width: 1px;
   height: 16px;
   background: #e4e7ec;
-  margin: 0 4px;
+  margin: 0 2px;
 }
 
 .wysiwyg-heading-select {
-  height: 26px;
+  height: 28px;
   padding: 0 6px;
   border: 1px solid #e4e7ec;
   border-radius: 6px;
-  background: transparent;
+  background: #fff;
   color: #667085;
   font-size: 12px;
   font-weight: 500;
@@ -611,47 +775,112 @@ onMounted(() => {
   color: #344054;
 }
 
-.wysiwyg-content {
+.wysiwyg-content :deep(.ProseMirror) {
+  min-height: inherit;
   padding: 12px;
   font-size: 14px;
   line-height: 1.6;
-  color: var(--text-primary);
+  color: #000000;
   outline: none;
   word-break: break-word;
   overflow-wrap: anywhere;
-  max-width: 100%;
 }
 
-.wysiwyg-content:empty::before {
+.wysiwyg-content-fullscreen {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.wysiwyg-shell-fullscreen .wysiwyg-content :deep(.ProseMirror) {
+  min-height: calc(100vh - 173px);
+}
+
+.wysiwyg-content :deep(.ProseMirror p.is-editor-empty:first-child::before) {
   content: attr(data-placeholder);
   color: var(--text-tertiary, #9ca3af);
   pointer-events: none;
+  float: left;
+  height: 0;
 }
 
-.wysiwyg-content ul,
-.wysiwyg-content ol {
-  padding-left: 1.4em !important;
+.wysiwyg-content :deep(ul) {
+  padding-left: 1.6em !important;
   margin: 4px 0 !important;
-  margin-left: 0 !important;
-  list-style-position: inside;
+  list-style-type: disc !important;
+  list-style-position: outside;
 }
 
-.wysiwyg-content li {
-  margin-left: 0 !important;
-  text-indent: 0;
+.wysiwyg-content :deep(ol) {
+  padding-left: 1.6em !important;
+  margin: 4px 0 !important;
+  list-style-type: decimal !important;
+  list-style-position: outside;
 }
 
-.wysiwyg-content a {
+.wysiwyg-content :deep(li) {
+  margin: 0 0 4px !important;
+  text-indent: 0 !important;
+  display: list-item !important;
+}
+
+.wysiwyg-content :deep(a) {
   color: #2563eb;
   text-decoration: underline;
 }
 
-.wysiwyg-content img,
-.wysiwyg-content video,
-.wysiwyg-content iframe,
-.wysiwyg-content table,
-.wysiwyg-content pre {
+.wysiwyg-content :deep(img),
+.wysiwyg-content :deep(table),
+.wysiwyg-content :deep(pre) {
   max-width: 100%;
+}
+
+.wysiwyg-content :deep(video) {
+  display: block;
+  max-width: none;
+}
+
+.wysiwyg-content :deep(iframe) {
+  display: block;
+  max-width: none;
+}
+
+.wysiwyg-source {
+  width: 100%;
+  border: 0;
+  outline: none;
+  resize: vertical;
+  padding: 12px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #0f172a;
+  background: #fbfdff;
+}
+
+.wysiwyg-shell-fullscreen .wysiwyg-source {
+  min-height: calc(100vh - 173px) !important;
+  resize: none;
+  flex: 1 1 auto;
+}
+
+.wysiwyg-source-fullscreen {
+  min-height: calc(100vh - 173px) !important;
+}
+
+.wysiwyg-color {
+  display: inline-flex;
+  align-items: center;
+}
+
+.wysiwyg-color input {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
 .wysiwyg-meta {

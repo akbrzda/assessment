@@ -13,8 +13,24 @@
         </div>
       </section>
 
-      <!-- Реальный контент -->
-      <template>
+      <div v-if="isDataLoading" class="dashboard-loading app-panel">
+        <SkeletonPageHeader />
+        <SkeletonCard />
+        <div class="dashboard-loading__stats">
+          <SkeletonBlock class="dashboard-loading__stat" />
+          <SkeletonBlock class="dashboard-loading__stat" />
+          <SkeletonBlock class="dashboard-loading__stat" />
+        </div>
+        <SkeletonList :items="3" />
+      </div>
+
+      <div v-else-if="dashboardError" class="dashboard-error app-panel">
+        <h2 class="section-title">Не удалось загрузить дашборд</h2>
+        <p class="dashboard-error__text">{{ dashboardError }}</p>
+        <button class="continue-btn" type="button" @click="loadDashboardData">Повторить</button>
+      </div>
+
+      <template v-else>
         <section class="dashboard-section">
           <h2 class="section-title">Продолжить обучение</h2>
           <article v-if="continueCourse" class="continue-card app-panel">
@@ -32,7 +48,7 @@
                 loading="lazy"
                 @error="handleContinueImageError"
               />
-              <BookOpen v-else :size="28" class="continue-image-icon" />
+              <component v-else :is="continueCourseFallbackIcon" class="continue-image-icon" :size="30" stroke-width="2" />
             </div>
           </article>
           <article v-else-if="dashboardStats.courses === 0" class="continue-empty app-panel">
@@ -75,7 +91,13 @@
         <section class="dashboard-section">
           <h2 class="section-title">Ближайшие задачи</h2>
           <div v-if="displayTasks.length" class="task-list app-list-stack">
-            <button v-for="task in displayTasks" :key="task.id" class="task-item app-panel" type="button" @click="router.push('/assessments')">
+            <button
+              v-for="task in displayTasks"
+              :key="task.id"
+              class="task-item app-panel"
+              type="button"
+              @click="router.push({ name: 'assessments' })"
+            >
               <div
                 class="task-icon app-round-icon"
                 :class="
@@ -96,7 +118,7 @@
           <div v-else class="tasks-empty app-panel">
             <ShieldCheck :size="32" class="tasks-empty-icon" />
             <p class="tasks-empty-text">Все курсы завершены или ещё не начаты</p>
-            <button class="tasks-empty-link" type="button" @click="router.push('/assessments')">Перейти к курсам</button>
+            <button class="tasks-empty-link" type="button" @click="router.push({ name: 'assessments' })">Перейти к курсам</button>
           </div>
         </section>
       </template>
@@ -111,6 +133,11 @@ import { Bell, BookOpen, ChevronRight, Clock3, MessageSquareText, ShieldCheck } 
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 import { apiClient } from "../services/apiClient";
+import { getCourseFallbackVisual } from "../utils/courseVisuals";
+import SkeletonBlock from "../components/skeleton/SkeletonBlock.vue";
+import SkeletonCard from "../components/skeleton/SkeletonCard.vue";
+import SkeletonList from "../components/skeleton/SkeletonList.vue";
+import SkeletonPageHeader from "../components/skeleton/SkeletonPageHeader.vue";
 
 function normalizeCourse(item) {
   if (!item) {
@@ -140,6 +167,10 @@ export default {
     Clock3,
     MessageSquareText,
     ShieldCheck,
+    SkeletonBlock,
+    SkeletonCard,
+    SkeletonList,
+    SkeletonPageHeader,
   },
   setup() {
     const router = useRouter();
@@ -149,6 +180,7 @@ export default {
     const recentActivity = ref([]);
     const courses = ref([]);
     const isDataLoading = ref(false);
+    const dashboardError = ref("");
     const isContinueImageBroken = ref(false);
     const dashboardStats = ref({
       courses: 0,
@@ -209,6 +241,13 @@ export default {
       return continueCourse.value.coverUrl;
     });
 
+    const continueCourseFallbackIcon = computed(() => {
+      if (!continueCourse.value?.id) {
+        return getCourseFallbackVisual(0).icon;
+      }
+      return getCourseFallbackVisual(continueCourse.value.id).icon;
+    });
+
     watch(
       () => continueCourse.value?.coverUrl,
       () => {
@@ -235,7 +274,10 @@ export default {
         return;
       }
       telegramStore.hapticFeedback("impact", "light");
-      router.push(`/courses/${courseId}`);
+      router.push({
+        name: "course-details",
+        params: { id: courseId },
+      });
     }
 
     function handleContinueAction() {
@@ -244,7 +286,7 @@ export default {
         return;
       }
 
-      router.push("/assessments");
+      router.push({ name: "assessments" });
     }
 
     function handleContinueImageError() {
@@ -257,6 +299,7 @@ export default {
       }
 
       isDataLoading.value = true;
+      dashboardError.value = "";
       try {
         const [, coursesResponse] = await Promise.all([userStore.loadOverview(), apiClient.listCourses()]);
 
@@ -272,7 +315,7 @@ export default {
         };
 
         recentActivity.value = courses.value
-          .filter((course) => Number(course.progress?.progressPercent || 0) > 0)
+          .filter((course) => Number(course.progress?.progressPercent || 0) > 0 && course.progress?.status !== "completed")
           .sort((a, b) => {
             return Number(b.progress?.progressPercent || 0) - Number(a.progress?.progressPercent || 0);
           })
@@ -289,6 +332,7 @@ export default {
           }));
       } catch (error) {
         console.error("Не удалось загрузить данные дашборда", error);
+        dashboardError.value = error?.message || "Попробуйте повторить позже";
         courses.value = [];
         recentActivity.value = [];
         dashboardStats.value = {
@@ -302,19 +346,25 @@ export default {
     }
 
     onMounted(async () => {
+      if (typeof document !== "undefined" && document.body) {
+        document.body.style.overflow = "";
+      }
       await loadDashboardData();
     });
 
     return {
       userStore,
       isDataLoading,
+      dashboardError,
       dashboardStats,
       greetingText,
       continueCourse,
       continueCourseTitle,
       continueCourseMeta,
       continueCourseImageUrl,
+      continueCourseFallbackIcon,
       displayTasks,
+      loadDashboardData,
       handleContinueAction,
       handleContinueImageError,
       router,
@@ -389,6 +439,36 @@ export default {
 
 .dashboard-section {
   margin-bottom: 24px;
+}
+
+.dashboard-loading,
+.dashboard-error {
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.dashboard-loading__text,
+.dashboard-error__text {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.dashboard-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dashboard-loading__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboard-loading__stat {
+  height: 90px;
+  border-radius: 12px;
 }
 
 .section-heading-row {
@@ -490,7 +570,7 @@ export default {
 }
 
 .continue-image-icon {
-  color: var(--text-secondary);
+  color: rgba(15, 23, 42, 0.62);
 }
 
 /* ── Stats grid ──────────────────────────────────── */

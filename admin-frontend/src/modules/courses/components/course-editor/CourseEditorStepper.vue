@@ -7,8 +7,9 @@
       :class="{
         'stepper-active': currentStep === step.id,
         'stepper-completed': currentStep > step.id,
+        'stepper-disabled': step.id > currentStep,
       }"
-      @click="emit('step-click', step.id)"
+      @click="handleStepClick(step.id)"
     >
       <div v-if="index > 0" class="stepper-connector"></div>
       <div class="stepper-bubble">
@@ -26,12 +27,19 @@
 <script setup>
 import { Check } from "lucide-vue-next";
 
-defineProps({
+const props = defineProps({
   steps: { type: Array, required: true },
   currentStep: { type: Number, required: true },
 });
 
 const emit = defineEmits(["step-click"]);
+
+const handleStepClick = (stepId) => {
+  if (stepId > props.currentStep) {
+    return;
+  }
+  emit("step-click", stepId);
+};
 </script>
 
 <style scoped>
@@ -54,6 +62,10 @@ const emit = defineEmits(["step-click"]);
   flex: 1;
   min-width: 0;
   cursor: pointer;
+}
+
+.stepper-item.stepper-disabled {
+  cursor: not-allowed;
 }
 
 .stepper-connector {

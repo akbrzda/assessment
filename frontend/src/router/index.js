@@ -79,6 +79,18 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/profile/achievements",
+    name: "achievements",
+    component: () => import("../views/AchievementsView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/profile/history",
+    name: "learning-history",
+    component: () => import("../views/LearningHistoryView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/:pathMatch(.*)*",
     redirect: "/invitation",
   },
@@ -96,6 +108,16 @@ router.beforeEach(async (to, from, next) => {
     return next(navigationTarget);
   }
   return next();
+});
+
+router.afterEach((to) => {
+  if (typeof document === "undefined" || !document.body) {
+    return;
+  }
+
+  if (to.name !== "assessment-process") {
+    document.body.style.overflow = "";
+  }
 });
 
 export default router;

@@ -236,14 +236,16 @@ const formatDate = (value) => {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("ru-RU");
+  return date.toLocaleDateString("ru-RU", { timeZone: "UTC" });
 };
 
 const formatDateTime = (value) => {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return (
+    date.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC"
+  );
 };
 
 const formatScore = (score) => {
@@ -335,13 +337,18 @@ onMounted(async () => {
   flex-direction: column;
   gap: 16px;
 }
-.back-btn {
-  border: none;
-  background: transparent;
-  color: #4f46e5;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 0;
+.user-details-back :deep(.button) {
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 38px;
+  box-shadow: none;
+}
+
+.user-details-back :deep(.button-ghost) {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: #344054;
 }
 .user-head-card {
   display: grid;

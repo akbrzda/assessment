@@ -247,7 +247,14 @@
                 <Button type="button" class="materials-delete-button" variant="danger" size="sm" icon="trash" @click="emit('clear-material-content')">Удалить материал</Button>
                 <div>
                   <ActionButton action="cancel" size="sm" class="materials-cancel-button" @click="emit('close-material-editor', 2)" />
-                  <ActionButton action="save" label="Сохранить изменения" size="sm" class="materials-save-button" :disabled="updatingTopicId === activeMaterialTopic.id" @click="emit('save-material-topic')" />
+                  <ActionButton
+                    action="save"
+                    :label="isMaterialSaving ? 'Сохраняем материал...' : 'Сохранить изменения'"
+                    size="sm"
+                    class="materials-save-button"
+                    :disabled="isMaterialSaving || updatingTopicId === activeMaterialTopic.id"
+                    @click="emit('save-material-topic')"
+                  />
                 </div>
               </div>
             </div>
@@ -303,6 +310,7 @@ const props = defineProps({
   activeMaterialTopic: { type: Object, default: null },
   activeMaterialForm: { type: Object, default: null },
   materialIframeDraft: { type: String, default: "" },
+  savingMaterialTopicId: { type: [Number, String, null], default: null },
 });
 
 const emit = defineEmits([
@@ -339,6 +347,8 @@ const materialIframeDraftModel = computed({
   get: () => props.materialIframeDraft,
   set: (value) => emit("update:material-iframe-draft", value),
 });
+
+const isMaterialSaving = computed(() => Number(props.savingMaterialTopicId) === Number(props.activeMaterialTopic?.id));
 </script>
 
 <style scoped>

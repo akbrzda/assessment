@@ -12,8 +12,14 @@
       </div>
     </div>
 
-    <div v-if="isLoading" class="loading-state">
-      <div class="spinner"></div>
+    <div v-if="isLoading" class="leaderboard-skeleton">
+      <SkeletonPageHeader />
+      <div class="leaderboard-skeleton__podium">
+        <SkeletonBlock class="leaderboard-skeleton__person leaderboard-skeleton__person--small" />
+        <SkeletonBlock class="leaderboard-skeleton__person leaderboard-skeleton__person--large" />
+        <SkeletonBlock class="leaderboard-skeleton__person leaderboard-skeleton__person--small" />
+      </div>
+      <SkeletonList :items="5" />
     </div>
 
     <template v-else-if="leaders.length">
@@ -78,9 +84,17 @@ import { ref, onMounted } from "vue";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 import { apiClient } from "../services/apiClient";
+import SkeletonBlock from "../components/skeleton/SkeletonBlock.vue";
+import SkeletonList from "../components/skeleton/SkeletonList.vue";
+import SkeletonPageHeader from "../components/skeleton/SkeletonPageHeader.vue";
 
 export default {
   name: "LeaderboardView",
+  components: {
+    SkeletonBlock,
+    SkeletonList,
+    SkeletonPageHeader,
+  },
   setup() {
     const userStore = useUserStore();
     const telegramStore = useTelegramStore();
@@ -323,21 +337,29 @@ export default {
   color: var(--text-secondary);
   white-space: nowrap;
 }
-.loading-state {
+.leaderboard-skeleton {
   display: flex;
-  justify-content: center;
-  padding: 80px 0;
+  flex-direction: column;
+  gap: 14px;
 }
-.spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--divider, #e0e0e0);
-  border-top-color: #5b5fcf;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+
+.leaderboard-skeleton__podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
 }
-@keyframes spin {
-  to { transform: rotate(360deg); }
+
+.leaderboard-skeleton__person {
+  border-radius: 16px;
+}
+
+.leaderboard-skeleton__person--small {
+  height: 120px;
+}
+
+.leaderboard-skeleton__person--large {
+  height: 152px;
 }
 .empty-state {
   text-align: center;

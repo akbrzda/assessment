@@ -43,6 +43,7 @@
       :get-user-status="getUserStatus"
       :format-date="formatDate"
       :is-super-admin="authStore.isSuperAdmin"
+      :can-invite-to-client-app="canInviteToClientApp"
       @update:page="
         pagination.page = $event;
         loadUsers();
@@ -57,6 +58,7 @@
       @open-profile-page="openProfilePage"
       @open-edit-modal="openEditModal"
       @open-delete-modal="openDeleteModal"
+      @invite-existing-user="openInviteForExistingUser"
     />
 
     <!-- Create modal -->
@@ -258,7 +260,7 @@ const showProfileModal = ref(false);
 const showResetProgressModal = ref(false);
 const showInviteModal = ref(false);
 
-const inviteForm = ref({ firstName: "", lastName: "", phone: "", positionId: "", branchId: "" });
+const inviteForm = ref({ firstName: "", lastName: "", phone: "", positionId: "", branchId: "", existingUserId: null });
 const inviteErrors = ref({});
 const inviteLink = ref("");
 const inviteCreatedUserId = ref(null);
@@ -287,6 +289,12 @@ const canEditUser = (user) => {
   if (authStore.isManager && user.role_name === "employee") return true;
 
   return false;
+};
+
+const canInviteToClientApp = (user) => {
+  if (!user) return false;
+  const hasAdminAccess = user.role_name === "superadmin" || user.role_name === "manager";
+  return hasAdminAccess && !user.telegram_id;
 };
 
 const defaultForm = () => ({
@@ -841,6 +849,7 @@ const formatDate = (value) => {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    timeZone: "UTC",
   });
 };
 
@@ -848,13 +857,16 @@ const formatDateTime = (value) => {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return (
+    date.toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "UTC",
+    }) + " UTC"
+  );
 };
 
 const formatTimeSpent = (seconds) => {
@@ -1026,7 +1038,25 @@ const applyGeneratedPassword = async () => {
 };
 
 const openInviteModal = () => {
-  inviteForm.value = { firstName: "", lastName: "", phone: "", positionId: "", branchId: "" };
+  inviteForm.value = { firstName: "", lastName: "", phone: "", positionId: "", branchId: "", existingUserId: null };
+  inviteErrors.value = {};
+  inviteLink.value = "";
+  showInviteModal.value = true;
+};
+
+const openInviteForExistingUser = (user) => {
+  if (!canInviteToClientApp(user)) {
+    showToast("Приглашение доступно только для пользователей с доступом в админ-панель без Telegram", "warning");
+    return;
+  }
+  inviteForm.value = {
+    firstName: user.first_name || "",
+    lastName: user.last_name || "",
+    phone: "",
+    positionId: user.position_id ? Number(user.position_id) : "",
+    branchId: user.branch_id ? Number(user.branch_id) : "",
+    existingUserId: Number(user.id),
+  };
   inviteErrors.value = {};
   inviteLink.value = "";
   showInviteModal.value = true;
@@ -1060,6 +1090,7 @@ const handleInviteCreate = async () => {
       phone: inviteForm.value.phone.trim() || undefined,
       positionId: Number(inviteForm.value.positionId),
       branchId: Number(inviteForm.value.branchId),
+      existingUserId: inviteForm.value.existingUserId ? Number(inviteForm.value.existingUserId) : undefined,
     });
     const code = data?.invitation?.code;
     inviteCreatedUserId.value = data?.invitation?.invited_user_id || null;
@@ -1260,7 +1291,6 @@ onMounted(async () => {
   }
 }
 
-
 .credentials-card {
   display: flex;
   flex-direction: column;
@@ -1324,5 +1354,4 @@ onMounted(async () => {
   color: var(--text-secondary);
   margin: 12px 0 0;
 }
-
 </style>

@@ -25,9 +25,13 @@ export function useBackButton() {
   const NAVIGATION_HIERARCHY = {
     // Пользовательские страницы
     profile: "/dashboard",
+    achievements: "/profile",
+    "learning-history": "/profile",
     leaderboard: "/dashboard",
     assessments: "/dashboard",
     "course-details": "/assessments",
+    "course-topic": (currentRoute) => `/courses/${currentRoute.params.courseId}`,
+    "course-subtopic": (currentRoute) => `/courses/${currentRoute.params.courseId}/topics/${currentRoute.params.sectionId}`,
     "assessment-results": "/assessments",
 
     // Админские страницы
@@ -57,15 +61,16 @@ export function useBackButton() {
     const routeName = route.name;
 
     // Проверяем есть ли в иерархии родительский маршрут
-    const parentRoute = NAVIGATION_HIERARCHY[routeName];
+    const routeResolver = NAVIGATION_HIERARCHY[routeName];
+    const parentRoute = typeof routeResolver === "function" ? routeResolver(route) : routeResolver;
 
     if (parentRoute) {
       console.log(`🔙 Navigating from ${routeName} to ${parentRoute}`);
-      router.push(parentRoute);
+      router.replace(parentRoute);
     } else {
       // Если не определено - возвращаемся на dashboard
       console.log(`🔙 No parent route defined for ${routeName}, going to dashboard`);
-      router.push("/dashboard");
+      router.replace("/dashboard");
     }
   }
 
@@ -77,7 +82,7 @@ export function useBackButton() {
       telegramStore.showBackButton(handleBackButton);
       console.log(`⬅️ Back button shown for route: ${route.name}`);
     } else {
-      telegramStore.hideBackButton();
+      telegramStore.hideBackButton(handleBackButton);
       console.log(`❌ Back button hidden for route: ${route.name}`);
     }
   }
@@ -97,7 +102,7 @@ export function useBackButton() {
 
   onUnmounted(() => {
     // Скрываем кнопку при размонтировании компонента
-    telegramStore.hideBackButton();
+    telegramStore.hideBackButton(handleBackButton);
     stopWatcher();
   });
 

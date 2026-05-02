@@ -48,8 +48,7 @@
             <span class="preview-side-label">Статус курса</span>
             <span class="preview-status-chip">{{ getStatusLabel(course.status) }}</span>
           </div>
-          <div class="preview-info-note">Курс ещё не опубликован. После публикации он станет доступен обучающимся в соответствии с назначениями.</div>
-          <Button :loading="publishing" :disabled="publicationErrorsForDisplay.length > 0" @click="emit('publish')">Опубликовать курс</Button>
+          <div class="preview-info-note">Для публикации нажмите кнопку «Опубликовать» в шапке страницы.</div>
         </section>
 
         <section class="preview-side-card">
@@ -286,15 +285,22 @@ const emit = defineEmits(["publish", "update:active-preview-topic-id"]);
 }
 
 .preview-material-text {
-  color: var(--text-primary);
-  font-size: 15px;
-  line-height: 24px;
+  color: #000000;
+  font-size: 14px;
+  line-height: 1.6;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .preview-material-text :deep(h1),
 .preview-material-text :deep(h2),
-.preview-material-text :deep(h3) {
+.preview-material-text :deep(h3),
+.preview-material-text :deep(h4),
+.preview-material-text :deep(h5),
+.preview-material-text :deep(h6) {
   margin: 0 0 12px;
+  line-height: 1.3;
+  font-weight: 700;
 }
 
 .preview-material-text :deep(p) {
@@ -303,8 +309,31 @@ const emit = defineEmits(["publish", "update:active-preview-topic-id"]);
 
 .preview-material-text :deep(ul),
 .preview-material-text :deep(ol) {
-  margin: 0 0 12px;
-  padding-left: 20px;
+  padding-left: 1.6em;
+  margin: 4px 0 12px;
+  list-style-position: outside;
+}
+
+.preview-material-text :deep(li) {
+  margin: 0 0 4px;
+  text-indent: 0;
+}
+
+.preview-material-text :deep(a) {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.preview-material-text :deep(img),
+.preview-material-text :deep(table),
+.preview-material-text :deep(pre) {
+  max-width: 100%;
+}
+
+.preview-material-text :deep(video),
+.preview-material-text :deep(iframe) {
+  display: block;
+  max-width: 100%;
 }
 
 .preview-empty-state {

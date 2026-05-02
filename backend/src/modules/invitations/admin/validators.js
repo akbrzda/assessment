@@ -6,6 +6,7 @@ const createSchema = Joi.object({
   branchId: Joi.number().integer().positive().required(),
   positionId: Joi.number().integer().positive().required(),
   phone: Joi.string().trim().max(20).optional().allow("", null),
+  existingUserId: Joi.number().integer().positive().optional(),
 });
 
 const updateSchema = Joi.object({

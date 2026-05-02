@@ -52,6 +52,7 @@ export const useTelegramStore = defineStore("telegram", () => {
   const user = ref(null);
   const initData = ref("");
   const inviteToken = ref(null);
+  let activeBackButtonHandler = null;
 
   const isReady = computed(() => Boolean(tg.value));
   const theme = computed(() => tg.value?.colorScheme || "light");
@@ -288,14 +289,17 @@ export const useTelegramStore = defineStore("telegram", () => {
       return false;
     }
 
-    if (typeof onClick === "function" && typeof backButton.offClick === "function") {
-      backButton.offClick(onClick);
+    if (typeof backButton.offClick === "function" && typeof activeBackButtonHandler === "function") {
+      backButton.offClick(activeBackButtonHandler);
     }
 
     backButton.show();
 
     if (typeof onClick === "function" && typeof backButton.onClick === "function") {
       backButton.onClick(onClick);
+      activeBackButtonHandler = onClick;
+    } else {
+      activeBackButtonHandler = null;
     }
 
     return true;
@@ -310,6 +314,12 @@ export const useTelegramStore = defineStore("telegram", () => {
 
     if (typeof onClick === "function" && typeof backButton.offClick === "function") {
       backButton.offClick(onClick);
+      if (activeBackButtonHandler === onClick) {
+        activeBackButtonHandler = null;
+      }
+    } else if (typeof backButton.offClick === "function" && typeof activeBackButtonHandler === "function") {
+      backButton.offClick(activeBackButtonHandler);
+      activeBackButtonHandler = null;
     }
 
     backButton.hide();
@@ -323,11 +333,12 @@ export const useTelegramStore = defineStore("telegram", () => {
       return false;
     }
 
-    if (typeof backButton.offClick === "function") {
-      backButton.offClick(onClick);
+    if (typeof backButton.offClick === "function" && typeof activeBackButtonHandler === "function") {
+      backButton.offClick(activeBackButtonHandler);
     }
 
     backButton.onClick(onClick);
+    activeBackButtonHandler = onClick;
     return true;
   }
 

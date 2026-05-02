@@ -86,7 +86,16 @@
                       <span class="tests-question-label">Вопрос {{ questionIndex + 1 }}</span>
                       <p class="tests-question-hint">Настройте текст, тип ответа и правильные значения.</p>
                     </div>
-                    <Button type="button" class="tests-question-remove" variant="danger" size="sm" icon="trash" :icon-only="true" aria-label="Удалить вопрос" @click="removeQuestion(questionIndex)" />
+                    <Button
+                      type="button"
+                      class="tests-question-remove"
+                      variant="danger"
+                      size="sm"
+                      icon="trash"
+                      :icon-only="true"
+                      aria-label="Удалить вопрос"
+                      @click="removeQuestion(questionIndex)"
+                    />
                   </div>
 
                   <Textarea
@@ -125,7 +134,15 @@
                   <div v-else class="tests-options-block">
                     <div class="tests-options-header">
                       <span>Варианты ответов</span>
-                      <Button type="button" class="tests-inline-action" variant="ghost" size="sm" icon="plus" :disabled="question.options.length >= 6" @click="addOption(questionIndex)">
+                      <Button
+                        type="button"
+                        class="tests-inline-action"
+                        variant="ghost"
+                        size="sm"
+                        icon="plus"
+                        :disabled="question.options.length >= 6"
+                        @click="addOption(questionIndex)"
+                      >
                         Вариант
                       </Button>
                     </div>
@@ -538,16 +555,6 @@ watch(
   { deep: true },
 );
 
-watch(
-  activeSection,
-  async (section) => {
-    if (section) {
-      await ensureDraftLoaded(section.id);
-    }
-  },
-  { immediate: true },
-);
-
 const ensureDraftLoaded = async (sectionId) => {
   const section = sections.value.find((item) => Number(item.id) === Number(sectionId));
   const draft = drafts.value[sectionId];
@@ -565,6 +572,16 @@ const ensureDraftLoaded = async (sectionId) => {
     draft.loading = false;
   }
 };
+
+watch(
+  activeSection,
+  async (section) => {
+    if (section) {
+      await ensureDraftLoaded(section.id);
+    }
+  },
+  { immediate: true },
+);
 
 const selectSection = async (sectionId) => {
   selectedSectionId.value = sectionId;

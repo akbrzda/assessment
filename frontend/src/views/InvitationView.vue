@@ -80,6 +80,11 @@
         </div>
       </div>
 
+      <div v-else-if="isLoading" class="card empty-state">
+        <h3 class="title-small mb-8">Загружаем приглашение</h3>
+        <p class="body-small text-secondary">Пожалуйста, подождите...</p>
+      </div>
+
       <div v-else-if="!isLoading" class="card empty-state">
         <div class="empty-icon">
           <XCircle />

@@ -1,11 +1,9 @@
 <template>
   <div class="profile-page">
-    <!-- Кнопка настроек -->
     <button class="settings-btn" @click="handleSettings">
       <Settings :size="22" />
     </button>
 
-    <!-- Шапка профиля -->
     <div class="profile-header">
       <div class="avatar-wrap">
         <img v-if="user?.avatar" :src="user.avatar" :alt="user?.firstName" class="avatar-img" />
@@ -16,8 +14,29 @@
       <p class="user-position">{{ user?.position }}</p>
     </div>
 
-    <!-- Меню -->
-    <div class="menu-card">
+    <div class="stats-row">
+      <div class="stat-item">
+        <span class="stat-value">{{ profilePoints }}</span>
+        <span class="stat-label">Очки</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-value">{{ statsData.certificates }}</span>
+        <span class="stat-label">Бейджи</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-value">{{ statsData.completedCourses }}</span>
+        <span class="stat-label">Завершено курсов</span>
+      </div>
+    </div>
+
+    <div v-if="isStatsLoading" class="profile-skeleton">
+      <SkeletonBlock class="profile-skeleton__stats" />
+      <SkeletonList :items="5" />
+    </div>
+
+    <div v-else class="menu-card">
       <button class="menu-item" @click="handleAchievements">
         <span class="menu-icon-wrap">
           <Star :size="20" class="menu-icon" />
@@ -76,6 +95,8 @@ import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 import { useRouter } from "vue-router";
 import { apiClient } from "../services/apiClient";
+import SkeletonBlock from "../components/skeleton/SkeletonBlock.vue";
+import SkeletonList from "../components/skeleton/SkeletonList.vue";
 
 export default {
   name: "ProfileView",
@@ -86,6 +107,8 @@ export default {
     Award,
     LogOut,
     ChevronRight,
+    SkeletonBlock,
+    SkeletonList,
   },
   setup() {
     const userStore = useUserStore();
@@ -96,9 +119,17 @@ export default {
 
     const isStatsLoading = ref(true);
     const statsData = ref({
-      courses: 0,
-      completed: 0,
+      completedCourses: 0,
       certificates: 0,
+    });
+
+    const profilePoints = computed(() => {
+      const overviewPoints = Number(userStore.overview?.user?.points);
+      if (Number.isFinite(overviewPoints)) {
+        return overviewPoints;
+      }
+      const userPoints = Number(user.value?.points);
+      return Number.isFinite(userPoints) ? userPoints : 0;
     });
 
     async function loadStats() {
@@ -108,26 +139,30 @@ export default {
           await userStore.ensureStatus();
         }
 
-        const [coursesResponse, overviewResponse] = await Promise.all([
-          apiClient.listCourses().catch(() => null),
-          userStore.loadOverview().catch(() => null),
-        ]);
+        let completedCourses = 0;
+        try {
+          const coursesResponse = await apiClient.listCourses();
+          const coursesList = coursesResponse?.courses || [];
+          completedCourses = coursesList.filter((course) => course.progress?.status === "completed").length;
+        } catch (error) {
+          console.warn("Не удалось получить список курсов для статистики профиля", error);
+        }
 
-        const coursesList = coursesResponse?.courses || [];
-        const total = coursesList.length;
-        const completed = coursesList.filter((c) => c.progress?.status === "completed").length;
-
-        const overview = overviewResponse || userStore.overview;
-        const badges = Array.isArray(overview?.badges) ? overview.badges : [];
-        const earnedBadges = badges.filter((b) => b.earned).length;
+        let earnedBadgesCount = 0;
+        try {
+          const overview = await userStore.loadOverview();
+          const badges = Array.isArray(overview?.badges) ? overview.badges : [];
+          earnedBadgesCount = badges.filter((badge) => badge.earned).length;
+        } catch (error) {
+          console.warn("Не удалось получить бейджи для статистики профиля", error);
+          const fallbackBadges = Array.isArray(userStore.overview?.badges) ? userStore.overview.badges : [];
+          earnedBadgesCount = fallbackBadges.filter((badge) => badge.earned).length;
+        }
 
         statsData.value = {
-          courses: total,
-          completed,
-          certificates: earnedBadges,
+          completedCourses,
+          certificates: earnedBadgesCount,
         };
-      } catch (error) {
-        console.warn("Не удалось загрузить статистику профиля", error);
       } finally {
         isStatsLoading.value = false;
       }
@@ -135,12 +170,12 @@ export default {
 
     function handleAchievements() {
       telegramStore.hapticFeedback("impact", "light");
-      telegramStore.showAlert("Раздел «Мои достижения» будет доступен в следующем обновлении");
+      router.push({ name: "achievements" });
     }
 
     function handleHistory() {
       telegramStore.hapticFeedback("impact", "light");
-      router.push("/assessments");
+      router.push({ name: "learning-history" });
     }
 
     function handleCertificates() {
@@ -167,6 +202,7 @@ export default {
       userStore,
       user,
       statsData,
+      profilePoints,
       isStatsLoading,
       handleAchievements,
       handleHistory,
@@ -366,5 +402,17 @@ export default {
 
 .menu-label--logout {
   color: var(--error);
+}
+
+.profile-skeleton {
+  margin: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-skeleton__stats {
+  height: 86px;
+  border-radius: 14px;
 }
 </style>

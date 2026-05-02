@@ -97,14 +97,30 @@ async function createInvitation(payload, actor, req) {
 
   const code = await ensureUniqueCode();
 
-  // Создаём pending-профиль сотрудника заранее
-  const invitedUserId = await userModel.createPendingUser({
-    firstName: payload.firstName,
-    lastName: payload.lastName,
-    positionId: payload.positionId || null,
-    branchId: payload.branchId,
-    roleId: employeeRole.id,
-  });
+  let invitedUserId = null;
+  if (payload.existingUserId) {
+    const existingUser = await userModel.findById(payload.existingUserId);
+    if (!existingUser) {
+      throw buildError("Пользователь не найден", 404);
+    }
+    const hasAdminAccess = existingUser.roleName === "superadmin" || existingUser.roleName === "manager";
+    if (!hasAdminAccess) {
+      throw buildError("Можно приглашать только пользователей с доступом в админ-панель", 422);
+    }
+    if (existingUser.telegramId) {
+      throw buildError("У пользователя уже есть доступ в клиентское приложение", 422);
+    }
+    invitedUserId = existingUser.id;
+  } else {
+    // Создаём pending-профиль сотрудника заранее
+    invitedUserId = await userModel.createPendingUser({
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+      positionId: payload.positionId || null,
+      branchId: payload.branchId,
+      roleId: employeeRole.id,
+    });
+  }
 
   const invitationId = await invitationsRepository.createInvitation({
     code,
