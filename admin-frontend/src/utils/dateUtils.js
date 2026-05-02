@@ -15,7 +15,6 @@ export function formatDate(date, includeTime = true) {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
-      timeZone: "UTC",
     };
 
     if (includeTime) {
@@ -23,7 +22,7 @@ export function formatDate(date, includeTime = true) {
       options.minute = "2-digit";
     }
 
-    return dateObj.toLocaleString("ru-RU", options) + (includeTime ? " UTC" : "");
+    return dateObj.toLocaleString("ru-RU", options);
   } catch (error) {
     console.error("Ошибка форматирования даты:", error);
     return String(date);
@@ -101,4 +100,38 @@ export function toISOString(date) {
     console.error("Ошибка конвертации в ISO:", error);
     return null;
   }
+}
+
+/**
+ * Форматирует дату в YYYY-MM-DD в локальном часовом поясе браузера
+ * @param {string|Date} date
+ * @returns {string}
+ */
+export function toLocalDateInputValue(date) {
+  if (!date) return "";
+  const dateObj = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(dateObj.getTime())) return "";
+
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const day = String(dateObj.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Форматирует дату/время в YYYY-MM-DDTHH:mm в локальном часовом поясе браузера
+ * @param {string|Date} date
+ * @returns {string}
+ */
+export function toLocalDateTimeInputValue(date) {
+  if (!date) return "";
+  const dateObj = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(dateObj.getTime())) return "";
+
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const day = String(dateObj.getDate()).padStart(2, "0");
+  const hours = String(dateObj.getHours()).padStart(2, "0");
+  const minutes = String(dateObj.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
 }

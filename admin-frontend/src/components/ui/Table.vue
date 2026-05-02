@@ -1,7 +1,7 @@
 <template>
   <div
     :data-density="density"
-    class="table-shell relative w-full overflow-auto rounded-[var(--radius-md)] border border-border/80 bg-card shadow-[var(--elevation-soft)]"
+    class="table-shell relative w-full overflow-x-auto overflow-y-visible rounded-[var(--radius-md)] border border-border/80 bg-card shadow-[var(--elevation-soft)]"
   >
     <table class="w-full caption-bottom text-sm">
       <slot />

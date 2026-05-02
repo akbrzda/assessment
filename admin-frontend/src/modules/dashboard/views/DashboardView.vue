@@ -480,8 +480,8 @@ const resolveDateRange = (params) => {
   }
 
   if (params.period === "custom" && params.date_from && params.date_to) {
-    result.dateFrom = new Date(`${params.date_from}T00:00:00.000Z`);
-    result.dateTo = new Date(`${params.date_to}T23:59:59.999Z`);
+    result.dateFrom = new Date(`${params.date_from}T00:00:00`);
+    result.dateTo = new Date(`${params.date_to}T23:59:59.999`);
   }
 
   return result;

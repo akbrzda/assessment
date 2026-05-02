@@ -83,9 +83,9 @@ async function listUsers(req, res, next) {
     }
 
     if (search) {
-      whereClause += " AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.login LIKE ?)";
+      whereClause += " AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.login LIKE ? OR CAST(u.id AS CHAR) LIKE ?)";
       const searchPattern = `%${search}%`;
-      params.push(searchPattern, searchPattern, searchPattern);
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern);
     }
 
     const [[countRow]] = await pool.query(
@@ -108,6 +108,80 @@ async function listUsers(req, res, next) {
     res.json({
       users,
       total,
+      page,
+      limit,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getUserLoginHistory(req, res, next) {
+  try {
+    const currentUser = req.user || {};
+    const rawUserId = Number(req.query?.userId);
+    const userId = Number.isInteger(rawUserId) && rawUserId > 0 ? rawUserId : null;
+    const search = String(req.query?.search || "").trim();
+    const rawPage = Number(req.query?.page);
+    const rawLimit = Number(req.query?.limit);
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.trunc(rawPage) : 1;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.trunc(rawLimit), 100) : 20;
+    const offset = (page - 1) * limit;
+
+    const whereParts = ["1=1"];
+    const params = [];
+
+    if (currentUser.role === "manager") {
+      const managerBranchId = Number(currentUser.branch_id || currentUser.branchId || 0);
+      if (managerBranchId > 0) {
+        whereParts.push("u.branch_id = ?");
+        params.push(managerBranchId);
+      }
+    }
+
+    if (userId) {
+      whereParts.push("u.id = ?");
+      params.push(userId);
+    }
+
+    if (search) {
+      const searchPattern = `%${search}%`;
+      whereParts.push("(u.first_name LIKE ? OR u.last_name LIKE ? OR u.login LIKE ? OR CAST(u.id AS CHAR) LIKE ?)");
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    const whereClause = `WHERE ${whereParts.join(" AND ")}`;
+
+    const [[countRow]] = await pool.query(
+      `SELECT COUNT(*) AS total
+       FROM user_login_history ulh
+       JOIN users u ON u.id = ulh.user_id
+       ${whereClause}`,
+      params,
+    );
+
+    const [rows] = await pool.query(
+      `SELECT
+         ulh.id,
+         ulh.user_id,
+         ulh.status,
+         ulh.ip_address,
+         ulh.user_agent,
+         ulh.created_at,
+         u.login,
+         u.first_name,
+         u.last_name
+       FROM user_login_history ulh
+       JOIN users u ON u.id = ulh.user_id
+       ${whereClause}
+       ORDER BY ulh.created_at DESC, ulh.id DESC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset],
+    );
+
+    res.json({
+      events: rows,
+      total: Number(countRow?.total || 0),
       page,
       limit,
     });
@@ -988,6 +1062,7 @@ async function bulkExportUsers(req, res, next) {
 
 module.exports = {
   listUsers,
+  getUserLoginHistory,
   updateUser,
   deleteUser,
   createUser,

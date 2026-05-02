@@ -238,6 +238,7 @@ import AssessmentTheoryBuilder from "./AssessmentTheoryBuilder.vue";
 import { useToast } from "@/composables/useToast";
 import { createEmptyTheory, mapVersionToTheoryData, buildTheoryPayload, validateTheoryData, hasTheoryBlocks } from "@/utils/theory";
 import { formatBranchLabel } from "@/utils/branch";
+import { toLocalDateInputValue } from "@/utils/dateUtils";
 
 const props = defineProps({
   assessment: {
@@ -540,14 +541,7 @@ const handleQuestionTypeChange = (qIndex, type) => {
 
 const formatDateForInput = (dateString) => {
   if (!dateString) return "";
-  if (typeof dateString === "string" && dateString.includes("T")) {
-    return dateString.split("T")[0];
-  }
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  return date.toISOString().split("T")[0];
+  return toLocalDateInputValue(dateString);
 };
 
 const handleSubmit = async () => {

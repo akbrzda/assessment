@@ -243,6 +243,7 @@ import gamificationRulesApi from "@/api/gamificationRules";
 import Button from "@/components/ui/Button.vue";
 import ActionButton from "@/components/ui/ActionButton.vue";
 import DatePicker from "@/components/ui/DatePicker.vue";
+import { toLocalDateTimeInputValue } from "@/utils/dateUtils";
 
 const props = defineProps({
   rule: {
@@ -300,8 +301,8 @@ if (props.rule) {
     ruleType: props.rule.ruleType,
     priority: props.rule.priority || 100,
     isActive: props.rule.isActive,
-    activeFrom: props.rule.activeFrom ? new Date(props.rule.activeFrom).toISOString().slice(0, 16) : null,
-    activeTo: props.rule.activeTo ? new Date(props.rule.activeTo).toISOString().slice(0, 16) : null,
+    activeFrom: props.rule.activeFrom ? toLocalDateTimeInputValue(props.rule.activeFrom) : null,
+    activeTo: props.rule.activeTo ? toLocalDateTimeInputValue(props.rule.activeTo) : null,
   };
 
   if (props.rule.condition) {

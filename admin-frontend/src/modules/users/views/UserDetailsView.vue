@@ -1,8 +1,10 @@
 <template>
   <div class="user-details-page">
-    <div class="user-details-back">
-      <Button type="button" class="back-btn" @click="goBack" icon="arrow-left"> Назад к списку </Button>
-    </div>
+    <PageHeader title="Профиль пользователя">
+      <template #actions>
+        <Button type="button" variant="secondary" icon="arrow-left" @click="goBack">Назад</Button>
+      </template>
+    </PageHeader>
 
     <Card v-if="loading" class="user-details-card">
       <Preloader />
@@ -82,17 +84,23 @@
             <thead>
               <tr>
                 <th>Дата и время</th>
-                <th>Действие</th>
-                <th>Устройство / IP</th>
-                <th>Браузер</th>
+                <th>Статус входа</th>
+                <th>IP</th>
+                <th>Устройство</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, idx) in activityRows" :key="idx">
-                <td>{{ row.date }}</td>
-                <td>{{ row.action }}</td>
-                <td>{{ row.device }}</td>
-                <td>{{ row.browser }}</td>
+              <tr v-for="row in loginEvents" :key="row.id">
+                <td>{{ formatDateTime(row.created_at) }}</td>
+                <td>{{ getLoginStatusLabel(row.status) }}</td>
+                <td>{{ row.ip_address || "—" }}</td>
+                <td>{{ row.user_agent || "—" }}</td>
+              </tr>
+              <tr v-if="!loginHistoryLoading && !loginEvents.length">
+                <td colspan="4">Событий входа пока нет</td>
+              </tr>
+              <tr v-if="loginHistoryLoading">
+                <td colspan="4">Загрузка истории входов...</td>
               </tr>
             </tbody>
           </table>
@@ -171,9 +179,9 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import apiClient from "@/utils/axios";
-import { Badge, Button, Card, Preloader, Tabs } from "@/components/ui";
+import { Badge, Button, Card, PageHeader, Preloader, Tabs } from "@/components/ui";
 import { useToast } from "@/composables/useToast";
-import { getUserCourses } from "@/api/users";
+import { getUserCourses, getUserLoginHistory } from "@/api/users";
 import { BOT_USERNAME } from "@/env";
 
 const route = useRoute();
@@ -182,8 +190,10 @@ const { showToast } = useToast();
 
 const loading = ref(false);
 const coursesLoading = ref(false);
+const loginHistoryLoading = ref(false);
 const profile = ref(null);
 const userCourses = ref([]);
+const loginEvents = ref([]);
 const activeTab = ref("general");
 const tabs = [
   { key: "general", label: "Общая информация" },
@@ -211,16 +221,6 @@ const invitationLink = computed(() => {
 const userStatusLabel = computed(() => (profile.value?.user?.telegram_id ? "Активен" : "Ожидает"));
 const userStatusKey = computed(() => (profile.value?.user?.telegram_id ? "active" : "awaiting"));
 
-const activityRows = computed(() => {
-  const rows = (profile.value?.assessmentsSummary || []).slice(0, 5).map((item) => ({
-    date: formatDateTime(item.last_attempt_at),
-    action: `Аттестация: ${item.title}`,
-    device: "— / —",
-    browser: "—",
-  }));
-  return rows.length ? rows : [{ date: "—", action: "Нет активности", device: "—", browser: "—" }];
-});
-
 const getRoleBadgeVariant = (role) => {
   if (role === "superadmin") return "primary";
   if (role === "manager") return "info";
@@ -236,16 +236,14 @@ const formatDate = (value) => {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("ru-RU", { timeZone: "UTC" });
+  return date.toLocaleDateString("ru-RU");
 };
 
 const formatDateTime = (value) => {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return (
-    date.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC"
-  );
+  return date.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 };
 
 const formatScore = (score) => {
@@ -324,10 +322,34 @@ const loadCourses = async () => {
   }
 };
 
+const getLoginStatusLabel = (status) => {
+  if (status === "success") return "Успешно";
+  return status || "—";
+};
+
+const loadLoginHistory = async () => {
+  loginHistoryLoading.value = true;
+  try {
+    const userId = Number(route.params.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      loginEvents.value = [];
+      return;
+    }
+    const data = await getUserLoginHistory({ userId, page: 1, limit: 50 });
+    loginEvents.value = data?.events || [];
+  } catch (error) {
+    console.error("Ошибка загрузки истории входов пользователя", error);
+    showToast("Не удалось загрузить историю входов", "error");
+    loginEvents.value = [];
+  } finally {
+    loginHistoryLoading.value = false;
+  }
+};
+
 const goBack = () => router.push("/users");
 
 onMounted(async () => {
-  await Promise.all([loadProfile(), loadCourses()]);
+  await Promise.all([loadProfile(), loadCourses(), loadLoginHistory()]);
 });
 </script>
 
@@ -336,19 +358,6 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-.user-details-back :deep(.button) {
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  min-height: 38px;
-  box-shadow: none;
-}
-
-.user-details-back :deep(.button-ghost) {
-  border: 1px solid var(--border);
-  background: #fff;
-  color: #344054;
 }
 .user-head-card {
   display: grid;

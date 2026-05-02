@@ -4,17 +4,10 @@
 
     <div v-else-if="error" class="error-state">
       <p>{{ error }}</p>
-      <Button @click="goBack">Вернуться к списку</Button>
+      <Button variant="secondary" icon="arrow-left" @click="goBack">Назад</Button>
     </div>
 
     <div v-else class="details-container">
-      <!-- Хлебные крошки -->
-      <nav class="breadcrumbs" aria-label="breadcrumb">
-        <span class="breadcrumb-link" @click="$router.push('/assessments')">Аттестации</span>
-        <span class="breadcrumb-sep">›</span>
-        <span class="breadcrumb-current">Детали аттестации</span>
-      </nav>
-
       <!-- Компонент детализации -->
       <AssessmentDetails :assessmentId="assessmentId" />
     </div>
@@ -58,35 +51,6 @@ onMounted(() => {
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-}
-
-.breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin-bottom: 24px;
-}
-
-.breadcrumb-link {
-  color: var(--accent-blue);
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.breadcrumb-link:hover {
-  text-decoration: underline;
-}
-
-.breadcrumb-sep {
-  color: var(--text-secondary);
-  opacity: 0.5;
-}
-
-.breadcrumb-current {
-  color: var(--text-primary);
-  font-weight: 500;
 }
 
 .details-container {

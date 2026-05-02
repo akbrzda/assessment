@@ -19,7 +19,7 @@
     >
       <template #head>
         <TableHead>
-          <input type="checkbox" :checked="allUsersSelected" @change="emit('toggle-select-all')" />
+          <input type="checkbox" :checked="allUsersSelected" aria-label="Выбрать всех пользователей" @change="emit('toggle-select-all')" />
         </TableHead>
         <TableHead>Пользователь</TableHead>
         <TableHead>Логин</TableHead>
@@ -34,7 +34,12 @@
       <template #body>
         <TableRow v-for="user in visibleUsers" :key="user.id">
           <TableCell>
-            <input type="checkbox" :checked="selectedUserIds.includes(user.id)" @change="emit('toggle-user-selection', user.id)" />
+            <input
+              type="checkbox"
+              :checked="selectedUserIds.includes(user.id)"
+              :aria-label="`Выбрать пользователя ${user.first_name} ${user.last_name}`"
+              @change="emit('toggle-user-selection', user.id)"
+            />
           </TableCell>
           <TableCell>
             <div class="cursor-pointer" @click="emit('open-profile-page', user)">
@@ -67,15 +72,6 @@
                 icon="pencil"
                 title="Редактировать"
                 @click="emit('open-edit-modal', user)"
-              />
-              <Button
-                v-if="canInviteToClientApp(user)"
-                variant="ghost"
-                size="sm"
-                :icon-only="true"
-                icon="user-plus"
-                title="Пригласить в клиентское приложение"
-                @click="emit('invite-existing-user', user)"
               />
               <Button
                 v-if="isSuperAdmin"
@@ -124,16 +120,6 @@
             <Button v-if="canEditUser(user)" size="sm" variant="secondary" icon="pencil" class="flex-1" @click="emit('open-edit-modal', user)">
               Редактировать
             </Button>
-            <Button
-              v-if="canInviteToClientApp(user)"
-              size="sm"
-              variant="secondary"
-              icon="user-plus"
-              class="flex-1"
-              @click="emit('invite-existing-user', user)"
-            >
-              Пригласить
-            </Button>
             <Button v-if="isSuperAdmin" size="sm" variant="danger" icon="trash" @click="emit('open-delete-modal', user)" />
           </div>
         </div>
@@ -158,7 +144,6 @@ defineProps({
   getUserStatus: { type: Function, required: true },
   formatDate: { type: Function, required: true },
   isSuperAdmin: { type: Boolean, required: true },
-  canInviteToClientApp: { type: Function, required: true },
 });
 
 const emit = defineEmits([
@@ -169,7 +154,6 @@ const emit = defineEmits([
   "open-profile-page",
   "open-edit-modal",
   "open-delete-modal",
-  "invite-existing-user",
 ]);
 </script>
 

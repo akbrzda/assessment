@@ -107,7 +107,6 @@ const sectionLabels = {
   reports: "Отчёты",
   branches: "Филиалы",
   positions: "Должности",
-  invitations: "Приглашения",
   settings: "Настройки",
   profile: "Профиль",
 };
@@ -128,7 +127,7 @@ const flattenedSearchResults = computed(() =>
       key: `u-${u.id}`,
       type: "Пользователь",
       title: `${u.first_name} ${u.last_name}`,
-      route: "/users",
+      route: `/users/${u.id}/profile`,
     })),
     ...(searchResults.value.assessments || []).map((a) => ({ key: `a-${a.id}`, type: "Аттестация", title: a.title, route: `/assessments/${a.id}` })),
     ...(searchResults.value.questions || []).map((q) => ({ key: `q-${q.id}`, type: "Вопрос", title: q.question_text, route: `/questions/${q.id}` })),

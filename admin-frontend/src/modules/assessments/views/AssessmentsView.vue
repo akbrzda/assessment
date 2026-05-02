@@ -147,6 +147,17 @@
         </div>
       </template>
     </DataTable>
+
+    <ConfirmDialog
+      v-model="deleteDialogOpen"
+      title="Удалить аттестацию?"
+      message="Это действие нельзя отменить. Аттестация будет удалена."
+      confirm-text="Удалить"
+      cancel-text="Отмена"
+      variant="danger"
+      :loading="deleteLoading"
+      @confirm="handleDeleteAssessment"
+    />
   </div>
 </template>
 
@@ -155,7 +166,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { getAssessments, deleteAssessment } from "@/api/assessments";
-import { Button, Badge, PageHeader, FilterBar, DataTable, TableHead, TableRow, TableCell } from "@/components/ui";
+import { Button, Badge, PageHeader, FilterBar, DataTable, TableHead, TableRow, TableCell, ConfirmDialog } from "@/components/ui";
 import { useToast } from "@/composables/useToast";
 import { useSkeletonGate } from "@/composables/useSkeletonGate";
 import { formatBranchLabel } from "@/utils/branch";
@@ -166,6 +177,9 @@ const authStore = useAuthStore();
 const loading = ref(false);
 const { skeletonVisible } = useSkeletonGate(loading, { minDuration: 360, delay: 90 });
 const assessments = ref([]);
+const assessmentToDelete = ref(null);
+const deleteDialogOpen = ref(false);
+const deleteLoading = ref(false);
 const totalAssessments = ref(0);
 const pagination = ref({
   page: 1,
@@ -268,16 +282,25 @@ const goToTheory = (id) => {
 
 const canEditAssessment = (assessment) => true; // Можно редактировать в любом статусе (вопросы и теорию)
 
-const confirmDelete = async (assessment) => {
-  if (confirm(`Вы уверены, что хотите удалить аттестацию "${assessment.title}"?`)) {
-    try {
-      await deleteAssessment(assessment.id);
-      showToast("Аттестация удалена", "success");
-      loadAssessments();
-    } catch (error) {
-      console.error("Delete assessment error:", error);
-      showToast("Ошибка удаления аттестации", "error");
-    }
+const confirmDelete = (assessment) => {
+  assessmentToDelete.value = assessment;
+  deleteDialogOpen.value = true;
+};
+
+const handleDeleteAssessment = async () => {
+  if (!assessmentToDelete.value) return;
+  try {
+    deleteLoading.value = true;
+    await deleteAssessment(assessmentToDelete.value.id);
+    showToast("Аттестация удалена", "success");
+    deleteDialogOpen.value = false;
+    assessmentToDelete.value = null;
+    await loadAssessments();
+  } catch (error) {
+    console.error("Delete assessment error:", error);
+    showToast("Ошибка удаления аттестации", "error");
+  } finally {
+    deleteLoading.value = false;
   }
 };
 

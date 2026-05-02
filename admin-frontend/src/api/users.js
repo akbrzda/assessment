@@ -10,6 +10,16 @@ export const getUsers = async (filters = {}, options = {}) => {
   return data;
 };
 
+export const getUserLoginHistory = async (filters = {}, options = {}) => {
+  const { forceFresh = false } = options;
+  const { data } = await apiClient.get("/admin/users/login-history", {
+    params: filters,
+    cache: !forceFresh,
+    cacheMaxAge: 30000,
+  });
+  return data;
+};
+
 export const getUserById = async (id) => {
   const { data } = await apiClient.get(`/admin/users/${id}`, {
     cacheMaxAge: 120000, // 2 минуты
@@ -117,6 +127,7 @@ export const globalSearch = async ({ query, limit = 8 }) => {
 
 export default {
   getUsers,
+  getUserLoginHistory,
   getUserById,
   getUserCourses,
   createUser,

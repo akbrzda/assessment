@@ -40,7 +40,6 @@
       <div v-if="form.questionType !== 'text'" class="form-group">
         <div class="options-header">
           <label class="form-label">Варианты ответов (2-6)</label>
-          <Button @click="addOption" :disabled="form.options.length >= 6" variant="secondary" size="sm">+ Добавить вариант</Button>
         </div>
 
         <div class="options-list">

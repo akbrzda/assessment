@@ -91,7 +91,6 @@ import {
   BookOpenCheck as BookOpenCheckIcon,
   FileQuestion as FileQuestionIcon,
   BarChart3 as BarChart3Icon,
-  Link2 as Link2Icon,
   Building2 as Building2Icon,
   Briefcase as BriefcaseIcon,
   Settings as SettingsIcon,
@@ -139,7 +138,6 @@ const navSections = computed(() => {
       items: [
         { label: "Дашборд", to: "/dashboard", icon: LayoutDashboardIcon },
         has("users") && { label: "Пользователи", to: "/users", icon: UsersIcon },
-        has("invitations") && { label: "Приглашения", to: "/invitations", icon: Link2Icon },
       ].filter(Boolean),
     },
     {

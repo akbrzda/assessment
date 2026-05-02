@@ -2,7 +2,7 @@
   <div class="theory-view">
     <div class="page-header">
       <div class="page-header-left">
-        <Button variant="ghost" icon="arrow-left" @click="goBack"> Назад </Button>
+        <Button variant="secondary" icon="arrow-left" @click="goBack">Назад</Button>
         <div class="page-header-texts">
           <h1>Теория аттестации</h1>
           <p>Настройте обязательные и дополнительные блоки и опубликуйте версию.</p>

@@ -4,12 +4,12 @@
 
     <div v-else-if="error" class="error-state">
       <p>{{ error }}</p>
-      <Button @click="goBack">Вернуться к деталям</Button>
+      <Button variant="secondary" icon="arrow-left" @click="goBack">Назад</Button>
     </div>
 
     <div v-else-if="data" class="progress-content">
       <div class="page-header">
-        <Button variant="ghost" icon="arrow-left" @click="goBack"> Назад </Button>
+        <Button variant="secondary" icon="arrow-left" @click="goBack">Назад</Button>
         <div>
           <h1 class="page-title">{{ data.user.first_name }} {{ data.user.last_name }}</h1>
           <p class="page-subtitle">{{ data.assessment.title }}</p>

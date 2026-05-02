@@ -38,12 +38,6 @@ const routes = [
         meta: { roles: ["superadmin", "manager"], module: "users", title: "Профиль пользователя" },
       },
       {
-        path: "invitations",
-        name: "Invitations",
-        component: () => import("../modules/invitations/views/InvitationsView.vue"),
-        meta: { roles: ["superadmin", "manager"], module: "invitations", title: "Приглашения" },
-      },
-      {
         path: "assessments",
         name: "Assessments",
         component: () => import("../modules/assessments/views/AssessmentsView.vue"),
@@ -96,6 +90,12 @@ const routes = [
         name: "EditCourse",
         component: () => import("../modules/courses/views/CourseEditorView.vue"),
         meta: { roles: ["superadmin", "manager"], module: "courses", title: "Редактировать курс" },
+      },
+      {
+        path: "courses/:id/statistics",
+        name: "CourseStatistics",
+        component: () => import("../modules/courses/views/CourseStatisticsView.vue"),
+        meta: { roles: ["superadmin", "manager"], module: "courses", title: "Статистика курса" },
       },
       {
         path: "questions",

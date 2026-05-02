@@ -31,7 +31,15 @@
     </template>
 
     <!-- Пустое состояние -->
-    <EmptyState v-else-if="courses.length === 0" type="filter" title="Курсы не найдены" />
+    <EmptyState
+      v-else-if="courses.length === 0"
+      :type="hasActiveFilters ? 'filter' : 'first-time'"
+      title="Курсы не найдены"
+      :description="hasActiveFilters ? 'Попробуйте изменить параметры поиска или фильтры.' : 'Создайте первый курс, чтобы начать обучение сотрудников.'"
+      :show-button="!hasActiveFilters"
+      button-text="Создать курс"
+      @action="goToCreate"
+    />
 
     <!-- Карточный режим -->
     <template v-else-if="viewMode === 'cards'">
@@ -75,7 +83,10 @@
 
           <!-- Футер карточки -->
           <div class="card-footer">
-            <ActionButton action="edit" size="sm" @click="goToEdit(course.id)" />
+            <div class="card-main-actions">
+              <ActionButton action="edit" size="sm" @click="goToEdit(course.id)" />
+              <Button variant="secondary" size="sm" icon="file-chart-column" @click="goToStatistics(course.id)">Статистика</Button>
+            </div>
             <div class="menu-wrap" @click.stop>
               <Button variant="ghost" size="sm" icon="more-horizontal" :icon-only="true" aria-label="Открыть меню действий" @click="toggleMenu(course.id)" />
               <div v-if="openMenuId === course.id" class="dropdown-menu">
@@ -147,16 +158,11 @@
                 <TableCell>{{ course.version }}</TableCell>
                 <TableCell>{{ formatDate(course.updatedAt) }}</TableCell>
                 <TableCell>
-                  <div class="author-cell">
-                    <div class="author-avatar">СА</div>
-                    <div>
-                      <div class="author-name">Суперадмин</div>
-                      <div class="author-role">Суперадмин</div>
-                    </div>
-                  </div>
+                  <span class="text-sm text-foreground">{{ getCourseAuthor(course) }}</span>
                 </TableCell>
                 <TableCell @click.stop>
                   <div class="row-actions">
+                    <Button variant="ghost" size="sm" icon="file-chart-column" :icon-only="true" aria-label="Статистика курса" @click="goToStatistics(course.id)" />
                     <Button variant="ghost" size="sm" icon="pencil" :icon-only="true" aria-label="Редактировать курс" @click="goToEdit(course.id)" />
                     <div class="menu-wrap" @click.stop>
                       <Button variant="ghost" size="sm" icon="more-horizontal" :icon-only="true" aria-label="Открыть меню действий" @click="toggleMenu(course.id)" />
@@ -269,7 +275,11 @@
           </TableHeader>
           <TableBody>
             <TableRow v-for="row in funnel" :key="row.courseId">
-              <TableCell>{{ row.courseTitle }}</TableCell>
+              <TableCell>
+                <button type="button" class="funnel-course-link" @click="goToStatistics(row.courseId)">
+                  {{ row.courseTitle }}
+                </button>
+              </TableCell>
               <TableCell>{{ row.assignedCount }}</TableCell>
               <TableCell>{{ row.completedCount }}</TableCell>
               <TableCell>{{ row.assignedCount > 0 ? Math.round((row.completedCount / row.assignedCount) * 100) : 0 }}%</TableCell>
@@ -286,9 +296,6 @@
             </TableRow>
           </TableBody>
         </Table>
-      </div>
-      <div class="funnel-link-row">
-        <a href="#" class="funnel-link">Смотреть детальную статистику →</a>
       </div>
     </div>
 
@@ -315,6 +322,17 @@
         </div>
       </div>
     </Modal>
+
+    <ConfirmDialog
+      v-model="courseActionDialog.open"
+      :title="courseActionDialog.title"
+      :message="courseActionDialog.message"
+      :confirm-text="courseActionDialog.confirmText"
+      cancel-text="Отмена"
+      :variant="courseActionDialog.variant"
+      :loading="courseActionDialog.loading"
+      @confirm="confirmCourseAction"
+    />
   </div>
 </template>
 
@@ -333,6 +351,7 @@ import {
   PageHeader,
   EmptyState,
   Pagination,
+  ConfirmDialog,
   SkeletonCards,
   SkeletonCard,
   Table,
@@ -391,6 +410,16 @@ const filters = ref({
   status: "",
   author: "",
 });
+const courseActionDialog = ref({
+  open: false,
+  title: "",
+  message: "",
+  confirmText: "Подтвердить",
+  variant: "warning",
+  loading: false,
+  action: null,
+  course: null,
+});
 
 // Модель для FilterBar (синхронизируется с filters)
 const filterBarModel = computed({
@@ -428,6 +457,8 @@ const courseFilterDefs = computed(() => [
     options: [],
   },
 ]);
+
+const hasActiveFilters = computed(() => Boolean(filters.value.search || filters.value.status || filters.value.author));
 
 const getStatusLabel = (status) => {
   const labels = {
@@ -525,31 +556,80 @@ const goToEdit = (id) => {
   router.push(`/courses/${id}/edit`);
 };
 
-const handleArchive = async (course) => {
-  if (!window.confirm(`Закрыть курс "${course.title}" для новых пользователей?`)) {
-    return;
-  }
-
-  try {
-    await archiveCourse(course.id);
-    showToast("Курс закрыт", "success");
-    await loadCourses();
-  } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось закрыть курс"), "error");
-  }
+const goToStatistics = (id) => {
+  if (!id) return;
+  router.push(`/courses/${id}/statistics`);
 };
 
-const handleDelete = async (course) => {
-  if (!window.confirm(`Удалить курс "${course.title}"?`)) {
-    return;
-  }
+const getCourseAuthor = (course) => {
+  const directName = course?.authorName || course?.author_name || course?.createdByName || course?.created_by_name;
+  if (directName) return directName;
+
+  const author = course?.author || course?.createdBy || course?.created_by;
+  if (!author) return "—";
+
+  const fullName = [author.firstName, author.lastName].filter(Boolean).join(" ");
+  return fullName || author.name || author.login || author.email || "—";
+};
+
+const openCourseActionDialog = (course, action) => {
+  const config =
+    action === "archive"
+      ? {
+          title: "Закрыть курс?",
+          message: "Курс будет закрыт для новых пользователей.",
+          confirmText: "Закрыть",
+          variant: "warning",
+        }
+      : {
+          title: "Удалить курс?",
+          message: "Это действие нельзя отменить. Курс будет удален.",
+          confirmText: "Удалить",
+          variant: "danger",
+        };
+
+  courseActionDialog.value = {
+    ...courseActionDialog.value,
+    ...config,
+    open: true,
+    loading: false,
+    action,
+    course,
+  };
+};
+
+const handleArchive = (course) => {
+  openCourseActionDialog(course, "archive");
+};
+
+const handleDelete = (course) => {
+  openCourseActionDialog(course, "delete");
+};
+
+const confirmCourseAction = async () => {
+  const { action, course } = courseActionDialog.value;
+  if (!action || !course?.id) return;
 
   try {
-    await deleteCourse(course.id);
-    showToast("Курс удален", "success");
+    courseActionDialog.value.loading = true;
+    if (action === "archive") {
+      await archiveCourse(course.id);
+      showToast("Курс закрыт", "success");
+    } else {
+      await deleteCourse(course.id);
+      showToast("Курс удален", "success");
+    }
+    courseActionDialog.value.open = false;
+    courseActionDialog.value.course = null;
     await loadCourses();
   } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось удалить курс"), "error");
+    if (action === "archive") {
+      showToast(getErrorMessage(error, "Не удалось закрыть курс"), "error");
+    } else {
+      showToast(getErrorMessage(error, "Не удалось удалить курс"), "error");
+    }
+  } finally {
+    courseActionDialog.value.loading = false;
   }
 };
 
@@ -916,6 +996,13 @@ const handleRemoveCategory = (categoryValue) => {
   border-top: 1px solid var(--divider);
   padding-top: 12px;
   margin-top: auto;
+  align-items: center;
+}
+
+.card-main-actions {
+  display: flex;
+  gap: 8px;
+  flex: 1;
 }
 
 .card-edit-btn {
@@ -1009,7 +1096,7 @@ const handleRemoveCategory = (categoryValue) => {
   background: var(--bg-primary);
   border: 1px solid var(--divider);
   border-radius: 16px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .table-scroll {
@@ -1283,19 +1370,18 @@ const handleRemoveCategory = (categoryValue) => {
   white-space: nowrap;
 }
 
-.funnel-link-row {
-  margin-top: 12px;
-  text-align: right;
-}
-
-.funnel-link {
-  font-size: 13px;
-  font-weight: 500;
+.funnel-course-link {
+  border: none;
+  background: transparent;
+  padding: 0;
   color: hsl(var(--accent-blue));
-  text-decoration: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.3;
 }
 
-.funnel-link:hover {
+.funnel-course-link:hover {
   text-decoration: underline;
 }
 

@@ -9,6 +9,7 @@ router.use(verifyJWT);
 router.use(checkModuleAccess("courses"));
 
 router.get("/", controller.listCourses);
+router.get("/analytics/funnel", controller.getAnalyticsFunnel);
 router.post("/", controller.createCourse);
 router.get("/:id", controller.getCourse);
 router.get("/:id/preview", controller.getCoursePreview);
@@ -45,7 +46,6 @@ router.get("/:id/users/:userId/progress", controller.getCourseUserProgress);
 router.delete("/:id/users/:userId/progress", controller.resetCourseUserProgress);
 
 // Аналитика
-router.get("/analytics/funnel", controller.getAnalyticsFunnel);
 router.get("/:id/analytics/sections", controller.getSectionFailures);
 router.get("/:id/analytics/progress-report", controller.getCourseProgressReport);
 

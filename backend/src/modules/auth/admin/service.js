@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const config = require("../../../config/env");
 const authRepository = require("./repository");
 const { createLog } = require("../../../services/adminLogService");
+const { pool } = require("../../../config/database");
 
 const ACCESS_TOKEN_TTL = process.env.JWT_ACCESS_TTL || "30m";
 const REFRESH_TOKEN_TTL = process.env.JWT_REFRESH_TTL || "7d";
@@ -44,6 +45,25 @@ function setRefreshCookie(res, token) {
 
 function clearRefreshCookie(res) {
   res.clearCookie(REFRESH_COOKIE_NAME, refreshCookieOptions);
+}
+
+function extractIpFromRequest(req) {
+  const forwarded = req?.headers?.["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim()) {
+    return forwarded.split(",")[0].trim();
+  }
+  return req?.socket?.remoteAddress || null;
+}
+
+async function recordLoginHistory({ userId, req }) {
+  const ipAddress = extractIpFromRequest(req);
+  const userAgent = String(req?.headers?.["user-agent"] || "").slice(0, 500) || null;
+
+  await pool.execute(
+    `INSERT INTO user_login_history (user_id, status, ip_address, user_agent, created_at)
+     VALUES (?, 'success', ?, ?, UTC_TIMESTAMP())`,
+    [userId, ipAddress, userAgent],
+  );
 }
 
 function toUserResponse(user) {
@@ -97,6 +117,7 @@ async function login(payload, req, res) {
 
   await authRepository.updateRefreshToken(user.id, refreshToken);
   await createLog(user.id, "LOGIN", `Вход в админ-панель (${user.role_name})`, "auth", user.id, req);
+  await recordLoginHistory({ userId: user.id, req });
 
   setRefreshCookie(res, refreshToken);
 

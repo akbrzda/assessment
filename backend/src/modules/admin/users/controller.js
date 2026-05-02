@@ -8,6 +8,14 @@ async function listUsers(req, res, next) {
   }
 }
 
+async function getUserLoginHistory(req, res, next) {
+  try {
+    return await moduleService.getUserLoginHistory(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function exportUsersToExcel(req, res, next) {
   try {
     return await moduleService.exportUsersToExcel(req, res, next);
@@ -106,6 +114,7 @@ async function bulkExportUsers(req, res, next) {
 
 module.exports = {
   listUsers,
+  getUserLoginHistory,
   exportUsersToExcel,
   getUserDetailedStats,
   getUserCourses,
@@ -119,4 +128,3 @@ module.exports = {
   bulkTransferBranch,
   bulkExportUsers,
 };
-

@@ -2,8 +2,15 @@
   <div class="form-wrapper">
     <Preloader v-if="loading" />
     <form v-else @submit.prevent="handleSubmit" class="form-container">
+      <div class="wizard-steps" role="tablist" aria-label="Шаги формы аттестации">
+        <div v-for="step in steps" :key="step.id" :class="['wizard-step', { active: currentStep === step.id, done: currentStep > step.id }]">
+          <span class="wizard-step-index">{{ step.id }}</span>
+          <span class="wizard-step-label">{{ step.label }}</span>
+        </div>
+      </div>
+
       <!-- Основная информация -->
-      <section class="form-section">
+      <section v-if="currentStep === 1" class="form-section">
         <h3 class="section-heading">Основная информация</h3>
 
         <Input v-model="form.title" type="text" label="Название" required />
@@ -34,7 +41,7 @@
       </section>
 
       <!-- Назначение -->
-      <section class="form-section">
+      <section v-if="currentStep === 2" class="form-section">
         <h3 class="section-heading">Назначить аттестацию</h3>
 
         <div class="checkbox-field">
@@ -69,7 +76,7 @@
       </section>
 
       <!-- Вопросы -->
-      <section class="form-section">
+      <section v-if="currentStep === 3" class="form-section">
         <div class="section-header">
           <h3 class="section-heading">Вопросы <span class="required">*</span></h3>
           <Button type="button" @click="addQuestion" variant="secondary" size="sm" icon="plus">Добавить вопрос</Button>
@@ -124,11 +131,15 @@
       </section>
 
       <!-- Кнопки -->
-      <div class="form-actions">
+      <div class="form-actions sticky-footer">
         <Button @click="$emit('cancel')" variant="secondary">Отмена</Button>
-        <Button type="submit" :disabled="!isFormValid" variant="primary">
-          {{ assessmentId ? "Сохранить" : "Создать" }}
-        </Button>
+        <div class="wizard-actions">
+          <Button v-if="currentStep > 1" type="button" variant="secondary" @click="goBack">Назад</Button>
+          <Button v-if="currentStep < steps.length" type="button" variant="primary" @click="goNext">Далее</Button>
+          <Button v-else type="submit" :disabled="!isFormValid" variant="primary">
+            {{ assessmentId ? "Сохранить" : "Создать" }}
+          </Button>
+        </div>
       </div>
     </form>
   </div>
@@ -146,6 +157,7 @@ import Textarea from "@/components/ui/Textarea.vue";
 import DatePicker from "@/components/ui/DatePicker.vue";
 import { useToast } from "@/composables/useToast";
 import { formatBranchLabel } from "@/utils/branch";
+import { toLocalDateInputValue } from "@/utils/dateUtils";
 
 const props = defineProps({
   assessmentId: {
@@ -175,6 +187,12 @@ const form = ref({
 });
 const isUnlimitedAttempts = ref(false);
 const { showToast } = useToast();
+const currentStep = ref(1);
+const steps = [
+  { id: 1, label: "Основные данные" },
+  { id: 2, label: "Назначение" },
+  { id: 3, label: "Вопросы" },
+];
 
 const isFormValid = computed(() => {
   if (!form.value.title || !form.value.openAt || !form.value.closeAt) return false;
@@ -242,8 +260,8 @@ const loadAssessment = async () => {
     const assessment = data.assessment;
 
     // Преобразуем datetime в формат date (YYYY-MM-DD)
-    const openAtDate = new Date(assessment.open_at).toISOString().slice(0, 10);
-    const closeAtDate = new Date(assessment.close_at).toISOString().slice(0, 10);
+    const openAtDate = toLocalDateInputValue(assessment.open_at);
+    const closeAtDate = toLocalDateInputValue(assessment.close_at);
 
     form.value = {
       title: assessment.title,
@@ -336,6 +354,32 @@ const setCorrectOption = (qIndex, oIndex) => {
   });
 };
 
+const canProceedFromStep = (step) => {
+  if (step === 1) {
+    validateDateField("openAt");
+    validateDateField("closeAt");
+    return Boolean(form.value.title && form.value.openAt && form.value.closeAt && Object.keys(errors.value).length === 0);
+  }
+
+  if (step === 2) return true;
+
+  return isFormValid.value;
+};
+
+const goBack = () => {
+  if (currentStep.value > 1) currentStep.value -= 1;
+};
+
+const goNext = () => {
+  if (!canProceedFromStep(currentStep.value)) {
+    showToast("Заполните обязательные поля текущего шага", "warning");
+    return;
+  }
+  if (currentStep.value < steps.length) {
+    currentStep.value += 1;
+  }
+};
+
 watch(isUnlimitedAttempts, (nextValue) => {
   if (nextValue) {
     form.value.maxAttempts = 0;
@@ -405,6 +449,51 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 32px;
+}
+
+.wizard-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--divider);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.wizard-step.active {
+  border-color: hsl(var(--primary) / 0.5);
+  color: var(--text-primary);
+  background: hsl(var(--primary) / 0.08);
+}
+
+.wizard-step.done {
+  border-color: hsl(var(--accent-green) / 0.5);
+}
+
+.wizard-step-index {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--bg-primary);
+}
+
+.wizard-step-label {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
 .form-section {
@@ -658,10 +747,22 @@ onMounted(async () => {
 
 .form-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--divider);
+}
+
+.sticky-footer {
+  position: sticky;
+  bottom: 0;
+  padding: 12px;
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  background: var(--bg-primary);
+}
+
+.wizard-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .btn-primary,
@@ -719,6 +820,12 @@ onMounted(async () => {
   }
 
   .form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .wizard-actions {
+    width: 100%;
+    display: flex;
     flex-direction: column-reverse;
   }
 

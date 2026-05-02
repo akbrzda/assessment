@@ -15,6 +15,7 @@ const router = express.Router();
 router.use(verifyJWT, checkModuleAccess("users"));
 
 router.get("/", cacheMiddleware({ ttl: 60 }), usersController.listUsers);
+router.get("/login-history", cacheMiddleware({ ttl: 30 }), usersController.getUserLoginHistory);
 router.get("/export/excel", usersController.exportUsersToExcel);
 router.post(
   "/bulk/role",

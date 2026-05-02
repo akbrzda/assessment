@@ -64,16 +64,17 @@ const handleLogin = async () => {
 
 <style scoped>
 .login-wrapper {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(160deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
   padding: 32px;
+  box-sizing: border-box;
 }
 
 :deep(.login-card) {
-  width: 360px;
+  width: min(420px, 100%);
   max-width: 100%;
 }
 
@@ -115,8 +116,18 @@ const handleLogin = async () => {
 }
 
 @media (max-width: 480px) {
+  .login-wrapper {
+    padding: 16px;
+    align-items: flex-start;
+  }
+
   :deep(.login-card) {
     width: 100%;
+    margin-top: 24px;
+  }
+
+  .login-header h1 {
+    font-size: 22px;
   }
 }
 </style>

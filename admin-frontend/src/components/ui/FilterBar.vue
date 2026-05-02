@@ -161,6 +161,18 @@
         Очистить
       </button>
 
+      <template v-for="def in mobileInlineFilterDefs" :key="`${def.key}-mobile-inline`">
+        <select
+          class="md:hidden h-8 max-w-[130px] px-2 py-1 text-xs border border-border rounded-lg bg-background text-foreground outline-none"
+          :value="modelValue[def.key] || ''"
+          :aria-label="def.label"
+          @change="selectOption(def.key, $event.target.value)"
+        >
+          <option value="">{{ def.placeholder || def.label || "Все" }}</option>
+          <option v-for="opt in def.options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+      </template>
+
       <!-- Разворачивание (мобильное) -->
       <button
         class="flex md:hidden items-center gap-1.5 px-2.5 py-1.5 border-none bg-transparent cursor-pointer text-muted-foreground text-sm rounded-xl shrink-0 ml-auto"
@@ -188,7 +200,7 @@
         </div>
       </div>
 
-      <div v-for="def in filterDefs" :key="def.key + '_mobile'" class="flex flex-col gap-1.5">
+      <div v-for="def in mobileDrawerFilterDefs" :key="def.key + '_mobile'" class="flex flex-col gap-1.5">
         <template v-if="def.type === 'select' || !def.type">
           <label class="text-xs font-medium text-muted-foreground">{{ def.label }}</label>
           <select
@@ -246,6 +258,7 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import Icon from "./Icon.vue";
 import DatePicker from "./DatePicker.vue";
+import { toLocalDateInputValue } from "@/utils/dateUtils";
 
 const props = defineProps({
   modelValue: {
@@ -292,13 +305,13 @@ function getDropdownAlignmentClass(index) {
 }
 
 function getToday() {
-  return new Date().toISOString().split("T")[0];
+  return toLocalDateInputValue(new Date());
 }
 
 function getDateOffset(days) {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return d.toISOString().split("T")[0];
+  return toLocalDateInputValue(d);
 }
 
 function getMonthStart() {
@@ -466,6 +479,10 @@ const activeChips = computed(() => {
 });
 
 const activeCount = computed(() => activeChips.value.length);
+const mobileInlineFilterDefs = computed(() => props.filterDefs.filter((def) => def.type === "select" || !def.type).slice(0, 2));
+const mobileDrawerFilterDefs = computed(() =>
+  props.filterDefs.filter((def) => !mobileInlineFilterDefs.value.some((inlineDef) => inlineDef.key === def.key)),
+);
 
 const hasActiveFilters = computed(() => {
   if (props.modelValue[props.searchKey]) return true;

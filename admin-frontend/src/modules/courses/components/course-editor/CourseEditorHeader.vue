@@ -1,7 +1,7 @@
 <template>
   <div class="course-editor-header">
     <div class="course-editor-header-left">
-      <Button variant="ghost" icon="arrow-left" size="sm" @click="emit('back')">К списку курсов</Button>
+      <Button variant="secondary" icon="arrow-left" @click="emit('back')">Назад</Button>
     </div>
     <div class="course-editor-header-right">
       <Button v-if="currentStep < totalSteps" :loading="saving" :disabled="!canProceed" @click="emit('next')">Далее</Button>
@@ -53,12 +53,6 @@ const emit = defineEmits(["back", "next", "save"]);
   font-weight: 600;
   min-height: 38px;
   box-shadow: none;
-}
-
-.course-editor-header-left :deep(.button-ghost) {
-  border: 1px solid var(--course-border);
-  background: #fff;
-  color: #344054;
 }
 
 .course-editor-header-right :deep(.button-primary) {

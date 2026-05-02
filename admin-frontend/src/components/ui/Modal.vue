@@ -12,6 +12,8 @@
         @keydown.esc="handleEsc"
       >
         <div
+          ref="modalContainer"
+          tabindex="-1"
           :class="cn('bg-background rounded-[var(--radius-lg)] max-h-[90vh] overflow-y-auto w-full border border-border/80 flex flex-col', sizeClass)"
           :style="{ boxShadow: 'var(--shadow-modal)' }"
           @click.stop
@@ -48,7 +50,7 @@
 </template>
 
 <script setup>
-import { computed, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { cn } from "@/lib/utils";
 import Icon from "./Icon.vue";
 
@@ -79,6 +81,8 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["close", "update:modelValue"]);
+const modalContainer = ref(null);
+const lastFocusedElement = ref(null);
 
 const isVisible = computed(() => (props.modelValue !== undefined ? props.modelValue : props.show));
 
@@ -105,9 +109,67 @@ const handleEsc = () => {
   if (props.closable) close();
 };
 
+const getFocusableElements = () => {
+  if (!modalContainer.value) return [];
+  return Array.from(
+    modalContainer.value.querySelectorAll(
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((el) => !el.hasAttribute("disabled") && el.getAttribute("aria-hidden") !== "true");
+};
+
+const focusFirstElement = () => {
+  const focusable = getFocusableElements();
+  if (focusable.length > 0) {
+    focusable[0].focus();
+    return;
+  }
+  modalContainer.value?.focus();
+};
+
+const handleTabTrap = (event) => {
+  if (!isVisible.value || event.key !== "Tab") return;
+  const focusable = getFocusableElements();
+  if (focusable.length === 0) {
+    event.preventDefault();
+    modalContainer.value?.focus();
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+
+  if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
+};
+
 // Блокировка скролла body пока модал открыт
 watch(isVisible, (val) => {
   document.body.style.overflow = val ? "hidden" : "";
+  if (val) {
+    lastFocusedElement.value = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    nextTick(() => {
+      focusFirstElement();
+      document.addEventListener("keydown", handleTabTrap);
+    });
+    return;
+  }
+
+  document.removeEventListener("keydown", handleTabTrap);
+  if (lastFocusedElement.value && typeof lastFocusedElement.value.focus === "function") {
+    lastFocusedElement.value.focus();
+  }
+});
+
+onBeforeUnmount(() => {
+  document.body.style.overflow = "";
+  document.removeEventListener("keydown", handleTabTrap);
 });
 </script>
 

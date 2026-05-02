@@ -4,7 +4,7 @@
 
     <div v-else-if="error" class="error-state">
       <p>{{ error }}</p>
-      <Button @click="goBack">Вернуться к списку</Button>
+      <Button variant="secondary" icon="arrow-left" @click="goBack">Назад</Button>
     </div>
 
     <div v-else class="edit-container">

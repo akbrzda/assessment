@@ -1616,7 +1616,7 @@ const handleRemoveAssignment = async (userId) => {
 
 const formatAssignedAt = (iso) => {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }) + " UTC";
+  return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 };
 
 const formatDuration = (secondsValue) => {

@@ -3,7 +3,7 @@
     <!-- Шапка с навигацией -->
     <div class="wizard-header">
       <div class="wizard-header-left">
-        <Button variant="ghost" icon="arrow-left" size="sm" @click="emit('cancel')">К списку аттестаций</Button>
+        <Button variant="secondary" icon="arrow-left" @click="emit('cancel')">Назад</Button>
       </div>
       <div class="wizard-header-right">
         <Button v-if="currentStep > 1" variant="secondary" @click="prevStep">Назад</Button>
@@ -340,6 +340,7 @@ import { getAdminTheory, publishTheory } from "@/api/theory";
 import { createEmptyTheory, validateTheoryData, buildTheoryPayload, hasTheoryBlocks, mapVersionToTheoryData } from "@/utils/theory";
 import { useToast } from "@/composables/useToast";
 import { formatBranchLabel } from "@/utils/branch";
+import { toLocalDateInputValue } from "@/utils/dateUtils";
 
 const props = defineProps({
   mode: {
@@ -457,9 +458,7 @@ const persistTheoryVersion = async (assessmentId) => {
 
 const formatDateForInput = (value) => {
   if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toISOString().slice(0, 10);
+  return toLocalDateInputValue(value);
 };
 
 const mapAssessmentQuestionToForm = (question) => {

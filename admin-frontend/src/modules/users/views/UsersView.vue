@@ -12,9 +12,6 @@
       </template>
       <template #actions>
         <Button v-if="authStore.isSuperAdmin" icon="plus" size="md" @click="openCreateModal"> Добавить пользователя </Button>
-        <Button v-if="authStore.isSuperAdmin || authStore.isManager" icon="user-plus" variant="secondary" size="md" @click="openInviteModal">
-          Пригласить сотрудника
-        </Button>
         <Button icon="file-chart-column" variant="secondary" size="md" @click="handleExportExcel">Экспорт Excel</Button>
       </template>
     </PageHeader>
@@ -22,7 +19,7 @@
     <FilterBar
       v-model="filterBarModel"
       search-key="search"
-      search-placeholder="Поиск по имени, логину или email..."
+      search-placeholder="Поиск по имени, логину или ID..."
       :filter-defs="filterDefs"
       class="mb-4"
       @change="onFilterChange"
@@ -43,7 +40,6 @@
       :get-user-status="getUserStatus"
       :format-date="formatDate"
       :is-super-admin="authStore.isSuperAdmin"
-      :can-invite-to-client-app="canInviteToClientApp"
       @update:page="
         pagination.page = $event;
         loadUsers();
@@ -58,7 +54,6 @@
       @open-profile-page="openProfilePage"
       @open-edit-modal="openEditModal"
       @open-delete-modal="openDeleteModal"
-      @invite-existing-user="openInviteForExistingUser"
     />
 
     <!-- Create modal -->
@@ -194,19 +189,6 @@
       </div>
     </Modal>
 
-    <UserInviteModal
-      :show="showInviteModal"
-      :invite-link="inviteLink"
-      :invite-form="inviteForm"
-      :invite-errors="inviteErrors"
-      :position-options="positionOptions"
-      :branch-options="branchOptions"
-      :action-loading="actionLoading"
-      @close="closeInviteModal"
-      @copy-link="copyInviteLink"
-      @open-profile="openInvitedUserProfile"
-      @create="handleInviteCreate"
-    />
   </div>
 </template>
 
@@ -216,17 +198,14 @@ import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import apiClient from "@/utils/axios";
 import { getUsers, getReferences, createUser, updateUser, deleteUser, resetPassword, resetAssessmentProgress } from "@/api/users";
-import { createInvitation } from "@/api/invitations";
 import { Badge, Button, FilterBar, Input, Modal, PageHeader, Tabs } from "@/components/ui";
 import UserForm from "@/modules/users/components/UserForm.vue";
 import UserPermissionsManager from "@/modules/users/components/UserPermissionsManager.vue";
-import UserInviteModal from "@/modules/users/components/users-view/UserInviteModal.vue";
 import UserProfileModal from "@/modules/users/components/users-view/UserProfileModal.vue";
 import UsersTable from "@/modules/users/components/users-view/UsersTable.vue";
 import { useToast } from "@/composables/useToast";
 import { useSkeletonGate } from "@/composables/useSkeletonGate";
 import { formatBranchLabel } from "@/utils/branch";
-import { BOT_USERNAME } from "@/env";
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -258,12 +237,6 @@ const showResetPasswordModal = ref(false);
 const showDeleteModal = ref(false);
 const showProfileModal = ref(false);
 const showResetProgressModal = ref(false);
-const showInviteModal = ref(false);
-
-const inviteForm = ref({ firstName: "", lastName: "", phone: "", positionId: "", branchId: "", existingUserId: null });
-const inviteErrors = ref({});
-const inviteLink = ref("");
-const inviteCreatedUserId = ref(null);
 
 const selectedUser = ref(null);
 const selectedAssessment = ref(null);
@@ -289,12 +262,6 @@ const canEditUser = (user) => {
   if (authStore.isManager && user.role_name === "employee") return true;
 
   return false;
-};
-
-const canInviteToClientApp = (user) => {
-  if (!user) return false;
-  const hasAdminAccess = user.role_name === "superadmin" || user.role_name === "manager";
-  return hasAdminAccess && !user.telegram_id;
 };
 
 const defaultForm = () => ({
@@ -849,7 +816,6 @@ const formatDate = (value) => {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-    timeZone: "UTC",
   });
 };
 
@@ -864,8 +830,7 @@ const formatDateTime = (value) => {
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-      timeZone: "UTC",
-    }) + " UTC"
+    })
   );
 };
 
@@ -1037,87 +1002,6 @@ const applyGeneratedPassword = async () => {
   }
 };
 
-const openInviteModal = () => {
-  inviteForm.value = { firstName: "", lastName: "", phone: "", positionId: "", branchId: "", existingUserId: null };
-  inviteErrors.value = {};
-  inviteLink.value = "";
-  showInviteModal.value = true;
-};
-
-const openInviteForExistingUser = (user) => {
-  if (!canInviteToClientApp(user)) {
-    showToast("Приглашение доступно только для пользователей с доступом в админ-панель без Telegram", "warning");
-    return;
-  }
-  inviteForm.value = {
-    firstName: user.first_name || "",
-    lastName: user.last_name || "",
-    phone: "",
-    positionId: user.position_id ? Number(user.position_id) : "",
-    branchId: user.branch_id ? Number(user.branch_id) : "",
-    existingUserId: Number(user.id),
-  };
-  inviteErrors.value = {};
-  inviteLink.value = "";
-  showInviteModal.value = true;
-};
-
-const closeInviteModal = () => {
-  showInviteModal.value = false;
-  inviteLink.value = "";
-  inviteCreatedUserId.value = null;
-  inviteErrors.value = {};
-};
-
-const validateInviteForm = () => {
-  const errors = {};
-  if (!inviteForm.value.firstName.trim()) errors.firstName = "Введите имя";
-  if (!inviteForm.value.lastName.trim()) errors.lastName = "Введите фамилию";
-  if (!inviteForm.value.positionId) errors.positionId = "Выберите должность";
-  if (!inviteForm.value.branchId) errors.branchId = "Выберите филиал";
-  inviteErrors.value = errors;
-  return Object.keys(errors).length === 0;
-};
-
-const handleInviteCreate = async () => {
-  if (!validateInviteForm()) return;
-
-  actionLoading.value = true;
-  try {
-    const { data } = await createInvitation({
-      firstName: inviteForm.value.firstName.trim(),
-      lastName: inviteForm.value.lastName.trim(),
-      phone: inviteForm.value.phone.trim() || undefined,
-      positionId: Number(inviteForm.value.positionId),
-      branchId: Number(inviteForm.value.branchId),
-      existingUserId: inviteForm.value.existingUserId ? Number(inviteForm.value.existingUserId) : undefined,
-    });
-    const code = data?.invitation?.code;
-    inviteCreatedUserId.value = data?.invitation?.invited_user_id || null;
-    if (code) {
-      const botUsername = BOT_USERNAME || "";
-      inviteLink.value = botUsername ? `https://t.me/${botUsername}?startapp=${code}` : `Код приглашения: ${code}`;
-    }
-    await loadUsers();
-    showToast("Приглашение создано", "success");
-  } catch (error) {
-    console.error("Ошибка создания приглашения", error);
-    showToast(error.response?.data?.error || "Не удалось создать приглашение", "error");
-  } finally {
-    actionLoading.value = false;
-  }
-};
-
-const copyInviteLink = async () => {
-  if (!inviteLink.value) return;
-  try {
-    await navigator.clipboard.writeText(inviteLink.value);
-    showToast("Ссылка скопирована", "success");
-  } catch {
-    showToast("Не удалось скопировать ссылку", "error");
-  }
-};
-
 const copyText = async (text) => {
   if (!text) return;
   try {
@@ -1126,17 +1010,6 @@ const copyText = async (text) => {
   } catch {
     showToast("Не удалось скопировать", "error");
   }
-};
-
-const openInvitedUserProfile = () => {
-  const userId = Number(inviteCreatedUserId.value);
-  if (!Number.isInteger(userId) || userId <= 0) {
-    showToast("Пользователь приглашения еще не создан", "warning");
-    closeInviteModal();
-    return;
-  }
-  closeInviteModal();
-  router.push(`/users/${userId}/profile`);
 };
 
 watch(
