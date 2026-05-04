@@ -71,6 +71,15 @@ export const getCourseMediaLibrary = async () => {
   return response.data;
 };
 
+export const deleteCourseMediaLibraryItems = async (mediaUrls) => {
+  return mutateWithInvalidation(async () => {
+    const response = await axios.delete("/admin/courses/media-library", {
+      data: { mediaUrls },
+    });
+    return response.data;
+  }, /get:\/admin\/courses/i);
+};
+
 export const deleteCourse = async (id) => {
   return mutateWithInvalidation(async () => {
     const response = await axios.delete(`/admin/courses/${id}`);

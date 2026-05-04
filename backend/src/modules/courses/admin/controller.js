@@ -171,6 +171,46 @@ async function listCourseMedia(req, res, next) {
   }
 }
 
+async function deleteCourseMedia(req, res, next) {
+  try {
+    const mediaUrls = Array.isArray(req.body?.mediaUrls) ? req.body.mediaUrls : [];
+    if (!mediaUrls.length) {
+      return res.status(400).json({ error: "Список медиафайлов пуст" });
+    }
+
+    let deleted = 0;
+    let skipped = 0;
+
+    for (const mediaUrlRaw of mediaUrls) {
+      const mediaUrl = String(mediaUrlRaw || "").trim();
+      if (!mediaUrl.startsWith("/uploads/course-media/")) {
+        skipped += 1;
+        continue;
+      }
+
+      const fileName = path.basename(mediaUrl);
+      const extension = path.extname(fileName || "").toLowerCase();
+      if (!fileName || !COURSE_MEDIA_ALLOWED_EXTENSIONS.includes(extension)) {
+        skipped += 1;
+        continue;
+      }
+
+      const filePath = path.join(COURSE_MEDIA_UPLOAD_DIR, fileName);
+      if (!fs.existsSync(filePath)) {
+        skipped += 1;
+        continue;
+      }
+
+      fs.unlinkSync(filePath);
+      deleted += 1;
+    }
+
+    return res.json({ deleted, skipped });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function getCourse(req, res, next) {
   try {
     const courseId = parseId(req.params.id);
@@ -632,6 +672,7 @@ async function getCourseProgressReport(req, res, next) {
 module.exports = {
   listCourses,
   listCourseMedia,
+  deleteCourseMedia,
   getCourse,
   getCoursePreview,
   createCourse,

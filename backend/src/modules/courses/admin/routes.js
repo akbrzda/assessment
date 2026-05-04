@@ -10,6 +10,7 @@ router.use(checkModuleAccess("courses"));
 
 router.get("/", controller.listCourses);
 router.get("/media-library", controller.listCourseMedia);
+router.delete("/media-library", controller.deleteCourseMedia);
 router.get("/analytics/funnel", controller.getAnalyticsFunnel);
 router.post("/", controller.createCourse);
 router.get("/:id", controller.getCourse);

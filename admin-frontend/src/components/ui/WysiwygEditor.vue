@@ -221,32 +221,98 @@
             Видео
           </button>
         </div>
-        <button type="button" class="media-library-refresh" :disabled="mediaLibraryLoading" @click="loadMediaLibrary(true)">
-          {{ mediaLibraryLoading ? "Обновление..." : "Обновить" }}
+
+        <div class="media-library-actions">
+          <button
+            type="button"
+            class="media-library-refresh"
+            :disabled="mediaLibraryLoading || mediaLibraryUploading"
+            @click="loadMediaLibrary(true)"
+          >
+            {{ mediaLibraryLoading ? "Обновление..." : "Обновить" }}
+          </button>
+          <button
+            type="button"
+            class="media-library-refresh"
+            :disabled="mediaLibraryUploading || mediaLibraryDeleting"
+            @click="openMediaLibraryUpload"
+          >
+            <Upload :size="14" />
+            <span>{{ mediaLibraryUploading ? "Загрузка..." : "Добавить файлы" }}</span>
+          </button>
+          <button type="button" class="media-library-refresh" :disabled="!filteredMediaLibraryItems.length" @click="selectAllVisibleMedia">
+            <CheckSquare :size="14" />
+            <span>Выбрать все</span>
+          </button>
+          <button type="button" class="media-library-refresh" :disabled="!hasSelectedMedia" @click="clearMediaSelection">
+            <Square :size="14" />
+            <span>Снять выбор</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="media-library-bulk-actions">
+        <span class="media-library-selection">Выбрано: {{ selectedMediaUrls.length }}</span>
+        <button type="button" class="media-library-refresh" :disabled="!hasSelectedMedia" @click="insertSelectedMedia">Вставить выбранное</button>
+        <button
+          type="button"
+          class="media-library-refresh media-library-danger"
+          :disabled="!hasSelectedMedia || mediaLibraryDeleting"
+          @click="deleteSelectedMedia"
+        >
+          <Trash2 :size="14" />
+          <span>{{ mediaLibraryDeleting ? "Удаление..." : "Удалить выбранное" }}</span>
         </button>
       </div>
+
+      <input
+        ref="mediaLibraryInputRef"
+        class="wysiwyg-file-input"
+        type="file"
+        multiple
+        accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/ogg,video/quicktime"
+        @change="handleMediaLibraryUpload"
+      />
 
       <div v-if="mediaLibraryLoading" class="media-library-empty">Загружаем медиатеку...</div>
       <div v-else-if="!filteredMediaLibraryItems.length" class="media-library-empty">
         Файлы не найдены. Загрузите изображение или видео, и они появятся здесь.
       </div>
       <div v-else class="media-library-grid">
-        <button
+        <article
           v-for="item in filteredMediaLibraryItems"
           :key="item.mediaUrl"
-          type="button"
           class="media-library-item"
-          @click="insertMediaFromLibrary(item)"
+          :class="{ 'media-library-item-selected': isMediaSelected(item.mediaUrl) }"
+          @click="toggleMediaSelection(item.mediaUrl)"
         >
+          <div class="media-library-check">
+            <CheckSquare v-if="isMediaSelected(item.mediaUrl)" :size="14" />
+            <Square v-else :size="14" />
+          </div>
+
           <div class="media-library-preview">
             <img v-if="item.mediaType === 'image'" :src="resolveMediaUrl(item.mediaUrl)" :alt="item.fileName || 'Изображение'" />
             <video v-else :src="resolveMediaUrl(item.mediaUrl)" muted preload="metadata"></video>
           </div>
+
           <div class="media-library-meta">
             <div class="media-library-name">{{ item.fileName }}</div>
             <div class="media-library-info">{{ item.mediaType === "video" ? "Видео" : "Изображение" }} · {{ formatBytes(item.size) }}</div>
           </div>
-        </button>
+
+          <div class="media-library-item-actions">
+            <button type="button" class="media-library-refresh" @click.stop="insertMediaFromLibrary(item)">Вставить</button>
+            <button
+              type="button"
+              class="media-library-refresh media-library-danger"
+              :disabled="mediaLibraryDeleting"
+              @click.stop="deleteSingleMedia(item.mediaUrl)"
+            >
+              Удалить
+            </button>
+          </div>
+        </article>
       </div>
     </Modal>
   </div>
@@ -274,13 +340,17 @@ import {
   ImagePlus,
   Video,
   Images,
+  Upload,
+  Trash2,
+  CheckSquare,
+  Square,
   Eraser,
   Code2,
   Maximize2,
   Minimize2,
   X,
 } from "lucide-vue-next";
-import { getCourseMediaLibrary, uploadCourseMedia } from "../../api/courses";
+import { deleteCourseMediaLibraryItems, getCourseMediaLibrary, uploadCourseMedia } from "../../api/courses";
 import { API_BASE_URL } from "../../env";
 import { useToast } from "../../composables/useToast";
 import Modal from "./Modal.vue";
@@ -364,8 +434,12 @@ const lastValidHtml = ref(props.modelValue || "<p></p>");
 const bodyScrollLockPadding = ref(0);
 const mediaLibraryOpen = ref(false);
 const mediaLibraryLoading = ref(false);
+const mediaLibraryUploading = ref(false);
+const mediaLibraryDeleting = ref(false);
 const mediaLibraryItems = ref([]);
 const mediaLibraryFilter = ref("all");
+const mediaLibraryInputRef = ref(null);
+const selectedMediaUrls = ref([]);
 
 const fontSizeOptions = [
   { value: "", label: "Размер" },
@@ -447,6 +521,8 @@ const filteredMediaLibraryItems = computed(() => {
 
   return mediaLibraryItems.value.filter((item) => item.mediaType === mediaLibraryFilter.value);
 });
+
+const hasSelectedMedia = computed(() => selectedMediaUrls.value.length > 0);
 
 const isActive = (name) => Boolean(editor.value?.isActive(name));
 
@@ -561,12 +637,46 @@ const loadMediaLibrary = async (forceReload = false) => {
   }
 };
 
+const detectMediaTypeByFile = (file) => {
+  const mimeType = String(file?.type || "").toLowerCase();
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("video/")) return "video";
+  return null;
+};
+
+const openMediaLibraryUpload = () => {
+  mediaLibraryInputRef.value?.click();
+};
+
 const openMediaLibrary = async () => {
   mediaLibraryOpen.value = true;
+  clearMediaSelection();
   await loadMediaLibrary(false);
 };
 
-const insertMediaFromLibrary = (item) => {
+const isMediaSelected = (mediaUrl) => selectedMediaUrls.value.includes(mediaUrl);
+
+const toggleMediaSelection = (mediaUrl) => {
+  if (!mediaUrl) return;
+
+  if (isMediaSelected(mediaUrl)) {
+    selectedMediaUrls.value = selectedMediaUrls.value.filter((url) => url !== mediaUrl);
+    return;
+  }
+
+  selectedMediaUrls.value = [...selectedMediaUrls.value, mediaUrl];
+};
+
+const clearMediaSelection = () => {
+  selectedMediaUrls.value = [];
+};
+
+const selectAllVisibleMedia = () => {
+  const allVisible = filteredMediaLibraryItems.value.map((item) => item.mediaUrl).filter(Boolean);
+  selectedMediaUrls.value = [...new Set(allVisible)];
+};
+
+const insertOneMediaItem = (item) => {
   if (!item || !editor.value) return;
 
   const mediaUrl = resolveMediaUrl(item.mediaUrl || "");
@@ -587,11 +697,163 @@ const insertMediaFromLibrary = (item) => {
         },
       })
       .run();
-  } else {
-    editor.value.chain().focus().setImage({ src: mediaUrl }).run();
+    return;
   }
 
+  editor.value.chain().focus().setImage({ src: mediaUrl }).run();
+};
+
+const insertMediaFromLibrary = (item) => {
+  insertOneMediaItem(item);
   mediaLibraryOpen.value = false;
+};
+
+const insertSelectedMedia = () => {
+  if (!hasSelectedMedia.value || !editor.value) return;
+
+  const selectedSet = new Set(selectedMediaUrls.value);
+  const selectedItems = mediaLibraryItems.value.filter((item) => selectedSet.has(item.mediaUrl));
+  if (!selectedItems.length) return;
+
+  selectedItems.forEach((item) => {
+    insertOneMediaItem(item);
+  });
+
+  showToast(
+    {
+      title: "Медиа добавлено в материал",
+      description: `Вставлено элементов: ${selectedItems.length}.`,
+    },
+    "success",
+  );
+
+  mediaLibraryOpen.value = false;
+};
+
+const deleteMediaItems = async (mediaUrls) => {
+  if (!Array.isArray(mediaUrls) || !mediaUrls.length) return;
+
+  mediaLibraryDeleting.value = true;
+  try {
+    await deleteCourseMediaLibraryItems(mediaUrls);
+    const deletedSet = new Set(mediaUrls);
+    mediaLibraryItems.value = mediaLibraryItems.value.filter((item) => !deletedSet.has(item.mediaUrl));
+    selectedMediaUrls.value = selectedMediaUrls.value.filter((url) => !deletedSet.has(url));
+    showToast(
+      {
+        title: "Файлы удалены",
+        description: `Удалено элементов: ${mediaUrls.length}.`,
+      },
+      "success",
+    );
+  } catch (error) {
+    console.error("Не удалось удалить медиафайлы:", error);
+    showToast(
+      {
+        title: "Ошибка удаления",
+        description: resolveUploadErrorMessage(error, "Не удалось удалить выбранные файлы."),
+      },
+      "error",
+    );
+  } finally {
+    mediaLibraryDeleting.value = false;
+  }
+};
+
+const deleteSelectedMedia = async () => {
+  if (!hasSelectedMedia.value) return;
+  await deleteMediaItems([...selectedMediaUrls.value]);
+};
+
+const deleteSingleMedia = async (mediaUrl) => {
+  if (!mediaUrl) return;
+  await deleteMediaItems([mediaUrl]);
+};
+
+const handleMediaLibraryUpload = async (event) => {
+  const files = Array.from(event?.target?.files || []);
+  if (!files.length) return;
+
+  mediaLibraryUploading.value = true;
+  let uploadedCount = 0;
+  let skippedCount = 0;
+
+  try {
+    for (const file of files) {
+      const mediaType = detectMediaTypeByFile(file);
+      if (!mediaType) {
+        skippedCount += 1;
+        continue;
+      }
+
+      if (mediaType === "image" && Number(file.size || 0) > IMAGE_MAX_SIZE_BYTES) {
+        skippedCount += 1;
+        showToast(
+          {
+            title: "Пропуск файла",
+            description: `Изображение ${file.name} больше 50 МБ.`,
+          },
+          "warning",
+        );
+        continue;
+      }
+
+      if (mediaType === "video" && Number(file.size || 0) > VIDEO_MAX_SIZE_BYTES) {
+        skippedCount += 1;
+        showToast(
+          {
+            title: "Пропуск файла",
+            description: `Видео ${file.name} больше 1024 МБ.`,
+          },
+          "warning",
+        );
+        continue;
+      }
+
+      try {
+        const response = await uploadCourseMedia(file, mediaType);
+        putMediaItemToLibrary({
+          ...response,
+          size: file.size,
+          fileName: response?.originalName || file.name,
+          mediaType: response?.mediaType || mediaType,
+        });
+        uploadedCount += 1;
+      } catch (error) {
+        skippedCount += 1;
+        showToast(
+          {
+            title: "Ошибка загрузки файла",
+            description: resolveUploadErrorMessage(error, `Не удалось загрузить ${file.name}.`),
+          },
+          "error",
+        );
+      }
+    }
+
+    if (uploadedCount > 0) {
+      showToast(
+        {
+          title: "Галерея обновлена",
+          description: `Добавлено файлов: ${uploadedCount}.`,
+        },
+        "success",
+      );
+    }
+
+    if (skippedCount > 0) {
+      showToast(
+        {
+          title: "Часть файлов пропущена",
+          description: `Пропущено файлов: ${skippedCount}.`,
+        },
+        "warning",
+      );
+    }
+  } finally {
+    mediaLibraryUploading.value = false;
+    if (event?.target) event.target.value = "";
+  }
 };
 
 const getVideoDimensionsFromFile = (file) =>
@@ -1164,6 +1426,27 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
+.media-library-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.media-library-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.media-library-selection {
+  margin-right: auto;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .media-library-tab,
 .media-library-refresh {
   border: 1px solid var(--divider);
@@ -1174,6 +1457,9 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-weight: 600;
   padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .media-library-tab-active {
@@ -1184,6 +1470,15 @@ onBeforeUnmount(() => {
 .media-library-refresh:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.media-library-danger {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.media-library-danger:hover:not(:disabled) {
+  background: #fef2f2;
 }
 
 .media-library-empty {
@@ -1214,10 +1509,31 @@ onBeforeUnmount(() => {
   padding: 8px;
   text-align: left;
   cursor: pointer;
+  position: relative;
+}
+
+.media-library-item-selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25);
 }
 
 .media-library-item:hover {
   border-color: var(--primary, #3b82f6);
+}
+
+.media-library-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  z-index: 2;
 }
 
 .media-library-preview {
@@ -1255,5 +1571,15 @@ onBeforeUnmount(() => {
 .media-library-info {
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.media-library-item-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.media-library-item-actions .media-library-refresh {
+  font-size: 12px;
+  padding: 5px 8px;
 }
 </style>
