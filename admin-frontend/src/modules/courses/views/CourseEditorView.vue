@@ -1126,7 +1126,7 @@ const saveCurrentStepBeforeForwardNavigation = async () => {
     return await finalAssessmentStepRef.value.savePendingChanges();
   }
 
-  return await saveCourse({ silentSuccess: true });
+  return await saveCourse();
 };
 
 const openAssessmentEditor = (target, assessmentId = null) => {
@@ -1707,9 +1707,21 @@ watch(sectionTestsEnabled, (val) => {
   if (id) localStorage.setItem(`course-${id}-sectionTestsEnabled`, String(val));
 });
 
-watch(finalAssessmentEnabled, (val) => {
+watch(finalAssessmentEnabled, async (val) => {
   const id = courseId.value;
   if (id) localStorage.setItem(`course-${id}-finalAssessmentEnabled`, String(val));
+  if (!val) {
+    form.value.finalAssessmentId = null;
+    if (isEditMode.value && id) {
+      try {
+        const response = await updateCourse(id, { finalAssessmentId: null });
+        course.value = { ...course.value, ...response.course };
+        showToast("Итоговая аттестация отключена", "success");
+      } catch (error) {
+        showToast(getErrorMessage(error, "Не удалось сохранить изменения"), "error");
+      }
+    }
+  }
 });
 
 onBeforeUnmount(() => {

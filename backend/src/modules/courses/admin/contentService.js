@@ -1,4 +1,4 @@
-const { pool } = require("../../../config/database");
+﻿const { pool } = require("../../../config/database");
 const coursesRepo = require("../courses.repository");
 const mutationsRepo = require("../coursesMutations.repository");
 const progressRepo = require("../courseProgress.repository");
@@ -6,7 +6,7 @@ const { logAndSend, buildActorFromRequest } = require("../../../services/auditSe
 
 function ensureCourseEditable(courseStatus) {
   if (courseStatus === "archived") {
-    const error = new Error("Закрытый курс нельзя редактировать.");
+    const error = new Error("Р—Р°РєСЂС‹С‚С‹Р№ РєСѓСЂСЃ РЅРµР»СЊР·СЏ СЂРµРґР°РєС‚РёСЂРѕРІР°С‚СЊ.");
     error.status = 409;
     throw error;
   }
@@ -19,7 +19,7 @@ async function recalculateProgressIfPublished(courseId, isPublished, connection)
   await progressRepo.recalculateCourseProgressForAllUsers({ courseId, connection });
 }
 
-// ─── Разделы ────────────────────────────────────────────────────────────────
+// в”Ђв”Ђв”Ђ Р Р°Р·РґРµР»С‹ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 async function createSection(courseId, payload, userId, req) {
   const connection = await pool.getConnection();
@@ -27,7 +27,7 @@ async function createSection(courseId, payload, userId, req) {
     await connection.beginTransaction();
     const course = await coursesRepo.findById(courseId, { connection, forUpdate: true });
     if (!course) {
-      const error = new Error("Курс не найден");
+      const error = new Error("РљСѓСЂСЃ РЅРµ РЅР°Р№РґРµРЅ");
       error.status = 404;
       throw error;
     }
@@ -35,8 +35,8 @@ async function createSection(courseId, payload, userId, req) {
     const orderIndex = payload.orderIndex ?? (await mutationsRepo.getNextSectionOrder(courseId, connection));
     if (payload.orderIndex) await mutationsRepo.shiftSectionsUp(courseId, orderIndex, connection);
     const sectionId = await mutationsRepo.insertSection(courseId, { ...payload, orderIndex }, connection);
-    await mutationsRepo.touchCourse(courseId, userId, course.status === "published", connection);
-    await recalculateProgressIfPublished(courseId, course.status === "published", connection);
+    await mutationsRepo.touchCourse(courseId, userId, false, connection);
+    await recalculateProgressIfPublished(courseId, false, connection);
     await connection.commit();
 
     const sections = await coursesRepo.listSectionsByCourseId(courseId);
@@ -66,7 +66,7 @@ async function updateSection(sectionId, payload, userId, req) {
     await connection.beginTransaction();
     const section = await coursesRepo.findSectionById(sectionId, { connection, forUpdate: true });
     if (!section) {
-      const error = new Error("Раздел не найден");
+      const error = new Error("Р Р°Р·РґРµР» РЅРµ РЅР°Р№РґРµРЅ");
       error.status = 404;
       throw error;
     }
@@ -80,8 +80,8 @@ async function updateSection(sectionId, payload, userId, req) {
       }
     }
     await mutationsRepo.updateSectionFields(sectionId, payload, connection);
-    await mutationsRepo.touchCourse(section.courseId, userId, section.courseStatus === "published", connection);
-    await recalculateProgressIfPublished(section.courseId, section.courseStatus === "published", connection);
+    await mutationsRepo.touchCourse(section.courseId, userId, false, connection);
+    await recalculateProgressIfPublished(section.courseId, false, connection);
     await connection.commit();
 
     const sections = await coursesRepo.listSectionsByCourseId(section.courseId);
@@ -111,15 +111,15 @@ async function deleteSection(sectionId, userId, req) {
     await connection.beginTransaction();
     const section = await coursesRepo.findSectionById(sectionId, { connection, forUpdate: true });
     if (!section) {
-      const error = new Error("Раздел не найден");
+      const error = new Error("Р Р°Р·РґРµР» РЅРµ РЅР°Р№РґРµРЅ");
       error.status = 404;
       throw error;
     }
     ensureCourseEditable(section.courseStatus);
     await mutationsRepo.deleteSectionById(sectionId, connection);
     await mutationsRepo.compactSectionOrder(section.courseId, section.orderIndex, connection);
-    await mutationsRepo.touchCourse(section.courseId, userId, section.courseStatus === "published", connection);
-    await recalculateProgressIfPublished(section.courseId, section.courseStatus === "published", connection);
+    await mutationsRepo.touchCourse(section.courseId, userId, false, connection);
+    await recalculateProgressIfPublished(section.courseId, false, connection);
     await connection.commit();
 
     const updatedCourse = await coursesRepo.getCourseByIdForAdmin(section.courseId);
@@ -141,7 +141,7 @@ async function deleteSection(sectionId, userId, req) {
   }
 }
 
-// ─── Темы ───────────────────────────────────────────────────────────────────
+// в”Ђв”Ђв”Ђ РўРµРјС‹ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 async function createTopic(sectionId, payload, userId, req) {
   const connection = await pool.getConnection();
@@ -149,7 +149,7 @@ async function createTopic(sectionId, payload, userId, req) {
     await connection.beginTransaction();
     const section = await coursesRepo.findSectionById(sectionId, { connection, forUpdate: true });
     if (!section) {
-      const error = new Error("Раздел не найден");
+      const error = new Error("Р Р°Р·РґРµР» РЅРµ РЅР°Р№РґРµРЅ");
       error.status = 404;
       throw error;
     }
@@ -157,8 +157,8 @@ async function createTopic(sectionId, payload, userId, req) {
     const orderIndex = payload.orderIndex ?? (await mutationsRepo.getNextTopicOrder(sectionId, connection));
     if (payload.orderIndex) await mutationsRepo.shiftTopicsUp(sectionId, orderIndex, connection);
     const topicId = await mutationsRepo.insertTopic(sectionId, section.courseId, { ...payload, orderIndex }, connection);
-    await mutationsRepo.touchCourse(section.courseId, userId, section.courseStatus === "published", connection);
-    await recalculateProgressIfPublished(section.courseId, section.courseStatus === "published", connection);
+    await mutationsRepo.touchCourse(section.courseId, userId, false, connection);
+    await recalculateProgressIfPublished(section.courseId, false, connection);
     await connection.commit();
 
     const topics = await coursesRepo.listTopicsBySectionId(sectionId);
@@ -188,7 +188,7 @@ async function reorderSections(courseId, sectionIds, userId, req) {
     await connection.beginTransaction();
     const course = await coursesRepo.findById(courseId, { connection, forUpdate: true });
     if (!course) {
-      const error = new Error("Курс не найден");
+      const error = new Error("РљСѓСЂСЃ РЅРµ РЅР°Р№РґРµРЅ");
       error.status = 404;
       throw error;
     }
@@ -198,13 +198,13 @@ async function reorderSections(courseId, sectionIds, userId, req) {
     const dbIds = sections.map((section) => Number(section.id)).sort((a, b) => a - b);
     const requestedIds = sectionIds.map(Number).sort((a, b) => a - b);
     if (dbIds.length !== requestedIds.length || dbIds.some((id, index) => id !== requestedIds[index])) {
-      const error = new Error("Передан некорректный состав тем курса для сортировки");
+      const error = new Error("РџРµСЂРµРґР°РЅ РЅРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ СЃРѕСЃС‚Р°РІ С‚РµРј РєСѓСЂСЃР° РґР»СЏ СЃРѕСЂС‚РёСЂРѕРІРєРё");
       error.status = 422;
       throw error;
     }
 
     await mutationsRepo.reorderSections(courseId, sectionIds, connection);
-    await mutationsRepo.touchCourse(courseId, userId, course.status === "published", connection);
+    await mutationsRepo.touchCourse(courseId, userId, false, connection);
     await connection.commit();
 
     const updatedCourse = await coursesRepo.getCourseByIdForAdmin(courseId);
@@ -232,7 +232,7 @@ async function reorderTopics(courseId, sectionId, topicIds, userId, req) {
     await connection.beginTransaction();
     const section = await coursesRepo.findSectionById(sectionId, { connection, forUpdate: true });
     if (!section || section.courseId !== Number(courseId)) {
-      const error = new Error("Тема курса не найдена");
+      const error = new Error("РўРµРјР° РєСѓСЂСЃР° РЅРµ РЅР°Р№РґРµРЅР°");
       error.status = 404;
       throw error;
     }
@@ -242,13 +242,13 @@ async function reorderTopics(courseId, sectionId, topicIds, userId, req) {
     const dbIds = topics.map((topic) => Number(topic.id)).sort((a, b) => a - b);
     const requestedIds = topicIds.map(Number).sort((a, b) => a - b);
     if (dbIds.length !== requestedIds.length || dbIds.some((id, index) => id !== requestedIds[index])) {
-      const error = new Error("Передан некорректный состав подтем для сортировки");
+      const error = new Error("РџРµСЂРµРґР°РЅ РЅРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ СЃРѕСЃС‚Р°РІ РїРѕРґС‚РµРј РґР»СЏ СЃРѕСЂС‚РёСЂРѕРІРєРё");
       error.status = 422;
       throw error;
     }
 
     await mutationsRepo.reorderTopics(sectionId, topicIds, connection);
-    await mutationsRepo.touchCourse(section.courseId, userId, section.courseStatus === "published", connection);
+    await mutationsRepo.touchCourse(section.courseId, userId, false, connection);
     await connection.commit();
 
     const updatedCourse = await coursesRepo.getCourseByIdForAdmin(section.courseId);
@@ -276,14 +276,14 @@ async function updateTopic(topicId, payload, userId, req) {
     await connection.beginTransaction();
     const topic = await coursesRepo.findTopicById(topicId, { connection, forUpdate: true });
     if (!topic) {
-      const error = new Error("Тема не найдена");
+      const error = new Error("РўРµРјР° РЅРµ РЅР°Р№РґРµРЅР°");
       error.status = 404;
       throw error;
     }
     ensureCourseEditable(topic.courseStatus);
     const resolvedHasMaterial = payload.hasMaterial !== undefined ? payload.hasMaterial : topic.hasMaterial;
     if (!resolvedHasMaterial) {
-      const error = new Error("Подтема должна содержать учебный материал");
+      const error = new Error("РџРѕРґС‚РµРјР° РґРѕР»Р¶РЅР° СЃРѕРґРµСЂР¶Р°С‚СЊ СѓС‡РµР±РЅС‹Р№ РјР°С‚РµСЂРёР°Р»");
       error.status = 422;
       throw error;
     }
@@ -296,8 +296,8 @@ async function updateTopic(topicId, payload, userId, req) {
       }
     }
     await mutationsRepo.updateTopicFields(topicId, payload, connection);
-    await mutationsRepo.touchCourse(topic.courseId, userId, topic.courseStatus === "published", connection);
-    await recalculateProgressIfPublished(topic.courseId, topic.courseStatus === "published", connection);
+    await mutationsRepo.touchCourse(topic.courseId, userId, false, connection);
+    await recalculateProgressIfPublished(topic.courseId, false, connection);
     await connection.commit();
 
     const topics = await coursesRepo.listTopicsBySectionId(topic.sectionId);
@@ -327,15 +327,15 @@ async function deleteTopic(topicId, userId, req) {
     await connection.beginTransaction();
     const topic = await coursesRepo.findTopicById(topicId, { connection, forUpdate: true });
     if (!topic) {
-      const error = new Error("Тема не найдена");
+      const error = new Error("РўРµРјР° РЅРµ РЅР°Р№РґРµРЅР°");
       error.status = 404;
       throw error;
     }
     ensureCourseEditable(topic.courseStatus);
     await mutationsRepo.deleteTopicById(topicId, connection);
     await mutationsRepo.compactTopicOrder(topic.sectionId, topic.orderIndex, connection);
-    await mutationsRepo.touchCourse(topic.courseId, userId, topic.courseStatus === "published", connection);
-    await recalculateProgressIfPublished(topic.courseId, topic.courseStatus === "published", connection);
+    await mutationsRepo.touchCourse(topic.courseId, userId, false, connection);
+    await recalculateProgressIfPublished(topic.courseId, false, connection);
     await connection.commit();
 
     const updatedCourse = await coursesRepo.getCourseByIdForAdmin(topic.courseId);
