@@ -187,48 +187,55 @@
                         icon="more-horizontal"
                         :icon-only="true"
                         aria-label="Открыть меню действий"
-                        @click="toggleMenu(course.id)"
+                        @click="toggleMenu(course.id, $event)"
                       />
-                      <div v-if="openMenuId === course.id" class="dropdown-menu table-dropdown">
-                        <Button
-                          class="dropdown-item"
-                          variant="link"
-                          size="sm"
-                          icon="pencil"
-                          @click="
-                            goToEdit(course.id);
-                            openMenuId = null;
-                          "
+                      <Teleport to="body">
+                        <div
+                          v-if="openMenuId === course.id"
+                          class="dropdown-menu dropdown-menu--fixed"
+                          :style="{ top: menuPos.top + 'px', right: menuPos.right + 'px' }"
+                          @click.stop
                         >
-                          Редактировать
-                        </Button>
-                        <Button
-                          v-if="course.status === 'published'"
-                          class="dropdown-item"
-                          variant="link"
-                          size="sm"
-                          icon="archive"
-                          @click="
-                            handleArchive(course);
-                            openMenuId = null;
-                          "
-                        >
-                          Закрыть
-                        </Button>
-                        <Button
-                          v-if="course.status !== 'published'"
-                          class="dropdown-item danger"
-                          variant="link"
-                          size="sm"
-                          icon="trash"
-                          @click="
-                            handleDelete(course);
-                            openMenuId = null;
-                          "
-                        >
-                          Удалить
-                        </Button>
-                      </div>
+                          <Button
+                            class="dropdown-item"
+                            variant="link"
+                            size="sm"
+                            icon="pencil"
+                            @click="
+                              goToEdit(course.id);
+                              openMenuId = null;
+                            "
+                          >
+                            Редактировать
+                          </Button>
+                          <Button
+                            v-if="course.status === 'published'"
+                            class="dropdown-item"
+                            variant="link"
+                            size="sm"
+                            icon="archive"
+                            @click="
+                              handleArchive(course);
+                              openMenuId = null;
+                            "
+                          >
+                            Закрыть
+                          </Button>
+                          <Button
+                            v-if="course.status !== 'published'"
+                            class="dropdown-item danger"
+                            variant="link"
+                            size="sm"
+                            icon="trash"
+                            @click="
+                              handleDelete(course);
+                              openMenuId = null;
+                            "
+                          >
+                            Удалить
+                          </Button>
+                        </div>
+                      </Teleport>
                     </div>
                   </div>
                 </TableCell>
@@ -360,7 +367,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import {
   Badge,
@@ -424,6 +431,7 @@ const viewTabsConfig = [
 ];
 
 const openMenuId = ref(null);
+const menuPos = ref({ top: 0, right: 0 });
 const currentPage = ref(1);
 const pageSize = ref(10);
 const funnelPeriod = ref("30days");
@@ -664,6 +672,11 @@ onMounted(async () => {
   } catch {
     // Воронка — не критичная функция, ошибку не показываем
   }
+  window.addEventListener("scroll", closeMenus, { passive: true, capture: true });
+});
+
+onUnmounted(() => {
+  window.removeEventListener("scroll", closeMenus, { capture: true });
 });
 
 watch(viewMode, (nextMode) => {
@@ -718,8 +731,20 @@ const funnelColumns = computed(() => {
   ];
 });
 
-const toggleMenu = (id) => {
-  openMenuId.value = openMenuId.value === id ? null : id;
+const toggleMenu = (id, event) => {
+  if (openMenuId.value === id) {
+    openMenuId.value = null;
+    return;
+  }
+  openMenuId.value = id;
+  if (event?.currentTarget) {
+    const wrap = event.currentTarget.closest(".menu-wrap") || event.currentTarget;
+    const rect = wrap.getBoundingClientRect();
+    menuPos.value = {
+      top: rect.bottom + 4,
+      right: window.innerWidth - rect.right,
+    };
+  }
 };
 
 const closeMenus = () => {
@@ -1090,6 +1115,10 @@ const handleRemoveCategory = (categoryValue) => {
   right: 0;
 }
 
+.dropdown-menu--fixed {
+  position: fixed;
+}
+
 .dropdown-item {
   display: flex;
   align-items: center;
@@ -1312,7 +1341,7 @@ const handleRemoveCategory = (categoryValue) => {
   gap: 0;
   align-items: flex-end;
   height: 180px;
-  padding-bottom: 0; 
+  padding-bottom: 0;
   margin-bottom: 0;
 }
 

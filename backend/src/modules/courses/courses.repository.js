@@ -137,9 +137,7 @@ async function validatePublicationIntegrity(courseId, options = {}) {
   const sections = await listSectionsByCourseId(courseId, options);
   const errors = [];
 
-  if (!course.finalAssessmentId) {
-    errors.push("Для публикации курса необходимо назначить итоговую аттестацию");
-  } else {
+  if (course.finalAssessmentId) {
     const [rows] = await executor.execute("SELECT id FROM assessments WHERE id = ? LIMIT 1", [course.finalAssessmentId]);
     if (!rows.length) errors.push("Указанная итоговая аттестация курса не найдена");
   }
