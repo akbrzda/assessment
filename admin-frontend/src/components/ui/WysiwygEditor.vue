@@ -193,7 +193,7 @@
     <p v-if="error" class="wysiwyg-error">{{ error }}</p>
     <p v-else-if="hint" class="wysiwyg-hint">{{ hint }}</p>
 
-    <Modal v-model="mediaLibraryOpen" title="Медиагалерея" size="xl">
+    <Modal v-model="mediaLibraryOpen" title="Медиагалерея" size="xl" :z-index="1200">
       <div class="media-library-head">
         <div class="media-library-tabs">
           <button
@@ -293,7 +293,7 @@
 
           <div class="media-library-preview">
             <img v-if="item.mediaType === 'image'" :src="resolveMediaUrl(item.mediaUrl)" :alt="item.fileName || 'Изображение'" />
-            <video v-else :src="resolveMediaUrl(item.mediaUrl)" muted preload="metadata"></video>
+            <video v-else :src="resolveMediaUrl(item.mediaUrl)" muted preload="none"></video>
           </div>
 
           <div class="media-library-meta">
@@ -651,7 +651,7 @@ const openMediaLibraryUpload = () => {
 const openMediaLibrary = async () => {
   mediaLibraryOpen.value = true;
   clearMediaSelection();
-  await loadMediaLibrary(false);
+  void loadMediaLibrary(false);
 };
 
 const isMediaSelected = (mediaUrl) => selectedMediaUrls.value.includes(mediaUrl);
@@ -815,7 +815,7 @@ const handleMediaLibraryUpload = async (event) => {
         putMediaItemToLibrary({
           ...response,
           size: file.size,
-          fileName: response?.originalName || file.name,
+          fileName: response?.fileName || response?.originalName || file.name,
           mediaType: response?.mediaType || mediaType,
         });
         uploadedCount += 1;
@@ -912,7 +912,7 @@ const handleImageFileChange = async (event) => {
     putMediaItemToLibrary({
       ...response,
       size: file.size,
-      fileName: response?.originalName || file.name,
+      fileName: response?.fileName || response?.originalName || file.name,
       mediaType: response?.mediaType || "image",
     });
     editor.value.chain().focus().setImage({ src: mediaUrl }).run();
@@ -947,8 +947,10 @@ const handleVideoFileChange = async (event) => {
   }
 
   const initialProgressText = `Загрузка видео: 0% (0 Б из ${formatBytes(file.size)})`;
-  let toastId = sonnerToast.loading(initialProgressText, {
+  let toastId = sonnerToast.loading("Загружается видео", {
+    description: initialProgressText,
     duration: Infinity,
+    position: "top-right",
   });
   let lastProgressPercent = -1;
 
@@ -966,9 +968,11 @@ const handleVideoFileChange = async (event) => {
 
         lastProgressPercent = percent;
         const progressText = `Загрузка видео: ${percent}% (${formatBytes(loaded)} из ${formatBytes(total || file.size)})`;
-        toastId = sonnerToast.loading(progressText, {
+        toastId = sonnerToast.loading("Загружается видео", {
           id: toastId,
+          description: progressText,
           duration: Infinity,
+          position: "top-right",
         });
       },
     });
@@ -977,7 +981,7 @@ const handleVideoFileChange = async (event) => {
     putMediaItemToLibrary({
       ...response,
       size: file.size,
-      fileName: response?.originalName || file.name,
+      fileName: response?.fileName || response?.originalName || file.name,
       mediaType: response?.mediaType || "video",
     });
     editor.value
@@ -997,8 +1001,9 @@ const handleVideoFileChange = async (event) => {
 
     sonnerToast.success("Видео успешно загружено", {
       id: toastId,
-      description: `${file.name} добавлено в материал.`,
+      description: `${response?.fileName || response?.originalName || file.name} добавлено в материал.`,
       duration: 3500,
+      position: "top-right",
     });
   } catch (error) {
     console.error("Не удалось загрузить видео:", error);
@@ -1006,6 +1011,7 @@ const handleVideoFileChange = async (event) => {
       id: toastId,
       description: resolveUploadErrorMessage(error, "Не удалось загрузить видео. Попробуйте еще раз."),
       duration: 6000,
+      position: "top-right",
     });
   } finally {
     if (event?.target) event.target.value = "";
@@ -1551,6 +1557,10 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.media-library-preview video {
+  pointer-events: none;
 }
 
 .media-library-meta {

@@ -4,7 +4,7 @@
       <div
         v-if="isVisible"
         class="fixed inset-0 flex items-center justify-center p-4 backdrop-blur-[2px]"
-        :style="{ zIndex: 'var(--z-modal)', background: 'hsl(215 28% 8% / 0.6)' }"
+        :style="overlayStyle"
         role="dialog"
         :aria-modal="true"
         :aria-label="title"
@@ -78,6 +78,10 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  zIndex: {
+    type: [Number, String],
+    default: null,
+  },
 });
 
 const emit = defineEmits(["close", "update:modelValue"]);
@@ -85,6 +89,10 @@ const modalContainer = ref(null);
 const lastFocusedElement = ref(null);
 
 const isVisible = computed(() => (props.modelValue !== undefined ? props.modelValue : props.show));
+const overlayStyle = computed(() => ({
+  zIndex: props.zIndex ?? "var(--z-modal)",
+  background: "hsl(215 28% 8% / 0.6)",
+}));
 
 const sizeClass = computed(
   () =>
@@ -187,7 +195,9 @@ onBeforeUnmount(() => {
 
 .modal-enter-active > div,
 .modal-leave-active > div {
-  transition: transform var(--duration-normal) var(--ease-spring), opacity var(--duration-normal) var(--ease-out-expo);
+  transition:
+    transform var(--duration-normal) var(--ease-spring),
+    opacity var(--duration-normal) var(--ease-out-expo);
 }
 .modal-enter-from > div {
   transform: scale(0.96) translateY(10px);
