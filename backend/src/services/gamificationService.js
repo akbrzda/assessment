@@ -3,6 +3,7 @@ const gamificationModel = require("../models/gamificationModel");
 const logger = require("../utils/logger");
 const { buildAuditEntry, logAuditEvent } = require("./auditService");
 const rulesEngine = require("./gamificationRulesEngine");
+const settingsService = require("./settingsService");
 
 function formatNumber(value) {
   return Number.isFinite(value) ? Number(value) : 0;
@@ -28,7 +29,7 @@ async function hasUnfinishedAssignments(connection, userId) {
   const [[totalRow]] = await connection.execute(
     `SELECT COUNT(*) AS total
        FROM (${placeholderSql}) assigned`,
-    [userId, userId, userId]
+    [userId, userId, userId],
   );
 
   const totalAssigned = Number(totalRow?.total || 0);
@@ -50,7 +51,7 @@ async function hasUnfinishedAssignments(connection, userId) {
        ) attempts ON attempts.assessment_id = assigned.assessment_id
       WHERE attempts.best_score IS NULL
          OR attempts.best_score < a.pass_score_percent`,
-    [userId, userId, userId, userId]
+    [userId, userId, userId, userId],
   );
 
   return {
@@ -67,7 +68,16 @@ function buildEvent(type, points, description) {
   };
 }
 
+async function isGamificationEnabled() {
+  const enabled = await settingsService.getSetting("GAMIFICATION_ENABLED", "true");
+  return enabled === "true" || enabled === true;
+}
+
 async function processAnswerEvent({ userId, attemptId, assessmentId, questionId, answerCorrect }) {
+  if (!(await isGamificationEnabled())) {
+    return { skipped: true, reason: "gamification_disabled" };
+  }
+
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -122,7 +132,7 @@ async function processAnswerEvent({ userId, attemptId, assessmentId, questionId,
           branchId: user.branchId,
           positionId: user.positionId,
         },
-        connection
+        connection,
       );
     }
 
@@ -137,7 +147,7 @@ async function processAnswerEvent({ userId, attemptId, assessmentId, questionId,
           attemptId,
           description: badge.description,
         },
-        connection
+        connection,
       );
       if (inserted) {
         awardedBadges.push({ code: badge.code, name: badge.name });
@@ -175,6 +185,10 @@ async function processAnswerEvent({ userId, attemptId, assessmentId, questionId,
 }
 
 async function processAttemptCompletion({ userId, attemptId, assessment, attempt }) {
+  if (!(await isGamificationEnabled())) {
+    return { skipped: true, reason: "gamification_disabled" };
+  }
+
   const connection = await pool.getConnection();
   const logContext = {
     lines: [],
@@ -291,7 +305,7 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
           branchId: user.branchId,
           positionId: user.positionId,
         },
-        connection
+        connection,
       );
     }
 
@@ -315,7 +329,7 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
           attemptId,
           description: badge.description,
         },
-        connection
+        connection,
       );
       if (inserted) {
         awardedBadges.push({
@@ -361,7 +375,7 @@ async function processAttemptCompletion({ userId, attemptId, assessment, attempt
       `<b>Р“РµР№РјРёС„РёРєР°С†РёСЏ</b>`,
       `РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ: ${user.firstName} ${user.lastName} (ID: ${userId})`,
       `РћС‡РєРё: +${totalEarned} -> ${newPoints}`,
-      `Р РµР·СѓР»СЊС‚Р°С‚: ${formatNumber(attempt.scorePercent)}% (${passed ? "СѓСЃРїРµС€РЅРѕ" : "РЅРµСѓСЃРїРµС€РЅРѕ"})`
+      `Р РµР·СѓР»СЊС‚Р°С‚: ${formatNumber(attempt.scorePercent)}% (${passed ? "СѓСЃРїРµС€РЅРѕ" : "РЅРµСѓСЃРїРµС€РЅРѕ"})`,
     );
     if (previousLevel !== newLevel) {
       logContext.lines.push(`Уровень: ${previousLevel} -> ${newLevel}`);

@@ -9,17 +9,7 @@
       </template>
     </PageHeader>
 
-    <FilterBar
-      v-model="filters"
-      search-key="search"
-      search-placeholder="Поиск..."
-      :filter-defs="filterDefs"
-      class="mb-4"
-    />
-    <div class="filter-actions mb-4">
-      <ActionButton action="reset" @click="resetFilters" />
-      <ActionButton action="apply" label="Применить фильтры" @click="loadData" />
-    </div>
+    <FilterBar v-model="filters" search-key="search" search-placeholder="Поиск..." :filter-defs="filterDefs" class="mb-4" @change="loadData" />
 
     <div v-if="skeletonVisible" class="space-y-4">
       <div class="stats-grid">
@@ -143,7 +133,14 @@
                 <td class="attempts-cell">{{ user.total_assessments }}</td>
                 <td class="score-cell">{{ formatUserScore(user.avg_score) }}%</td>
                 <td>
-                  <Button @click="openUserReport(user.id)" variant="ghost" size="sm" icon="file-text" :icon-only="true" aria-label="Посмотреть отчёт" />
+                  <Button
+                    @click="openUserReport(user.id)"
+                    variant="ghost"
+                    size="sm"
+                    icon="file-text"
+                    :icon-only="true"
+                    aria-label="Посмотреть отчёт"
+                  />
                 </td>
               </tr>
             </tbody>
@@ -390,16 +387,6 @@ const loadData = async () => {
   }
 };
 
-const resetFilters = () => {
-  filters.value = {
-    dateFrom: "",
-    dateTo: "",
-    branchId: "",
-    positionId: "",
-  };
-  loadData();
-};
-
 const handleExportExcel = async () => {
   exporting.value = true;
   try {
@@ -469,11 +456,6 @@ onMounted(async () => {
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 16px;
-}
-
-.filter-actions {
-  display: flex;
-  gap: 12px;
 }
 
 .hide-mobile {
@@ -765,10 +747,6 @@ onMounted(async () => {
 
   .filters-grid {
     grid-template-columns: 1fr;
-  }
-
-  .filter-actions {
-    flex-direction: column;
   }
 }
 

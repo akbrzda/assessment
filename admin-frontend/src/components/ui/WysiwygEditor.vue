@@ -221,6 +221,7 @@ import {
 } from "lucide-vue-next";
 import { uploadCourseMedia } from "../../api/courses";
 import { API_BASE_URL } from "../../env";
+import { useToast } from "../../composables/useToast";
 
 const VideoNode = Node.create({
   name: "video",
@@ -283,6 +284,10 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["update:modelValue"]);
+const { showToast } = useToast();
+
+const IMAGE_MAX_SIZE_BYTES = 50 * 1024 * 1024;
+const VIDEO_MAX_SIZE_BYTES = 1024 * 1024 * 1024;
 
 const API_ORIGIN = (API_BASE_URL || "http://localhost:3001/api").replace(/\/api\/?$/, "");
 const imageInputRef = ref(null);
@@ -463,9 +468,25 @@ const getVideoDimensionsFromFile = (file) =>
     };
   });
 
+const resolveUploadErrorMessage = (error, fallback) => {
+  return error?.response?.data?.error || error?.message || fallback;
+};
+
 const handleImageFileChange = async (event) => {
   const file = event?.target?.files?.[0] || null;
   if (!file || !editor.value) return;
+
+  if (Number(file.size || 0) > IMAGE_MAX_SIZE_BYTES) {
+    showToast(
+      {
+        title: "Файл слишком большой",
+        description: "Изображение должно быть не больше 50 МБ.",
+      },
+      "warning",
+    );
+    if (event?.target) event.target.value = "";
+    return;
+  }
 
   try {
     const response = await uploadCourseMedia(file, "image");
@@ -474,6 +495,13 @@ const handleImageFileChange = async (event) => {
     editor.value.chain().focus().setImage({ src: mediaUrl }).run();
   } catch (error) {
     console.error("Не удалось загрузить изображение:", error);
+    showToast(
+      {
+        title: "Ошибка загрузки изображения",
+        description: resolveUploadErrorMessage(error, "Не удалось загрузить изображение. Попробуйте еще раз."),
+      },
+      "error",
+    );
   } finally {
     if (event?.target) event.target.value = "";
   }
@@ -482,6 +510,18 @@ const handleImageFileChange = async (event) => {
 const handleVideoFileChange = async (event) => {
   const file = event?.target?.files?.[0] || null;
   if (!file || !editor.value) return;
+
+  if (Number(file.size || 0) > VIDEO_MAX_SIZE_BYTES) {
+    showToast(
+      {
+        title: "Файл слишком большой",
+        description: "Видео должно быть не больше 1024 МБ.",
+      },
+      "warning",
+    );
+    if (event?.target) event.target.value = "";
+    return;
+  }
 
   try {
     const { width, height } = await getVideoDimensionsFromFile(file);
@@ -504,6 +544,13 @@ const handleVideoFileChange = async (event) => {
       .run();
   } catch (error) {
     console.error("Не удалось загрузить видео:", error);
+    showToast(
+      {
+        title: "Ошибка загрузки видео",
+        description: resolveUploadErrorMessage(error, "Не удалось загрузить видео. Попробуйте еще раз."),
+      },
+      "error",
+    );
   } finally {
     if (event?.target) event.target.value = "";
   }

@@ -1,246 +1,236 @@
 <template>
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-modal p-4">
-    <div class="bg-card rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-      <!-- Заголовок -->
-      <div class="sticky top-0 bg-card border-b border-border px-6 py-4 flex justify-between items-center">
-        <h3 class="text-xl font-semibold text-foreground">
-          {{ isEditing ? "Редактировать правило" : "Новое правило" }}
-        </h3>
-        <Button @click="$emit('close')" variant="ghost" icon="x" :icon-only="true" aria-label="Закрыть форму" />
+  <Modal :model-value="true" :title="isEditing ? 'Редактировать правило' : 'Новое правило'" size="xl" @close="$emit('close')">
+    <!-- Контент формы -->
+    <form @submit.prevent="handleSubmit" class="space-y-6">
+      <!-- Основные поля -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-1"> Код правила <span class="text-destructive">*</span> </label>
+          <input
+            v-model="formData.code"
+            type="text"
+            required
+            :disabled="isEditing"
+            class="w-full px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground placeholder:text-muted-foreground disabled:bg-muted disabled:cursor-not-allowed"
+            placeholder="base_score"
+          />
+          <p class="mt-1 text-xs text-muted-foreground">Уникальный идентификатор (только английские буквы, цифры, _)</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-1"> Название <span class="text-destructive">*</span> </label>
+          <input
+            v-model="formData.name"
+            type="text"
+            required
+            class="w-full px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground placeholder:text-muted-foreground"
+            placeholder="Базовые очки"
+          />
+        </div>
       </div>
 
-      <!-- Контент формы -->
-      <form @submit.prevent="handleSubmit" class="p-6 space-y-6">
-        <!-- Основные поля -->
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-foreground mb-1"> Код правила <span class="text-destructive">*</span> </label>
-            <input
-              v-model="formData.code"
-              type="text"
-              required
-              :disabled="isEditing"
-              class="w-full px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground placeholder:text-muted-foreground disabled:bg-muted disabled:cursor-not-allowed"
-              placeholder="base_score"
-            />
-            <p class="mt-1 text-xs text-muted-foreground">Уникальный идентификатор (только английские буквы, цифры, _)</p>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-foreground mb-1"> Название <span class="text-destructive">*</span> </label>
-            <input
-              v-model="formData.name"
-              type="text"
-              required
-              class="w-full px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground placeholder:text-muted-foreground"
-              placeholder="Базовые очки"
-            />
-          </div>
+      <div class="grid grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-1"> Тип правила <span class="text-destructive">*</span> </label>
+          <select
+            v-model="formData.ruleType"
+            required
+            class="w-full px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground"
+          >
+            <option value="points">Очки</option>
+            <option value="badge">Бейдж</option>
+          </select>
         </div>
 
-        <div class="grid grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-1">Приоритет</label>
+          <input
+            v-model.number="formData.priority"
+            type="number"
+            min="0"
+            class="w-full px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground"
+          />
+          <p class="mt-1 text-xs text-muted-foreground">Меньше = выше</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-1">Статус</label>
+          <div class="flex items-center h-10">
+            <input v-model="formData.isActive" type="checkbox" class="h-4 w-4 text-primary focus:ring-ring border-input rounded" />
+            <label class="ml-2 text-sm text-foreground">Активно</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Период действия -->
+      <div class="grid grid-cols-2 gap-4">
+        <DatePicker v-model="formData.activeFrom" label="Активно с" />
+        <DatePicker v-model="formData.activeTo" label="Активно до" />
+      </div>
+
+      <!-- Условия (Condition) -->
+      <div>
+        <label class="block text-sm font-medium text-foreground mb-2">Условия применения</label>
+        <div class="bg-muted/40 p-4 rounded-lg space-y-3">
           <div>
-            <label class="block text-sm font-medium text-foreground mb-1"> Тип правила <span class="text-destructive">*</span> </label>
-            <select
-              v-model="formData.ruleType"
-              required
-              class="w-full px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground"
-            >
-              <option value="points">Очки</option>
-              <option value="badge">Бейдж</option>
+            <label class="text-xs text-muted-foreground">Событие</label>
+            <select v-model="conditionForm.event" class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground">
+              <option value="attempt">Завершение попытки</option>
+              <option value="answer">Ответ на вопрос</option>
             </select>
           </div>
-
-          <div>
-            <label class="block text-sm font-medium text-foreground mb-1">Приоритет</label>
-            <input
-              v-model.number="formData.priority"
-              type="number"
-              min="0"
-              class="w-full px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground"
-            />
-            <p class="mt-1 text-xs text-muted-foreground">Меньше = выше</p>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="flex items-center">
+              <input v-model="conditionForm.passed" type="checkbox" class="rounded border-input text-primary" />
+              <span class="ml-2 text-sm text-foreground">Тест пройден</span>
+            </label>
+            <label class="flex items-center">
+              <input v-model="conditionForm.perfect" type="checkbox" class="rounded border-input text-primary" />
+              <span class="ml-2 text-sm text-foreground">Идеальный результат</span>
+            </label>
           </div>
-
-          <div>
-            <label class="block text-sm font-medium text-foreground mb-1">Статус</label>
-            <div class="flex items-center h-10">
-              <input v-model="formData.isActive" type="checkbox" class="h-4 w-4 text-primary focus:ring-ring border-input rounded" />
-              <label class="ml-2 text-sm text-foreground">Активно</label>
-            </div>
+          <div v-if="conditionForm.event === 'answer'">
+            <label class="flex items-center">
+              <input v-model="conditionForm.answer_correct" type="checkbox" class="rounded border-input text-primary" />
+              <span class="ml-2 text-sm text-foreground">Ответ верный</span>
+            </label>
           </div>
-        </div>
-
-        <!-- Период действия -->
-        <div class="grid grid-cols-2 gap-4">
-          <DatePicker v-model="formData.activeFrom" label="Активно с" />
-          <DatePicker v-model="formData.activeTo" label="Активно до" />
-        </div>
-
-        <!-- Условия (Condition) -->
-        <div>
-          <label class="block text-sm font-medium text-foreground mb-2">Условия применения</label>
-          <div class="bg-muted/40 p-4 rounded-lg space-y-3">
+          <div class="grid grid-cols-3 gap-3">
             <div>
-              <label class="text-xs text-muted-foreground">Событие</label>
-              <select v-model="conditionForm.event" class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground">
-                <option value="attempt">Завершение попытки</option>
-                <option value="answer">Ответ на вопрос</option>
-              </select>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <label class="flex items-center">
-                <input v-model="conditionForm.passed" type="checkbox" class="rounded border-input text-primary" />
-                <span class="ml-2 text-sm text-foreground">Тест пройден</span>
-              </label>
-              <label class="flex items-center">
-                <input v-model="conditionForm.perfect" type="checkbox" class="rounded border-input text-primary" />
-                <span class="ml-2 text-sm text-foreground">Идеальный результат</span>
-              </label>
-            </div>
-            <div v-if="conditionForm.event === 'answer'">
-              <label class="flex items-center">
-                <input v-model="conditionForm.answer_correct" type="checkbox" class="rounded border-input text-primary" />
-                <span class="ml-2 text-sm text-foreground">Ответ верный</span>
-              </label>
-            </div>
-            <div class="grid grid-cols-3 gap-3">
-              <div>
-                <label class="text-xs text-muted-foreground">Мин. балл (%)</label>
-                <input
-                  v-model.number="conditionForm.min_score"
-                  type="number"
-                  min="0"
-                  max="100"
-                  class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
-                />
-              </div>
-              <div>
-                <label class="text-xs text-muted-foreground">Макс. балл (%)</label>
-                <input
-                  v-model.number="conditionForm.max_score"
-                  type="number"
-                  min="0"
-                  max="100"
-                  class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
-                />
-              </div>
-              <div>
-                <label class="text-xs text-muted-foreground">Макс. время (ratio)</label>
-                <input
-                  v-model.number="conditionForm.max_time_ratio"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="1"
-                  class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
-                />
-              </div>
-            </div>
-            <div>
-              <label class="text-xs text-muted-foreground">Мин. серия</label>
+              <label class="text-xs text-muted-foreground">Мин. балл (%)</label>
               <input
-                v-model.number="conditionForm.min_streak"
+                v-model.number="conditionForm.min_score"
                 type="number"
                 min="0"
+                max="100"
+                class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
+              />
+            </div>
+            <div>
+              <label class="text-xs text-muted-foreground">Макс. балл (%)</label>
+              <input
+                v-model.number="conditionForm.max_score"
+                type="number"
+                min="0"
+                max="100"
+                class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
+              />
+            </div>
+            <div>
+              <label class="text-xs text-muted-foreground">Макс. время (ratio)</label>
+              <input
+                v-model.number="conditionForm.max_time_ratio"
+                type="number"
+                step="0.01"
+                min="0"
+                max="1"
                 class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
               />
             </div>
           </div>
+          <div>
+            <label class="text-xs text-muted-foreground">Мин. серия</label>
+            <input
+              v-model.number="conditionForm.min_streak"
+              type="number"
+              min="0"
+              class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
+            />
+          </div>
         </div>
+      </div>
 
-        <!-- Формула -->
-        <div>
-          <label class="block text-sm font-medium text-foreground mb-2">Формула начисления</label>
-          <div class="bg-muted/40 p-4 rounded-lg space-y-3">
-            <div v-if="formData.ruleType === 'points'">
-              <div>
-                <label class="text-xs text-muted-foreground">Режим</label>
-                <select v-model="formulaForm.mode" class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground">
-                  <option value="fixed">Фиксированное значение</option>
-                  <option value="percent_of_score">Процент от балла</option>
-                  <option value="multiplier">Множитель</option>
-                </select>
-              </div>
-              <div class="mt-2">
-                <label class="text-xs text-muted-foreground">Значение</label>
-                <input
-                  v-model.number="formulaForm.value"
-                  type="number"
-                  step="0.01"
-                  class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
-                />
-              </div>
-              <div v-if="formulaForm.mode === 'percent_of_score'" class="mt-2">
-                <label class="text-xs text-muted-foreground">Максимальный лимит (cap)</label>
-                <input
-                  v-model.number="formulaForm.cap"
-                  type="number"
-                  class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
-                />
-              </div>
+      <!-- Формула -->
+      <div>
+        <label class="block text-sm font-medium text-foreground mb-2">Формула начисления</label>
+        <div class="bg-muted/40 p-4 rounded-lg space-y-3">
+          <div v-if="formData.ruleType === 'points'">
+            <div>
+              <label class="text-xs text-muted-foreground">Режим</label>
+              <select v-model="formulaForm.mode" class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground">
+                <option value="fixed">Фиксированное значение</option>
+                <option value="percent_of_score">Процент от балла</option>
+                <option value="multiplier">Множитель</option>
+              </select>
             </div>
-            <div v-else>
-              <label class="text-xs text-muted-foreground">Код бейджа</label>
+            <div class="mt-2">
+              <label class="text-xs text-muted-foreground">Значение</label>
               <input
-                v-model="formulaForm.badge_code"
-                type="text"
+                v-model.number="formulaForm.value"
+                type="number"
+                step="0.01"
                 class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
-                placeholder="perfect_run"
+              />
+            </div>
+            <div v-if="formulaForm.mode === 'percent_of_score'" class="mt-2">
+              <label class="text-xs text-muted-foreground">Максимальный лимит (cap)</label>
+              <input
+                v-model.number="formulaForm.cap"
+                type="number"
+                class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
               />
             </div>
           </div>
-        </div>
-
-        <!-- Scope (опционально) -->
-        <div>
-          <label class="block text-sm font-medium text-foreground mb-2">Область применения (необязательно)</label>
-          <div class="bg-muted/40 p-4 rounded-lg space-y-3">
-            <div>
-              <label class="text-xs text-muted-foreground">ID филиалов (через запятую)</label>
-              <input
-                v-model="scopeForm.branchIdsStr"
-                type="text"
-                class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
-                placeholder="1,2,3"
-              />
-            </div>
-            <div>
-              <label class="text-xs text-muted-foreground">ID должностей (через запятую)</label>
-              <input
-                v-model="scopeForm.positionIdsStr"
-                type="text"
-                class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
-                placeholder="1,2"
-              />
-            </div>
-            <div>
-              <label class="text-xs text-muted-foreground">ID аттестаций (через запятую)</label>
-              <input
-                v-model="scopeForm.assessmentIdsStr"
-                type="text"
-                class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
-                placeholder="10,15"
-              />
-            </div>
+          <div v-else>
+            <label class="text-xs text-muted-foreground">Код бейджа</label>
+            <input
+              v-model="formulaForm.badge_code"
+              type="text"
+              class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
+              placeholder="perfect_run"
+            />
           </div>
         </div>
+      </div>
 
-        <!-- Кнопки -->
-        <div class="flex justify-end gap-3 pt-4 border-t border-border">
-          <ActionButton action="cancel" @click="$emit('close')" />
-          <ActionButton action="save" type="submit" :loading="saving" :disabled="saving" />
+      <!-- Scope (опционально) -->
+      <div>
+        <label class="block text-sm font-medium text-foreground mb-2">Область применения (необязательно)</label>
+        <div class="bg-muted/40 p-4 rounded-lg space-y-3">
+          <div>
+            <label class="text-xs text-muted-foreground">ID филиалов (через запятую)</label>
+            <input
+              v-model="scopeForm.branchIdsStr"
+              type="text"
+              class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
+              placeholder="1,2,3"
+            />
+          </div>
+          <div>
+            <label class="text-xs text-muted-foreground">ID должностей (через запятую)</label>
+            <input
+              v-model="scopeForm.positionIdsStr"
+              type="text"
+              class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
+              placeholder="1,2"
+            />
+          </div>
+          <div>
+            <label class="text-xs text-muted-foreground">ID аттестаций (через запятую)</label>
+            <input
+              v-model="scopeForm.assessmentIdsStr"
+              type="text"
+              class="w-full px-2 py-1 border border-input bg-background rounded text-sm text-foreground"
+              placeholder="10,15"
+            />
+          </div>
         </div>
-      </form>
-    </div>
-  </div>
+      </div>
+
+      <!-- Кнопки -->
+      <div class="flex justify-end gap-3 pt-4 border-t border-border mt-2">
+        <ActionButton action="cancel" @click="$emit('close')" />
+        <ActionButton action="save" type="submit" :loading="saving" :disabled="saving" />
+      </div>
+    </form>
+  </Modal>
 </template>
 
 <script setup>
 import { ref, computed, watch } from "vue";
 import { useToast } from "@/composables/useToast";
 import gamificationRulesApi from "@/api/gamificationRules";
-import Button from "@/components/ui/Button.vue";
+import Modal from "@/components/ui/Modal.vue";
 import ActionButton from "@/components/ui/ActionButton.vue";
 import DatePicker from "@/components/ui/DatePicker.vue";
 import { toLocalDateTimeInputValue } from "@/utils/dateUtils";

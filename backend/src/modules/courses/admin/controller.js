@@ -20,6 +20,8 @@ const {
 
 const COURSE_COVERS_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/courses");
 const COURSE_MEDIA_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/course-media");
+const COURSE_MEDIA_IMAGE_MAX_SIZE = 50 * 1024 * 1024;
+const COURSE_MEDIA_VIDEO_MAX_SIZE = 1024 * 1024 * 1024;
 
 const courseCoverStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -65,7 +67,7 @@ const courseMediaStorage = multer.diskStorage({
 
 const uploadCourseMediaFile = multer({
   storage: courseMediaStorage,
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: COURSE_MEDIA_VIDEO_MAX_SIZE },
   fileFilter: (req, file, cb) => {
     const mimeType = String(file.mimetype || "").toLowerCase();
     const imageTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
@@ -186,6 +188,9 @@ async function uploadCourseCover(req, res, next) {
 async function uploadCourseMedia(req, res, next) {
   uploadCourseMediaFile(req, res, async (uploadError) => {
     if (uploadError) {
+      if (uploadError.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({ error: "Превышен лимит размера файла. Видео до 1024 МБ, изображения до 50 МБ." });
+      }
       return res.status(400).json({ error: uploadError.message });
     }
 
@@ -196,6 +201,17 @@ async function uploadCourseMedia(req, res, next) {
     try {
       const mimeType = String(req.file.mimetype || "").toLowerCase();
       const isVideo = mimeType.startsWith("video/");
+      const maxAllowedSize = isVideo ? COURSE_MEDIA_VIDEO_MAX_SIZE : COURSE_MEDIA_IMAGE_MAX_SIZE;
+
+      if (Number(req.file.size || 0) > maxAllowedSize) {
+        if (req.file?.path && fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+        return res.status(400).json({
+          error: isVideo ? "Превышен лимит видео. Максимальный размер — 1024 МБ." : "Превышен лимит изображения. Максимальный размер — 50 МБ.",
+        });
+      }
+
       const mediaType = isVideo ? "video" : "image";
       const mediaUrl = `/uploads/course-media/${req.file.filename}`;
 

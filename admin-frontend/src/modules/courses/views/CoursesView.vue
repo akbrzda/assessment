@@ -1312,8 +1312,7 @@ const handleRemoveCategory = (categoryValue) => {
   gap: 0;
   align-items: flex-end;
   height: 180px;
-  padding-bottom: 0;
-  border-bottom: 1px solid var(--divider);
+  padding-bottom: 0; 
   margin-bottom: 0;
 }
 

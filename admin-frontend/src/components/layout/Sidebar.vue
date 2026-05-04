@@ -82,7 +82,7 @@
 
 <script setup>
 import { computed } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import { useAuthStore } from "../../stores/auth";
 import {
   LayoutDashboard as LayoutDashboardIcon,
@@ -100,6 +100,7 @@ import {
 } from "lucide-vue-next";
 
 const authStore = useAuthStore();
+const router = useRouter();
 
 const props = defineProps({
   isOpen: { type: Boolean, default: true },
@@ -172,6 +173,7 @@ const asideClasses = computed(() => ["sidebar", props.isOpen ? "is-open" : "is-c
 
 const handleLogout = async () => {
   await authStore.logout();
+  await router.replace("/login");
 };
 </script>
 

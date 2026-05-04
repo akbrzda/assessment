@@ -13,39 +13,6 @@
 
     <!-- Content -->
     <div v-else class="settings-content">
-      <!-- Вкладка: Общие настройки -->
-      <div v-if="activeTab === 'general'" class="settings-section">
-        <h3 class="section-title">Общие настройки</h3>
-
-        <!-- Начисление очков (легаси) -->
-        <Card title="Начисление очков" icon="Settings">
-          <div class="form-grid">
-            <Input
-              v-model.number="gamificationSettings.points_per_assessment"
-              type="number"
-              label="Очки за прохождение аттестации"
-              placeholder="10"
-            />
-            <Input
-              v-model.number="gamificationSettings.high_score_multiplier"
-              type="number"
-              label="Множитель за высокий результат (90%+)"
-              placeholder="1.5"
-            />
-            <Input
-              v-model.number="gamificationSettings.perfect_score_bonus"
-              type="number"
-              label="Бонус за идеальный результат (100%)"
-              placeholder="50"
-            />
-            <Input v-model.number="gamificationSettings.monthly_activity_bonus" type="number" label="Очки за активность в месяц" placeholder="20" />
-          </div>
-          <template #footer>
-            <Button @click="saveGamificationSettings" variant="primary" :loading="savingGamification" size="md">Сохранить настройки очков</Button>
-          </template>
-        </Card>
-      </div>
-
       <!-- Вкладка: Геймификация -->
       <div v-if="activeTab === 'gamification'" class="settings-section">
         <h3 class="section-title">Геймификация</h3>
@@ -58,16 +25,28 @@
 
         <!-- Гибкие правила геймификации -->
         <Card title="Гибкие правила геймификации" icon="Settings">
+          <div class="rules-toggle-container">
+            <label class="rules-toggle-label">
+              <input v-model="gamificationEnabled" @change="toggleGamification" type="checkbox" class="rules-toggle-checkbox" />
+              <div class="rules-toggle-content">
+                <div class="rules-toggle-title">Включить геймификацию</div>
+                <div class="rules-toggle-description">Глобально включает/выключает начисление очков и выдачу бейджей</div>
+              </div>
+            </label>
+          </div>
+
           <!-- Индикатор активного режима -->
-          <div :class="['mode-indicator', rulesEnabled ? 'mode-rules' : 'mode-classic']">
+          <div :class="['mode-indicator', gamificationEnabled ? (rulesEnabled ? 'mode-rules' : 'mode-classic') : 'mode-classic']">
             <span class="mode-indicator-dot"></span>
             <span class="mode-indicator-label">
               Активный режим:
-              <strong>{{ rulesEnabled ? "Движок правил" : "Встроенная логика (Классический)" }}</strong>
+              <strong>{{
+                !gamificationEnabled ? "Геймификация выключена" : rulesEnabled ? "Движок правил" : "Встроенная логика (Классический)"
+              }}</strong>
             </span>
           </div>
 
-          <div class="rules-toggle-container">
+          <div class="rules-toggle-container" :class="{ 'opacity-60 pointer-events-none': !gamificationEnabled }">
             <label class="rules-toggle-label">
               <input v-model="rulesEnabled" @change="toggleRulesEngine" type="checkbox" class="rules-toggle-checkbox" />
               <div class="rules-toggle-content">
@@ -79,7 +58,7 @@
             </label>
           </div>
 
-          <div v-if="rulesEnabled" class="rules-content">
+          <div v-if="gamificationEnabled && rulesEnabled" class="rules-content">
             <GamificationRulesManager />
             <div class="rules-dry-run">
               <GamificationDryRun />
@@ -173,8 +152,6 @@ import GamificationRulesManager from "@/modules/gamification/components/Gamifica
 import GamificationDryRun from "@/modules/gamification/components/GamificationDryRun.vue";
 import Card from "@/components/ui/Card.vue";
 import Tabs from "@/components/ui/Tabs.vue";
-import Input from "@/components/ui/Input.vue";
-import Button from "@/components/ui/Button.vue";
 import Icon from "@/components/ui/Icon.vue";
 import PageHeader from "@/components/ui/PageHeader.vue";
 import Skeleton from "@/components/ui/Skeleton.vue";
@@ -187,27 +164,16 @@ const { showToast, showSuccess, showError } = useToast();
 
 // Табы
 const tabsConfig = [
-  { value: "general", label: "Общие" },
   { value: "gamification", label: "Геймификация" },
   { value: "environment", label: "Переменные окружения" },
 ];
 
-const activeTab = ref("general");
+const activeTab = ref("gamification");
 const settingsLoading = ref(true);
 const { skeletonVisible } = useSkeletonGate(settingsLoading, { minDuration: 320, delay: 80 });
 
-// Состояния настроек
-const gamificationSettings = ref({
-  points_per_assessment: 10,
-  high_score_multiplier: 1.5,
-  perfect_score_bonus: 50,
-  monthly_activity_bonus: 20,
-});
-
+const gamificationEnabled = ref(true);
 const rulesEnabled = ref(false);
-
-// Состояния сохранения
-const savingGamification = ref(false);
 
 // Загрузка настроек
 const loadSettings = async () => {
@@ -220,10 +186,9 @@ const loadSettings = async () => {
     settings.forEach((setting) => {
       const value = parseValue(setting.setting_value);
 
-      // Распределяем по категориям
-      if (setting.setting_key.startsWith("gamification_")) {
-        const key = setting.setting_key.replace("gamification_", "");
-        gamificationSettings.value[key] = value;
+      // Флаг движка правил
+      if (setting.setting_key === "GAMIFICATION_ENABLED") {
+        gamificationEnabled.value = value === "true" || value === true;
       }
 
       // Флаг движка правил
@@ -247,22 +212,6 @@ const parseValue = (value) => {
   return value;
 };
 
-// Сохранение настроек геймификации
-const saveGamificationSettings = async () => {
-  savingGamification.value = true;
-  try {
-    for (const [key, value] of Object.entries(gamificationSettings.value)) {
-      await settingsApi.updateSetting(`gamification_${key}`, value);
-    }
-    showToast("Настройки геймификации сохранены", "success");
-  } catch (error) {
-    console.error("Ошибка сохранения настроек геймификации:", error);
-    showToast("Не удалось сохранить настройки", "error");
-  } finally {
-    savingGamification.value = false;
-  }
-};
-
 // Переключение движка правил
 const toggleRulesEngine = async () => {
   try {
@@ -273,6 +222,17 @@ const toggleRulesEngine = async () => {
     showError("Не удалось изменить настройку");
     // Откатываем изменение
     rulesEnabled.value = !rulesEnabled.value;
+  }
+};
+
+const toggleGamification = async () => {
+  try {
+    await settingsApi.updateSetting("GAMIFICATION_ENABLED", gamificationEnabled.value.toString());
+    showSuccess(gamificationEnabled.value ? "Геймификация включена" : "Геймификация выключена вручную");
+  } catch (error) {
+    console.error("Ошибка переключения геймификации:", error);
+    showError("Не удалось изменить настройку");
+    gamificationEnabled.value = !gamificationEnabled.value;
   }
 };
 
@@ -337,13 +297,6 @@ onMounted(() => {
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 16px 0;
-}
-
-/* Forms */
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
 }
 
 /* Gamification Rules */

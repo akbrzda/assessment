@@ -63,7 +63,7 @@ function mapUserProgress(row, requiredTotalDefault) {
 }
 
 function buildEffectiveCourseProgress(baseProgress, sections) {
-  const requiredSections = sections.filter((section) => section.isRequired);
+  const requiredSections = sections.filter((section) => section.isRequired && (section.topics || []).some((topic) => topic.hasMaterial));
   const totalRequiredSections = requiredSections.length;
   const passedRequiredSections = requiredSections.filter(
     (section) => section.progress.status === "passed" && section.progress.allTopicsCompleted,
@@ -160,9 +160,9 @@ async function listPublishedCoursesForUser(userId, userPositionId, userBranchId)
             cup.started_at AS user_started_at, cup.completed_at AS user_completed_at,
             cup.last_activity_at AS user_last_activity_at, cup.assigned_at AS user_assigned_at, cup.deadline_at AS user_deadline_at,
             cua.assigned_at AS manual_assigned_at, cua.deadline_at AS manual_deadline_at,
-            (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id) AS sections_count,
+            (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id AND EXISTS (SELECT 1 FROM course_topics ct2 WHERE ct2.section_id = cs.id AND ct2.has_material = 1)) AS sections_count,
             (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id AND cs.is_required = 1) AS required_sections_count,
-            (SELECT COUNT(*) FROM course_topics ct WHERE ct.course_id = c.id) AS topics_count,
+            (SELECT COUNT(*) FROM course_topics ct WHERE ct.course_id = c.id AND ct.has_material = 1) AS topics_count,
             (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id AND cs.assessment_id IS NOT NULL) AS tests_count
        FROM courses c
        LEFT JOIN course_user_progress cup ON cup.course_id = c.id AND cup.user_id = ?
@@ -312,7 +312,7 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
         isTopicRequired: topic.isRequired,
         previousRequiredTopic,
       });
-      if (topic.isRequired) {
+      if (topic.isRequired && topic.hasMaterial) {
         previousRequiredTopic = topic;
       }
       return {
@@ -326,7 +326,7 @@ async function getCourseForUser(courseId, userId, { positionId = null, branchId 
       };
     });
 
-    const requiredTopics = topics.filter((item) => item.isRequired);
+    const requiredTopics = topics.filter((item) => item.isRequired && item.hasMaterial);
     const allTopicsCompleted = requiredTopics.length === 0 || requiredTopics.every((item) => item.progress.status === "completed");
     const sectionStatus = sectionRow.user_section_status || "not_started";
     const effectiveSectionStatus = sectionStatus === "passed" && !allTopicsCompleted ? "in_progress" : sectionStatus;

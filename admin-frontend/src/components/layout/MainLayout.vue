@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-background text-foreground">
+  <div v-if="authStore.isAuthenticated" class="min-h-screen bg-background text-foreground">
     <div class="flex min-h-screen overflow-x-clip">
       <!-- Сайдбар: постоянный на desktop -->
       <Sidebar v-if="!isMobile" class="flex" :is-open="true" :is-collapsed="isSidebarCollapsed" @navigate="() => {}" />
@@ -37,8 +37,10 @@ import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import Sidebar from "./Sidebar.vue";
 import TopBar from "./TopBar.vue";
 import { useThemeStore } from "../../stores/theme";
+import { useAuthStore } from "../../stores/auth";
 
 const themeStore = useThemeStore();
+const authStore = useAuthStore();
 const isMobile = ref(false);
 const mobileMenuOpen = ref(false);
 const isSidebarCollapsed = computed(() => themeStore.sidebarCollapsed);
