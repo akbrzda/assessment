@@ -22,6 +22,27 @@ const COURSE_COVERS_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/co
 const COURSE_MEDIA_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/course-media");
 const COURSE_MEDIA_IMAGE_MAX_SIZE = 50 * 1024 * 1024;
 const COURSE_MEDIA_VIDEO_MAX_SIZE = 1024 * 1024 * 1024;
+const COURSE_MEDIA_ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".webm", ".ogg", ".mov"];
+
+function resolveMediaMimeType(extension) {
+  const mimeTypesByExtension = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".ogg": "video/ogg",
+    ".mov": "video/quicktime",
+  };
+
+  return mimeTypesByExtension[extension] || "application/octet-stream";
+}
+
+function resolveMediaTypeByExtension(extension) {
+  return [".mp4", ".webm", ".ogg", ".mov"].includes(extension) ? "video" : "image";
+}
 
 const courseCoverStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -104,6 +125,47 @@ async function listCourses(req, res, next) {
     const search = req.query.search ? String(req.query.search).trim() : undefined;
     const courses = await coursesService.listCourses({ status, search });
     res.json({ courses });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function listCourseMedia(req, res, next) {
+  try {
+    if (!fs.existsSync(COURSE_MEDIA_UPLOAD_DIR)) {
+      return res.json({ items: [] });
+    }
+
+    const entries = fs.readdirSync(COURSE_MEDIA_UPLOAD_DIR, { withFileTypes: true });
+    const items = entries
+      .filter((entry) => entry.isFile())
+      .map((entry) => {
+        const extension = path.extname(entry.name || "").toLowerCase();
+        if (!COURSE_MEDIA_ALLOWED_EXTENSIONS.includes(extension)) {
+          return null;
+        }
+
+        const fullPath = path.join(COURSE_MEDIA_UPLOAD_DIR, entry.name);
+        const stats = fs.statSync(fullPath);
+        const mimeType = resolveMediaMimeType(extension);
+
+        return {
+          fileName: entry.name,
+          mediaUrl: `/uploads/course-media/${entry.name}`,
+          mediaType: resolveMediaTypeByExtension(extension),
+          mimeType,
+          size: Number(stats.size || 0),
+          updatedAt: stats.mtime ? stats.mtime.toISOString() : null,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        const left = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const right = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return right - left;
+      });
+
+    return res.json({ items });
   } catch (error) {
     next(error);
   }
@@ -569,6 +631,7 @@ async function getCourseProgressReport(req, res, next) {
 
 module.exports = {
   listCourses,
+  listCourseMedia,
   getCourse,
   getCoursePreview,
   createCourse,

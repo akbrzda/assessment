@@ -9,6 +9,7 @@ router.use(verifyJWT);
 router.use(checkModuleAccess("courses"));
 
 router.get("/", controller.listCourses);
+router.get("/media-library", controller.listCourseMedia);
 router.get("/analytics/funnel", controller.getAnalyticsFunnel);
 router.post("/", controller.createCourse);
 router.get("/:id", controller.getCourse);

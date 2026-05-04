@@ -119,6 +119,9 @@
         <button type="button" class="wysiwyg-btn" title="Добавить видео" aria-label="Добавить видео" @mousedown.prevent="openVideoUpload">
           <Video class="wysiwyg-btn-icon" />
         </button>
+        <button type="button" class="wysiwyg-btn" title="Медиагалерея" aria-label="Медиагалерея" @mousedown.prevent="openMediaLibrary">
+          <Images class="wysiwyg-btn-icon" />
+        </button>
         <button type="button" class="wysiwyg-btn" title="Очистить формат" aria-label="Очистить формат" @mousedown.prevent="clearFormatting">
           <Eraser class="wysiwyg-btn-icon" />
         </button>
@@ -189,6 +192,63 @@
 
     <p v-if="error" class="wysiwyg-error">{{ error }}</p>
     <p v-else-if="hint" class="wysiwyg-hint">{{ hint }}</p>
+
+    <Modal v-model="mediaLibraryOpen" title="Медиагалерея" size="xl">
+      <div class="media-library-head">
+        <div class="media-library-tabs">
+          <button
+            type="button"
+            class="media-library-tab"
+            :class="{ 'media-library-tab-active': mediaLibraryFilter === 'all' }"
+            @click="mediaLibraryFilter = 'all'"
+          >
+            Все
+          </button>
+          <button
+            type="button"
+            class="media-library-tab"
+            :class="{ 'media-library-tab-active': mediaLibraryFilter === 'image' }"
+            @click="mediaLibraryFilter = 'image'"
+          >
+            Изображения
+          </button>
+          <button
+            type="button"
+            class="media-library-tab"
+            :class="{ 'media-library-tab-active': mediaLibraryFilter === 'video' }"
+            @click="mediaLibraryFilter = 'video'"
+          >
+            Видео
+          </button>
+        </div>
+        <button type="button" class="media-library-refresh" :disabled="mediaLibraryLoading" @click="loadMediaLibrary(true)">
+          {{ mediaLibraryLoading ? "Обновление..." : "Обновить" }}
+        </button>
+      </div>
+
+      <div v-if="mediaLibraryLoading" class="media-library-empty">Загружаем медиатеку...</div>
+      <div v-else-if="!filteredMediaLibraryItems.length" class="media-library-empty">
+        Файлы не найдены. Загрузите изображение или видео, и они появятся здесь.
+      </div>
+      <div v-else class="media-library-grid">
+        <button
+          v-for="item in filteredMediaLibraryItems"
+          :key="item.mediaUrl"
+          type="button"
+          class="media-library-item"
+          @click="insertMediaFromLibrary(item)"
+        >
+          <div class="media-library-preview">
+            <img v-if="item.mediaType === 'image'" :src="resolveMediaUrl(item.mediaUrl)" :alt="item.fileName || 'Изображение'" />
+            <video v-else :src="resolveMediaUrl(item.mediaUrl)" muted preload="metadata"></video>
+          </div>
+          <div class="media-library-meta">
+            <div class="media-library-name">{{ item.fileName }}</div>
+            <div class="media-library-info">{{ item.mediaType === "video" ? "Видео" : "Изображение" }} · {{ formatBytes(item.size) }}</div>
+          </div>
+        </button>
+      </div>
+    </Modal>
   </div>
 </template>
 
@@ -213,15 +273,18 @@ import {
   Unlink,
   ImagePlus,
   Video,
+  Images,
   Eraser,
   Code2,
   Maximize2,
   Minimize2,
   X,
 } from "lucide-vue-next";
-import { uploadCourseMedia } from "../../api/courses";
+import { getCourseMediaLibrary, uploadCourseMedia } from "../../api/courses";
 import { API_BASE_URL } from "../../env";
 import { useToast } from "../../composables/useToast";
+import Modal from "./Modal.vue";
+import { toast as sonnerToast } from "vue-sonner";
 
 const VideoNode = Node.create({
   name: "video",
@@ -299,6 +362,10 @@ const currentColor = ref("#000000");
 const charCount = ref(0);
 const lastValidHtml = ref(props.modelValue || "<p></p>");
 const bodyScrollLockPadding = ref(0);
+const mediaLibraryOpen = ref(false);
+const mediaLibraryLoading = ref(false);
+const mediaLibraryItems = ref([]);
+const mediaLibraryFilter = ref("all");
 
 const fontSizeOptions = [
   { value: "", label: "Размер" },
@@ -373,6 +440,14 @@ const activeFontSize = computed(() => {
   return value || "";
 });
 
+const filteredMediaLibraryItems = computed(() => {
+  if (mediaLibraryFilter.value === "all") {
+    return mediaLibraryItems.value;
+  }
+
+  return mediaLibraryItems.value.filter((item) => item.mediaType === mediaLibraryFilter.value);
+});
+
 const isActive = (name) => Boolean(editor.value?.isActive(name));
 
 const run = (command) => {
@@ -439,6 +514,86 @@ const openVideoUpload = () => {
   videoInputRef.value?.click();
 };
 
+const formatBytes = (value) => {
+  const bytes = Number(value || 0);
+  if (!bytes) return "0 Б";
+
+  const units = ["Б", "КБ", "МБ", "ГБ"];
+  const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const normalized = bytes / 1024 ** unitIndex;
+  return `${normalized >= 10 ? normalized.toFixed(0) : normalized.toFixed(1)} ${units[unitIndex]}`;
+};
+
+const putMediaItemToLibrary = (item) => {
+  if (!item?.mediaUrl) return;
+
+  const normalizedItem = {
+    fileName: item.fileName || item.originalName || "Без названия",
+    mediaUrl: item.mediaUrl,
+    mediaType: item.mediaType || "image",
+    mimeType: item.mimeType || "",
+    size: Number(item.size || 0),
+    updatedAt: item.updatedAt || new Date().toISOString(),
+  };
+
+  mediaLibraryItems.value = [normalizedItem, ...mediaLibraryItems.value.filter((entry) => entry.mediaUrl !== normalizedItem.mediaUrl)];
+};
+
+const loadMediaLibrary = async (forceReload = false) => {
+  if (mediaLibraryLoading.value) return;
+  if (!forceReload && mediaLibraryItems.value.length) return;
+
+  mediaLibraryLoading.value = true;
+  try {
+    const payload = await getCourseMediaLibrary();
+    mediaLibraryItems.value = Array.isArray(payload?.items) ? payload.items : [];
+  } catch (error) {
+    console.error("Не удалось загрузить медиатеку:", error);
+    showToast(
+      {
+        title: "Не удалось открыть медиагалерею",
+        description: resolveUploadErrorMessage(error, "Попробуйте обновить список файлов."),
+      },
+      "error",
+    );
+  } finally {
+    mediaLibraryLoading.value = false;
+  }
+};
+
+const openMediaLibrary = async () => {
+  mediaLibraryOpen.value = true;
+  await loadMediaLibrary(false);
+};
+
+const insertMediaFromLibrary = (item) => {
+  if (!item || !editor.value) return;
+
+  const mediaUrl = resolveMediaUrl(item.mediaUrl || "");
+  if (!mediaUrl) return;
+
+  if (item.mediaType === "video") {
+    editor.value
+      .chain()
+      .focus()
+      .insertContent({
+        type: "video",
+        attrs: {
+          src: mediaUrl,
+          controls: true,
+          preload: "metadata",
+          width: null,
+          height: null,
+        },
+      })
+      .run();
+  } else {
+    editor.value.chain().focus().setImage({ src: mediaUrl }).run();
+  }
+
+  mediaLibraryOpen.value = false;
+};
+
 const getVideoDimensionsFromFile = (file) =>
   new Promise((resolve) => {
     if (!file) {
@@ -492,6 +647,12 @@ const handleImageFileChange = async (event) => {
     const response = await uploadCourseMedia(file, "image");
     const mediaUrl = resolveMediaUrl(response?.mediaUrl || "");
     if (!mediaUrl) return;
+    putMediaItemToLibrary({
+      ...response,
+      size: file.size,
+      fileName: response?.originalName || file.name,
+      mediaType: response?.mediaType || "image",
+    });
     editor.value.chain().focus().setImage({ src: mediaUrl }).run();
   } catch (error) {
     console.error("Не удалось загрузить изображение:", error);
@@ -523,11 +684,40 @@ const handleVideoFileChange = async (event) => {
     return;
   }
 
+  const initialProgressText = `Загрузка видео: 0% (0 Б из ${formatBytes(file.size)})`;
+  let toastId = sonnerToast.loading(initialProgressText, {
+    duration: Infinity,
+  });
+  let lastProgressPercent = -1;
+
   try {
     const { width, height } = await getVideoDimensionsFromFile(file);
-    const response = await uploadCourseMedia(file, "video");
+    const response = await uploadCourseMedia(file, "video", {
+      onUploadProgress: (progressEvent) => {
+        const total = Number(progressEvent?.total || file.size || 0);
+        const loaded = Number(progressEvent?.loaded || 0);
+        const percent = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+
+        if (percent === lastProgressPercent && percent !== 100) {
+          return;
+        }
+
+        lastProgressPercent = percent;
+        const progressText = `Загрузка видео: ${percent}% (${formatBytes(loaded)} из ${formatBytes(total || file.size)})`;
+        toastId = sonnerToast.loading(progressText, {
+          id: toastId,
+          duration: Infinity,
+        });
+      },
+    });
     const mediaUrl = resolveMediaUrl(response?.mediaUrl || "");
     if (!mediaUrl) return;
+    putMediaItemToLibrary({
+      ...response,
+      size: file.size,
+      fileName: response?.originalName || file.name,
+      mediaType: response?.mediaType || "video",
+    });
     editor.value
       .chain()
       .focus()
@@ -542,15 +732,19 @@ const handleVideoFileChange = async (event) => {
         },
       })
       .run();
+
+    sonnerToast.success("Видео успешно загружено", {
+      id: toastId,
+      description: `${file.name} добавлено в материал.`,
+      duration: 3500,
+    });
   } catch (error) {
     console.error("Не удалось загрузить видео:", error);
-    showToast(
-      {
-        title: "Ошибка загрузки видео",
-        description: resolveUploadErrorMessage(error, "Не удалось загрузить видео. Попробуйте еще раз."),
-      },
-      "error",
-    );
+    sonnerToast.error("Ошибка загрузки видео", {
+      id: toastId,
+      description: resolveUploadErrorMessage(error, "Не удалось загрузить видео. Попробуйте еще раз."),
+      duration: 6000,
+    });
   } finally {
     if (event?.target) event.target.value = "";
   }
@@ -955,5 +1149,111 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 12px;
   color: #ef4444;
+}
+
+.media-library-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.media-library-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.media-library-tab,
+.media-library-refresh {
+  border: 1px solid var(--divider);
+  background: #ffffff;
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 10px;
+}
+
+.media-library-tab-active {
+  background: var(--bg-secondary);
+  border-color: var(--text-primary);
+}
+
+.media-library-refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.media-library-empty {
+  border: 1px dashed var(--divider);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-align: center;
+  padding: 24px 16px;
+}
+
+.media-library-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.media-library-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.media-library-item:hover {
+  border-color: var(--primary, #3b82f6);
+}
+
+.media-library-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 110px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.media-library-preview img,
+.media-library-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-library-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.media-library-name {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media-library-info {
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 </style>
