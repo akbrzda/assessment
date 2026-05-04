@@ -2,7 +2,7 @@ import { createApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
 import router from "./router";
-import "vue-sonner/lib/index.css";
+import "vue-sonner/style.css";
 import "./style.css";
 import websocketService from "./services/websocket";
 import { useAuthStore } from "./stores/auth";
