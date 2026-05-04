@@ -1,5 +1,11 @@
 <template>
   <div class="assessment-details-view">
+    <PageHeader title="Детали аттестации">
+      <template #actions>
+        <Button variant="secondary" icon="arrow-left" @click="goBack">Назад</Button>
+      </template>
+    </PageHeader>
+
     <Preloader v-if="loading" />
 
     <div v-else-if="error" class="error-state">
@@ -17,6 +23,7 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import PageHeader from "@/components/ui/PageHeader.vue";
 import Preloader from "@/components/ui/Preloader.vue";
 import Button from "@/components/ui/Button.vue";
 import AssessmentDetails from "@/modules/assessments/components/AssessmentDetails.vue";

@@ -5,7 +5,7 @@
         <div class="flex flex-wrap gap-2 mt-1">
           <Badge variant="default" size="sm">Всего: {{ stats.total }}</Badge>
           <Badge variant="primary" size="sm">Суперадминов: {{ stats.superadmin }}</Badge>
-          <Badge variant="info" size="sm">Менеджеров: {{ stats.manager }}</Badge>
+          <Badge variant="info" size="sm">Управляющих: {{ stats.manager }}</Badge>
           <Badge variant="success" size="sm">Сотрудников: {{ stats.employee }}</Badge>
           <Badge v-if="stats.awaiting > 0" variant="warning" size="sm">Ожидают: {{ stats.awaiting }}</Badge>
         </div>
@@ -188,7 +188,6 @@
         <Button variant="danger" :loading="actionLoading" @click="handleResetProgress">Сбросить прогресс</Button>
       </div>
     </Modal>
-
   </div>
 </template>
 
@@ -800,7 +799,7 @@ const getRoleBadgeVariant = (roleName) => {
     case "superadmin":
       return "primary";
     case "manager":
-      return "warning";
+      return "info";
     case "employee":
       return "success";
     default:
@@ -823,15 +822,13 @@ const formatDateTime = (value) => {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return (
-    date.toLocaleString("ru-RU", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  );
+  return date.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 const formatTimeSpent = (seconds) => {

@@ -55,6 +55,7 @@
               v-for="item in flattenedSearchResults"
               :key="item.key"
               class="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-accent/40 transition"
+              @mousedown.prevent
               @click="openSearchResult(item)"
             >
               <span class="shrink-0 text-xs text-muted-foreground w-20">{{ item.type }}</span>
@@ -97,6 +98,8 @@ const searchLoading = ref(false);
 const searchResults = ref({ users: [], assessments: [], questions: [] });
 const showSearchResults = ref(false);
 let searchTimer = null;
+// Счётчик для игнорирования устаревших ответов при быстром наборе
+let searchSeq = 0;
 
 const sectionLabels = {
   dashboard: "Дашборд",
@@ -143,13 +146,18 @@ const handleSearchInput = () => {
     return;
   }
   searchTimer = setTimeout(async () => {
+    const seq = ++searchSeq;
     try {
       searchLoading.value = true;
-      searchResults.value = await globalSearch({ query: q, limit: 6 });
+      const result = await globalSearch({ query: q, limit: 6 });
+      // Игнорируем ответ, если пришёл новый запрос
+      if (seq !== searchSeq) return;
+      searchResults.value = result;
     } catch {
+      if (seq !== searchSeq) return;
       searchResults.value = { users: [], assessments: [], questions: [] };
     } finally {
-      searchLoading.value = false;
+      if (seq === searchSeq) searchLoading.value = false;
     }
   }, 250);
 };

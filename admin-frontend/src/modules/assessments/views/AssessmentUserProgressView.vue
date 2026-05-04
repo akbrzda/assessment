@@ -1,5 +1,11 @@
 <template>
   <div class="assessment-user-progress">
+    <PageHeader v-if="data" :title="`${data.user.first_name} ${data.user.last_name}`" :subtitle="data.assessment.title">
+      <template #actions>
+        <Button variant="secondary" icon="arrow-left" @click="goBack">Назад</Button>
+      </template>
+    </PageHeader>
+
     <Preloader v-if="loading" />
 
     <div v-else-if="error" class="error-state">
@@ -8,14 +14,6 @@
     </div>
 
     <div v-else-if="data" class="progress-content">
-      <div class="page-header">
-        <Button variant="secondary" icon="arrow-left" @click="goBack">Назад</Button>
-        <div>
-          <h1 class="page-title">{{ data.user.first_name }} {{ data.user.last_name }}</h1>
-          <p class="page-subtitle">{{ data.assessment.title }}</p>
-        </div>
-      </div>
-
       <div class="summary-grid">
         <Card class="summary-card">
           <div class="summary-label">Статус</div>
@@ -143,6 +141,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { getAssessmentUserProgress } from "@/api/assessments";
+import PageHeader from "@/components/ui/PageHeader.vue";
 import Card from "@/components/ui/Card.vue";
 import Button from "@/components/ui/Button.vue";
 import Preloader from "@/components/ui/Preloader.vue";
@@ -416,24 +415,6 @@ onMounted(() => {
   gap: 24px;
 }
 
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.page-subtitle {
-  color: var(--text-secondary);
-  margin: 4px 0 0;
-}
-
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -604,11 +585,6 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
   .attempts-header {
     flex-direction: column;
     align-items: flex-start;

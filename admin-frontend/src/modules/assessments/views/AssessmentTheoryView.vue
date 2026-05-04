@@ -1,14 +1,8 @@
 <template>
   <div class="theory-view">
-    <div class="page-header">
-      <div class="page-header-left">
+    <PageHeader title="Теория аттестации" subtitle="Настройте обязательные и дополнительные блоки и опубликуйте версию.">
+      <template #actions>
         <Button variant="secondary" icon="arrow-left" @click="goBack">Назад</Button>
-        <div class="page-header-texts">
-          <h1>Теория аттестации</h1>
-          <p>Настройте обязательные и дополнительные блоки и опубликуйте версию.</p>
-        </div>
-      </div>
-      <div class="page-actions">
         <Button icon="refresh-ccw" variant="secondary" size="sm" :disabled="loading" @click="loadTheory"> Обновить </Button>
         <Button
           icon="bookmark-check"
@@ -30,8 +24,8 @@
         >
           Новая версия
         </Button>
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <Preloader v-if="loading" />
 
@@ -207,6 +201,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import draggable from "vuedraggable";
 import { GripVertical } from "lucide-vue-next";
+import PageHeader from "@/components/ui/PageHeader.vue";
 import Button from "@/components/ui/Button.vue";
 import Card from "@/components/ui/Card.vue";
 import Input from "@/components/ui/Input.vue";
@@ -459,38 +454,6 @@ onMounted(() => {
   gap: 24px;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.page-header-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.page-header-texts h1 {
-  margin: 0 0 4px 0;
-  font-size: 26px;
-  font-weight: 700;
-}
-
-.page-header-texts p {
-  margin: 0;
-  color: var(--text-secondary);
-}
-
-.page-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
 .theory-content {
   display: flex;
   flex-direction: column;
@@ -647,16 +610,6 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .page-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
   .block-card {
     padding: 16px;
   }

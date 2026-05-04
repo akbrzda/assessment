@@ -79,8 +79,11 @@ const handleLogin = async () => {
 }
 
 .login-header {
+  flex-direction: column;
   text-align: center;
   margin-bottom: 28px;
+  display: flex;
+  align-items: center;
 }
 
 .login-header h1 {

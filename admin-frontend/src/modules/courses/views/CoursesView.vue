@@ -35,7 +35,9 @@
       v-else-if="courses.length === 0"
       :type="hasActiveFilters ? 'filter' : 'first-time'"
       title="Курсы не найдены"
-      :description="hasActiveFilters ? 'Попробуйте изменить параметры поиска или фильтры.' : 'Создайте первый курс, чтобы начать обучение сотрудников.'"
+      :description="
+        hasActiveFilters ? 'Попробуйте изменить параметры поиска или фильтры.' : 'Создайте первый курс, чтобы начать обучение сотрудников.'
+      "
       :show-button="!hasActiveFilters"
       button-text="Создать курс"
       @action="goToCreate"
@@ -88,7 +90,14 @@
               <Button variant="secondary" size="sm" icon="file-chart-column" @click="goToStatistics(course.id)">Статистика</Button>
             </div>
             <div class="menu-wrap" @click.stop>
-              <Button variant="ghost" size="sm" icon="more-horizontal" :icon-only="true" aria-label="Открыть меню действий" @click="toggleMenu(course.id)" />
+              <Button
+                variant="ghost"
+                size="sm"
+                icon="more-horizontal"
+                :icon-only="true"
+                aria-label="Открыть меню действий"
+                @click="toggleMenu(course.id)"
+              />
               <div v-if="openMenuId === course.id" class="dropdown-menu">
                 <Button class="dropdown-item" variant="link" size="sm" icon="pencil" @click="goToEdit(course.id)">Редактировать</Button>
                 <Button
@@ -162,10 +171,24 @@
                 </TableCell>
                 <TableCell @click.stop>
                   <div class="row-actions">
-                    <Button variant="ghost" size="sm" icon="file-chart-column" :icon-only="true" aria-label="Статистика курса" @click="goToStatistics(course.id)" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon="chart-column"
+                      :icon-only="true"
+                      aria-label="Статистика курса"
+                      @click="goToStatistics(course.id)"
+                    />
                     <Button variant="ghost" size="sm" icon="pencil" :icon-only="true" aria-label="Редактировать курс" @click="goToEdit(course.id)" />
                     <div class="menu-wrap" @click.stop>
-                      <Button variant="ghost" size="sm" icon="more-horizontal" :icon-only="true" aria-label="Открыть меню действий" @click="toggleMenu(course.id)" />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon="more-horizontal"
+                        :icon-only="true"
+                        aria-label="Открыть меню действий"
+                        @click="toggleMenu(course.id)"
+                      />
                       <div v-if="openMenuId === course.id" class="dropdown-menu table-dropdown">
                         <Button
                           class="dropdown-item"
@@ -738,7 +761,6 @@ const handleRemoveCategory = (categoryValue) => {
   saveCourseCategories(courseCategories.value);
   showToast("Категория удалена", "success");
 };
-
 </script>
 
 <style scoped>

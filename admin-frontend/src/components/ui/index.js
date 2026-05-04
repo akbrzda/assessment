@@ -39,7 +39,6 @@ export { default as Avatar } from "./Avatar.vue";
 export { default as Tooltip } from "./Tooltip.vue";
 export { default as Alert } from "./Alert.vue";
 export { default as Tabs } from "./Tabs.vue";
-export { default as Breadcrumbs } from "./Breadcrumbs.vue";
 export { default as Progress } from "./Progress.vue";
 export { default as Stepper } from "./Stepper.vue";
 export { default as Accordion } from "./Accordion.vue";

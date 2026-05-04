@@ -70,7 +70,13 @@
                 :loading="closingAssignmentUserId === a.userId"
                 @click="emit('close-assignment', a.userId)"
               />
-              <Button size="sm" variant="danger" icon="trash" :loading="removingAssignmentUserId === a.userId" @click="emit('remove-assignment', a.userId)" />
+              <Button
+                size="sm"
+                variant="danger"
+                icon="trash"
+                :loading="removingAssignmentUserId === a.userId"
+                @click="emit('remove-assignment', a.userId)"
+              />
             </td>
           </tr>
         </tbody>
@@ -225,8 +231,7 @@ const newAssignmentDeadlineAtModel = computed({
 }
 
 .add-assignment {
-  display: grid;
-  grid-template-columns: minmax(180px, 220px) minmax(180px, 240px) auto;
+  display: flex;
   align-items: end;
   gap: 12px;
   margin-bottom: 14px;
