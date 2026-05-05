@@ -220,7 +220,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { Badge, Button, Card, Modal, Preloader, Select } from "@/components/ui";
 import AssessmentForm from "@/modules/assessments/components/AssessmentForm.vue";
@@ -282,6 +282,7 @@ const tempIdCounter = ref(-1);
 
 const sectionTestsEnabled = ref(true);
 const finalAssessmentEnabled = ref(true);
+let restoringFromStorage = false;
 
 const sectionForms = ref({});
 const sectionErrors = ref({});
@@ -1710,6 +1711,7 @@ watch(sectionTestsEnabled, (val) => {
 watch(finalAssessmentEnabled, async (val) => {
   const id = courseId.value;
   if (id) localStorage.setItem(`course-${id}-finalAssessmentEnabled`, String(val));
+  if (restoringFromStorage) return;
   if (!val) {
     form.value.finalAssessmentId = null;
     if (isEditMode.value && id) {
@@ -1741,8 +1743,11 @@ onMounted(async () => {
   if (id) {
     const storedTests = localStorage.getItem(`course-${id}-sectionTestsEnabled`);
     const storedFinal = localStorage.getItem(`course-${id}-finalAssessmentEnabled`);
+    restoringFromStorage = true;
     if (storedTests !== null) sectionTestsEnabled.value = storedTests !== "false";
     if (storedFinal !== null) finalAssessmentEnabled.value = storedFinal !== "false";
+    await nextTick();
+    restoringFromStorage = false;
   }
 });
 </script>

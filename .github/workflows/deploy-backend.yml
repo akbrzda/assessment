@@ -88,6 +88,7 @@ jobs:
             --exclude '.git' \
             --exclude 'logs' \
             --exclude 'bot' \
+            --exclude 'uploads' \
             backend/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/backend.theorica.ru/
 
       - name: Install dependencies on server
