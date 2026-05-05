@@ -115,13 +115,7 @@
         >
           <Quote class="wysiwyg-btn-icon" />
         </button>
-        <button
-          type="button"
-          class="wysiwyg-btn"
-          title="Вставить таблицу"
-          aria-label="Вставить таблицу"
-          @mousedown.prevent="insertTable"
-        >
+        <button type="button" class="wysiwyg-btn" title="Вставить таблицу" aria-label="Вставить таблицу" @mousedown.prevent="insertTable">
           <TableIcon class="wysiwyg-btn-icon" />
         </button>
         <span class="wysiwyg-divider"></span>
