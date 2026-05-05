@@ -19,6 +19,7 @@ async function globalSearch(req, res, next) {
         users: [],
         assessments: [],
         questions: [],
+        courses: [],
       });
     }
 
@@ -54,10 +55,19 @@ async function globalSearch(req, res, next) {
       LIMIT ?
     `;
 
-    const [users, assessments, questions] = await Promise.all([
+    const courseSql = `
+      SELECT c.id, c.title, c.status
+      FROM courses c
+      WHERE c.title LIKE ?
+      ORDER BY c.id DESC
+      LIMIT ?
+    `;
+
+    const [users, assessments, questions, courses] = await Promise.all([
       pool.query(userSql, userParams).then(([rows]) => rows),
       pool.query(assessmentSql, [like, limit]).then(([rows]) => rows),
       pool.query(questionSql, [like, limit]).then(([rows]) => rows),
+      pool.query(courseSql, [like, limit]).then(([rows]) => rows),
     ]);
 
     res.json({
@@ -65,6 +75,7 @@ async function globalSearch(req, res, next) {
       users,
       assessments,
       questions,
+      courses,
     });
   } catch (error) {
     next(error);

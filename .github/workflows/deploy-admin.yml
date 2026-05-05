@@ -76,3 +76,31 @@ jobs:
           script: |
             ls -la /var/www/admin.theorica.ru
             echo "Deployment completed successfully"
+
+      - name: Configure nginx cache headers for index.html
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # index.html не должен кешироваться браузером — иначе после деплоя
+            # браузер запрашивает старые JS-чанки, которых уже нет, и получает 404.
+            SNIPPET="/etc/nginx/snippets/admin-no-cache.conf"
+            mkdir -p /etc/nginx/snippets
+            cat > "$SNIPPET" << 'NGINX_EOF'
+            location = /index.html {
+              add_header Cache-Control "no-cache, must-revalidate" always;
+              add_header Pragma "no-cache" always;
+              add_header Expires "0" always;
+            }
+            NGINX_EOF
+
+            # Добавляем include в конфиг сайта, если его ещё нет
+            SITE_CONF=$(grep -rl "admin.theorica.ru\|/var/www/admin.theorica.ru" /etc/nginx/sites-enabled/ 2>/dev/null | head -1)
+            if [ -n "$SITE_CONF" ] && ! grep -q "admin-no-cache.conf" "$SITE_CONF"; then
+              sed -i "/server_name\|root \/var\/www\/admin/a\\    include /etc/nginx/snippets/admin-no-cache.conf;" "$SITE_CONF"
+            fi
+
+            nginx -t && systemctl reload nginx
+            echo "Nginx cache headers configured"

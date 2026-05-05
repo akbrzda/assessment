@@ -48,7 +48,7 @@ class WebSocketService {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: this.maxReconnectAttempts,
-      transports: ["polling", "websocket"],
+      transports: ["websocket", "polling"],
     });
 
     this.setupEventHandlers();

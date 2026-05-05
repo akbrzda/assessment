@@ -137,12 +137,24 @@ jobs:
               pm2 save
             fi
 
-      - name: Check application status
+      - name: Wait for backend to become healthy
         uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            pm2 status assessment-backend
-            pm2 logs assessment-backend --lines 50 --nostream
+            PORT=$(grep "^PORT=" /var/www/backend.theorica.ru/.env | cut -d= -f2)
+            PORT=${PORT:-3001}
+            echo "Ожидание запуска на порту $PORT..."
+            for i in $(seq 1 20); do
+              if curl -sf "http://localhost:$PORT/api/health" > /dev/null 2>&1; then
+                echo "✅ Backend доступен (попытка $i)"
+                exit 0
+              fi
+              echo "⏳ Попытка $i/20 — ожидание..."
+              sleep 3
+            done
+            echo "❌ Backend не запустился за 60 секунд"
+            pm2 logs assessment-backend --lines 100 --nostream
+            exit 1

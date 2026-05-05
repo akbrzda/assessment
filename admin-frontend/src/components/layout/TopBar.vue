@@ -95,7 +95,7 @@ const toggleTheme = () => themeStore.setThemeMode(themeMode.value === "dark" ? "
 
 const searchQuery = ref("");
 const searchLoading = ref(false);
-const searchResults = ref({ users: [], assessments: [], questions: [] });
+const searchResults = ref({ users: [], assessments: [], questions: [], courses: [] });
 const showSearchResults = ref(false);
 let searchTimer = null;
 // Счётчик для игнорирования устаревших ответов при быстром наборе
@@ -133,6 +133,7 @@ const flattenedSearchResults = computed(() =>
       route: `/users/${u.id}/profile`,
     })),
     ...(searchResults.value.assessments || []).map((a) => ({ key: `a-${a.id}`, type: "Аттестация", title: a.title, route: `/assessments/${a.id}` })),
+    ...(searchResults.value.courses || []).map((c) => ({ key: `c-${c.id}`, type: "Курс", title: c.title, route: `/courses/${c.id}` })),
     ...(searchResults.value.questions || []).map((q) => ({ key: `q-${q.id}`, type: "Вопрос", title: q.question_text, route: `/questions/${q.id}` })),
   ].slice(0, 10),
 );
@@ -155,7 +156,7 @@ const handleSearchInput = () => {
       searchResults.value = result;
     } catch {
       if (seq !== searchSeq) return;
-      searchResults.value = { users: [], assessments: [], questions: [] };
+      searchResults.value = { users: [], assessments: [], questions: [], courses: [] };
     } finally {
       if (seq === searchSeq) searchLoading.value = false;
     }
