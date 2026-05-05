@@ -4,6 +4,8 @@ const mutationsRepo = require("../coursesMutations.repository");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
 const fs = require("fs");
 const path = require("path");
+const notificationService = require("../../../services/notifications/notificationService");
+const logger = require("../../../utils/logger");
 
 // - урс -
 
@@ -205,6 +207,14 @@ async function publishCourse(courseId, userId, req) {
       entityId: courseId,
       metadata: { title: course.title, version: course.version },
     });
+
+    // Создаём уведомления для всех employee без прогресса по курсу
+    setImmediate(() =>
+      _scheduleNewCourseNotifications(courseId, course.title).catch((err) => {
+        logger.error("publishCourse: ошибка создания уведомлений courseId=%s: %s", courseId, err.message);
+      }),
+    );
+
     return course;
   } catch (error) {
     await connection.rollback();
@@ -212,6 +222,55 @@ async function publishCourse(courseId, userId, req) {
   } finally {
     connection.release();
   }
+}
+
+/**
+ * Создаёт уведомления типа new_course для сотрудников без прогресса по курсу.
+ * Ограничение: не более 3 уведомлений о новых курсах в день на пользователя.
+ */
+async function _scheduleNewCourseNotifications(courseId, courseTitle) {
+  // Выбираем employees без прогресса по курсу и с включёнными уведомлениями
+  const [users] = await pool.execute(
+    `SELECT u.id, u.first_name
+     FROM users u
+     WHERE u.role = 'employee'
+       AND u.notifications_enabled = 1
+       AND u.telegram_id IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM course_user_progress cup
+         WHERE cup.course_id = ? AND cup.user_id = u.id
+       )`,
+    [courseId],
+  );
+
+  if (!users.length) {
+    logger.debug("_scheduleNewCourseNotifications: нет получателей для courseId=%s", courseId);
+    return;
+  }
+
+  let created = 0;
+  for (const user of users) {
+    // Ограничение: не более 3 уведомлений о новых курсах в день
+    const todayCount = await notificationService.countNewCourseTodayForUser(user.id);
+    if (todayCount >= 3) {
+      continue;
+    }
+
+    await notificationService.create({
+      userId: user.id,
+      type: "new_course",
+      entityType: "course",
+      entityId: courseId,
+      payload: {
+        firstName: user.first_name,
+        courseTitle,
+        courseId,
+      },
+    });
+    created++;
+  }
+
+  logger.info("_scheduleNewCourseNotifications: создано %d уведомлений для courseId=%s", created, courseId);
 }
 
 async function archiveCourse(courseId, userId, req) {

@@ -2,7 +2,19 @@ import axios from "axios";
 import { API_BASE_URL } from "@/env";
 import { clearSession, setAccessToken } from "./tokenStorage";
 
-const DEFAULT_API_BASE_URL = API_BASE_URL || "http://localhost:3001/api";
+const resolveApiBaseUrl = () => {
+  if (API_BASE_URL) {
+    return API_BASE_URL;
+  }
+
+  if (typeof window !== "undefined" && window.location?.hostname && window.location.hostname !== "localhost") {
+    return "/api";
+  }
+
+  return "http://localhost:3001/api";
+};
+
+const DEFAULT_API_BASE_URL = resolveApiBaseUrl();
 
 let isRefreshing = false;
 let failedQueue = [];

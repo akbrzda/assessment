@@ -25,6 +25,12 @@ const adminProfileRoutes = require("./modules/admin/profile");
 const adminPermissionsRoutes = require("./modules/admin/permissions");
 const adminSearchRoutes = require("./modules/admin/search/routes");
 const { metricsMiddleware } = require("./services/metricsService");
+const botModule = require("./modules/bot");
+const certificatesModule = require("./modules/certificates");
+const { registerAssessmentEvents } = require("./events/assessmentEvents");
+
+// Регистрируем обработчики доменных событий
+registerAssessmentEvents();
 
 const app = express();
 
@@ -92,7 +98,11 @@ apiRouter.use("/cloud-storage", cloudStorageRoutes);
 apiRouter.use("/gamification", gamificationModule.routes);
 apiRouter.use("/leaderboard", leaderboardRoutes);
 apiRouter.use("/courses", coursesModule.routes);
-
+apiRouter.use("/bot", botModule.routes);
+apiRouter.use("/certificates", certificatesModule.publicRouter);
+apiRouter.use("/admin/certificates", certificatesModule.adminRouter);
+// Внутренний маршрут для Telegram-бота (авторизация по BOT_TOKEN)
+app.use("/api/bot/internal", botModule.internalRoutes);
 app.use("/api", apiRouter);
 
 app.use(errorHandler);

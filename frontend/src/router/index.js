@@ -91,6 +91,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/certificates",
+    name: "certificates",
+    component: () => import("../views/CertificatesView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/:pathMatch(.*)*",
     redirect: "/invitation",
   },

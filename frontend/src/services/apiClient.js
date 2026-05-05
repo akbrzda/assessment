@@ -220,4 +220,10 @@ export const apiClient = {
     const query = searchParams.toString();
     return request(query ? `/assessments/user/attempts?${query}` : "/assessments/user/attempts");
   },
+  getMyCertificates() {
+    return request("/certificates/my");
+  },
+  downloadCertificate(uuid) {
+    return request(`/certificates/${uuid}/download`, { responseType: "blob" });
+  },
 };

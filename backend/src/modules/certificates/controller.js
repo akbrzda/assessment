@@ -1,0 +1,143 @@
+const path = require("path");
+const fs = require("fs");
+const logger = require("../../utils/logger");
+const repository = require("./repository");
+const certificateService = require("../../services/certificates/certificateService");
+
+/**
+ * GET /api/certificates/my
+ * Список сертификатов текущего пользователя.
+ */
+async function getMyCertificates(req, res, next) {
+  try {
+    const userId = req.user.id;
+    const items = await repository.findByUserId(userId);
+    res.json({ items });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/certificates/:uuid
+ * Публичные метаданные сертификата (верификация).
+ */
+async function getCertificateByUuid(req, res, next) {
+  try {
+    const { uuid } = req.params;
+    const cert = await repository.findByUuid(uuid);
+    if (!cert || cert.status === "revoked") {
+      return res.status(404).json({ error: "Сертификат не найден" });
+    }
+    // Не возвращаем внутренние пути
+    const { file_path, ...safeFields } = cert;
+    res.json(safeFields);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/certificates/:uuid/download
+ * Скачивание PDF файла.
+ */
+async function downloadCertificate(req, res, next) {
+  try {
+    const { uuid } = req.params;
+    const cert = await repository.findByUuid(uuid);
+    if (!cert || cert.status !== "issued") {
+      return res.status(404).json({ error: "Сертификат не найден или не готов" });
+    }
+    if (!cert.file_path || !fs.existsSync(cert.file_path)) {
+      return res.status(404).json({ error: "Файл сертификата не найден" });
+    }
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="certificate-${uuid}.pdf"`);
+    fs.createReadStream(cert.file_path).pipe(res);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/admin/certificates
+ * Список сертификатов с фильтрами.
+ */
+async function listCertificates(req, res, next) {
+  try {
+    const { userId, courseId, status, page = 1, limit = 20 } = req.query;
+    const result = await repository.findAll({
+      userId: userId ? Number(userId) : null,
+      courseId: courseId ? Number(courseId) : null,
+      status: status || null,
+      page: Math.max(1, Number(page)),
+      limit: Math.min(100, Math.max(1, Number(limit))),
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/admin/certificates/:id/revoke
+ * Аннулирование сертификата.
+ */
+async function revokeCertificate(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const adminId = req.user.id;
+    const success = await repository.revoke(id, adminId);
+    if (!success) {
+      return res.status(404).json({ error: "Сертификат не найден или уже аннулирован" });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/admin/certificates/issue
+ * Ручная выдача сертификата администратором.
+ */
+async function issueCertificate(req, res, next) {
+  try {
+    const { userId, courseId } = req.body;
+    if (!userId || !courseId) {
+      return res.status(400).json({ error: "userId и courseId обязательны" });
+    }
+
+    // Получаем данные пользователя и курса
+    const { pool } = require("../../config/database");
+    const [[userRow]] = await pool.execute(`SELECT id, first_name, last_name FROM users WHERE id = ? LIMIT 1`, [userId]);
+    if (!userRow) return res.status(404).json({ error: "Пользователь не найден" });
+
+    const [[courseRow]] = await pool.execute(`SELECT id, title FROM courses WHERE id = ? LIMIT 1`, [courseId]);
+    if (!courseRow) return res.status(404).json({ error: "Курс не найден" });
+
+    const cert = await certificateService.generateCertificate(userId, courseId, null, {
+      firstName: userRow.first_name,
+      lastName: userRow.last_name,
+      courseTitle: courseRow.title,
+      scorePercent: null,
+    });
+
+    if (!cert) {
+      return res.status(500).json({ error: "Не удалось сгенерировать сертификат" });
+    }
+
+    res.status(201).json(cert);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  getMyCertificates,
+  getCertificateByUuid,
+  downloadCertificate,
+  listCertificates,
+  revokeCertificate,
+  issueCertificate,
+};

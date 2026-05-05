@@ -97,6 +97,7 @@ import {
   LayoutTemplate as LayoutTemplateIcon,
   LogOut as LogOutIcon,
   X as XIcon,
+  Award as AwardIcon,
 } from "lucide-vue-next";
 
 const authStore = useAuthStore();
@@ -148,6 +149,7 @@ const navSections = computed(() => {
         has("assessments") && { label: "Аттестации", to: "/assessments", icon: ClipboardListIcon },
         has("courses") && { label: "Курсы", to: "/courses", icon: BookOpenCheckIcon },
         has("questions") && { label: "Банк вопросов", to: "/questions", icon: FileQuestionIcon },
+        { label: "Сертификаты", to: "/certificates", icon: AwardIcon },
       ].filter(Boolean),
     },
     {

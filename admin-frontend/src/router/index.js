@@ -152,6 +152,12 @@ const routes = [
         meta: { roles: ["superadmin", "manager"], title: "Профиль" },
       },
       {
+        path: "certificates",
+        name: "Certificates",
+        component: () => import("../modules/certificates/views/CertificatesView.vue"),
+        meta: { roles: ["superadmin", "manager"], title: "Сертификаты" },
+      },
+      {
         path: "404",
         name: "NotFound",
         component: () => import("../modules/auth/views/NotFoundView.vue"),

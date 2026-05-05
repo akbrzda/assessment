@@ -8,6 +8,7 @@ const { initWebSocket } = require("./services/websocketService");
 const { startAttemptMaintenance } = require("./services/attemptMaintenanceService");
 const { connectRedis } = require("./services/redisService");
 const { startGamificationWorker } = require("./services/gamificationQueueService");
+const { startNotificationScheduler } = require("./services/notifications/notificationScheduler");
 
 async function bootstrap() {
   try {
@@ -18,6 +19,7 @@ async function bootstrap() {
     startAttemptMaintenance();
     await connectRedis();
     startGamificationWorker();
+    startNotificationScheduler();
 
     server.listen(config.port, () => {
       logger.info(`Server listening on port ${config.port}`);

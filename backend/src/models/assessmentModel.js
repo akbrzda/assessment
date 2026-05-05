@@ -1,5 +1,6 @@
 const { pool } = require("../config/database");
 const logger = require("../utils/logger");
+const appEvents = require("../events/appEvents");
 
 // Simple LRU cache for findAssessmentByIdForManager (TTL 60s, max 200 entries)
 const _assessmentCache = new Map();
@@ -1831,17 +1832,33 @@ async function completeAttempt(attemptId, userId) {
     await connection.commit();
     logger.debug("completeAttempt committed attemptId=%s score=%s", attemptId, scorePercent);
 
+    const finalScorePercent = updatedAttempt.score_percent != null ? Number(updatedAttempt.score_percent) : scorePercent;
+    const passScorePercent = assessment.pass_score_percent != null ? Number(assessment.pass_score_percent) : 0;
+
+    // Уведомляем подписчиков о завершении попытки (асинхронно, не блокируем ответ)
+    setImmediate(() => {
+      appEvents.emit("attempt.completed", {
+        userId,
+        assessmentId: assessment.id,
+        attemptId,
+        attemptNumber: Number(attempt.attempt_number),
+        scorePercent: finalScorePercent,
+        passScorePercent,
+        passed: finalScorePercent >= passScorePercent,
+      });
+    });
+
     return {
       assessment: {
         id: assessment.id,
         title: assessment.title,
-        passScorePercent: assessment.pass_score_percent != null ? Number(assessment.pass_score_percent) : 0,
+        passScorePercent,
         createdBy: assessment.created_by,
         timeLimitMinutes: assessment.time_limit_minutes != null ? Number(assessment.time_limit_minutes) : null,
       },
       attempt: {
         id: attemptId,
-        scorePercent: updatedAttempt.score_percent != null ? Number(updatedAttempt.score_percent) : scorePercent,
+        scorePercent: finalScorePercent,
         correctAnswers: updatedAttempt.correct_answers != null ? Number(updatedAttempt.correct_answers) : correctAnswers,
         totalQuestions: updatedAttempt.total_questions != null ? Number(updatedAttempt.total_questions) : totalQuestions,
         timeSpentSeconds: updatedAttempt.time_spent_seconds != null ? Number(updatedAttempt.time_spent_seconds) : null,

@@ -52,6 +52,7 @@ export const useTelegramStore = defineStore("telegram", () => {
   const user = ref(null);
   const initData = ref("");
   const inviteToken = ref(null);
+  const pendingCourseId = ref(null);
   let activeBackButtonHandler = null;
 
   const isReady = computed(() => Boolean(tg.value));
@@ -145,6 +146,15 @@ export const useTelegramStore = defineStore("telegram", () => {
       inviteCode = startParam.replace("invite_", "");
     } else if (urlInvite) {
       inviteCode = urlInvite;
+    }
+
+    // Обработка deep link для открытия курса: startapp=course_[id]
+    const rawStartParam = tgWebAppStartParam || startApp || startParam || "";
+    if (typeof rawStartParam === "string" && rawStartParam.startsWith("course_")) {
+      const parsedCourseId = Number(rawStartParam.replace("course_", ""));
+      if (Number.isInteger(parsedCourseId) && parsedCourseId > 0) {
+        pendingCourseId.value = parsedCourseId;
+      }
     }
 
     console.log("📩 Найден код приглашения:", inviteCode);
@@ -376,6 +386,7 @@ export const useTelegramStore = defineStore("telegram", () => {
     user,
     initData,
     inviteToken,
+    pendingCourseId,
 
     // getters
     isReady,
