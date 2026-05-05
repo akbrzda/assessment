@@ -105,6 +105,25 @@
         >
           <ListOrdered class="wysiwyg-btn-icon" />
         </button>
+        <button
+          type="button"
+          class="wysiwyg-btn"
+          :class="{ 'wysiwyg-btn-active': isActive('blockquote') }"
+          title="Цитата"
+          aria-label="Цитата"
+          @mousedown.prevent="run('toggleBlockquote')"
+        >
+          <Quote class="wysiwyg-btn-icon" />
+        </button>
+        <button
+          type="button"
+          class="wysiwyg-btn"
+          title="Вставить таблицу"
+          aria-label="Вставить таблицу"
+          @mousedown.prevent="insertTable"
+        >
+          <TableIcon class="wysiwyg-btn-icon" />
+        </button>
         <span class="wysiwyg-divider"></span>
 
         <button type="button" class="wysiwyg-btn" title="Ссылка" aria-label="Ссылка" @mousedown.prevent="setLink">
@@ -328,6 +347,10 @@ import Color from "@tiptap/extension-color";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
+import Table from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableHeader from "@tiptap/extension-table-header";
+import TableCell from "@tiptap/extension-table-cell";
 import {
   Bold,
   Italic,
@@ -335,6 +358,8 @@ import {
   Strikethrough,
   List,
   ListOrdered,
+  Quote,
+  Table as TableIcon,
   Link as LinkIcon,
   Unlink,
   ImagePlus,
@@ -467,6 +492,10 @@ const editor = ref(
         autolink: true,
       }),
       Image,
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
       VideoNode,
       IframeNode,
     ],
@@ -561,6 +590,11 @@ const setColor = (value) => {
 const clearFormatting = () => {
   if (!editor.value || sourceMode.value) return;
   editor.value.chain().focus().unsetAllMarks().clearNodes().run();
+};
+
+const insertTable = () => {
+  if (!editor.value || sourceMode.value) return;
+  editor.value.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
 };
 
 const setLink = () => {
@@ -1338,10 +1372,45 @@ onBeforeUnmount(() => {
   text-decoration: underline;
 }
 
+.wysiwyg-content :deep(blockquote) {
+  border-left: 4px solid #e2e8f0;
+  margin: 12px 0;
+  padding: 8px 16px;
+  color: #64748b;
+  font-style: italic;
+  background: #f8fafc;
+  border-radius: 0 4px 4px 0;
+}
+
 .wysiwyg-content :deep(img),
-.wysiwyg-content :deep(table),
 .wysiwyg-content :deep(pre) {
   max-width: 100%;
+}
+
+.wysiwyg-content :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 100%;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.wysiwyg-content :deep(th),
+.wysiwyg-content :deep(td) {
+  border: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  min-width: 80px;
+  vertical-align: top;
+}
+
+.wysiwyg-content :deep(th) {
+  background: #f1f5f9;
+  font-weight: 600;
+  text-align: left;
+}
+
+.wysiwyg-content :deep(.selectedCell) {
+  background: #dbeafe;
 }
 
 .wysiwyg-content :deep(video) {
