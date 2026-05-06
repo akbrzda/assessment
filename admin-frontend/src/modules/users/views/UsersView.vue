@@ -11,6 +11,7 @@
         </div>
       </template>
       <template #actions>
+        <Button v-if="canOpenInvitations" icon="user-plus" size="md" variant="secondary" @click="goToInvitations">Пригласить сотрудника</Button>
         <Button v-if="authStore.isSuperAdmin" icon="plus" size="md" @click="openCreateModal"> Добавить пользователя </Button>
         <Button icon="file-chart-column" variant="secondary" size="md" @click="handleExportExcel">Экспорт Excel</Button>
       </template>
@@ -257,6 +258,8 @@ const selectedUserIds = ref([]);
 const activeUserTab = ref("all");
 const isCreateCredentialsSynced = ref(false);
 
+const canOpenInvitations = computed(() => authStore.isSuperAdmin || authStore.hasModuleAccess("invitations"));
+
 const canEditUser = (user) => {
   // Superadmin может редактировать всех
   if (authStore.isSuperAdmin) return true;
@@ -471,6 +474,10 @@ const goToNextPage = () => {
 const openProfilePage = (user) => {
   if (!user?.id) return;
   router.push(`/users/${user.id}/profile`);
+};
+
+const goToInvitations = () => {
+  router.push("/invitations");
 };
 
 const handleExportExcel = async () => {

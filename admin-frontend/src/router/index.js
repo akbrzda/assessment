@@ -38,6 +38,12 @@ const routes = [
         meta: { roles: ["superadmin", "manager"], module: "users", title: "Профиль пользователя" },
       },
       {
+        path: "invitations",
+        name: "Invitations",
+        component: () => import("../modules/invitations/views/InvitationsView.vue"),
+        meta: { roles: ["superadmin", "manager"], module: "invitations", title: "Приглашения" },
+      },
+      {
         path: "roles",
         name: "Roles",
         component: () => import("../modules/admin/roles/views/RolesListView.vue"),

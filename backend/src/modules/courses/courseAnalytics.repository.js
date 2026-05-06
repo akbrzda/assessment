@@ -42,9 +42,18 @@ async function ensureCourseAnalyticsSchema() {
   return schemaValidationPromise;
 }
 
-async function getCourseFunnelStats() {
+async function getCourseFunnelStats(options = {}) {
   await ensureCourseAnalyticsSchema();
-  const [rows] = await pool.execute(
+  const allowedBranchIds = Array.isArray(options.allowedBranchIds) ? options.allowedBranchIds.filter((item) => Number(item) > 0) : [];
+  const hasBranchFilter = allowedBranchIds.length > 0;
+
+  const params = [];
+  if (hasBranchFilter) params.push(allowedBranchIds);
+  if (hasBranchFilter) params.push(allowedBranchIds);
+  if (hasBranchFilter) params.push(allowedBranchIds);
+  if (hasBranchFilter) params.push(allowedBranchIds);
+
+  const [rows] = await pool.query(
     `SELECT c.id AS course_id, c.title AS course_title,
             COALESCE(assigned.assigned_count, 0) AS assigned_count,
             COUNT(cup.user_id) AS enrolled_count,
@@ -58,11 +67,17 @@ async function getCourseFunnelStats() {
             COALESCE(final_attempts.avg_final_score, 0) AS avg_final_score,
             COALESCE(course_attempts.course_time_seconds, 0) + COALESCE(final_attempts.final_time_seconds, 0) AS total_time_spent_seconds
        FROM courses c
-       LEFT JOIN course_user_progress cup ON cup.course_id = c.id
+       LEFT JOIN (
+         SELECT cup.course_id, cup.user_id, cup.started_at, cup.status, cup.progress_percent
+           FROM course_user_progress cup
+           ${hasBranchFilter ? "JOIN users u ON u.id = cup.user_id AND u.branch_id IN (?)" : ""}
+       ) cup ON cup.course_id = c.id
        LEFT JOIN (
          SELECT cua.course_id, COUNT(*) AS assigned_count
            FROM course_user_assignments cua
+           JOIN users u ON u.id = cua.user_id
           WHERE cua.status = 'active'
+            ${hasBranchFilter ? "AND u.branch_id IN (?)" : ""}
           GROUP BY cua.course_id
        ) assigned ON assigned.course_id = c.id
        LEFT JOIN (
@@ -72,7 +87,9 @@ async function getCourseFunnelStats() {
                 COALESCE(SUM(aa.time_spent_seconds), 0) AS course_time_seconds
            FROM course_sections cs
            JOIN assessment_attempts aa ON aa.assessment_id = cs.assessment_id AND aa.status = 'completed'
+           JOIN users u ON u.id = aa.user_id
           WHERE cs.assessment_id IS NOT NULL
+            ${hasBranchFilter ? "AND u.branch_id IN (?)" : ""}
           GROUP BY cs.course_id
        ) course_attempts ON course_attempts.course_id = c.id
        LEFT JOIN (
@@ -82,13 +99,16 @@ async function getCourseFunnelStats() {
                 COALESCE(SUM(aa.time_spent_seconds), 0) AS final_time_seconds
            FROM courses c2
            JOIN assessment_attempts aa ON aa.assessment_id = c2.final_assessment_id AND aa.status = 'completed'
+           JOIN users u ON u.id = aa.user_id
           WHERE c2.final_assessment_id IS NOT NULL
+            ${hasBranchFilter ? "AND u.branch_id IN (?)" : ""}
           GROUP BY c2.id
        ) final_attempts ON final_attempts.course_id = c.id
       WHERE c.status = 'published'
       GROUP BY c.id, c.title, assigned.assigned_count, course_attempts.course_attempts_count, course_attempts.avg_course_score,
                course_attempts.course_time_seconds, final_attempts.final_attempts_count, final_attempts.avg_final_score, final_attempts.final_time_seconds
       ORDER BY assigned_count DESC, enrolled_count DESC, c.title ASC`,
+    params,
   );
 
   return rows.map((row) => ({
@@ -108,20 +128,27 @@ async function getCourseFunnelStats() {
   }));
 }
 
-async function getSectionFailureStats(courseId) {
+async function getSectionFailureStats(courseId, options = {}) {
   await ensureCourseAnalyticsSchema();
-  const [rows] = await pool.execute(
+  const allowedBranchIds = Array.isArray(options.allowedBranchIds) ? options.allowedBranchIds.filter((item) => Number(item) > 0) : [];
+  const hasBranchFilter = allowedBranchIds.length > 0;
+
+  const [rows] = await pool.query(
     `SELECT cs.id AS section_id, cs.title AS section_title, cs.order_index,
             COUNT(csup.user_id) AS total_attempts,
             SUM(CASE WHEN csup.status = 'failed' THEN 1 ELSE 0 END) AS failed_count,
             SUM(CASE WHEN csup.status = 'passed' THEN 1 ELSE 0 END) AS passed_count,
             AVG(csup.score_percent) AS avg_score
        FROM course_sections cs
-       LEFT JOIN course_section_user_progress csup ON csup.section_id = cs.id
+       LEFT JOIN (
+         SELECT csup.*
+           FROM course_section_user_progress csup
+           ${hasBranchFilter ? "JOIN users u ON u.id = csup.user_id AND u.branch_id IN (?)" : ""}
+       ) csup ON csup.section_id = cs.id
       WHERE cs.course_id = ?
       GROUP BY cs.id, cs.title, cs.order_index
       ORDER BY cs.order_index ASC`,
-    [courseId],
+    hasBranchFilter ? [allowedBranchIds, courseId] : [courseId],
   );
 
   return rows.map((row) => ({

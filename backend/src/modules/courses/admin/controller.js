@@ -764,7 +764,10 @@ async function resetCourseUserProgress(req, res, next) {
 
 async function getAnalyticsFunnel(req, res, next) {
   try {
-    const courses = await analyticsRepo.getCourseFunnelStats();
+    const managerBranchIds = await resolveManagerBranchIds(req.user);
+    const courses = await analyticsRepo.getCourseFunnelStats({
+      allowedBranchIds: managerBranchIds,
+    });
     res.json({ courses });
   } catch (error) {
     next(error);
@@ -775,7 +778,10 @@ async function getSectionFailures(req, res, next) {
   try {
     const courseId = parseId(req.params.id);
     if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
-    const sections = await analyticsRepo.getSectionFailureStats(courseId);
+    const managerBranchIds = await resolveManagerBranchIds(req.user);
+    const sections = await analyticsRepo.getSectionFailureStats(courseId, {
+      allowedBranchIds: managerBranchIds,
+    });
     res.json({ sections });
   } catch (error) {
     next(error);
