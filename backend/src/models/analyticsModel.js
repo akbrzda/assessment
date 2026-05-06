@@ -105,13 +105,6 @@ async function getSummary({ from = null, to = null, branchId = null, positionId 
   const passedAttempts = Number(attempts.passedAttempts || 0);
   const passRate = completedAttempts ? Math.round((passedAttempts / completedAttempts) * 100) : 0;
 
-  console.log("[getSummary] Статистика:", {
-    totalUsers: userCount.total_users,
-    totalAssessments: assessmentCount.total_assessments,
-    completedAttempts,
-    averageScore: attempts.averageScore,
-  });
-
   return {
     totalAssessments: Number(assessmentCount.total_assessments || 0),
     distinctAssessments: Number(attempts.distinctAssessments || 0),

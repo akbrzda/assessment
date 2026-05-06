@@ -1,0 +1,37 @@
+name: Security Checks
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/security-checks.yml"
+
+jobs:
+  security:
+    name: Backend Security
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Audit dependencies (high/critical)
+        working-directory: backend
+        run: npm audit --audit-level=high
+
+      - name: Run security tests
+        working-directory: backend
+        env:
+          TEST_API_BASE: http://localhost:3001/api
+        run: node --test tests/security.test.js

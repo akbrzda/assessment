@@ -35,6 +35,7 @@ jobs:
           NODE_ENV=${{ secrets.BACKEND_NODE_ENV }}
           PORT=${{ secrets.BACKEND_PORT }}
           ALLOWED_ORIGINS=${{ secrets.BACKEND_ALLOWED_ORIGINS }}
+          BACKEND_URL=${{ secrets.BACKEND_URL }}
 
           DB_HOST=${{ secrets.BACKEND_DB_HOST }}
           DB_PORT=${{ secrets.BACKEND_DB_PORT }}
@@ -87,7 +88,6 @@ jobs:
             --exclude 'node_modules' \
             --exclude '.git' \
             --exclude 'logs' \
-            --exclude 'bot' \
             --exclude 'uploads' \
             backend/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/backend.theorica.ru/
 

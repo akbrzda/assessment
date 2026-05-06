@@ -1,9 +1,12 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const path = require("path");
 const config = require("./config/env");
 const { errorHandler, timezone: timezoneMiddleware } = require("./middleware");
+const verifyJWT = require("./middleware/verifyJWT");
+const { verifyCertificateLimiter } = require("./middleware/rateLimit");
 
 const authModule = require("./modules/auth");
 const invitationModule = require("./modules/invitations");
@@ -33,6 +36,7 @@ const { registerAssessmentEvents } = require("./events/assessmentEvents");
 registerAssessmentEvents();
 
 const app = express();
+app.set("trust proxy", 1);
 
 const isProduction = config.nodeEnv === "production";
 if (isProduction && config.allowedOrigins.length === 0) {
@@ -45,6 +49,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.use(helmet());
 app.use(express.json());
 app.use(cookieParser());
 
@@ -53,6 +58,9 @@ app.use((req, res, next) => {
   res.setHeader("X-Robots-Tag", "noindex, nofollow");
   next();
 });
+
+// Доступ к сертификатам только для авторизованных пользователей
+app.use("/uploads/certificates", verifyJWT, express.static(path.join(__dirname, "../../uploads/certificates")));
 
 // Статические файлы (иконки, обложки, медиа)
 app.use("/uploads", express.static(path.join(__dirname, "../../uploads")));
@@ -99,6 +107,7 @@ apiRouter.use("/gamification", gamificationModule.routes);
 apiRouter.use("/leaderboard", leaderboardRoutes);
 apiRouter.use("/courses", coursesModule.routes);
 apiRouter.use("/bot", botModule.routes);
+apiRouter.use("/verify", verifyCertificateLimiter, certificatesModule.verifyRouter);
 apiRouter.use("/certificates", certificatesModule.publicRouter);
 apiRouter.use("/admin/certificates", certificatesModule.adminRouter);
 // Внутренний маршрут для Telegram-бота (авторизация по BOT_TOKEN)

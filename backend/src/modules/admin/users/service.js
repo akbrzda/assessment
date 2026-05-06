@@ -752,6 +752,9 @@ async function createUser(req, res, next) {
     // Хешируем пароль, если указан
     let hashedPassword = null;
     if (password) {
+      if (password.length < 8) {
+        return res.status(400).json({ error: "Пароль должен быть не менее 8 символов" });
+      }
       hashedPassword = await bcrypt.hash(password, 10);
     }
 
@@ -817,8 +820,8 @@ async function resetPassword(req, res, next) {
 
     const { newPassword } = req.body;
 
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: "Пароль должен быть не менее 6 символов" });
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: "Пароль должен быть не менее 8 символов" });
     }
 
     const [users] = await pool.query(

@@ -4,6 +4,10 @@ const resolveUser = require("../../middleware/resolveUser");
 const verifyJWT = require("../../middleware/verifyJWT");
 const controller = require("./controller");
 
+// Публичная верификация сертификата по UUID
+const verifyRouter = express.Router();
+verifyRouter.get("/:uuid", controller.getCertificateByUuid);
+
 // Публичные маршруты (MiniApp)
 const publicRouter = express.Router();
 publicRouter.use(verifyInitData, resolveUser);
@@ -19,4 +23,4 @@ adminRouter.get("/:uuid/download", controller.downloadCertificate);
 adminRouter.post("/issue", controller.issueCertificate);
 adminRouter.post("/:id/revoke", controller.revokeCertificate);
 
-module.exports = { publicRouter, adminRouter };
+module.exports = { verifyRouter, publicRouter, adminRouter };

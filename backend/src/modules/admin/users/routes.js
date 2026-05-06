@@ -57,9 +57,10 @@ router.delete(
   invalidateCacheMiddleware(/^http:GET:.*\/api\/admin\/users/),
   usersController.deleteUser,
 );
-router.post("/:id/reset-password", usersController.resetPassword);
+router.post("/:id/reset-password", canEditUser, usersController.resetPassword);
 router.delete(
   "/:userId/assessments/:assessmentId/progress",
+  verifyAdminRole(["superadmin"]),
   invalidateCacheMiddleware(
     (req) => new RegExp(`^http:GET:.*\/api\/admin\/users\/${req.params.userId}`),
   ),

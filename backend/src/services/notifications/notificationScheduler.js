@@ -5,7 +5,9 @@ const notificationSender = require("./notificationSender");
 const { pool } = require("../../config/database");
 const certificateService = require("../certificates/certificateService");
 
-const tasks = [];
+const SCHEDULER_STATE_KEY = "__assessmentNotificationSchedulerState";
+const schedulerState = global[SCHEDULER_STATE_KEY] || { tasks: [], startupTimer: null };
+global[SCHEDULER_STATE_KEY] = schedulerState;
 
 /**
  * Отправляет pending уведомления из очереди.
@@ -211,28 +213,28 @@ async function retryCertificates() {
  * Вызывается один раз при старте сервера.
  */
 function startNotificationScheduler() {
-  if (tasks.length > 0) {
+  if (schedulerState.tasks.length > 0) {
     logger.warn("Планировщик уведомлений уже запущен, повторный запуск пропущен");
     return;
   }
 
   // Запускаем первый прогон сразу через небольшую задержку после старта
-  setTimeout(processPendingNotifications, 10_000);
+  schedulerState.startupTimer = setTimeout(processPendingNotifications, 10_000);
 
   // Каждые 5 минут — обработка очереди pending
-  tasks.push(cron.schedule("*/5 * * * *", processPendingNotifications));
+  schedulerState.tasks.push(cron.schedule("*/5 * * * *", processPendingNotifications));
 
   // Каждые 30 минут — повтор failed уведомлений
-  tasks.push(cron.schedule("*/30 * * * *", retryFailedNotifications));
+  schedulerState.tasks.push(cron.schedule("*/30 * * * *", retryFailedNotifications));
 
   // Каждые 4 часа — напоминания по незавершённым курсам
-  tasks.push(cron.schedule("0 */4 * * *", scheduleReminders));
+  schedulerState.tasks.push(cron.schedule("0 */4 * * *", scheduleReminders));
 
   // Ежедневно в 09:00 — напоминания о дедлайнах
-  tasks.push(cron.schedule("0 9 * * *", deadlineReminders));
+  schedulerState.tasks.push(cron.schedule("0 9 * * *", deadlineReminders));
 
   // Каждые 15 минут — повтор генерации сертификатов
-  tasks.push(cron.schedule("*/15 * * * *", retryCertificates));
+  schedulerState.tasks.push(cron.schedule("*/15 * * * *", retryCertificates));
 
   logger.info("Планировщик уведомлений запущен (node-cron)");
 }
@@ -241,8 +243,13 @@ function startNotificationScheduler() {
  * Останавливает планировщик (для корректного завершения процесса).
  */
 function stopNotificationScheduler() {
-  tasks.forEach((t) => t.stop());
-  tasks.length = 0;
+  if (schedulerState.startupTimer) {
+    clearTimeout(schedulerState.startupTimer);
+    schedulerState.startupTimer = null;
+  }
+
+  schedulerState.tasks.forEach((t) => t.stop());
+  schedulerState.tasks.length = 0;
   logger.info("Планировщик уведомлений остановлен");
 }
 

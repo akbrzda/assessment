@@ -404,11 +404,6 @@ exports.createAssessment = async (req, res, next) => {
         for (let j = 0; j < question.options.length; j++) {
           const option = question.options[j];
           const isCorrectValue = questionType === "single" || questionType === "multiple" ? (option.isCorrect ? 1 : 0) : 0;
-          console.log(
-            `[createAssessment] Saving option: questionId=${questionId}, text="${option.text}", isCorrect=${
-              option.isCorrect
-            } (type: ${typeof option.isCorrect}), converted=${isCorrectValue}`
-          );
           await connection.query(
             `
             INSERT INTO assessment_question_options (question_id, option_text, match_text, is_correct, order_index)
@@ -444,7 +439,6 @@ exports.createAssessment = async (req, res, next) => {
            AND u.position_id IN (?)`,
         [finalBranchIds, finalPositionIds]
       );
-      console.log("Users from branch+position:", usersFromBoth);
       autoUserIds.push(...usersFromBoth.map((u) => u.id));
     } else if (finalBranchIds && finalBranchIds.length > 0) {
       // Только филиалы
@@ -453,7 +447,6 @@ exports.createAssessment = async (req, res, next) => {
          WHERE u.branch_id IN (?)`,
         [finalBranchIds]
       );
-      console.log("Users from branches:", usersFromBranches);
       autoUserIds.push(...usersFromBranches.map((u) => u.id));
     } else if (finalPositionIds && finalPositionIds.length > 0) {
       // Только должности
@@ -462,7 +455,6 @@ exports.createAssessment = async (req, res, next) => {
          WHERE u.position_id IN (?)`,
         [finalPositionIds]
       );
-      console.log("Users from positions:", usersFromPositions);
       autoUserIds.push(...usersFromPositions.map((u) => u.id));
     }
 
@@ -470,15 +462,6 @@ exports.createAssessment = async (req, res, next) => {
     const directUserIds = Array.isArray(finalUserIds) ? [...new Set(finalUserIds)] : [];
     autoUserIds = [...new Set(autoUserIds)];
     const assignedUserIds = [...new Set([...autoUserIds, ...directUserIds])];
-
-    console.log("=== Assignment Debug ===");
-    console.log("Final Branch IDs:", finalBranchIds);
-    console.log("Final Position IDs:", finalPositionIds);
-    console.log("Final User IDs:", finalUserIds);
-    console.log("Assigned User IDs:", assignedUserIds);
-    console.log("Direct User IDs:", directUserIds);
-    console.log("Auto User IDs:", autoUserIds);
-    console.log("=======================");
 
     // Вставить назначения
     if (assignedUserIds.length > 0) {
@@ -673,9 +656,6 @@ exports.updateAssessment = async (req, res, next) => {
         );
       }
 
-      console.log(
-        `Обновлены назначения для аттестации ${assessmentId}: филиалы=${finalBranchIds.length}, должности=${finalPositionIds.length}, пользователей=${assignedUserIds.length}`
-      );
     }
 
     // Если переданы вопросы, обновить их

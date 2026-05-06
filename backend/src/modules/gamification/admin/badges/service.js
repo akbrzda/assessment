@@ -23,13 +23,14 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|svg/;
+    const allowedTypes = /jpeg|jpg|png|gif/;
+    const allowedMimeTypes = ["image/jpeg", "image/png", "image/gif"];
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
+    const mimetype = allowedMimeTypes.includes(String(file.mimetype || "").toLowerCase());
     if (mimetype && extname) {
       return cb(null, true);
     }
-    cb(new Error("Только изображения разрешены (jpeg, jpg, png, gif, svg)"));
+    cb(new Error("Только изображения разрешены (jpeg, jpg, png, gif)"));
   },
 }).single("icon");
 

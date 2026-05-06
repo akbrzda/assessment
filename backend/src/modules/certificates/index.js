@@ -1,3 +1,3 @@
-const { publicRouter, adminRouter } = require("./routes");
+const { verifyRouter, publicRouter, adminRouter } = require("./routes");
 
-module.exports = { publicRouter, adminRouter };
+module.exports = { verifyRouter, publicRouter, adminRouter };
