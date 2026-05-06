@@ -274,8 +274,7 @@ import {
   resetCourseUserProgress,
 } from "@/api/courses";
 import { getAssessments } from "@/api/assessments";
-import { getPositions } from "@/api/positions";
-import { getBranches } from "@/api/branches";
+import { getReferences } from "@/api/users";
 import { useToast } from "@/composables/useToast";
 import { loadCourseCategories } from "@/modules/courses/utils/courseCategories";
 
@@ -808,21 +807,13 @@ const loadAssessments = async () => {
   }
 };
 
-const loadPositions = async () => {
+const loadReferences = async () => {
   try {
-    const data = await getPositions();
+    const data = await getReferences();
     positionOptions.value = data.positions || [];
-  } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось загрузить должности"), "error");
-  }
-};
-
-const loadBranches = async () => {
-  try {
-    const data = await getBranches();
     branchOptions.value = data.branches || [];
   } catch (error) {
-    showToast(getErrorMessage(error, "Не удалось загрузить филиалы"), "error");
+    showToast(getErrorMessage(error, "Не удалось загрузить справочники"), "error");
   }
 };
 
@@ -1766,7 +1757,7 @@ onMounted(async () => {
   window.addEventListener("dragover", preventWindowFileDrop);
   window.addEventListener("drop", preventWindowFileDrop);
   loading.value = true;
-  await Promise.all([loadAssessments(), loadPositions(), loadBranches(), loadCourse()]);
+  await Promise.all([loadAssessments(), loadReferences(), loadCourse()]);
   loading.value = false;
 
   const id = courseId.value;

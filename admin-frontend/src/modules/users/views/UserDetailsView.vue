@@ -196,15 +196,7 @@
               <td>{{ item.reason || "—" }}</td>
               <td>{{ formatDateTime(item.expiresAt) }}</td>
               <td>
-                <Button
-                  v-if="item.id"
-                  size="sm"
-                  variant="danger"
-                  icon="Trash"
-                  @click="removeOverride(item.id)"
-                >
-                  Удалить
-                </Button>
+                <Button v-if="item.id" size="sm" variant="danger" icon="Trash" @click="removeOverride(item.id)"> Удалить </Button>
               </td>
             </tr>
             <tr v-if="!permissionOverrides.length">
@@ -283,6 +275,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
 import apiClient from "@/utils/axios";
 import { Badge, Button, Card, Input, Modal, PageHeader, Preloader, Select, Tabs } from "@/components/ui";
 import { useToast } from "@/composables/useToast";
@@ -301,6 +294,7 @@ import { BOT_USERNAME } from "@/env";
 const route = useRoute();
 const router = useRouter();
 const { showToast } = useToast();
+const authStore = useAuthStore();
 
 const loading = ref(false);
 const coursesLoading = ref(false);
@@ -319,16 +313,23 @@ const rolesSaving = ref(false);
 const overridesSaving = ref(false);
 const newRoleForm = ref({ roleId: "", expiresAt: "" });
 const newOverrideForm = ref({ permissionId: "", effect: "allow", reason: "", expiresAt: "" });
-const tabs = [
-  { key: "general", label: "Общая информация" },
-  { key: "courses", label: "Курсы" },
-  { key: "assessments", label: "Аттестации" },
-  { key: "achievements", label: "Достижения" },
-  { key: "roles", label: "Роли" },
-  { key: "overrides", label: "Permission Overrides" },
-];
+const canManageRolesAndPermissions = computed(() => authStore.user?.role !== "manager");
 
-const tabsConfig = tabs.map((t) => ({ value: t.key, label: t.label }));
+const tabsConfig = computed(() => {
+  const baseTabs = [
+    { key: "general", label: "Общая информация" },
+    { key: "courses", label: "Курсы" },
+    { key: "assessments", label: "Аттестации" },
+    { key: "achievements", label: "Достижения" },
+  ];
+
+  if (canManageRolesAndPermissions.value) {
+    baseTabs.push({ key: "roles", label: "Роли" });
+    baseTabs.push({ key: "overrides", label: "Permission Overrides" });
+  }
+
+  return baseTabs.map((item) => ({ value: item.key, label: item.label }));
+});
 
 const fullName = computed(() => `${profile.value?.user?.first_name || ""} ${profile.value?.user?.last_name || ""}`.trim() || "Пользователь");
 const initials = computed(() => {
@@ -485,6 +486,14 @@ const loadLoginHistory = async () => {
 };
 
 const loadPermissionsData = async () => {
+  if (!canManageRolesAndPermissions.value) {
+    roleAssignments.value = [];
+    permissionOverrides.value = [];
+    availablePermissions.value = [];
+    roleReferenceList.value = [];
+    return;
+  }
+
   try {
     const userId = Number(route.params.id);
     if (!Number.isInteger(userId) || userId <= 0) {
@@ -619,7 +628,11 @@ const removeOverride = async (overrideId) => {
 const goBack = () => router.push("/users");
 
 onMounted(async () => {
-  await Promise.all([loadProfile(), loadCourses(), loadLoginHistory(), loadPermissionsData()]);
+  const tasks = [loadProfile(), loadCourses(), loadLoginHistory()];
+  if (canManageRolesAndPermissions.value) {
+    tasks.push(loadPermissionsData());
+  }
+  await Promise.all(tasks);
 });
 </script>
 

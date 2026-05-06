@@ -58,7 +58,7 @@
 
     <!-- Create modal -->
     <Modal :show="showCreateModal" title="Создать пользователя" @close="closeModals">
-      <UserForm v-model="formData" :references="references" />
+      <UserForm v-model="formData" :references="references" :current-user-role="authStore.user?.role" :current-user-id="authStore.user?.id" />
       <p class="create-hint">Логин будет автоматически сформирован из фамилии и первой буквы имени. Пароль будет сгенерирован автоматически.</p>
       <div class="modal-actions">
         <Button variant="secondary" @click="closeModals">Отмена</Button>
@@ -81,7 +81,14 @@
 
     <!-- Edit modal -->
     <Modal :show="showEditModal" title="Редактировать пользователя" @close="closeModals">
-      <UserForm v-model="formData" :references="references" :is-edit="true" :is-manager="authStore.isManager" :current-user-id="authStore.user?.id" />
+      <UserForm
+        v-model="formData"
+        :references="references"
+        :is-edit="true"
+        :is-manager="authStore.isManager"
+        :current-user-id="authStore.user?.id"
+        :current-user-role="authStore.user?.role"
+      />
 
       <div v-if="authStore.isSuperAdmin" class="divider"></div>
 

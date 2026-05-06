@@ -51,6 +51,7 @@
     />
 
     <Input
+      v-if="!shouldHideCredentialsFields"
       v-model="localData.login"
       :label="isEdit ? 'Логин' : 'Логин (опционально)'"
       placeholder="Логин для входа в админ-панель"
@@ -61,7 +62,7 @@
     />
 
     <Input
-      v-if="!isEdit"
+      v-if="!isEdit && !shouldHideCredentialsFields"
       v-model="localData.password"
       type="password"
       label="Пароль (опционально)"
@@ -86,6 +87,10 @@ const props = defineProps({
   isEdit: Boolean,
   isManager: Boolean,
   currentUserId: Number,
+  currentUserRole: {
+    type: String,
+    default: "",
+  },
 });
 
 const emit = defineEmits(["update:modelValue"]);
@@ -181,13 +186,31 @@ const roleOptions = computed(() => [
   })),
 ]);
 
+const isSelfEdit = computed(() => props.isEdit && Number(localData.value.id) > 0 && Number(props.currentUserId) === Number(localData.value.id));
+
+const targetRoleName = computed(() => {
+  const roleId = Number(localData.value.roleId);
+  if (!roleId) {
+    return "";
+  }
+  const role = (props.references?.roles || []).find((item) => Number(item.id) === roleId);
+  return String(role?.name || "").toLowerCase();
+});
+
+const shouldHideCredentialsFields = computed(() => {
+  const actorRole = String(props.currentUserRole || "").toLowerCase();
+  const isRestrictedActor = actorRole === "manager" || actorRole === "employee";
+  const isRestrictedTarget = targetRoleName.value === "manager" || targetRoleName.value === "employee";
+  return isRestrictedActor && isRestrictedTarget && !isSelfEdit.value;
+});
+
 watch(
   localData,
   (newValue) => {
     if (isSyncing.value) return;
     emit("update:modelValue", { ...newValue });
   },
-  { deep: true }
+  { deep: true },
 );
 
 watch(
@@ -203,7 +226,7 @@ watch(
       isSyncing.value = false;
     });
   },
-  { deep: true, immediate: true }
+  { deep: true, immediate: true },
 );
 </script>
 

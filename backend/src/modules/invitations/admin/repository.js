@@ -14,6 +14,45 @@ async function findByBranch(branchId) {
   return invitationModel.findByBranch(branchId);
 }
 
+async function findByBranches(branchIds) {
+  if (!Array.isArray(branchIds) || branchIds.length === 0) {
+    return [];
+  }
+
+  const [rows] = await pool.query(
+    `SELECT
+       i.id,
+       i.code,
+       i.role_id,
+       i.branch_id,
+       i.first_name,
+       i.last_name,
+       i.phone,
+       i.position_id,
+       i.created_by,
+       i.created_at,
+       i.updated_at,
+       i.used_by,
+       i.used_at,
+       i.invited_user_id,
+       b.name AS branch_name,
+       b.city AS branch_city,
+       p.name AS position_name,
+       CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, '')) AS created_by_name,
+       CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS used_by_name
+     FROM invitations i
+     LEFT JOIN branches b ON b.id = i.branch_id
+     LEFT JOIN positions p ON p.id = i.position_id
+     LEFT JOIN users c ON c.id = i.created_by
+     LEFT JOIN users u ON u.id = i.used_by
+     WHERE i.branch_id IN (?)
+     ORDER BY i.created_at DESC, i.id DESC`,
+    [branchIds],
+  );
+
+  return rows;
+}
+
 async function findById(invitationId) {
   return invitationModel.findById(invitationId);
 }
@@ -51,6 +90,16 @@ async function findUserBranchId(userId) {
   return rows[0]?.branch_id || null;
 }
 
+async function findManagerBranchIds(userId) {
+  const [rows] = await pool.query(
+    `SELECT DISTINCT branch_id AS branchId
+     FROM branch_managers
+     WHERE user_id = ?`,
+    [userId],
+  );
+  return rows.map((item) => Number(item.branchId)).filter((item) => item > 0);
+}
+
 async function updatePendingUserProfile(userId, { firstName, lastName, branchId, positionId }) {
   await pool.execute(
     `UPDATE users SET first_name = ?, last_name = ?, branch_id = ?, position_id = COALESCE(?, position_id), updated_at = NOW()
@@ -63,6 +112,7 @@ module.exports = {
   findAll,
   findByCreator,
   findByBranch,
+  findByBranches,
   findById,
   findActiveByCode,
   findManagerRole,
@@ -72,5 +122,6 @@ module.exports = {
   updateInvitation,
   removeInvitation,
   findUserBranchId,
+  findManagerBranchIds,
   updatePendingUserProfile,
 };

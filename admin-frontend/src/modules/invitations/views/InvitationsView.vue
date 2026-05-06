@@ -12,13 +12,7 @@
       </template>
     </PageHeader>
 
-    <FilterBar
-      v-model="filters"
-      search-key="search"
-      search-placeholder="Имя, фамилия, филиал или код..."
-      :filter-defs="filterDefs"
-      class="mb-4"
-    />
+    <FilterBar v-model="filters" search-key="search" search-placeholder="Имя, фамилия, филиал или код..." :filter-defs="filterDefs" class="mb-4" />
 
     <!-- Content -->
     <div v-if="skeletonVisible" class="space-y-4">
@@ -232,12 +226,7 @@ const { showToast } = useToast();
 const authStore = useAuthStore();
 
 const availableBranches = computed(() => {
-  if (authStore.user?.role !== "manager") {
-    return references.value.branches;
-  }
-
-  const managerBranchId = Number(authStore.user?.branchId || 0);
-  return references.value.branches.filter((branch) => Number(branch.id) === managerBranchId);
+  return references.value.branches;
 });
 
 const stats = computed(() => {
@@ -353,12 +342,13 @@ const normalizeInvitation = (item) => {
 };
 
 const openCreateModal = () => {
-  const managerBranchId = Number(authStore.user?.branchId || 0);
+  const defaultBranchId =
+    authStore.user?.role === "manager" && availableBranches.value.length === 1 ? Number(availableBranches.value[0]?.id || 0) : 0;
   editingInvitation.value = null;
   form.value = {
     firstName: "",
     lastName: "",
-    branchId: authStore.user?.role === "manager" ? managerBranchId || "" : "",
+    branchId: defaultBranchId || "",
   };
   showFormModal.value = true;
 };

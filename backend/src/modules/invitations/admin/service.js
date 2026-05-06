@@ -19,6 +19,19 @@ async function resolveActorBranchId(actor) {
   return Number(fromDb || 0);
 }
 
+async function resolveManagerBranchIds(actor) {
+  let branchIds = await invitationsRepository.findManagerBranchIds(actor.id);
+
+  if (branchIds.length === 0) {
+    const fallbackBranchId = await resolveActorBranchId(actor);
+    if (fallbackBranchId > 0) {
+      branchIds = [fallbackBranchId];
+    }
+  }
+
+  return [...new Set(branchIds.map(Number).filter((item) => item > 0))];
+}
+
 async function ensureUniqueCode() {
   for (let index = 0; index < 5; index += 1) {
     const code = generateInviteCode();
@@ -51,8 +64,8 @@ async function ensureManagerBranchAccess(actor, branchId) {
     return;
   }
 
-  const actorBranchId = await resolveActorBranchId(actor);
-  if (!actorBranchId || Number(branchId) !== actorBranchId) {
+  const allowedBranchIds = await resolveManagerBranchIds(actor);
+  if (!allowedBranchIds.length || !allowedBranchIds.includes(Number(branchId))) {
     throw buildError("Access denied", 403);
   }
 }
@@ -69,11 +82,11 @@ async function listInvitations(actor) {
   }
 
   if (actor.role === "manager") {
-    const actorBranchId = await resolveActorBranchId(actor);
-    if (!actorBranchId) {
+    const actorBranchIds = await resolveManagerBranchIds(actor);
+    if (!actorBranchIds.length) {
       throw buildError("Branch is required for manager", 403);
     }
-    return invitationsRepository.findByBranch(actorBranchId);
+    return invitationsRepository.findByBranches(actorBranchIds);
   }
 
   throw buildError("Access denied", 403);
