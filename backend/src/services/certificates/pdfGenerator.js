@@ -14,12 +14,7 @@ const WIDTH = 1240;
 const HEIGHT = 1754;
 
 function escapeXml(value = "") {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
+  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
 
 async function resolveLogoDataUrl() {
@@ -57,65 +52,92 @@ function buildCertificateSvg({ fullName, courseTitle, issuedAt, scorePercent, uu
   const safeResult = escapeXml(resultStr);
 
   const logoBlock = logoDataUrl
-    ? `<image href="${logoDataUrl}" x="80" y="70" width="180" height="70" preserveAspectRatio="xMidYMid meet" />`
+    ? `<image href="${logoDataUrl}" x="120" y="120" width="190" height="80" preserveAspectRatio="xMidYMid meet" />`
     : `
-      <rect x="80" y="70" width="180" height="70" rx="8" fill="none" stroke="#d1d5db" stroke-width="2" stroke-dasharray="8 6" />
-      <text x="170" y="112" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#9ca3af">ЛОГОТИП</text>
-    `;
+    <rect x="120" y="120" width="190" height="80" rx="10" fill="none" stroke="#d1d5db" stroke-width="2" stroke-dasharray="8 6" />
+    <text x="215" y="155" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#6b7280">ЛОГОТИП</text>
+    <text x="215" y="185" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#9ca3af">Ваш логотип</text>
+  `;
 
   return `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
-      <defs>
-        <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#ffffff"/>
-          <stop offset="100%" stop-color="#f5f6f8"/>
-        </linearGradient>
-        <linearGradient id="redGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#df1a24"/>
-          <stop offset="100%" stop-color="#be1119"/>
-        </linearGradient>
-      </defs>
+ <svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" transform="matrix(1,-1.2246467991473532e-16,1.2246467991473532e-16,1,0,0)">
+    <defs>
+      <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#ffffff"></stop>
+        <stop offset="100%" stop-color="#f6f7f9"></stop>
+      </linearGradient>
 
-      <rect width="${WIDTH}" height="${HEIGHT}" fill="url(#bgGrad)" />
-      <rect x="28" y="28" width="${WIDTH - 56}" height="${HEIGHT - 56}" rx="16" fill="none" stroke="#ef4444" stroke-opacity="0.35" stroke-width="2"/>
+      <linearGradient id="redGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#e11d27"></stop>
+        <stop offset="100%" stop-color="#b91c1c"></stop>
+      </linearGradient>
+      <pattern id="softLines" width="36" height="36" patternUnits="userSpaceOnUse">
+        <path d="M0 36 C12 18 24 18 36 0" fill="none" stroke="#e5e7eb" stroke-width="1" opacity="0.45"></path>
+      </pattern>
+    </defs>
 
-      <polygon points="${WIDTH - 200},0 ${WIDTH},0 ${WIDTH},200" fill="#c9151d"/>
-      <path d="M0,${HEIGHT - 330} C220,${HEIGHT - 120} 520,${HEIGHT - 20} ${WIDTH},${HEIGHT - 90} L${WIDTH},${HEIGHT} L0,${HEIGHT} Z" fill="url(#redGrad)"/>
+    <rect width="${WIDTH}" height="${HEIGHT}" fill="url(#bgGrad)"></rect>
 
-      <rect x="${WIDTH - 240}" y="0" width="180" height="300" fill="url(#redGrad)"/>
-      <polygon points="${WIDTH - 240},300 ${WIDTH - 150},360 ${WIDTH - 60},300" fill="url(#redGrad)"/>
-      <circle cx="${WIDTH - 150}" cy="140" r="58" fill="#ffffff"/>
-      <text x="${WIDTH - 150}" y="152" text-anchor="middle" font-family="Arial, sans-serif" font-size="44" fill="#c9151d">🎓</text>
+    <rect x="45" y="45" width="${WIDTH - 90}" height="${HEIGHT - 90}" rx="18" fill="none" stroke="#ef4444" stroke-opacity="0.35" stroke-width="2"></rect>
 
-      ${logoBlock}
+    <rect x="0" y="0" width="${WIDTH}" height="${HEIGHT}" fill="url(#softLines)" opacity="0.45"></rect>
 
-      <text x="${WIDTH / 2}" y="360" text-anchor="middle" font-family="Arial, sans-serif" font-size="96" font-weight="800" fill="#c9151d">СЕРТИФИКАТ</text>
-      <text x="${WIDTH / 2}" y="430" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" fill="#6b7280">об успешном завершении курса</text>
+    <path d="M0,${HEIGHT - 340} C260,${HEIGHT - 160} 560,${HEIGHT - 40} ${WIDTH},${HEIGHT - 105} L${WIDTH},${HEIGHT} L0,${HEIGHT} Z" fill="url(#redGrad)"></path>
 
-      <line x1="420" y1="470" x2="560" y2="470" stroke="#c9151d" stroke-width="2"/>
-      <text x="${WIDTH / 2}" y="478" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" fill="#c9151d">◆</text>
-      <line x1="680" y1="470" x2="820" y2="470" stroke="#c9151d" stroke-width="2"/>
+    <path d="M${WIDTH - 130},0 C${WIDTH - 70},120 ${WIDTH - 80},260 ${WIDTH},360 L${WIDTH},0 Z" fill="url(#redGrad)" opacity="0.95"></path>
 
-      <text x="${WIDTH / 2}" y="560" text-anchor="middle" font-family="Arial, sans-serif" font-size="56" fill="#6b7280">Настоящий сертификат подтверждает, что</text>
-      <text x="${WIDTH / 2}" y="670" text-anchor="middle" font-family="Arial, sans-serif" font-size="74" font-weight="700" fill="#111827">${safeName}</text>
-      <line x1="220" y1="720" x2="${WIDTH - 220}" y2="720" stroke="#ef4444" stroke-width="2"/>
-      <text x="${WIDTH / 2}" y="800" text-anchor="middle" font-family="Arial, sans-serif" font-size="56" fill="#6b7280">успешно прошел(а) курс обучения</text>
 
-      <rect x="380" y="850" width="480" height="96" rx="24" fill="url(#redGrad)"/>
-      <text x="${WIDTH / 2}" y="915" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#ffffff">${safeCourse}</text>
+    <text x="${WIDTH / 2}" y="410" text-anchor="middle" font-family="Arial, sans-serif" font-size="104" font-weight="800" fill="#c9151d">
+      СЕРТИФИКАТ
+    </text>
 
-      <rect x="220" y="1030" width="${WIDTH - 440}" height="170" rx="24" fill="#f3f4f6"/>
-      <line x1="${WIDTH / 2}" y1="1065" x2="${WIDTH / 2}" y2="1165" stroke="#d1d5db" stroke-width="2"/>
+    <text x="${WIDTH / 2}" y="485" text-anchor="middle" font-family="Arial, sans-serif" font-size="36" fill="#6b7280">
+      об успешном завершении курса
+    </text>
 
-      <text x="390" y="1095" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" fill="#6b7280">${safeDate}</text>
-      <text x="390" y="1145" text-anchor="middle" font-family="Arial, sans-serif" font-size="36" font-weight="700" fill="#111827">Дата выдачи</text>
+    <line x1="420" y1="530" x2="560" y2="530" stroke="#c9151d" stroke-width="2"></line>
+    <text x="${WIDTH / 2}" y="540" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#c9151d">◆</text>
+    <line x1="680" y1="530" x2="820" y2="530" stroke="#c9151d" stroke-width="2"></line>
 
-      <text x="850" y="1095" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" fill="#6b7280">${safeResult}</text>
-      <text x="850" y="1145" text-anchor="middle" font-family="Arial, sans-serif" font-size="36" font-weight="700" fill="#111827">Результат</text>
+    <text x="${WIDTH / 2}" y="630" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" fill="#6b7280">
+      Настоящий сертификат подтверждает, что
+    </text>
 
-      <text x="${WIDTH / 2}" y="1270" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#6b7280">ID: ${safeUuid}</text>
-    </svg>
-  `;
+    <text x="${WIDTH / 2}" y="750" text-anchor="middle" font-family="Arial, sans-serif" font-size="64" font-weight="700" fill="#111827">
+      ${safeName}
+    </text>
+
+    <line x1="260" y1="800" x2="${WIDTH - 260}" y2="800" stroke="#ef4444" stroke-width="2"></line>
+
+    <text x="${WIDTH / 2}" y="880" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" fill="#6b7280">
+      успешно прошел(а) курс обучения
+    </text>
+
+    <rect x="${WIDTH / 2 - 180}" y="930" width="360" height="92" rx="20" fill="url(#redGrad)"></rect>
+
+    <text x="${WIDTH / 2}" y="990" text-anchor="middle" font-family="Arial, sans-serif" font-size="36" font-weight="700" fill="#ffffff">
+      ${safeCourse}
+    </text>
+
+    <rect x="260" y="1140" width="${WIDTH - 520}" height="155" rx="24" fill="#f9fafb"></rect>
+
+    <line x1="${WIDTH / 2}" y1="1175" x2="${WIDTH / 2}" y2="1260" stroke="#d1d5db" stroke-width="2"></line>
+
+    <text x="420" y="1208" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#111827">
+      ${safeDate}
+    </text>
+    <text x="420" y="1253" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#6b7280">
+      Дата выдачи
+    </text>
+
+    <text x="820" y="1208" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#111827">
+      ${safeResult}
+    </text>
+    <text x="820" y="1253" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#6b7280">
+      Результат
+    </text>
+  </svg>
+`;
 }
 
 async function generatePng({ uuid, fullName, courseTitle, issuedAt, scorePercent }) {
@@ -129,9 +151,7 @@ async function generatePng({ uuid, fullName, courseTitle, issuedAt, scorePercent
   const logoDataUrl = await resolveLogoDataUrl();
   const svg = buildCertificateSvg({ fullName, courseTitle, issuedAt, scorePercent, uuid, logoDataUrl });
 
-  await sharp(Buffer.from(svg))
-    .png({ quality: 100, compressionLevel: 9 })
-    .toFile(filePath);
+  await sharp(Buffer.from(svg)).png({ quality: 100, compressionLevel: 9 }).toFile(filePath);
 
   logger.info("pngGenerator: сертификат сгенерирован uuid=%s path=%s", uuid, filePath);
   return { filePath, fileName };
