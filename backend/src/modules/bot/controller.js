@@ -33,14 +33,29 @@ async function updateNotificationSettings(req, res, next) {
 async function getUserStatus(req, res, next) {
   try {
     const telegramId = String(req.query.telegramId || "");
+    console.log("[bot/internal/user-status] incoming telegramId=%s", telegramId);
     if (!telegramId) {
+      console.log("[bot/internal/user-status] telegramId is empty");
       return res.status(400).json({ error: "telegramId обязателен" });
     }
     const status = await botService.getUserStatusByTelegramId(telegramId);
+    console.log("[bot/internal/user-status] status result=%O", status);
     if (!status) {
+      console.log("[bot/internal/user-status] user NOT found for telegramId=%s", telegramId);
       return res.status(404).json({ error: "Пользователь не найден" });
     }
+    console.log("[bot/internal/user-status] user found: firstName=%s, onboardingCompleted=%s", status.firstName, status.onboardingCompleted);
     res.json(status);
+  } catch (err) {
+    console.error("[bot/internal/user-status] error:", err.message);
+    next(err);
+  }
+}
+
+async function getOnboardingConfig(req, res, next) {
+  try {
+    const config = await botService.getOnboardingConfig();
+    res.json(config);
   } catch (err) {
     next(err);
   }
@@ -53,12 +68,19 @@ async function getUserStatus(req, res, next) {
 async function getCertificatesByTelegramId(req, res, next) {
   try {
     const telegramId = String(req.query.telegramId || "");
+    console.log("[bot/internal/certificates] incoming telegramId=%s", telegramId);
     if (!telegramId) {
+      console.log("[bot/internal/certificates] telegramId is empty");
       return res.status(400).json({ error: "telegramId обязателен" });
     }
     const certs = await certRepository.findAllByTelegramId(telegramId);
+    console.log("[bot/internal/certificates] found %d certificates", certs.length);
+    certs.forEach((c, i) => {
+      console.log("[bot/internal/certificates] cert[%d]: uuid=%s, course=%s, issued=%s", i, c.uuid, c.course_title, c.issued_at);
+    });
     res.json({ certificates: certs });
   } catch (err) {
+    console.error("[bot/internal/certificates] error:", err.message);
     next(err);
   }
 }
@@ -84,4 +106,11 @@ async function patchNotificationsByTelegramId(req, res, next) {
   }
 }
 
-module.exports = { getNotificationSettings, updateNotificationSettings, getUserStatus, getCertificatesByTelegramId, patchNotificationsByTelegramId };
+module.exports = {
+  getNotificationSettings,
+  updateNotificationSettings,
+  getUserStatus,
+  getOnboardingConfig,
+  getCertificatesByTelegramId,
+  patchNotificationsByTelegramId,
+};

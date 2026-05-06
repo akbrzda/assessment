@@ -1236,6 +1236,7 @@ exports.getUserAssessmentProgress = async (req, res, next) => {
 
     const assessment = assessments[0];
     const userRole = req.user.role;
+    const managerBranchId = Number(req.user.branch_id || req.user.branchId || 0);
 
     if (userRole === "manager") {
       const [access] = await pool.query(
@@ -1257,6 +1258,16 @@ exports.getUserAssessmentProgress = async (req, res, next) => {
 
       if (access.length === 0) {
         return res.status(403).json({ error: "Нет доступа Рє этой аттестации" });
+      }
+
+      const [targetUsers] = await pool.query("SELECT branch_id FROM users WHERE id = ? LIMIT 1", [userId]);
+      if (!targetUsers.length) {
+        return res.status(404).json({ error: "Пользователь не найден" });
+      }
+
+      const targetBranchId = Number(targetUsers[0].branch_id || 0);
+      if (!managerBranchId || managerBranchId !== targetBranchId) {
+        return res.status(403).json({ error: "Нет доступа к прогрессу пользователя из другого филиала" });
       }
     }
 

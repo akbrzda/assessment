@@ -38,6 +38,18 @@ const routes = [
         meta: { roles: ["superadmin", "manager"], module: "users", title: "Профиль пользователя" },
       },
       {
+        path: "roles",
+        name: "Roles",
+        component: () => import("../modules/admin/roles/views/RolesListView.vue"),
+        meta: { roles: ["superadmin"], module: "users", title: "Роли и права" },
+      },
+      {
+        path: "roles/:id",
+        name: "RoleDetails",
+        component: () => import("../modules/admin/roles/views/RoleDetailView.vue"),
+        meta: { roles: ["superadmin"], module: "users", title: "Редактирование роли" },
+      },
+      {
         path: "assessments",
         name: "Assessments",
         component: () => import("../modules/assessments/views/AssessmentsView.vue"),

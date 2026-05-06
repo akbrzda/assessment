@@ -69,6 +69,7 @@ export const useUserStore = defineStore("user", () => {
   const references = ref({ branches: [], positions: [], roles: [] });
   const registrationDefaults = ref({ firstName: "", lastName: "", avatarUrl: null });
   const invitation = ref(null);
+  const inviteFlow = ref({ hasInviteCode: false, inviteCodeValid: false, registrationByInvitationOnly: true });
   const invitationAccepted = ref(false);
   const overview = ref(null);
   const overviewLoading = ref(false);
@@ -148,6 +149,11 @@ export const useUserStore = defineStore("user", () => {
       } else {
         user.value = null;
         registrationDefaults.value = status.defaults || { firstName: "", lastName: "", avatarUrl: null };
+        inviteFlow.value = status.inviteFlow || {
+          hasInviteCode: Boolean(status.invitation),
+          inviteCodeValid: Boolean(status.invitation),
+          registrationByInvitationOnly: true,
+        };
         invitation.value = status.invitation || null;
         if (!invitation.value) {
           invitationAccepted.value = true;
@@ -265,8 +271,28 @@ export const useUserStore = defineStore("user", () => {
 
   function logout() {
     user.value = null;
+    inviteFlow.value = { hasInviteCode: false, inviteCodeValid: false, registrationByInvitationOnly: true };
     overview.value = null;
     isInitialized.value = false;
+  }
+
+  async function completeMiniAppOnboarding() {
+    if (!user.value) {
+      return { success: false, error: "Пользователь не авторизован" };
+    }
+
+    try {
+      const result = await apiClient.completeOnboarding();
+      user.value = {
+        ...user.value,
+        onboardingCompletedAt: result?.onboardingCompletedAt || new Date().toISOString(),
+        isFirstLogin: false,
+      };
+      return { success: true };
+    } catch (err) {
+      console.error("Не удалось завершить онбординг MiniApp", err);
+      return { success: false, error: err.message || "Не удалось завершить онбординг" };
+    }
   }
 
   return {
@@ -277,6 +303,7 @@ export const useUserStore = defineStore("user", () => {
     references,
     registrationDefaults,
     invitation,
+    inviteFlow,
     invitationAccepted,
     overview,
     overviewLoading,
@@ -294,6 +321,7 @@ export const useUserStore = defineStore("user", () => {
     register,
     updateProfile,
     acceptInvitation,
+    completeMiniAppOnboarding,
     logout,
   };
 });

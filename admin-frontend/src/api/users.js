@@ -68,10 +68,38 @@ export const getReferences = async () => {
 };
 
 export const getUserPermissions = async (userId) => {
-  const { data } = await apiClient.get(`/admin/permissions/users/${userId}`, {
+  const { data } = await apiClient.get(`/admin/users/${userId}/permissions`, {
     cacheMaxAge: 60000, // 1 минута
   });
   return data;
+};
+
+export const addUserRoleAssignment = async (userId, payload) => {
+  return mutateWithInvalidation(async () => {
+    const { data } = await apiClient.post(`/admin/users/${userId}/roles`, payload);
+    return data;
+  }, new RegExp(`get:/admin/users/${userId}`));
+};
+
+export const removeUserRoleAssignment = async (userId, roleId) => {
+  return mutateWithInvalidation(async () => {
+    await apiClient.delete(`/admin/users/${userId}/roles/${roleId}`);
+    return true;
+  }, new RegExp(`get:/admin/users/${userId}`));
+};
+
+export const addUserPermissionOverride = async (userId, payload) => {
+  return mutateWithInvalidation(async () => {
+    const { data } = await apiClient.post(`/admin/users/${userId}/permissions/override`, payload);
+    return data;
+  }, new RegExp(`get:/admin/users/${userId}/permissions`));
+};
+
+export const removeUserPermissionOverride = async (userId, overrideId) => {
+  return mutateWithInvalidation(async () => {
+    await apiClient.delete(`/admin/users/${userId}/permissions/override/${overrideId}`);
+    return true;
+  }, new RegExp(`get:/admin/users/${userId}/permissions`));
 };
 
 export const updateUserPermissions = async (userId, modules) => {
@@ -136,6 +164,10 @@ export default {
   resetPassword,
   getReferences,
   getUserPermissions,
+  addUserRoleAssignment,
+  removeUserRoleAssignment,
+  addUserPermissionOverride,
+  removeUserPermissionOverride,
   updateUserPermissions,
   getSystemModules,
   resetAssessmentProgress,

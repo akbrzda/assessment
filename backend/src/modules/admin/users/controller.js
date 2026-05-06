@@ -112,6 +112,46 @@ async function bulkExportUsers(req, res, next) {
   }
 }
 
+async function getPermissions(req, res, next) {
+  try {
+    return await moduleService.getPermissions(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function setPermissionOverride(req, res, next) {
+  try {
+    return await moduleService.setPermissionOverride(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function deletePermissionOverride(req, res, next) {
+  try {
+    return await moduleService.deletePermissionOverride(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function addUserRole(req, res, next) {
+  try {
+    return await moduleService.addUserRole(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function removeUserRole(req, res, next) {
+  try {
+    return await moduleService.removeUserRole(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   listUsers,
   getUserLoginHistory,
@@ -127,4 +167,9 @@ module.exports = {
   bulkUpdateRole,
   bulkTransferBranch,
   bulkExportUsers,
+  getPermissions,
+  setPermissionOverride,
+  deletePermissionOverride,
+  addUserRole,
+  removeUserRole,
 };

@@ -24,6 +24,7 @@ function resolveInviteCode(context, inviteCodeFromPayload = null) {
 async function getStatus(context) {
   const telegramUser = context.telegramUser;
   const inviteCode = resolveInviteCode(context);
+  const hasInviteCode = Boolean(inviteCode && inviteCode.length >= 4);
 
   if (context.currentUser) {
     const user = await authRepository.getDashboardData(context.currentUser.id);
@@ -34,7 +35,7 @@ async function getStatus(context) {
   }
 
   let invitation = null;
-  if (inviteCode && inviteCode.length >= 4) {
+  if (hasInviteCode) {
     invitation = await authRepository.findActiveInvitationByCode(inviteCode);
   }
 
@@ -44,6 +45,11 @@ async function getStatus(context) {
       firstName: telegramUser?.first_name || "",
       lastName: telegramUser?.last_name || "",
       avatarUrl: telegramUser?.photo_url || null,
+    },
+    inviteFlow: {
+      hasInviteCode,
+      inviteCodeValid: Boolean(invitation),
+      registrationByInvitationOnly: true,
     },
     invitation: invitation
       ? {
@@ -68,15 +74,19 @@ async function register(context, payload) {
   }
 
   const telegramUser = context.telegramUser;
+  console.log("[authService.register] telegramUser=%O", telegramUser);
   if (!telegramUser) {
+    console.log("[authService.register] ERROR: Missing Telegram user data");
     throw buildError("Missing Telegram user data", 400);
   }
 
   const telegramId = String(telegramUser.id);
+  console.log("[authService.register] telegramId=%s, firstName=%s, lastName=%s", telegramId, payload.firstName, payload.lastName);
   const avatarUrl = telegramUser.photo_url || null;
   const existingUser = await authRepository.findUserByTelegramId(telegramId);
 
   if (existingUser) {
+    console.log("[authService.register] User already exists: id=%s", existingUser.id);
     throw buildError("Вы уже зарегистрированы в системе", 400);
   }
 
@@ -92,6 +102,7 @@ async function register(context, payload) {
     // Если у приглашения есть заранее созданный pending-профиль — активируем его
     if (invitation.invited_user_id) {
       await authRepository.activatePendingUser(invitation.invited_user_id, { telegramId, avatarUrl });
+      await authRepository.completeOnboarding(invitation.invited_user_id);
       await authRepository.assignUserToMatchingAssessments({
         userId: invitation.invited_user_id,
         branchId: invitation.branch_id ? Number(invitation.branch_id) : null,
@@ -135,7 +146,10 @@ async function register(context, payload) {
       branchId: targetBranchId,
       roleId: targetRoleId,
     });
+    console.log("[authService.register] User created with invitation: userId=%s, telegramId=%s", userId, telegramId);
 
+    await authRepository.completeOnboarding(userId);
+    console.log("[authService.register] Onboarding marked as complete for userId=%s", userId);
     await authRepository.assignUserToMatchingAssessments({
       userId,
       branchId: targetBranchId ? Number(targetBranchId) : null,
@@ -143,6 +157,7 @@ async function register(context, payload) {
     });
     await authRepository.markInvitationUsed(invitation.id, userId);
     const user = await authRepository.getDashboardData(userId);
+    console.log("[authService.register] User retrieved: telegramId=%s, firstName=%s", user.telegramId, user.firstName);
 
     const auditEntry = buildAuditEntry({
       scope: "miniapp",
@@ -211,6 +226,7 @@ async function register(context, payload) {
     roleId: targetRoleId,
   });
 
+  await authRepository.completeOnboarding(userId);
   await authRepository.assignUserToMatchingAssessments({
     userId,
     branchId: targetBranchId ? Number(targetBranchId) : null,

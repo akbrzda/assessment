@@ -38,6 +38,84 @@
         </Card>
       </div>
 
+      <!-- Вкладка: Бот и онбординг -->
+      <div v-if="activeTab === 'bot'" class="settings-section">
+        <h3 class="section-title">Бот и онбординг</h3>
+
+        <Card title="Тексты Telegram-бота" icon="MessageSquare">
+          <p class="text-sm text-muted-foreground mb-4">
+            Здесь настраиваются тексты команды <code>/start</code>, подсказки и CTA. Доступен шаблон <code>&#123;&#123;name&#125;&#125;</code> для
+            подстановки имени.
+          </p>
+
+          <div class="bot-settings-grid">
+            <label class="bot-field">
+              <span class="bot-field-label">Заголовок онбординга</span>
+              <input v-model="botSettings.onboardingTitle" type="text" class="bot-field-input" placeholder="👋 Привет{{name}}!" />
+            </label>
+
+            <label class="bot-field">
+              <span class="bot-field-label">Текст онбординга</span>
+              <textarea
+                v-model="botSettings.onboardingBody"
+                rows="5"
+                class="bot-field-textarea"
+                placeholder="Описание шагов для нового пользователя"
+              ></textarea>
+            </label>
+
+            <label class="bot-field">
+              <span class="bot-field-label">Шаг 2 онбординга</span>
+              <textarea v-model="botSettings.onboardingStep2" rows="4" class="bot-field-textarea" placeholder="Как работает система"></textarea>
+            </label>
+
+            <label class="bot-field">
+              <span class="bot-field-label">Шаг 3 онбординга</span>
+              <textarea
+                v-model="botSettings.onboardingStep3"
+                rows="4"
+                class="bot-field-textarea"
+                placeholder="Финальные рекомендации перед стартом"
+              ></textarea>
+            </label>
+
+            <label class="bot-field">
+              <span class="bot-field-label">CTA кнопки открытия MiniApp</span>
+              <input v-model="botSettings.onboardingCtaText" type="text" class="bot-field-input" placeholder="Открыть приложение" />
+            </label>
+
+            <label class="bot-field">
+              <span class="bot-field-label">Текст главного меню</span>
+              <textarea
+                v-model="botSettings.mainMenuText"
+                rows="3"
+                class="bot-field-textarea"
+                placeholder="Привет{{name}}! Что хотите сделать?"
+              ></textarea>
+            </label>
+
+            <label class="bot-field">
+              <span class="bot-field-label">Текст помощи (/help)</span>
+              <textarea v-model="botSettings.helpText" rows="4" class="bot-field-textarea" placeholder="Список доступных команд"></textarea>
+            </label>
+
+            <label class="bot-field">
+              <span class="bot-field-label">Сообщение для пользователя без приглашения</span>
+              <textarea
+                v-model="botSettings.guestNoInviteText"
+                rows="4"
+                class="bot-field-textarea"
+                placeholder="Текст с инструкцией получить приглашение"
+              ></textarea>
+            </label>
+          </div>
+
+          <div class="bot-actions">
+            <Button icon="Save" :loading="botSaving" @click="saveBotSettings">Сохранить тексты бота</Button>
+          </div>
+        </Card>
+      </div>
+
       <!-- Вкладка: Геймификация -->
       <div v-if="activeTab === 'gamification'" class="settings-section">
         <h3 class="section-title">Геймификация</h3>
@@ -191,6 +269,7 @@ const { showToast, showSuccess, showError } = useToast();
 // Табы
 const tabsConfig = [
   { value: "general", label: "Общие" },
+  { value: "bot", label: "Бот и онбординг" },
   { value: "gamification", label: "Геймификация" },
   { value: "environment", label: "Переменные окружения" },
 ];
@@ -207,6 +286,64 @@ const logoUrl = ref("");
 const logoPreview = ref("");
 const logoUploading = ref(false);
 const logoFileInput = ref(null);
+
+const botSaving = ref(false);
+const botSettings = ref({
+  onboardingTitle: "👋 Привет{{name}}!",
+  onboardingBody:
+    "Я бот системы аттестации. Здесь вы будете:\n📚 Проходить обучающие курсы\n✅ Сдавать тесты и аттестации\n🏆 Получать баллы и бейджи\n📄 Получать сертификаты",
+  onboardingStep2: "Как это работает:\n1) Откройте назначенный курс\n2) Изучите материалы\n3) Пройдите тест\n4) Получите результат и сертификат",
+  onboardingStep3:
+    "Совет для быстрого старта:\n• Начните с ближайшего назначенного курса\n• Проходите обучение регулярно\n• Используйте /help для подсказок",
+  onboardingCtaText: "Открыть приложение",
+  mainMenuText: "Привет{{name}}! 👋\n\nЧто хотите сделать?",
+  helpText: "Доступные команды:\n/start — главное меню\n/certificate — последний сертификат\n/certificates — все сертификаты\n/help — подсказка",
+  guestNoInviteText:
+    "Для доступа к системе нужна персональная ссылка-приглашение. Попросите руководителя или администратора отправить её в Telegram.",
+});
+
+const BOT_SETTINGS_META = [
+  {
+    field: "onboardingTitle",
+    key: "BOT_ONBOARDING_TITLE",
+    description: "Заголовок приветствия в /start, поддерживается шаблон {{name}}",
+  },
+  {
+    field: "onboardingBody",
+    key: "BOT_ONBOARDING_BODY",
+    description: "Основной текст онбординга. Переносы строк задаются через Enter",
+  },
+  {
+    field: "onboardingStep2",
+    key: "BOT_ONBOARDING_STEP_2",
+    description: "Второй шаг онбординга",
+  },
+  {
+    field: "onboardingStep3",
+    key: "BOT_ONBOARDING_STEP_3",
+    description: "Третий шаг онбординга",
+  },
+  {
+    field: "onboardingCtaText",
+    key: "BOT_ONBOARDING_CTA_TEXT",
+    description: "Текст кнопки открытия MiniApp",
+  },
+  {
+    field: "mainMenuText",
+    key: "BOT_MAIN_MENU_TEXT",
+    description: "Текст главного меню после онбординга, поддерживается {{name}}",
+  },
+  {
+    field: "helpText",
+    key: "BOT_HELP_TEXT",
+    description: "Ответ на /help и кнопку «Помощь»",
+  },
+  {
+    field: "guestNoInviteText",
+    key: "BOT_GUEST_NO_INVITE_TEXT",
+    description: "Сообщение пользователю без приглашения",
+  },
+];
 
 async function handleLogoUpload(event) {
   const file = event.target.files?.[0];
@@ -251,12 +388,48 @@ const loadSettings = async () => {
       if (setting.setting_key === "GAMIFICATION_RULES_ENABLED") {
         rulesEnabled.value = value === "true" || value === true;
       }
+
+      const botField = BOT_SETTINGS_META.find((item) => item.key === setting.setting_key);
+      if (botField) {
+        botSettings.value[botField.field] = setting.setting_value || "";
+      }
     });
   } catch (error) {
     console.error("Ошибка загрузки настроек:", error);
     showToast("Не удалось загрузить настройки", "error");
   } finally {
     settingsLoading.value = false;
+  }
+};
+
+async function upsertSetting(key, value, description) {
+  try {
+    await settingsApi.updateSetting(key, value);
+  } catch (error) {
+    const status = Number(error?.response?.status || 0);
+    if (status !== 404) {
+      throw error;
+    }
+
+    await settingsApi.createSetting({ key, value, description });
+  }
+}
+
+const saveBotSettings = async () => {
+  try {
+    botSaving.value = true;
+
+    for (const meta of BOT_SETTINGS_META) {
+      const value = String(botSettings.value[meta.field] || "").trim();
+      await upsertSetting(meta.key, value, meta.description);
+    }
+
+    showSuccess("Настройки бота сохранены");
+  } catch (error) {
+    console.error("Ошибка сохранения настроек бота:", error);
+    showError("Не удалось сохранить настройки бота");
+  } finally {
+    botSaving.value = false;
   }
 };
 
@@ -370,6 +543,43 @@ onMounted(() => {
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 16px 0;
+}
+
+.bot-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.bot-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bot-field-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.bot-field-input,
+.bot-field-textarea {
+  width: 100%;
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--surface-card);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.bot-field-textarea {
+  resize: vertical;
+}
+
+.bot-actions {
+  margin-top: 16px;
 }
 
 /* Gamification Rules */

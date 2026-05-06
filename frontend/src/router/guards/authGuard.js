@@ -6,7 +6,7 @@ export async function resolveAuthNavigation(to, userStore) {
   } catch (error) {
     console.error("Не удалось проверить авторизацию", error);
     if (to.meta.requiresAuth) {
-      return "/invitation";
+      return { name: "invitation" };
     }
   }
 

@@ -2,6 +2,7 @@ const cache = require("./cache");
 const canEditUser = require("./canEditUser");
 const checkModuleAccess = require("./checkModuleAccess");
 const errorHandler = require("./errorHandler");
+const permission = require("./permission");
 const requireCourseFinalAssessmentAccess = require("./requireCourseFinalAssessmentAccess");
 const requireRole = require("./requireRole");
 const resolveUser = require("./resolveUser");
@@ -15,6 +16,7 @@ module.exports = {
   canEditUser,
   checkModuleAccess,
   errorHandler,
+  permission,
   requireCourseFinalAssessmentAccess,
   requireRole,
   resolveUser,

@@ -31,6 +31,8 @@ function buildAuditEntry({
   entityId = null,
   actor,
   metadata = {},
+  before = null,
+  after = null,
   result = "success",
   initiatorIp = null,
   userAgent = null,
@@ -49,6 +51,8 @@ function buildAuditEntry({
     entityId,
     actor: normalizedActor,
     metadata,
+    before,
+    after,
     result,
     initiatorIp,
     userAgent,
@@ -56,6 +60,12 @@ function buildAuditEntry({
 }
 
 async function logAuditEvent(entry) {
+  try {
+    await auditRepository.createLog(entry);
+  } catch (error) {
+    // Не блокируем бизнес-операции при проблемах аудита.
+    console.error("Не удалось сохранить аудит-событие:", error.message);
+  }
   return entry;
 }
 
@@ -67,6 +77,8 @@ async function logAndSend({
   entity,
   entityId,
   metadata = {},
+  before = null,
+  after = null,
   result = "success",
 }) {
   const entry = buildAuditEntry({
@@ -76,6 +88,8 @@ async function logAndSend({
     entityId,
     actor,
     metadata,
+    before,
+    after,
     result,
     initiatorIp: req ? req.headers["x-forwarded-for"] || req.socket?.remoteAddress || null : null,
     userAgent: req ? req.headers["user-agent"] : null,
@@ -84,9 +98,26 @@ async function logAndSend({
   return logAuditEvent(entry);
 }
 
+async function logCrudEvent({ req, actor, action, entity, entityId, before = null, after = null, metadata = {}, result = "success" }) {
+  return logAndSend({
+    req,
+    actor,
+    scope: "admin_panel",
+    action,
+    entity,
+    entityId,
+    before,
+    after,
+    metadata,
+    result,
+  });
+}
+
 module.exports = {
   buildAuditEntry,
   logAuditEvent,
   logAndSend,
+  logCrudEvent,
   buildActorFromRequest,
 };
+const auditRepository = require("./auditRepository");

@@ -7,6 +7,8 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "migrate": "node database/runMigrations.js",
+    "seed:permissions": "node scripts/seed-permissions.js",
+    "seed:role-permissions": "node scripts/seed-role-permissions.js",
     "schema:check:courses": "node scripts/check-required-schema.js --tables=course_sections,course_section_user_progress,assessment_attempt_questions",
     "phase0:diagnostics": "node scripts/phase0-diagnostics.js",
     "phase1:recalculate-matching": "node scripts/recalculate-matching-attempts.js",
@@ -15,6 +17,7 @@
     "test:assessment": "node --test tests/assessment.score-answer.test.js",
     "test:phase4": "node --test tests/phase4.integration.test.js",
     "test:courses": "node --test tests/courses/topics.completion.test.js tests/courses/sections.completion.test.js tests/courses/progress.calculation.test.js tests/courses/assignments.filter.test.js tests/courses/course.e2e.test.js tests/courses/analytics.repository.test.js tests/courses/reorder.service.test.js",
+    "test:permissions": "node --test tests/permission-service.test.js",
     "test": "node --test tests/admin-smoke.test.js tests/assessment.score-answer.test.js tests/phase4.integration.test.js tests/courses/topics.completion.test.js tests/courses/sections.completion.test.js tests/courses/progress.calculation.test.js tests/courses/assignments.filter.test.js tests/courses/course.e2e.test.js tests/courses/analytics.repository.test.js tests/courses/reorder.service.test.js"
   },
   "keywords": [],

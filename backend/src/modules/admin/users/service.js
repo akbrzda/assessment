@@ -6,6 +6,7 @@ const assessmentModel = require("../../../models/assessmentModel");
 const referenceModel = require("../../../models/referenceModel");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
 const { listPublishedCoursesForUser } = require("../../courses/userCourseView.repository");
+const permissionService = require("../../../services/PermissionService");
 
 const updateSchema = Joi.object({
   firstName: Joi.string().trim().min(2).max(64).required(),
@@ -17,6 +18,29 @@ const updateSchema = Joi.object({
   level: Joi.number().integer().min(1).default(1),
   points: Joi.number().integer().min(0).default(0),
 });
+
+const permissionOverrideSchema = Joi.object({
+  permissionId: Joi.number().integer().positive().required(),
+  effect: Joi.string().valid("allow", "deny").required(),
+  reason: Joi.string().trim().max(255).allow("", null).optional(),
+  expiresAt: Joi.date().iso().allow(null).optional(),
+});
+
+const addUserRoleSchema = Joi.object({
+  roleId: Joi.number().integer().positive().required(),
+  expiresAt: Joi.date().iso().allow(null).optional(),
+});
+
+function toMySqlDateTime(value) {
+  if (!value) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
 
 async function listUsers(req, res, next) {
   try {
@@ -325,24 +349,7 @@ async function deleteUser(req, res, next) {
       return res.status(400).json({ error: "Нельзя удалить самого себя" });
     }
 
-    try {
-      await userModel.deleteUser(userId);
-    } catch (deleteError) {
-      if (deleteError?.code === "ER_ROW_IS_REFERENCED_2") {
-        const sqlMessage = String(deleteError?.sqlMessage || "");
-        let reason = "Пользователь связан с другими данными и не может быть удален";
-
-        if (sqlMessage.includes("fk_assessments_created_by")) {
-          reason = "Нельзя удалить пользователя: он является автором аттестаций";
-        } else if (sqlMessage.includes("invitations")) {
-          reason = "Нельзя удалить пользователя: он связан с созданными приглашениями";
-        }
-
-        return res.status(409).json({ error: reason });
-      }
-
-      throw deleteError;
-    }
+    await userModel.softDelete(userId, currentUser.id);
 
     await logAndSend({
       req,
@@ -1063,6 +1070,225 @@ async function bulkExportUsers(req, res, next) {
   }
 }
 
+async function getPermissions(req, res, next) {
+  try {
+    const userId = Number(req.params.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({ error: "Некорректный идентификатор пользователя" });
+    }
+
+    const [users] = await pool.query("SELECT id FROM users WHERE id = ? LIMIT 1", [userId]);
+    if (!users.length) {
+      return res.status(404).json({ error: "Пользователь не найден" });
+    }
+
+    const permissions = await permissionService.getEffectivePermissions(userId);
+    return res.json({
+      userId,
+      effective: permissions.effective,
+      inherited: permissions.inherited,
+      overrides: permissions.overrides,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function setPermissionOverride(req, res, next) {
+  const connection = await pool.getConnection();
+  try {
+    const userId = Number(req.params.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({ error: "Некорректный идентификатор пользователя" });
+    }
+
+    const { error, value } = permissionOverrideSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
+    }
+
+    const [users] = await connection.query("SELECT id FROM users WHERE id = ? LIMIT 1", [userId]);
+    if (!users.length) {
+      return res.status(404).json({ error: "Пользователь не найден" });
+    }
+
+    const [permissions] = await connection.query(
+      "SELECT id FROM permissions WHERE id = ? AND is_active = 1 LIMIT 1",
+      [value.permissionId],
+    );
+    if (!permissions.length) {
+      return res.status(422).json({ error: "Право не найдено или неактивно" });
+    }
+
+    const expiresAt = toMySqlDateTime(value.expiresAt);
+    await connection.query(
+      `INSERT INTO user_permission_overrides
+        (user_id, permission_id, effect, reason, expires_at, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+       ON DUPLICATE KEY UPDATE
+         effect = VALUES(effect),
+         reason = VALUES(reason),
+         expires_at = VALUES(expires_at),
+         created_by = VALUES(created_by),
+         updated_at = UTC_TIMESTAMP()`,
+      [userId, value.permissionId, value.effect, value.reason || null, expiresAt, req.user?.id || null],
+    );
+
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "user.permission.override.set",
+      entity: "user",
+      entityId: userId,
+      metadata: {
+        permissionId: value.permissionId,
+        effect: value.effect,
+        expiresAt: value.expiresAt || null,
+      },
+    });
+
+    return res.status(200).json({ message: "Переопределение права сохранено" });
+  } catch (error) {
+    return next(error);
+  } finally {
+    connection.release();
+  }
+}
+
+async function deletePermissionOverride(req, res, next) {
+  try {
+    const userId = Number(req.params.id);
+    const overrideId = Number(req.params.overrideId);
+
+    if (!Number.isInteger(userId) || userId <= 0 || !Number.isInteger(overrideId) || overrideId <= 0) {
+      return res.status(400).json({ error: "Некорректные параметры" });
+    }
+
+    const [result] = await pool.query(
+      "DELETE FROM user_permission_overrides WHERE id = ? AND user_id = ? LIMIT 1",
+      [overrideId, userId],
+    );
+
+    if (!result.affectedRows) {
+      return res.status(404).json({ error: "Переопределение не найдено" });
+    }
+
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "user.permission.override.deleted",
+      entity: "user",
+      entityId: userId,
+      metadata: { overrideId },
+    });
+
+    return res.status(204).send();
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function addUserRole(req, res, next) {
+  try {
+    const userId = Number(req.params.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({ error: "Некорректный идентификатор пользователя" });
+    }
+
+    const { error, value } = addUserRoleSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
+    }
+
+    const [users] = await pool.query("SELECT id FROM users WHERE id = ? LIMIT 1", [userId]);
+    if (!users.length) {
+      return res.status(404).json({ error: "Пользователь не найден" });
+    }
+
+    const [roles] = await pool.query("SELECT id FROM roles WHERE id = ? LIMIT 1", [value.roleId]);
+    if (!roles.length) {
+      return res.status(422).json({ error: "Роль не найдена" });
+    }
+
+    const expiresAt = toMySqlDateTime(value.expiresAt);
+    await pool.query(
+      `INSERT INTO user_roles
+        (user_id, role_id, is_active, assigned_by, assigned_at, expires_at, created_at, updated_at)
+       VALUES (?, ?, 1, ?, UTC_TIMESTAMP(), ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+       ON DUPLICATE KEY UPDATE
+         is_active = 1,
+         assigned_by = VALUES(assigned_by),
+         assigned_at = UTC_TIMESTAMP(),
+         expires_at = VALUES(expires_at),
+         updated_at = UTC_TIMESTAMP()`,
+      [userId, value.roleId, req.user?.id || null, expiresAt],
+    );
+
+    const [userRoles] = await pool.query(
+      `SELECT
+         ur.id,
+         ur.role_id as roleId,
+         r.name as roleName,
+         ur.assigned_at as assignedAt,
+         ur.expires_at as expiresAt,
+         ur.assigned_by as assignedBy
+       FROM user_roles ur
+       JOIN roles r ON r.id = ur.role_id
+       WHERE ur.user_id = ? AND ur.is_active = 1
+       ORDER BY ur.assigned_at DESC`,
+      [userId],
+    );
+
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "user.role.added",
+      entity: "user",
+      entityId: userId,
+      metadata: { roleId: value.roleId, expiresAt: value.expiresAt || null },
+    });
+
+    return res.status(200).json({
+      user: { id: userId },
+      roles: userRoles,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function removeUserRole(req, res, next) {
+  try {
+    const userId = Number(req.params.id);
+    const roleId = Number(req.params.roleId);
+    if (!Number.isInteger(userId) || userId <= 0 || !Number.isInteger(roleId) || roleId <= 0) {
+      return res.status(400).json({ error: "Некорректные параметры" });
+    }
+
+    const [result] = await pool.query(
+      "DELETE FROM user_roles WHERE user_id = ? AND role_id = ? LIMIT 1",
+      [userId, roleId],
+    );
+
+    if (!result.affectedRows) {
+      return res.status(404).json({ error: "Роль пользователя не найдена" });
+    }
+
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "user.role.removed",
+      entity: "user",
+      entityId: userId,
+      metadata: { roleId },
+    });
+
+    return res.status(204).send();
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   listUsers,
   getUserLoginHistory,
@@ -1078,4 +1304,9 @@ module.exports = {
   bulkUpdateRole,
   bulkTransferBranch,
   bulkExportUsers,
+  getPermissions,
+  setPermissionOverride,
+  deletePermissionOverride,
+  addUserRole,
+  removeUserRole,
 };

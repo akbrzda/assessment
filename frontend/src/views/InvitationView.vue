@@ -85,12 +85,21 @@
         <p class="body-small text-secondary">Пожалуйста, подождите...</p>
       </div>
 
-      <div v-else-if="!isLoading" class="card empty-state">
+      <div v-else-if="inviteFlow.hasInviteCode" class="card empty-state">
         <div class="empty-icon">
           <XCircle />
         </div>
         <h3 class="title-small mb-8">Приглашение недоступно</h3>
         <p class="body-small text-secondary">Приглашение не найдено или истекло. Попросите администратора отправить новую ссылку.</p>
+      </div>
+
+      <div v-else class="card empty-state">
+        <div class="empty-icon">
+          <MailCheck />
+        </div>
+        <h3 class="title-small mb-8">Вход только по приглашению</h3>
+        <p class="body-small text-secondary">{{ welcomeText }}</p>
+        <p class="body-small text-secondary mt-8">Попросите руководителя или администратора отправить персональную ссылку-приглашение в Telegram.</p>
       </div>
     </div>
   </div>
@@ -99,16 +108,7 @@
 <script>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import {
-  ArrowRight,
-  BriefcaseBusiness,
-  Building2,
-  Hand,
-  MailCheck,
-  ShieldCheck,
-  User,
-  XCircle,
-} from "lucide-vue-next";
+import { ArrowRight, BriefcaseBusiness, Building2, Hand, MailCheck, ShieldCheck, User, XCircle } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 
@@ -131,7 +131,14 @@ export default {
 
     const alreadyRegisteredError = ref(false);
     const invitation = computed(() => userStore.invitation);
+    const inviteFlow = computed(() => userStore.inviteFlow || { hasInviteCode: false, inviteCodeValid: false, registrationByInvitationOnly: true });
     const isLoading = computed(() => userStore.isLoading);
+    const welcomeText = computed(() => {
+      const firstName = userStore.registrationDefaults?.firstName || telegramStore.user?.first_name || "";
+      return firstName
+        ? `${firstName}, у вас пока нет активного приглашения для входа в систему.`
+        : "У вас пока нет активного приглашения для входа в систему.";
+    });
     const fullName = computed(() => {
       if (!invitation.value) {
         return "";
@@ -174,7 +181,9 @@ export default {
 
     return {
       invitation,
+      inviteFlow,
       isLoading,
+      welcomeText,
       fullName,
       alreadyRegisteredError,
       acceptInvitation,

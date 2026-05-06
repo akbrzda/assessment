@@ -10,6 +10,7 @@ const assert = require("node:assert/strict");
 const http = require("node:http");
 const path = require("node:path");
 const fs = require("node:fs");
+const os = require("node:os");
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -96,6 +97,11 @@ describe("SEC-002 — Отсутствие обязательных security hea
   it("X-Powered-By заголовок скрыт", async () => {
     const r = await req("GET", "/health");
     assert.equal(r.headers["x-powered-by"], undefined, "УЯЗВИМОСТЬ SEC-002: X-Powered-By раскрывает технологический стек");
+  });
+
+  it("ответ на GET /health содержит Referrer-Policy", async () => {
+    const r = await req("GET", "/health");
+    assert.ok(r.headers["referrer-policy"], "УЯЗВИМОСТЬ SEC-002: заголовок Referrer-Policy отсутствует");
   });
 });
 
@@ -222,6 +228,66 @@ describe("SEC-008 — File Upload: проверка типов файлов (off
     // В текущем коде MIME проверяется через regex /jpeg|jpg|png|gif|svg/
     // image/svg+xml содержит "svg" → тест пройдёт; но MIME-тип разрешает SVG → уязвимость
     assert.ok(!dangerousMimes.includes("image/svg+xml") || true, "Заглушка: подробный тест требует запущенного сервера с тестовой БД");
+  });
+});
+
+describe("SEC-014 — Upload SVG блокируется на /admin/courses/upload-media", () => {
+  it("загрузка .svg возвращает 400", async (t) => {
+    const token = process.env.TEST_ADMIN_TOKEN;
+    if (!token) {
+      t.skip("Пропуск: не задан TEST_ADMIN_TOKEN для проверки upload");
+      return;
+    }
+
+    const svgPath = path.join(os.tmpdir(), `security-test-${Date.now()}.svg`);
+    fs.writeFileSync(svgPath, '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', "utf8");
+
+    try {
+      const form = new FormData();
+      form.append("media", new Blob([fs.readFileSync(svgPath)], { type: "image/svg+xml" }), "evil.svg");
+
+      const response = await fetch(`${BASE}/admin/courses/upload-media`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+
+      assert.equal(response.status, 400, `SVG не был заблокирован: получен статус ${response.status}`);
+    } finally {
+      fs.unlinkSync(svgPath);
+    }
+  });
+});
+
+describe("SEC-015 — IDOR manager: доступ к чужому филиалу запрещён", () => {
+  it("manager получает 403 на /admin/courses/:id/users/:userId/progress для пользователя другого филиала", async (t) => {
+    const managerToken = process.env.TEST_MANAGER_TOKEN;
+    const courseId = process.env.TEST_COURSE_ID;
+    const foreignUserId = process.env.TEST_FOREIGN_USER_ID;
+    if (!managerToken || !courseId || !foreignUserId) {
+      t.skip("Пропуск: нужны TEST_MANAGER_TOKEN, TEST_COURSE_ID, TEST_FOREIGN_USER_ID");
+      return;
+    }
+
+    const r = await req("GET", `/admin/courses/${courseId}/users/${foreignUserId}/progress`, {
+      headers: { Authorization: `Bearer ${managerToken}` },
+    });
+    assert.equal(r.status, 403, `Ожидался 403, получен ${r.status}`);
+  });
+
+  it("manager получает 403 на /admin/assessments/:id/users/:userId/progress для пользователя другого филиала", async (t) => {
+    const managerToken = process.env.TEST_MANAGER_TOKEN;
+    const assessmentId = process.env.TEST_ASSESSMENT_ID;
+    const foreignUserId = process.env.TEST_FOREIGN_USER_ID;
+    if (!managerToken || !assessmentId || !foreignUserId) {
+      t.skip("Пропуск: нужны TEST_MANAGER_TOKEN, TEST_ASSESSMENT_ID, TEST_FOREIGN_USER_ID");
+      return;
+    }
+
+    const r = await req("GET", `/admin/assessments/${assessmentId}/users/${foreignUserId}/progress`, {
+      headers: { Authorization: `Bearer ${managerToken}` },
+    });
+    assert.equal(r.status, 403, `Ожидался 403, получен ${r.status}`);
   });
 });
 

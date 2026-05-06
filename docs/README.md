@@ -60,5 +60,4 @@ assessment/
 
 ## Ссылки
 
-- [Отчёт по аудиту документации](DOCUMENTATION_AUDIT_REPORT.md)
 - Корневые файлы: [AGENTS.md](../AGENTS.md), [TASKS.md](../TASKS.md), [ROADMAP.md](../ROADMAP.md)

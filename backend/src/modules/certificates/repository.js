@@ -177,6 +177,7 @@ async function findLastByTelegramId(telegramId) {
  * Находит все issued сертификаты пользователя по telegram_id.
  */
 async function findAllByTelegramId(telegramId) {
+  console.log("[certRepository.findAllByTelegramId] executing query for telegramId=%s", telegramId);
   const [rows] = await pool.execute(
     `SELECT c.uuid, c.file_path, c.issued_at, co.title AS course_title
      FROM certificates c
@@ -186,6 +187,7 @@ async function findAllByTelegramId(telegramId) {
      ORDER BY c.issued_at DESC`,
     [String(telegramId)],
   );
+  console.log("[certRepository.findAllByTelegramId] query returned %d rows for telegramId=%s", rows.length, telegramId);
   return rows;
 }
 

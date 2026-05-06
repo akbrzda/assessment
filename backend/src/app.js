@@ -6,7 +6,7 @@ const path = require("path");
 const config = require("./config/env");
 const { errorHandler, timezone: timezoneMiddleware } = require("./middleware");
 const verifyJWT = require("./middleware/verifyJWT");
-const { verifyCertificateLimiter } = require("./middleware/rateLimit");
+const { verifyCertificateLimiter, adminGlobalLimiter } = require("./middleware/rateLimit");
 
 const authModule = require("./modules/auth");
 const invitationModule = require("./modules/invitations");
@@ -26,6 +26,7 @@ const adminPositionRoutes = require("./modules/admin/positions");
 const adminSettingsRoutes = require("./modules/admin/settings");
 const adminProfileRoutes = require("./modules/admin/profile");
 const adminPermissionsRoutes = require("./modules/admin/permissions");
+const adminRolesRoutes = require("./modules/admin/roles");
 const adminSearchRoutes = require("./modules/admin/search/routes");
 const { metricsMiddleware } = require("./services/metricsService");
 const botModule = require("./modules/bot");
@@ -49,7 +50,21 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        baseUri: ["'self'"],
+        frameAncestors: ["'none'"],
+        objectSrc: ["'none'"],
+      },
+    },
+    xContentTypeOptions: true,
+    frameguard: { action: "deny" },
+    referrerPolicy: { policy: "no-referrer" },
+  }),
+);
 app.use(express.json());
 app.use(cookieParser());
 
@@ -70,6 +85,7 @@ const apiRouter = express.Router();
 // Middleware для конвертации дат в часовой пояс пользователя
 apiRouter.use(timezoneMiddleware);
 apiRouter.use(metricsMiddleware);
+apiRouter.use("/admin", adminGlobalLimiter);
 
 apiRouter.get("/health", async (req, res, next) => {
   try {
@@ -96,6 +112,7 @@ apiRouter.use("/admin/gamification/rules", gamificationModule.admin.rules.routes
 apiRouter.use("/admin/invitations", invitationModule.admin.routes);
 apiRouter.use("/admin/profile", adminProfileRoutes);
 apiRouter.use("/admin/permissions", adminPermissionsRoutes);
+apiRouter.use("/admin/roles", adminRolesRoutes);
 apiRouter.use("/admin/search", adminSearchRoutes);
 apiRouter.use("/admin/courses", coursesModule.admin.routes);
 apiRouter.use("/admin/badges", gamificationModule.admin.badges.routes);

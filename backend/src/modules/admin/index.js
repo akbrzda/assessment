@@ -13,6 +13,7 @@ module.exports = {
   invitations: require("../invitations/admin/routes"),
   profile: require("./profile"),
   permissions: require("./permissions"),
+  roles: require("./roles"),
   courses: require("../courses/admin/routes"),
   badges: require("../gamification/admin/badges/routes"),
   levels: require("../gamification/admin/levels/routes"),

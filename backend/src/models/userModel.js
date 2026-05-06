@@ -155,6 +155,18 @@ async function deleteUser(userId) {
   }
 }
 
+async function softDelete(userId, actorId) {
+  await pool.execute(
+    `UPDATE users
+     SET is_active = 0,
+         deleted_at = NOW(),
+         deleted_by = ?,
+         updated_at = NOW()
+     WHERE id = ?`,
+    [actorId || null, userId],
+  );
+}
+
 async function updateAvatar(userId, avatarUrl) {
   await pool.execute("UPDATE users SET avatar_url = ?, updated_at = NOW() WHERE id = ?", [avatarUrl, userId]);
 }
@@ -220,6 +232,7 @@ module.exports = {
   findById,
   updateUserByAdmin,
   deleteUser,
+  softDelete,
   updateAvatar,
   findByIds,
   updateTimezone,

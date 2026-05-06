@@ -140,6 +140,7 @@ const navSections = computed(() => {
       items: [
         { label: "Дашборд", to: "/dashboard", icon: LayoutDashboardIcon },
         has("users") && { label: "Пользователи", to: "/users", icon: UsersIcon },
+        authStore.isSuperAdmin && has("users") && { label: "Роли", to: "/roles", icon: BriefcaseIcon },
       ].filter(Boolean),
     },
     {

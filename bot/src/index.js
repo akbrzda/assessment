@@ -17,6 +17,7 @@ for (const filename of envFiles) {
 }
 
 const { BOT_TOKEN, MINI_APP_URL, BACKEND_URL } = process.env;
+const botUsername = (process.env.BOT_USERNAME || "").trim();
 
 if (!BOT_TOKEN) {
   console.error("[bot] BOT_TOKEN is not set. Check bot/.env.");
@@ -124,15 +125,45 @@ function downloadFile(fileUrl) {
 }
 
 /**
- * Проверяет, завершил ли пользователь онбординг, по telegram_id.
- * Возвращает true/false/null (null = пользователь не найден в системе).
+ * Получает статус пользователя из системы по telegram_id.
+ * Возвращает расширенный объект статуса для корректного роутинга /start.
  */
-async function checkOnboardingStatus(telegramId) {
-  if (!backendUrl) return null;
+async function getUserStatus(telegramId) {
+  if (!backendUrl) {
+    return { found: false, notFound: false, unavailable: true };
+  }
+
   try {
     const { status, body } = await backendGet(`/api/bot/internal/user-status?telegramId=${telegramId}`);
-    if (status === 200 && body) return body.onboardingCompleted;
-    if (status === 404) return null;
+    if (status === 200 && body) {
+      return {
+        found: true,
+        notFound: false,
+        unavailable: false,
+        onboardingCompleted: Boolean(body.onboardingCompleted),
+        firstName: String(body.firstName || "").trim(),
+      };
+    }
+
+    if (status === 404) {
+      return { found: false, notFound: true, unavailable: false };
+    }
+
+    return { found: false, notFound: false, unavailable: true };
+  } catch {
+    return { found: false, notFound: false, unavailable: true };
+  }
+}
+
+async function getOnboardingConfig() {
+  if (!backendUrl) {
+    return null;
+  }
+  try {
+    const { status, body } = await backendGet("/api/bot/internal/onboarding-config");
+    if (status === 200 && body) {
+      return body;
+    }
     return null;
   } catch {
     return null;
@@ -166,68 +197,201 @@ async function setNotificationsEnabled(telegramId, enabled) {
   }
 }
 
-function buildOnboardingMessage(firstName) {
-  const name = firstName ? `, ${firstName}` : "";
-  return [
-    `👋 Привет${name}!`,
-    "",
-    "Я бот системы аттестации. Здесь ты будешь:",
-    "📚 Проходить обучающие курсы",
-    "✅ Сдавать тесты и аттестации",
-    "🏆 Получать баллы и бейджи за прогресс",
-    "📄 Получать сертификаты о прохождении",
-    "",
-    "Нажми кнопку ниже, чтобы открыть приложение и начать.",
-  ].join("\n");
+function applyNameTemplate(template, firstName) {
+  const normalizedName = firstName ? `, ${firstName}` : "";
+  return String(template || "").replaceAll("{{name}}", normalizedName);
 }
 
-function buildMainMenuMessage(firstName) {
-  const name = firstName ? `, ${firstName}` : "";
-  return `Привет${name}! 👋\n\nЧто хочешь сделать?`;
+function buildOnboardingMessage(firstName, config) {
+  const title = applyNameTemplate(config?.onboardingTitle || "👋 Привет{{name}}!", firstName);
+  const body = String(config?.onboardingBody || "").replaceAll("\\n", "\n");
+  return [title, "", body].join("\n").trim();
 }
 
-function buildMainMenuKeyboard(webAppUrl) {
+function buildOnboardingStep2Message(config) {
+  return String(config?.onboardingStep2 || "")
+    .replaceAll("\\n", "\n")
+    .trim();
+}
+
+function buildOnboardingStep3Message(config) {
+  const body = String(config?.onboardingStep3 || "").replaceAll("\\n", "\n");
+  return [body, "", "Готовы начать? Нажмите кнопку ниже."].join("\n").trim();
+}
+
+function buildGuestNoInviteMessage(firstName, config) {
+  const intro = firstName ? `👋 Привет, ${firstName}!` : "👋 Привет!";
+  const body = String(config?.guestNoInviteText || "").replaceAll("\\n", "\n");
+  const inviteHint = botUsername
+    ? `Для доступа к системе нужна персональная ссылка-приглашение. Попросите руководителя отправить её в Telegram.`
+    : "";
+  return `${intro}\n\n${body}${inviteHint}`;
+}
+
+function buildMainMenuMessage(firstName, config) {
+  return applyNameTemplate(config?.mainMenuText || "Привет{{name}}! 👋\n\nЧто хотите сделать?", firstName).replaceAll("\\n", "\n");
+}
+
+function buildHelpMessage(config) {
+  return String(config?.helpText || "Доступные команды:\n/start\n/certificate\n/certificates\n/help").replaceAll("\\n", "\n");
+}
+
+function buildMainMenuKeyboard(webAppUrl, config) {
   const keyboard = [];
   if (webAppUrl) {
-    keyboard.push([{ text: "📚 Открыть приложение", web_app: { url: webAppUrl } }]);
+    keyboard.push([{ text: `📚 ${String(config?.onboardingCtaText || "Открыть приложение")}`, web_app: { url: webAppUrl } }]);
   }
   keyboard.push([{ text: "📄 Мои сертификаты" }]);
-  keyboard.push([{ text: "🔔 Уведомления" }]);
+  keyboard.push([{ text: "🔔 Уведомления" }, { text: "ℹ️ Помощь" }]);
   return { keyboard, resize_keyboard: true };
 }
 
-function buildOnboardingKeyboard(webAppUrl) {
-  if (!webAppUrl) return undefined;
+function buildOnboardingKeyboard(webAppUrl, config) {
+  if (!webAppUrl) {
+    return {
+      inline_keyboard: [[{ text: "Дальше ➜", callback_data: "onboarding:step2" }]],
+    };
+  }
+
   return {
-    inline_keyboard: [[{ text: "Открыть приложение", web_app: { url: webAppUrl } }]],
+    inline_keyboard: [
+      [{ text: "Дальше ➜", callback_data: "onboarding:step2" }],
+      [{ text: String(config?.onboardingCtaText || "Открыть приложение"), web_app: { url: webAppUrl } }],
+    ],
+  };
+}
+
+function buildOnboardingStep2Keyboard(webAppUrl, config) {
+  if (!webAppUrl) {
+    return {
+      inline_keyboard: [
+        [
+          { text: "⬅ Назад", callback_data: "onboarding:step1" },
+          { text: "Дальше ➜", callback_data: "onboarding:step3" },
+        ],
+      ],
+    };
+  }
+
+  return {
+    inline_keyboard: [
+      [
+        { text: "⬅ Назад", callback_data: "onboarding:step1" },
+        { text: "Дальше ➜", callback_data: "onboarding:step3" },
+      ],
+      [{ text: String(config?.onboardingCtaText || "Открыть приложение"), web_app: { url: webAppUrl } }],
+    ],
+  };
+}
+
+function buildOnboardingStep3Keyboard(webAppUrl, config) {
+  if (!webAppUrl) {
+    return {
+      inline_keyboard: [[{ text: "⬅ Назад", callback_data: "onboarding:step2" }]],
+    };
+  }
+
+  return {
+    inline_keyboard: [
+      [{ text: "⬅ Назад", callback_data: "onboarding:step2" }],
+      [{ text: String(config?.onboardingCtaText || "Открыть приложение"), web_app: { url: webAppUrl } }],
+    ],
   };
 }
 
 bot.start(async (ctx) => {
-  const userName = ctx.from?.first_name || "";
+  const telegramFirstName = ctx.from?.first_name || "";
   const telegramId = String(ctx.from?.id || "");
   const startPayload = ctx.startPayload;
 
   const webAppUrl = miniAppUrl;
+  const onboardingConfig = await getOnboardingConfig();
+  const hasInvitePayload = Boolean(startPayload && startPayload.startsWith("invite_"));
 
   if (startPayload && startPayload.startsWith("invite_")) {
     console.log("[bot] Приглашение обнаружено:", startPayload);
   }
 
-  const onboardingCompleted = await checkOnboardingStatus(telegramId);
+  console.log("[bot /start] telegramId=%s, hasInvite=%s", telegramId, hasInvitePayload);
+  const userStatus = await getUserStatus(telegramId);
+  console.log("[bot /start] userStatus=%O", userStatus);
+  const userName = userStatus?.found ? userStatus.firstName || telegramFirstName : telegramFirstName;
+  const onboardingCompleted = userStatus?.found ? Boolean(userStatus.onboardingCompleted) : false;
 
-  if (onboardingCompleted === null || !onboardingCompleted) {
-    await ctx.reply(buildOnboardingMessage(userName), {
-      reply_markup: buildOnboardingKeyboard(webAppUrl),
+  console.log(
+    "[bot /start] found=%s, notFound=%s, unavailable=%s, onboardingCompleted=%s",
+    userStatus?.found,
+    userStatus?.notFound,
+    userStatus?.unavailable,
+    onboardingCompleted,
+  );
+
+  // Показываем сообщение про приглашение только если точно знаем, что пользователя нет в системе.
+  if (userStatus?.notFound && !hasInvitePayload) {
+    console.log("[bot /start] BRANCH: notFound без invite — отправляем сообщение про приглашение");
+    await ctx.reply(buildGuestNoInviteMessage(userName, onboardingConfig), {
       parse_mode: "HTML",
     });
     return;
   }
 
-  await ctx.reply(buildMainMenuMessage(userName), {
-    reply_markup: buildMainMenuKeyboard(webAppUrl),
+  if (!onboardingCompleted) {
+    await ctx.reply(buildOnboardingMessage(userName, onboardingConfig), {
+      reply_markup: buildOnboardingKeyboard(webAppUrl, onboardingConfig),
+      parse_mode: "HTML",
+    });
+    return;
+  }
+
+  await ctx.reply(buildMainMenuMessage(userName, onboardingConfig), {
+    reply_markup: buildMainMenuKeyboard(webAppUrl, onboardingConfig),
     parse_mode: "HTML",
   });
+});
+
+bot.command("help", async (ctx) => {
+  const onboardingConfig = await getOnboardingConfig();
+  await ctx.reply(buildHelpMessage(onboardingConfig), { parse_mode: "HTML" });
+});
+
+bot.action(/^onboarding:(step1|step2|step3)$/, async (ctx) => {
+  const step = ctx.match[1];
+  const telegramFirstName = ctx.from?.first_name || "";
+  const telegramId = String(ctx.from?.id || "");
+  const onboardingConfig = await getOnboardingConfig();
+  const userStatus = await getUserStatus(telegramId);
+  const userName = userStatus?.found ? userStatus.firstName || telegramFirstName : telegramFirstName;
+
+  const screens = {
+    step1: {
+      text: buildOnboardingMessage(userName, onboardingConfig),
+      keyboard: buildOnboardingKeyboard(miniAppUrl, onboardingConfig),
+    },
+    step2: {
+      text: buildOnboardingStep2Message(onboardingConfig),
+      keyboard: buildOnboardingStep2Keyboard(miniAppUrl, onboardingConfig),
+    },
+    step3: {
+      text: buildOnboardingStep3Message(onboardingConfig),
+      keyboard: buildOnboardingStep3Keyboard(miniAppUrl, onboardingConfig),
+    },
+  };
+
+  const screen = screens[step] || screens.step1;
+
+  try {
+    await ctx.editMessageText(screen.text, {
+      parse_mode: "HTML",
+      reply_markup: screen.keyboard,
+    });
+  } catch (error) {
+    await ctx.reply(screen.text, {
+      parse_mode: "HTML",
+      reply_markup: screen.keyboard,
+    });
+  }
+
+  await ctx.answerCbQuery();
 });
 
 // Команда /certificate — последний сертификат
@@ -309,8 +473,7 @@ bot.hears("📄 Мои сертификаты", async (ctx) => {
 bot.hears("🔔 Уведомления", async (ctx) => {
   const telegramId = String(ctx.from?.id || "");
 
-  // Получаем текущий статус через user-status (notifications_enabled не возвращается там)
-  // Используем отдельный запрос через backendGet
+  // Получаем текущий статус через user-status
   let enabled = true;
   try {
     const { status, body } = await backendGet(`/api/bot/internal/user-status?telegramId=${telegramId}`);
@@ -331,6 +494,11 @@ bot.hears("🔔 Уведомления", async (ctx) => {
       inline_keyboard: [[{ text: toggleLabel, callback_data: toggleData }]],
     },
   });
+});
+
+bot.hears("ℹ️ Помощь", async (ctx) => {
+  const onboardingConfig = await getOnboardingConfig();
+  await ctx.reply(buildHelpMessage(onboardingConfig), { parse_mode: "HTML" });
 });
 
 // Обработчик callback-кнопок вкл/выкл уведомлений

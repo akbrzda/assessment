@@ -144,6 +144,76 @@
         </div>
       </Card>
 
+      <Card v-else-if="activeTab === 'roles'" class="info-card">
+        <div class="tab-head">
+          <h3>Роли пользователя</h3>
+          <Button size="sm" icon="Plus" @click="openRoleModal">Добавить роль</Button>
+        </div>
+        <table class="activity-table">
+          <thead>
+            <tr>
+              <th>Роль</th>
+              <th>Назначена</th>
+              <th>Истекает</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in roleAssignments" :key="`${item.roleId}-${item.assignedAt}`">
+              <td>{{ item.roleName || "—" }}</td>
+              <td>{{ formatDateTime(item.assignedAt) }}</td>
+              <td>{{ formatDateTime(item.expiresAt) }}</td>
+              <td>
+                <Button size="sm" variant="danger" icon="Trash" @click="removeRole(item.roleId)">Удалить</Button>
+              </td>
+            </tr>
+            <tr v-if="!roleAssignments.length">
+              <td colspan="4">Роли не назначены</td>
+            </tr>
+          </tbody>
+        </table>
+      </Card>
+
+      <Card v-else-if="activeTab === 'overrides'" class="info-card">
+        <div class="tab-head">
+          <h3>Permission Overrides</h3>
+          <Button size="sm" icon="Plus" @click="openOverrideModal">Добавить override</Button>
+        </div>
+        <table class="activity-table">
+          <thead>
+            <tr>
+              <th>Permission ID</th>
+              <th>Effect</th>
+              <th>Reason</th>
+              <th>Expires</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in permissionOverrides" :key="`${item.permissionId}-${item.expiresAt || 'none'}`">
+              <td>{{ item.permissionId }}</td>
+              <td>{{ item.effect }}</td>
+              <td>{{ item.reason || "—" }}</td>
+              <td>{{ formatDateTime(item.expiresAt) }}</td>
+              <td>
+                <Button
+                  v-if="item.id"
+                  size="sm"
+                  variant="danger"
+                  icon="Trash"
+                  @click="removeOverride(item.id)"
+                >
+                  Удалить
+                </Button>
+              </td>
+            </tr>
+            <tr v-if="!permissionOverrides.length">
+              <td colspan="5">Нет явных переопределений</td>
+            </tr>
+          </tbody>
+        </table>
+      </Card>
+
       <Card v-else class="info-card">
         <h3>Курсы</h3>
         <table v-if="!coursesLoading && userCourses.length" class="activity-table">
@@ -172,6 +242,41 @@
         <p v-else class="empty-text">Данные по курсам отсутствуют</p>
       </Card>
     </template>
+
+    <Modal v-model="showRoleModal" title="Добавить роль" size="md">
+      <div class="modal-form">
+        <Select v-model="newRoleForm.roleId" :options="roleOptions" label="Роль" />
+        <Input v-model="newRoleForm.expiresAt" type="datetime-local" label="Истекает (опционально)" />
+      </div>
+      <template #footer>
+        <div class="modal-actions">
+          <Button variant="secondary" @click="showRoleModal = false">Отмена</Button>
+          <Button :loading="rolesSaving" @click="submitRoleAssignment">Добавить</Button>
+        </div>
+      </template>
+    </Modal>
+
+    <Modal v-model="showOverrideModal" title="Добавить permission override" size="lg">
+      <div class="modal-form">
+        <Select v-model="newOverrideForm.permissionId" :options="permissionOptions" label="Право" />
+        <Select
+          v-model="newOverrideForm.effect"
+          :options="[
+            { value: 'allow', label: 'allow' },
+            { value: 'deny', label: 'deny' },
+          ]"
+          label="Effect"
+        />
+        <Input v-model="newOverrideForm.reason" label="Причина (опционально)" placeholder="Причина изменения доступа" />
+        <Input v-model="newOverrideForm.expiresAt" type="datetime-local" label="Истекает (опционально)" />
+      </div>
+      <template #footer>
+        <div class="modal-actions">
+          <Button variant="secondary" @click="showOverrideModal = false">Отмена</Button>
+          <Button :loading="overridesSaving" @click="submitOverride">Сохранить</Button>
+        </div>
+      </template>
+    </Modal>
   </div>
 </template>
 
@@ -179,9 +284,18 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import apiClient from "@/utils/axios";
-import { Badge, Button, Card, PageHeader, Preloader, Tabs } from "@/components/ui";
+import { Badge, Button, Card, Input, Modal, PageHeader, Preloader, Select, Tabs } from "@/components/ui";
 import { useToast } from "@/composables/useToast";
-import { getUserCourses, getUserLoginHistory } from "@/api/users";
+import {
+  addUserPermissionOverride,
+  addUserRoleAssignment,
+  getReferences,
+  getUserCourses,
+  getUserLoginHistory,
+  getUserPermissions,
+  removeUserPermissionOverride,
+  removeUserRoleAssignment,
+} from "@/api/users";
 import { BOT_USERNAME } from "@/env";
 
 const route = useRoute();
@@ -195,11 +309,23 @@ const profile = ref(null);
 const userCourses = ref([]);
 const loginEvents = ref([]);
 const activeTab = ref("general");
+const roleAssignments = ref([]);
+const permissionOverrides = ref([]);
+const availablePermissions = ref([]);
+const roleReferenceList = ref([]);
+const showRoleModal = ref(false);
+const showOverrideModal = ref(false);
+const rolesSaving = ref(false);
+const overridesSaving = ref(false);
+const newRoleForm = ref({ roleId: "", expiresAt: "" });
+const newOverrideForm = ref({ permissionId: "", effect: "allow", reason: "", expiresAt: "" });
 const tabs = [
   { key: "general", label: "Общая информация" },
   { key: "courses", label: "Курсы" },
   { key: "assessments", label: "Аттестации" },
   { key: "achievements", label: "Достижения" },
+  { key: "roles", label: "Роли" },
+  { key: "overrides", label: "Permission Overrides" },
 ];
 
 const tabsConfig = tabs.map((t) => ({ value: t.key, label: t.label }));
@@ -220,6 +346,18 @@ const invitationLink = computed(() => {
 
 const userStatusLabel = computed(() => (profile.value?.user?.telegram_id ? "Активен" : "Ожидает"));
 const userStatusKey = computed(() => (profile.value?.user?.telegram_id ? "active" : "awaiting"));
+const permissionOptions = computed(() =>
+  availablePermissions.value.map((item) => ({
+    value: String(item.permissionId),
+    label: `${item.moduleCode || "module"}:${item.entityCode || "entity"}:${item.actionCode || "action"} (#${item.permissionId})`,
+  })),
+);
+const roleOptions = computed(() =>
+  roleReferenceList.value.map((item) => ({
+    value: String(item.id),
+    label: item.name || item.code || `Роль ${item.id}`,
+  })),
+);
 
 const getRoleBadgeVariant = (role) => {
   if (role === "superadmin") return "primary";
@@ -346,10 +484,142 @@ const loadLoginHistory = async () => {
   }
 };
 
+const loadPermissionsData = async () => {
+  try {
+    const userId = Number(route.params.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return;
+    }
+    const [permissionsData, referencesData] = await Promise.all([getUserPermissions(userId), getReferences()]);
+    const effective = permissionsData?.effective || [];
+    const inherited = permissionsData?.inherited || [];
+    const overrides = permissionsData?.overrides || [];
+
+    availablePermissions.value = Array.from(
+      new Map(
+        [...effective, ...inherited, ...overrides].map((item) => [
+          Number(item.permissionId || item.id),
+          {
+            permissionId: Number(item.permissionId || item.id),
+            moduleCode: item.moduleCode || item.module_code || "",
+            entityCode: item.entityCode || item.entity_code || "",
+            actionCode: item.actionCode || item.action_code || "",
+          },
+        ]),
+      ).values(),
+    );
+
+    permissionOverrides.value = overrides.map((item) => ({
+      id: item.id || null,
+      permissionId: Number(item.permissionId || item.id),
+      effect: item.effect,
+      reason: item.reason || "",
+      expiresAt: item.expiresAt || null,
+    }));
+
+    roleAssignments.value = Array.isArray(permissionsData?.roles) ? permissionsData.roles : [];
+    roleReferenceList.value = referencesData?.roles || [];
+  } catch (error) {
+    console.error("Ошибка загрузки прав пользователя", error);
+    showToast("Не удалось загрузить роли и overrides", "error");
+  }
+};
+
+const openRoleModal = () => {
+  newRoleForm.value = { roleId: "", expiresAt: "" };
+  showRoleModal.value = true;
+};
+
+const openOverrideModal = () => {
+  newOverrideForm.value = { permissionId: "", effect: "allow", reason: "", expiresAt: "" };
+  showOverrideModal.value = true;
+};
+
+const submitRoleAssignment = async () => {
+  const userId = Number(route.params.id);
+  const roleId = Number(newRoleForm.value.roleId);
+  if (!userId || !roleId) {
+    showToast("Выберите роль", "warning");
+    return;
+  }
+  rolesSaving.value = true;
+  try {
+    const payload = {
+      roleId,
+      expiresAt: newRoleForm.value.expiresAt ? new Date(newRoleForm.value.expiresAt).toISOString() : null,
+    };
+    const data = await addUserRoleAssignment(userId, payload);
+    roleAssignments.value = data?.roles || [];
+    showRoleModal.value = false;
+    showToast("Роль назначена", "success");
+  } catch (error) {
+    console.error("Ошибка назначения роли", error);
+    showToast("Не удалось назначить роль", "error");
+  } finally {
+    rolesSaving.value = false;
+  }
+};
+
+const removeRole = async (roleId) => {
+  const userId = Number(route.params.id);
+  if (!userId || !roleId) {
+    return;
+  }
+  try {
+    await removeUserRoleAssignment(userId, roleId);
+    roleAssignments.value = roleAssignments.value.filter((item) => Number(item.roleId) !== Number(roleId));
+    showToast("Роль удалена", "success");
+  } catch (error) {
+    console.error("Ошибка удаления роли", error);
+    showToast("Не удалось удалить роль", "error");
+  }
+};
+
+const submitOverride = async () => {
+  const userId = Number(route.params.id);
+  const permissionId = Number(newOverrideForm.value.permissionId);
+  if (!userId || !permissionId) {
+    showToast("Выберите право", "warning");
+    return;
+  }
+  overridesSaving.value = true;
+  try {
+    await addUserPermissionOverride(userId, {
+      permissionId,
+      effect: newOverrideForm.value.effect,
+      reason: newOverrideForm.value.reason || null,
+      expiresAt: newOverrideForm.value.expiresAt ? new Date(newOverrideForm.value.expiresAt).toISOString() : null,
+    });
+    showOverrideModal.value = false;
+    showToast("Override сохранён", "success");
+    await loadPermissionsData();
+  } catch (error) {
+    console.error("Ошибка сохранения override", error);
+    showToast("Не удалось сохранить override", "error");
+  } finally {
+    overridesSaving.value = false;
+  }
+};
+
+const removeOverride = async (overrideId) => {
+  const userId = Number(route.params.id);
+  if (!userId || !overrideId) {
+    return;
+  }
+  try {
+    await removeUserPermissionOverride(userId, overrideId);
+    permissionOverrides.value = permissionOverrides.value.filter((item) => Number(item.id) !== Number(overrideId));
+    showToast("Override удалён", "success");
+  } catch (error) {
+    console.error("Ошибка удаления override", error);
+    showToast("Не удалось удалить override", "error");
+  }
+};
+
 const goBack = () => router.push("/users");
 
 onMounted(async () => {
-  await Promise.all([loadProfile(), loadCourses(), loadLoginHistory()]);
+  await Promise.all([loadProfile(), loadCourses(), loadLoginHistory(), loadPermissionsData()]);
 });
 </script>
 
@@ -511,6 +781,23 @@ onMounted(async () => {
 .empty-text {
   color: hsl(var(--muted-foreground));
   margin: 0;
+}
+.tab-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 .invite-profile-row {
   display: flex;

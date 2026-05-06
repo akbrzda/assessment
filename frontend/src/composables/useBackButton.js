@@ -14,7 +14,6 @@ export function useBackButton() {
   // Список маршрутов, где кнопка назад НЕ должна показываться (главные страницы)
   const MAIN_ROUTES = [
     "dashboard",
-    "registration",
     "assessment-process", // Во время аттестации кнопка назад управляется вручную
   ];
 
@@ -94,7 +93,7 @@ export function useBackButton() {
     () => {
       updateBackButton();
     },
-    { immediate: true }
+    { immediate: true },
   );
 
   onMounted(() => {

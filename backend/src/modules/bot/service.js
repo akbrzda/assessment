@@ -1,4 +1,5 @@
 const botRepository = require("./repository");
+const settingsService = require("../../services/settingsService");
 
 function buildError(message, status) {
   const error = new Error(message);
@@ -58,13 +59,61 @@ async function updateNotificationSettings(currentUser, payload) {
  * Возвращает статус пользователя для внутренней проверки ботом.
  */
 async function getUserStatusByTelegramId(telegramId) {
+  console.log("[botService.getUserStatusByTelegramId] searching for telegramId=%s", telegramId);
   const row = await botRepository.getUserStatusByTelegramId(telegramId);
+  console.log("[botService.getUserStatusByTelegramId] repository result=%O", row);
   if (!row) {
+    console.log("[botService.getUserStatusByTelegramId] row not found");
     return null;
   }
-  return {
+  const result = {
     found: true,
+    firstName: row.first_name || "",
+    lastName: row.last_name || "",
+    notificationsEnabled: Boolean(row.notifications_enabled),
     onboardingCompleted: Boolean(row.onboarding_completed_at),
+  };
+  console.log("[botService.getUserStatusByTelegramId] returning=%O", result);
+  return result;
+}
+
+async function getOnboardingConfig() {
+  const [onboardingTitle, onboardingBody, onboardingStep2, onboardingStep3, onboardingCtaText, mainMenuText, helpText, guestNoInviteText] =
+    await Promise.all([
+      settingsService.getSetting("BOT_ONBOARDING_TITLE", "👋 Привет{{name}}!"),
+      settingsService.getSetting(
+        "BOT_ONBOARDING_BODY",
+        "Я бот системы аттестации. Здесь вы будете:\n📚 Проходить обучающие курсы\n✅ Сдавать тесты и аттестации\n🏆 Получать баллы и бейджи\n📄 Получать сертификаты",
+      ),
+      settingsService.getSetting(
+        "BOT_ONBOARDING_STEP_2",
+        "Как это работает:\n1) Откройте назначенный курс\n2) Изучите материалы\n3) Пройдите тест\n4) Получите результат и сертификат",
+      ),
+      settingsService.getSetting(
+        "BOT_ONBOARDING_STEP_3",
+        "Совет для быстрого старта:\n• Начните с ближайшего назначенного курса\n• Проходите обучение регулярно\n• Используйте /help для подсказок",
+      ),
+      settingsService.getSetting("BOT_ONBOARDING_CTA_TEXT", "Открыть приложение"),
+      settingsService.getSetting("BOT_MAIN_MENU_TEXT", "Привет{{name}}! 👋\n\nЧто хотите сделать?"),
+      settingsService.getSetting(
+        "BOT_HELP_TEXT",
+        "Доступные команды:\n/start — главное меню\n/certificate — последний сертификат\n/certificates — все сертификаты\n/help — подсказка",
+      ),
+      settingsService.getSetting(
+        "BOT_GUEST_NO_INVITE_TEXT",
+        "Для доступа к системе нужна персональная ссылка-приглашение. Попросите руководителя или администратора отправить её в Telegram.",
+      ),
+    ]);
+
+  return {
+    onboardingTitle: String(onboardingTitle || ""),
+    onboardingBody: String(onboardingBody || ""),
+    onboardingStep2: String(onboardingStep2 || ""),
+    onboardingStep3: String(onboardingStep3 || ""),
+    onboardingCtaText: String(onboardingCtaText || "Открыть приложение"),
+    mainMenuText: String(mainMenuText || ""),
+    helpText: String(helpText || ""),
+    guestNoInviteText: String(guestNoInviteText || ""),
   };
 }
 
@@ -79,4 +128,10 @@ async function patchNotificationsByTelegramId(telegramId, notificationsEnabled) 
   await botRepository.updateNotificationSettings(row.id, { notificationsEnabled });
 }
 
-module.exports = { getNotificationSettings, updateNotificationSettings, getUserStatusByTelegramId, patchNotificationsByTelegramId };
+module.exports = {
+  getNotificationSettings,
+  updateNotificationSettings,
+  getUserStatusByTelegramId,
+  getOnboardingConfig,
+  patchNotificationsByTelegramId,
+};

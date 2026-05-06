@@ -2,10 +2,12 @@ const express = require("express");
 const router = express.Router();
 const verifyJWT = require("../../../middleware/verifyJWT");
 const checkModuleAccess = require("../../../middleware/checkModuleAccess");
+const { requirePermission } = require("../../../middleware/permission");
 const analyticsController = require("./controller");
 
 router.use(verifyJWT);
 router.use(checkModuleAccess("analytics"));
+router.use(requirePermission("analytics", "analytics", "read"));
 
 router.get("/overall", analyticsController.getOverallStats);
 router.get("/branches", analyticsController.getBranchAnalytics);

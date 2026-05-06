@@ -14,6 +14,7 @@ publicRouter.patch("/notifications/settings", botController.updateNotificationSe
 const internalRouter = express.Router();
 internalRouter.use(verifyBotToken);
 internalRouter.get("/user-status", botController.getUserStatus);
+internalRouter.get("/onboarding-config", botController.getOnboardingConfig);
 internalRouter.get("/certificates", botController.getCertificatesByTelegramId);
 internalRouter.patch("/notifications/settings", botController.patchNotificationsByTelegramId);
 
