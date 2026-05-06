@@ -228,6 +228,11 @@ router.beforeEach(async (to, from, next) => {
     await authStore.loadUserPermissions();
   }
 
+  // Курс для manager работает в read-only: запрещаем маршруты редактирования.
+  if (authStore.user?.role === "manager" && ["CreateCourse", "EditCourse"].includes(String(to.name || ""))) {
+    return next({ name: "Courses" });
+  }
+
   // Если указан модуль, проверяем права на модуль (приоритет над ролями)
   if (requiredModule) {
     if (!authStore.hasModuleAccess(requiredModule)) {

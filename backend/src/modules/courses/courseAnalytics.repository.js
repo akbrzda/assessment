@@ -17,7 +17,11 @@ async function ensureCourseAnalyticsSchema() {
     .then(([rows]) => {
       const existingTables = new Set(
         rows
-          .map((row) => String(row.tableName || row.table_name || row.TABLE_NAME || "").trim().toLowerCase())
+          .map((row) =>
+            String(row.tableName || row.table_name || row.TABLE_NAME || "")
+              .trim()
+              .toLowerCase(),
+          )
           .filter(Boolean),
       );
       const missingTables = [];
@@ -25,9 +29,7 @@ async function ensureCourseAnalyticsSchema() {
       if (!existingTables.has("course_section_user_progress")) missingTables.push("course_section_user_progress");
 
       if (missingTables.length > 0) {
-        const error = new Error(
-          `Схема модуля курсов неактуальна. Отсутствуют таблицы: ${missingTables.join(", ")}. Примените миграции БД.`,
-        );
+        const error = new Error(`Схема модуля курсов неактуальна. Отсутствуют таблицы: ${missingTables.join(", ")}. Примените миграции БД.`);
         error.status = 500;
         throw error;
       }
@@ -133,9 +135,12 @@ async function getSectionFailureStats(courseId) {
   }));
 }
 
-async function getCourseProgressReport(courseId) {
+async function getCourseProgressReport(courseId, options = {}) {
   await ensureCourseAnalyticsSchema();
-  const [rows] = await pool.execute(
+  const allowedBranchIds = Array.isArray(options.allowedBranchIds) ? options.allowedBranchIds.filter((item) => Number(item) > 0) : [];
+  const hasBranchFilter = allowedBranchIds.length > 0;
+
+  const [rows] = await pool.query(
     `SELECT cup.user_id, cup.status, cup.progress_percent, cup.started_at, cup.completed_at, cup.last_activity_at,
             cup.completed_modules_count, cup.total_modules_count,
             u.first_name, u.last_name, u.login,
@@ -171,8 +176,9 @@ async function getCourseProgressReport(courseId) {
           GROUP BY c.id, aa.user_id
        ) final_metrics ON final_metrics.course_id = cup.course_id AND final_metrics.user_id = cup.user_id
       WHERE cup.course_id = ?
+        ${hasBranchFilter ? "AND u.branch_id IN (?)" : ""}
       ORDER BY cup.last_activity_at DESC`,
-    [courseId],
+    hasBranchFilter ? [courseId, allowedBranchIds] : [courseId],
   );
 
   const users = rows.map((row) => ({

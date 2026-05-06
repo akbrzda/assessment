@@ -94,9 +94,9 @@
 
       <UserPermissionsManager v-if="authStore.isSuperAdmin && selectedUser" :userId="selectedUser.id" />
 
-      <div class="divider"></div>
+      <div v-if="canManagePasswordInEditModal" class="divider"></div>
 
-      <div class="password-generator-card">
+      <div v-if="canManagePasswordInEditModal" class="password-generator-card">
         <div class="password-generator-head">
           <div>
             <p class="password-generator-title">Управление паролем</p>
@@ -125,7 +125,7 @@
     </Modal>
 
     <!-- Reset password modal -->
-    <Modal :show="showResetPasswordModal" title="Сбросить пароль" @close="closeModals">
+    <Modal :show="showResetPasswordModal && canManagePasswordInEditModal" title="Сбросить пароль" @close="closeModals">
       <p class="modal-text">
         Установите новый пароль для
         <strong>{{ selectedUser?.first_name }} {{ selectedUser?.last_name }}</strong>
@@ -269,6 +269,14 @@ const canEditUser = (user) => {
 
   return false;
 };
+
+const canManagePasswordInEditModal = computed(() => {
+  if (!selectedUser.value?.id || !authStore.user?.id) {
+    return false;
+  }
+
+  return Number(selectedUser.value.id) === Number(authStore.user.id);
+});
 
 const defaultForm = () => ({
   firstName: "",
@@ -585,6 +593,13 @@ const syncCreateCredentials = () => {
   formData.value.password = generatePasswordFromForm();
 };
 const openResetPasswordModal = (user) => {
+  const targetUserId = Number(user?.id || 0);
+  const currentUserId = Number(authStore.user?.id || 0);
+  if (!targetUserId || targetUserId !== currentUserId) {
+    showToast("Смена пароля доступна только для вашего профиля", "warning");
+    return;
+  }
+
   selectedUser.value = user;
   newPassword.value = "";
   showResetPasswordModal.value = true;
@@ -707,6 +722,10 @@ const handleUpdate = async () => {
 
 const handleResetPassword = async () => {
   if (!selectedUser.value) return;
+  if (!canManagePasswordInEditModal.value) {
+    showToast("Смена пароля доступна только для вашего профиля", "warning");
+    return;
+  }
   if (!newPassword.value || newPassword.value.length < 6) {
     showToast("Пароль должен содержать не менее 6 символов", "warning");
     return;

@@ -421,8 +421,11 @@ async function recalculateCourseProgressForAllUsers({ courseId, connection }) {
   );
 }
 
-async function getAdminUsersProgress(courseId) {
-  const [rows] = await pool.execute(
+async function getAdminUsersProgress(courseId, options = {}) {
+  const allowedBranchIds = Array.isArray(options.allowedBranchIds) ? options.allowedBranchIds.filter((item) => Number(item) > 0) : [];
+  const hasBranchFilter = allowedBranchIds.length > 0;
+
+  const [rows] = await pool.query(
     `SELECT cup.user_id, cup.status, cup.progress_percent,
             cup.started_at, cup.completed_at, cup.last_activity_at,
             cup.completed_modules_count, cup.total_modules_count,
@@ -433,8 +436,9 @@ async function getAdminUsersProgress(courseId) {
        LEFT JOIN positions p ON p.id = u.position_id
        LEFT JOIN branches b ON b.id = u.branch_id
       WHERE cup.course_id = ?
+        ${hasBranchFilter ? "AND u.branch_id IN (?)" : ""}
       ORDER BY cup.last_activity_at DESC`,
-    [courseId],
+    hasBranchFilter ? [courseId, allowedBranchIds] : [courseId],
   );
   return rows.map((r) => ({
     userId: Number(r.user_id),

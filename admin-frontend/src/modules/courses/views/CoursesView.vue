@@ -3,8 +3,8 @@
     <!-- Заголовок страницы -->
     <PageHeader title="Курсы" subtitle="Управляйте курсами, модулями и версиями">
       <template #actions>
-        <ActionButton action="settings" label="Категории" @click.stop="categoryManagerOpen = true" />
-        <ActionButton action="create" label="Создать курс" @click.stop="goToCreate" />
+        <ActionButton v-if="canManageCourseWrite" action="settings" label="Категории" @click.stop="categoryManagerOpen = true" />
+        <ActionButton v-if="canManageCourseWrite" action="create" label="Создать курс" @click.stop="goToCreate" />
       </template>
     </PageHeader>
 
@@ -38,7 +38,7 @@
       :description="
         hasActiveFilters ? 'Попробуйте изменить параметры поиска или фильтры.' : 'Создайте первый курс, чтобы начать обучение сотрудников.'
       "
-      :show-button="!hasActiveFilters"
+      :show-button="!hasActiveFilters && canManageCourseWrite"
       button-text="Создать курс"
       @action="goToCreate"
     />
@@ -86,10 +86,10 @@
           <!-- Футер карточки -->
           <div class="card-footer">
             <div class="card-main-actions">
-              <ActionButton action="edit" size="sm" @click="goToEdit(course.id)" />
+              <ActionButton v-if="canManageCourseWrite" action="edit" size="sm" @click="goToEdit(course.id)" />
               <Button variant="secondary" size="sm" icon="file-chart-column" @click="goToStatistics(course.id)">Статистика</Button>
             </div>
-            <div class="menu-wrap" @click.stop>
+            <div v-if="canManageCourseWrite" class="menu-wrap" @click.stop>
               <Button
                 variant="ghost"
                 size="sm"
@@ -179,8 +179,16 @@
                       aria-label="Статистика курса"
                       @click="goToStatistics(course.id)"
                     />
-                    <Button variant="ghost" size="sm" icon="pencil" :icon-only="true" aria-label="Редактировать курс" @click="goToEdit(course.id)" />
-                    <div class="menu-wrap" @click.stop>
+                    <Button
+                      v-if="canManageCourseWrite"
+                      variant="ghost"
+                      size="sm"
+                      icon="pencil"
+                      :icon-only="true"
+                      aria-label="Редактировать курс"
+                      @click="goToEdit(course.id)"
+                    />
+                    <div v-if="canManageCourseWrite" class="menu-wrap" @click.stop>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -369,6 +377,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
 import {
   Badge,
   Button,
@@ -400,6 +409,7 @@ import { loadCourseCategories, normalizeCategoryValue, saveCourseCategories } fr
 import { getRichTextPreview } from "@/utils/richText";
 
 const router = useRouter();
+const authStore = useAuthStore();
 const { showToast } = useToast();
 const COURSES_VIEW_MODE_STORAGE_KEY = "admin:courses:view-mode";
 const VIEW_MODES = ["cards", "table"];
@@ -558,6 +568,8 @@ const getErrorMessage = (error, fallbackText) => {
   return error?.response?.data?.error || fallbackText;
 };
 
+const canManageCourseWrite = computed(() => authStore.user?.role === "superadmin");
+
 const loadCourses = async () => {
   loading.value = true;
   try {
@@ -580,10 +592,18 @@ const resetFilters = () => {
 };
 
 const goToCreate = () => {
+  if (!canManageCourseWrite.value) {
+    showToast("Курс доступен только для чтения", "warning");
+    return;
+  }
   router.push("/courses/create");
 };
 
 const goToEdit = (id) => {
+  if (!canManageCourseWrite.value) {
+    showToast("Курс доступен только для чтения", "warning");
+    return;
+  }
   router.push(`/courses/${id}/edit`);
 };
 
@@ -630,10 +650,16 @@ const openCourseActionDialog = (course, action) => {
 };
 
 const handleArchive = (course) => {
+  if (!canManageCourseWrite.value) {
+    return;
+  }
   openCourseActionDialog(course, "archive");
 };
 
 const handleDelete = (course) => {
+  if (!canManageCourseWrite.value) {
+    return;
+  }
   openCourseActionDialog(course, "delete");
 };
 

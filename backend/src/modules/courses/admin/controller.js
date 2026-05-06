@@ -172,6 +172,40 @@ function parseId(value) {
   return Number.isInteger(n) && n > 0 ? n : 0;
 }
 
+async function resolveManagerBranchIds(currentUser = {}) {
+  if (String(currentUser.role || "").toLowerCase() !== "manager") {
+    return [];
+  }
+
+  const userId = Number(currentUser.id || 0);
+  const branchIds = [];
+
+  if (userId > 0) {
+    const [rows] = await pool.query(
+      `SELECT DISTINCT branch_id AS branchId
+       FROM branch_managers
+       WHERE user_id = ?`,
+      [userId],
+    );
+
+    for (const item of rows) {
+      const branchId = Number(item.branchId || 0);
+      if (branchId > 0) {
+        branchIds.push(branchId);
+      }
+    }
+  }
+
+  if (!branchIds.length) {
+    const fallbackBranchId = Number(currentUser.branch_id || currentUser.branchId || 0);
+    if (fallbackBranchId > 0) {
+      branchIds.push(fallbackBranchId);
+    }
+  }
+
+  return [...new Set(branchIds)];
+}
+
 function validate(schema, body, res) {
   const { error, value } = schema.validate(body, { abortEarly: false });
   if (error) {
@@ -666,7 +700,10 @@ async function getCourseUsers(req, res, next) {
   try {
     const courseId = parseId(req.params.id);
     if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
-    const users = await progressRepo.getAdminUsersProgress(courseId);
+    const managerBranchIds = await resolveManagerBranchIds(req.user);
+    const users = await progressRepo.getAdminUsersProgress(courseId, {
+      allowedBranchIds: managerBranchIds,
+    });
     res.json({ users });
   } catch (error) {
     next(error);
@@ -680,13 +717,13 @@ async function getCourseUserProgress(req, res, next) {
     if (!courseId || !userId) return res.status(400).json({ error: "Некорректные параметры" });
 
     if (req.user?.role === "manager") {
-      const managerBranchId = Number(req.user.branch_id || req.user.branchId || 0);
+      const managerBranchIds = await resolveManagerBranchIds(req.user);
       const [users] = await pool.query("SELECT branch_id FROM users WHERE id = ? LIMIT 1", [userId]);
       if (!users.length) {
         return res.status(404).json({ error: "Пользователь не найден" });
       }
       const targetBranchId = Number(users[0].branch_id || 0);
-      if (!managerBranchId || managerBranchId !== targetBranchId) {
+      if (!managerBranchIds.length || !managerBranchIds.includes(targetBranchId)) {
         return res.status(403).json({ error: "Нет доступа к прогрессу пользователя из другого филиала" });
       }
     }
@@ -749,7 +786,10 @@ async function getCourseProgressReport(req, res, next) {
   try {
     const courseId = parseId(req.params.id);
     if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
-    const report = await analyticsRepo.getCourseProgressReport(courseId);
+    const managerBranchIds = await resolveManagerBranchIds(req.user);
+    const report = await analyticsRepo.getCourseProgressReport(courseId, {
+      allowedBranchIds: managerBranchIds,
+    });
     res.json(report);
   } catch (error) {
     next(error);

@@ -11,6 +11,14 @@ const router = express.Router();
 router.use(verifyJWT);
 router.use(checkModuleAccess("courses"));
 
+function ensureCourseWriteAccess(req, res, next) {
+  if (String(req.user?.role || "").toLowerCase() === "manager") {
+    return res.status(403).json({ error: "Для управляющих курс доступен только для чтения" });
+  }
+
+  return next();
+}
+
 async function ensureCourseProgressPolicy(req, res, next) {
   try {
     const targetUserId = Number(req.params.userId);
@@ -35,37 +43,37 @@ async function ensureCourseProgressPolicy(req, res, next) {
 
 router.get("/", requirePermission("courses", "course", "read"), controller.listCourses);
 router.get("/media-library", controller.listCourseMedia);
-router.delete("/media-library", controller.deleteCourseMedia);
+router.delete("/media-library", ensureCourseWriteAccess, controller.deleteCourseMedia);
 router.get("/analytics/funnel", controller.getAnalyticsFunnel);
-router.post("/", requirePermission("courses", "course", "create"), controller.createCourse);
+router.post("/", ensureCourseWriteAccess, requirePermission("courses", "course", "create"), controller.createCourse);
 router.get("/:id", controller.getCourse);
 router.get("/:id/preview", controller.getCoursePreview);
-router.patch("/:id", requirePermission("courses", "course", "update"), controller.updateCourse);
-router.post("/:id/upload-cover", controller.uploadCourseCover);
-router.post("/upload-media", controller.uploadCourseMedia);
-router.delete("/:id", requirePermission("courses", "course", "delete"), controller.deleteCourse);
-router.post("/:id/publish", controller.publishCourse);
-router.post("/:id/archive", controller.archiveCourse);
+router.patch("/:id", ensureCourseWriteAccess, requirePermission("courses", "course", "update"), controller.updateCourse);
+router.post("/:id/upload-cover", ensureCourseWriteAccess, controller.uploadCourseCover);
+router.post("/upload-media", ensureCourseWriteAccess, controller.uploadCourseMedia);
+router.delete("/:id", ensureCourseWriteAccess, requirePermission("courses", "course", "delete"), controller.deleteCourse);
+router.post("/:id/publish", ensureCourseWriteAccess, controller.publishCourse);
+router.post("/:id/archive", ensureCourseWriteAccess, controller.archiveCourse);
 
-router.post("/:id/sections", controller.createSection);
-router.patch("/:id/sections/reorder", controller.reorderSections);
-router.patch("/sections/:sectionId", controller.updateSection);
-router.delete("/sections/:sectionId", controller.deleteSection);
+router.post("/:id/sections", ensureCourseWriteAccess, controller.createSection);
+router.patch("/:id/sections/reorder", ensureCourseWriteAccess, controller.reorderSections);
+router.patch("/sections/:sectionId", ensureCourseWriteAccess, controller.updateSection);
+router.delete("/sections/:sectionId", ensureCourseWriteAccess, controller.deleteSection);
 
-router.post("/sections/:sectionId/topics", controller.createTopic);
-router.patch("/:id/sections/:sectionId/topics/reorder", controller.reorderTopics);
-router.patch("/topics/:topicId", controller.updateTopic);
-router.delete("/topics/:topicId", controller.deleteTopic);
+router.post("/sections/:sectionId/topics", ensureCourseWriteAccess, controller.createTopic);
+router.patch("/:id/sections/:sectionId/topics/reorder", ensureCourseWriteAccess, controller.reorderTopics);
+router.patch("/topics/:topicId", ensureCourseWriteAccess, controller.updateTopic);
+router.delete("/topics/:topicId", ensureCourseWriteAccess, controller.deleteTopic);
 
 // Назначения: целевые должности и филиалы
 router.get("/:id/targets", controller.getTargets);
-router.put("/:id/targets", controller.updateTargets);
+router.put("/:id/targets", ensureCourseWriteAccess, controller.updateTargets);
 
 // Назначения: ручные назначения пользователей
 router.get("/:id/assignments", controller.getAssignments);
-router.post("/:id/assignments", controller.addAssignment);
-router.post("/:id/assignments/:userId/close", controller.closeAssignment);
-router.delete("/:id/assignments/:userId", controller.removeAssignment);
+router.post("/:id/assignments", ensureCourseWriteAccess, controller.addAssignment);
+router.post("/:id/assignments/:userId/close", ensureCourseWriteAccess, controller.closeAssignment);
+router.delete("/:id/assignments/:userId", ensureCourseWriteAccess, controller.removeAssignment);
 
 // Прогресс пользователей
 router.get("/:id/users", controller.getCourseUsers);
@@ -80,7 +88,7 @@ router.get(
   ensureCourseProgressPolicy,
   controller.getCourseUserProgress,
 );
-router.delete("/:id/users/:userId/progress", controller.resetCourseUserProgress);
+router.delete("/:id/users/:userId/progress", ensureCourseWriteAccess, controller.resetCourseUserProgress);
 
 // Аналитика
 router.get("/:id/analytics/sections", controller.getSectionFailures);
