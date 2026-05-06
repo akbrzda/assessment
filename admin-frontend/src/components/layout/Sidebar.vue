@@ -98,7 +98,6 @@ import {
   LogOut as LogOutIcon,
   X as XIcon,
   Award as AwardIcon,
-  UserPlus as UserPlusIcon,
 } from "lucide-vue-next";
 
 const authStore = useAuthStore();
@@ -141,7 +140,6 @@ const navSections = computed(() => {
       items: [
         { label: "Дашборд", to: "/dashboard", icon: LayoutDashboardIcon },
         has("users") && { label: "Пользователи", to: "/users", icon: UsersIcon },
-        has("invitations") && { label: "Приглашения", to: "/invitations", icon: UserPlusIcon },
         authStore.isSuperAdmin && has("users") && { label: "Роли", to: "/roles", icon: BriefcaseIcon },
       ].filter(Boolean),
     },

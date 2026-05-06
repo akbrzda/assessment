@@ -11,7 +11,7 @@
         </div>
       </template>
       <template #actions>
-        <Button v-if="canOpenInvitations" icon="user-plus" size="md" variant="secondary" @click="goToInvitations">Пригласить сотрудника</Button>
+        <Button v-if="canOpenInvitations" icon="user-plus" size="md" variant="secondary" @click="openInviteModal">Пригласить сотрудника</Button>
         <Button v-if="authStore.isSuperAdmin" icon="plus" size="md" @click="openCreateModal"> Добавить пользователя </Button>
         <Button icon="file-chart-column" variant="secondary" size="md" @click="handleExportExcel">Экспорт Excel</Button>
       </template>
@@ -78,6 +78,28 @@
         <Button variant="secondary" icon="Copy" @click="copyText(createdCredentials?.message)">Скопировать всё</Button>
         <Button @click="createdCredentials = null">Закрыть</Button>
       </div>
+    </Modal>
+
+    <Modal :show="showInviteModal" title="Пригласить сотрудника" @close="closeInviteModal">
+      <div v-if="inviteLink" class="invite-success">
+        <p class="invite-success-text">Приглашение создано. Отправьте ссылку сотруднику:</p>
+        <div class="invite-link-row">
+          <Input v-model="inviteLink" readonly label="Ссылка-приглашение" />
+          <Button size="sm" icon="Copy" variant="secondary" @click="copyInviteLink">Скопировать</Button>
+        </div>
+        <p class="invite-hint">После перехода по ссылке сотрудник увидит заполненные данные и подтвердит приглашение.</p>
+      </div>
+      <div v-else class="space-y-4">
+        <Input v-model="inviteForm.lastName" label="Фамилия" placeholder="Иванов" required />
+        <Input v-model="inviteForm.firstName" label="Имя" placeholder="Иван" required />
+        <Input v-model="inviteForm.phone" label="Номер телефона" placeholder="+7 (999) 000-00-00" />
+        <Select v-model.number="inviteForm.positionId" label="Должность" :options="invitePositionOptions" placeholder="Выберите должность" required />
+        <Select v-model.number="inviteForm.branchId" label="Филиал" :options="inviteBranchOptions" placeholder="Выберите филиал" required />
+      </div>
+      <template #footer>
+        <Button variant="secondary" @click="closeInviteModal">{{ inviteLink ? "Готово" : "Отмена" }}</Button>
+        <Button v-if="!inviteLink" :loading="actionLoading" @click="handleInviteCreate">Создать приглашение</Button>
+      </template>
     </Modal>
 
     <!-- Edit modal -->
@@ -205,7 +227,9 @@ import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import apiClient from "@/utils/axios";
 import { getUsers, getReferences, createUser, updateUser, deleteUser, resetPassword, resetAssessmentProgress } from "@/api/users";
-import { Badge, Button, FilterBar, Input, Modal, PageHeader, Tabs } from "@/components/ui";
+import { createInvitation } from "@/api/invitations";
+import { BOT_USERNAME } from "@/env";
+import { Badge, Button, FilterBar, Input, Modal, PageHeader, Select, Tabs } from "@/components/ui";
 import UserForm from "@/modules/users/components/UserForm.vue";
 import UserPermissionsManager from "@/modules/users/components/UserPermissionsManager.vue";
 import UserProfileModal from "@/modules/users/components/users-view/UserProfileModal.vue";
@@ -257,8 +281,25 @@ const passwordApplying = ref(false);
 const selectedUserIds = ref([]);
 const activeUserTab = ref("all");
 const isCreateCredentialsSynced = ref(false);
+const showInviteModal = ref(false);
+const inviteLink = ref("");
+const inviteForm = ref({ firstName: "", lastName: "", phone: "", positionId: "", branchId: "" });
 
 const canOpenInvitations = computed(() => authStore.isSuperAdmin || authStore.hasModuleAccess("invitations"));
+
+const inviteBranchOptions = computed(() =>
+  references.value.branches.map((branch) => ({
+    value: branch.id,
+    label: formatBranchLabel(branch),
+  })),
+);
+
+const invitePositionOptions = computed(() =>
+  references.value.positions.map((position) => ({
+    value: position.id,
+    label: position.name,
+  })),
+);
 
 const canEditUser = (user) => {
   // Superadmin может редактировать всех
@@ -476,8 +517,67 @@ const openProfilePage = (user) => {
   router.push(`/users/${user.id}/profile`);
 };
 
-const goToInvitations = () => {
-  router.push("/invitations");
+const openInviteModal = () => {
+  inviteForm.value = { firstName: "", lastName: "", phone: "", positionId: "", branchId: "" };
+  inviteLink.value = "";
+  showInviteModal.value = true;
+};
+
+const closeInviteModal = () => {
+  showInviteModal.value = false;
+  inviteLink.value = "";
+};
+
+const validateInviteForm = () => {
+  if (!inviteForm.value.firstName?.trim() || !inviteForm.value.lastName?.trim()) {
+    showToast("Укажите имя и фамилию", "warning");
+    return false;
+  }
+  if (!inviteForm.value.positionId || !inviteForm.value.branchId) {
+    showToast("Выберите должность и филиал", "warning");
+    return false;
+  }
+  return true;
+};
+
+const handleInviteCreate = async () => {
+  if (!validateInviteForm()) return;
+
+  actionLoading.value = true;
+  try {
+    const { data } = await createInvitation({
+      firstName: inviteForm.value.firstName.trim(),
+      lastName: inviteForm.value.lastName.trim(),
+      phone: inviteForm.value.phone?.trim() || undefined,
+      positionId: Number(inviteForm.value.positionId),
+      branchId: Number(inviteForm.value.branchId),
+    });
+
+    const code = data?.invitation?.code;
+    if (code) {
+      const botUsername = BOT_USERNAME || "";
+      inviteLink.value = botUsername ? `https://t.me/${botUsername}?startapp=${code}` : `Код приглашения: ${code}`;
+    }
+
+    await loadUsers({ forceFresh: true });
+    showToast("Приглашение создано", "success");
+  } catch (error) {
+    console.error("Ошибка создания приглашения", error);
+    showToast(error.response?.data?.error || "Не удалось создать приглашение", "error");
+  } finally {
+    actionLoading.value = false;
+  }
+};
+
+const copyInviteLink = async () => {
+  if (!inviteLink.value) return;
+  try {
+    await navigator.clipboard.writeText(inviteLink.value);
+    showToast("Ссылка скопирована", "success");
+  } catch (error) {
+    console.error("Ошибка копирования ссылки приглашения", error);
+    showToast("Не удалось скопировать ссылку", "error");
+  }
 };
 
 const handleExportExcel = async () => {
@@ -1250,6 +1350,30 @@ onMounted(async () => {
   font-size: 14px;
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.invite-success {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.invite-success-text {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.invite-link-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.invite-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .create-hint {
