@@ -39,6 +39,7 @@ function parseList(value) {
 
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
+  legacyCrudAuthEnabled: (process.env.LEGACY_CRUD_AUTH || "true").toLowerCase() === "true",
   telegramInitDataBypass:
     (process.env.TELEGRAM_INITDATA_BYPASS || "").toLowerCase() === "true" && (process.env.NODE_ENV || "development") !== "production",
   telegramBypassUser: {

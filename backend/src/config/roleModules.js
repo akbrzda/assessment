@@ -1,6 +1,6 @@
 const ROLE_DEFAULT_MODULES = {
   superadmin: ["*"],
-  manager: ["assessments", "analytics", "users", "questions", "invitations"],
+  manager: ["assessments", "analytics", "users", "questions", "courses", "invitations"],
 };
 
 function getDefaultModulesForRole(roleName) {
