@@ -60,6 +60,10 @@ async function updateCourseFields(courseId, fields, userId, connection) {
     cols.push("final_assessment_id = ?");
     params.push(fields.finalAssessmentId || null);
   }
+  if (fields.certificateEnabled !== undefined) {
+    cols.push("certificate_enabled = ?");
+    params.push(fields.certificateEnabled ? 1 : 0);
+  }
   if (fields.availabilityMode !== undefined) {
     cols.push("availability_mode = ?");
     params.push(fields.availabilityMode);

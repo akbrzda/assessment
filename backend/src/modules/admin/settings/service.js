@@ -1,6 +1,70 @@
 const { pool } = require("../../../config/database");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
 const settingsService = require("../../../services/settingsService");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+
+// Хранилище логотипа
+const logoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, "../../../../../uploads/logo");
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, "logo" + path.extname(file.originalname).toLowerCase());
+  },
+});
+
+const uploadLogoMiddleware = multer({
+  storage: logoStorage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|webp/;
+    if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Допустимые форматы: jpg, png, webp"));
+    }
+  },
+}).single("logo");
+
+/**
+ * POST /admin/settings/upload-logo
+ * Загружает логотип и сохраняет путь в system_settings.COMPANY_LOGO_URL
+ */
+exports.uploadLogo = (req, res, next) => {
+  uploadLogoMiddleware(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: "Файл не передан" });
+    }
+
+    const logoUrl = `/uploads/logo/${req.file.filename}`;
+
+    try {
+      // Создаём или обновляем настройку
+      const [existing] = await pool.query("SELECT setting_key FROM system_settings WHERE setting_key = 'COMPANY_LOGO_URL'");
+      if (existing.length > 0) {
+        await pool.query("UPDATE system_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = 'COMPANY_LOGO_URL'", [logoUrl]);
+      } else {
+        await pool.query(
+          "INSERT INTO system_settings (setting_key, setting_value, description) VALUES ('COMPANY_LOGO_URL', ?, 'Логотип компании для сертификатов')",
+          [logoUrl],
+        );
+      }
+
+      settingsService.clearCache();
+
+      res.json({ url: logoUrl });
+    } catch (dbErr) {
+      next(dbErr);
+    }
+  });
+};
 
 /**
  * Получить все настройки
@@ -182,4 +246,3 @@ exports.deleteSetting = async (req, res, next) => {
     next(error);
   }
 };
-

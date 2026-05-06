@@ -135,6 +135,20 @@
           @assessment-saved="handleFinalAssessmentSaved"
           @course-updated="handleCourseUpdatedFromFinalStep"
         />
+
+        <Card class="editor-card step-toggle-card" padding="none">
+          <div class="step-card-header step-card-header-tight step-card-header-no-border">
+            <div>
+              <h2>Сертификат</h2>
+              <p>При включении слушатель получит PNG-сертификат после успешного прохождения аттестации.</p>
+            </div>
+            <label class="step-feature-toggle" :class="{ 'step-feature-toggle--on': certificateEnabled }">
+              <input type="checkbox" v-model="certificateEnabled" class="step-feature-toggle-input" :disabled="!finalAssessmentEnabled" />
+              <span class="step-feature-toggle-track"><span class="step-feature-toggle-thumb"></span></span>
+              <span class="step-feature-toggle-label">{{ certificateEnabled ? "Включено" : "Отключено" }}</span>
+            </label>
+          </div>
+        </Card>
       </div>
 
       <Card v-if="false && currentStep === finalAssessmentStepId && isEditMode && course" class="editor-card final-assessment-card">
@@ -282,6 +296,7 @@ const tempIdCounter = ref(-1);
 
 const sectionTestsEnabled = ref(true);
 const finalAssessmentEnabled = ref(true);
+const certificateEnabled = ref(false);
 let restoringFromStorage = false;
 
 const sectionForms = ref({});
@@ -829,6 +844,7 @@ const applyCourseToForm = (courseItem) => {
     availabilityFrom: toLocalDateTimeInput(courseItem.availabilityFrom),
     availabilityTo: toLocalDateTimeInput(courseItem.availabilityTo),
   };
+  certificateEnabled.value = Boolean(courseItem.certificate_enabled);
 };
 
 const loadCourse = async () => {
@@ -1723,6 +1739,20 @@ watch(finalAssessmentEnabled, async (val) => {
         showToast(getErrorMessage(error, "Не удалось сохранить изменения"), "error");
       }
     }
+  }
+});
+
+watch(certificateEnabled, async (val) => {
+  if (restoringFromStorage) return;
+  const id = courseId.value;
+  if (!isEditMode.value || !id) return;
+  try {
+    const response = await updateCourse(id, { certificateEnabled: val });
+    course.value = { ...course.value, ...response.course };
+    showToast(val ? "Сертификат включён" : "Сертификат отключён", "success");
+  } catch (error) {
+    showToast(getErrorMessage(error, "Не удалось сохранить изменения"), "error");
+    certificateEnabled.value = !val;
   }
 });
 

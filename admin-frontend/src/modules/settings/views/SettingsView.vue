@@ -13,6 +13,31 @@
 
     <!-- Content -->
     <div v-else class="settings-content">
+      <!-- Вкладка: Общие -->
+      <div v-if="activeTab === 'general'" class="settings-section">
+        <h3 class="section-title">Общие настройки</h3>
+
+        <Card title="Логотип компании" icon="Image">
+          <p class="text-sm text-muted-foreground mb-4">
+            Логотип отображается в PNG-сертификатах. Рекомендуемый формат: PNG с прозрачным фоном, до 2 МБ.
+          </p>
+
+          <div class="flex flex-col gap-4">
+            <div v-if="logoPreview" class="logo-preview-wrap">
+              <img :src="logoPreview" alt="Логотип компании" class="logo-preview-img" />
+            </div>
+
+            <div class="flex items-center gap-3">
+              <input ref="logoFileInput" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="handleLogoUpload" />
+              <Button icon="Upload" :loading="logoUploading" @click="logoFileInput?.click()">
+                {{ logoPreview ? "Заменить логотип" : "Загрузить логотип" }}
+              </Button>
+              <span v-if="logoPreview" class="text-sm text-muted-foreground">Текущий путь: {{ logoPreview }}</span>
+            </div>
+          </div>
+        </Card>
+      </div>
+
       <!-- Вкладка: Геймификация -->
       <div v-if="activeTab === 'gamification'" class="settings-section">
         <h3 class="section-title">Геймификация</h3>
@@ -150,6 +175,7 @@ import BadgesManager from "@/modules/settings/components/BadgesManager.vue";
 import LevelsManager from "@/modules/settings/components/LevelsManager.vue";
 import GamificationRulesManager from "@/modules/gamification/components/GamificationRulesManager.vue";
 import GamificationDryRun from "@/modules/gamification/components/GamificationDryRun.vue";
+import Button from "@/components/ui/Button.vue";
 import Card from "@/components/ui/Card.vue";
 import Tabs from "@/components/ui/Tabs.vue";
 import Icon from "@/components/ui/Icon.vue";
@@ -164,16 +190,41 @@ const { showToast, showSuccess, showError } = useToast();
 
 // Табы
 const tabsConfig = [
+  { value: "general", label: "Общие" },
   { value: "gamification", label: "Геймификация" },
   { value: "environment", label: "Переменные окружения" },
 ];
 
-const activeTab = ref("gamification");
+const activeTab = ref("general");
 const settingsLoading = ref(true);
 const { skeletonVisible } = useSkeletonGate(settingsLoading, { minDuration: 320, delay: 80 });
 
 const gamificationEnabled = ref(true);
 const rulesEnabled = ref(false);
+
+// Общие настройки
+const logoUrl = ref("");
+const logoPreview = ref("");
+const logoUploading = ref(false);
+const logoFileInput = ref(null);
+
+async function handleLogoUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  logoUploading.value = true;
+  try {
+    const result = await settingsApi.uploadLogo(file);
+    logoUrl.value = result.url;
+    logoPreview.value = result.url;
+    showSuccess("Логотип загружен");
+  } catch (err) {
+    console.error("Ошибка загрузки логотипа:", err);
+    showError("Не удалось загрузить логотип");
+  } finally {
+    logoUploading.value = false;
+    if (logoFileInput.value) logoFileInput.value.value = "";
+  }
+}
 
 // Загрузка настроек
 const loadSettings = async () => {
@@ -185,6 +236,11 @@ const loadSettings = async () => {
     // Парсим настройки
     settings.forEach((setting) => {
       const value = parseValue(setting.setting_value);
+
+      if (setting.setting_key === "COMPANY_LOGO_URL") {
+        logoUrl.value = setting.setting_value || "";
+        logoPreview.value = setting.setting_value || "";
+      }
 
       // Флаг движка правил
       if (setting.setting_key === "GAMIFICATION_ENABLED") {
@@ -244,6 +300,23 @@ onMounted(() => {
 <style scoped>
 .settings-view {
   width: 100%;
+}
+
+.logo-preview-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  width: fit-content;
+}
+
+.logo-preview-img {
+  max-height: 64px;
+  max-width: 200px;
+  object-fit: contain;
 }
 
 .page-header {

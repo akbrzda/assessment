@@ -15,6 +15,7 @@ publicRouter.get("/:uuid/download", controller.downloadCertificate);
 const adminRouter = express.Router();
 adminRouter.use(verifyJWT);
 adminRouter.get("/", controller.listCertificates);
+adminRouter.get("/:uuid/download", controller.downloadCertificate);
 adminRouter.post("/issue", controller.issueCertificate);
 adminRouter.post("/:id/revoke", controller.revokeCertificate);
 

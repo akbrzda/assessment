@@ -226,4 +226,13 @@ export const apiClient = {
   downloadCertificate(uuid) {
     return request(`/certificates/${uuid}/download`, { responseType: "blob" });
   },
+  getNotificationSettings() {
+    return request("/bot/notifications/settings");
+  },
+  updateNotificationSettings(payload) {
+    return request("/bot/notifications/settings", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
 };

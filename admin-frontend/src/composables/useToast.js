@@ -36,9 +36,29 @@ export function useToast() {
     if (id) sonnerToast.dismiss(id);
   };
 
+  const showSuccess = (message) => {
+    showToast(message, "success");
+  };
+
+  const showError = (message) => {
+    showToast(message, "error");
+  };
+
+  const showWarning = (message) => {
+    showToast(message, "warning");
+  };
+
+  const showInfo = (message) => {
+    showToast(message, "info");
+  };
+
   return {
     toasts: { value: [] },
     showToast,
+    showSuccess,
+    showError,
+    showWarning,
+    showInfo,
     removeToast,
   };
 }

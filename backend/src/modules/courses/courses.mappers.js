@@ -33,6 +33,7 @@ function mapCourseRow(row) {
     availabilityTo: toIsoUtc(row.availability_to),
     version: Number(row.version || 0),
     finalAssessmentId: row.final_assessment_id ? Number(row.final_assessment_id) : null,
+    certificateEnabled: Boolean(row.certificate_enabled),
     createdBy: row.created_by ? Number(row.created_by) : null,
     updatedBy: row.updated_by ? Number(row.updated_by) : null,
     publishedAt: toIsoUtc(row.published_at),

@@ -1,7 +1,7 @@
 import axios from "../utils/axios";
 
 export const getCertificates = async (filters = {}) => {
-  const response = await axios.get("/admin/certificates", { params: filters });
+  const response = await axios.get("/admin/certificates", { params: filters, cache: false });
   return response.data;
 };
 
@@ -16,8 +16,9 @@ export const issueCertificate = async (payload) => {
 };
 
 export const downloadCertificate = async (uuid) => {
-  const response = await axios.get(`/certificates/${uuid}/download`, {
+  const response = await axios.get(`/admin/certificates/${uuid}/download`, {
     responseType: "blob",
+    cache: false,
   });
   return response.data;
 };

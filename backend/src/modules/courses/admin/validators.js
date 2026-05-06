@@ -41,6 +41,7 @@ const updateCourseSchema = Joi.object({
   category: Joi.string().trim().max(128).allow("", null),
   tags: Joi.array().items(Joi.string().trim().min(1).max(64)).max(20),
   finalAssessmentId: Joi.number().integer().positive().allow(null),
+  certificateEnabled: Joi.boolean(),
   status: Joi.string().valid("published", "archived"),
   ...availabilitySchema,
 }).min(1);

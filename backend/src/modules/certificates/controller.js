@@ -10,7 +10,10 @@ const certificateService = require("../../services/certificates/certificateServi
  */
 async function getMyCertificates(req, res, next) {
   try {
-    const userId = req.user.id;
+    const userId = req.currentUser?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
     const items = await repository.findByUserId(userId);
     res.json({ items });
   } catch (err) {
@@ -39,7 +42,7 @@ async function getCertificateByUuid(req, res, next) {
 
 /**
  * GET /api/certificates/:uuid/download
- * Скачивание PDF файла.
+ * Скачивание PNG файла.
  */
 async function downloadCertificate(req, res, next) {
   try {
@@ -51,8 +54,10 @@ async function downloadCertificate(req, res, next) {
     if (!cert.file_path || !fs.existsSync(cert.file_path)) {
       return res.status(404).json({ error: "Файл сертификата не найден" });
     }
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="certificate-${uuid}.pdf"`);
+    const extension = path.extname(cert.file_path || "").toLowerCase();
+    const mimeType = extension === ".png" ? "image/png" : "application/octet-stream";
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Content-Disposition", `attachment; filename="certificate-${uuid}${extension || ".png"}"`);
     fs.createReadStream(cert.file_path).pipe(res);
   } catch (err) {
     next(err);

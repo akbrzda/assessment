@@ -8,6 +8,7 @@ const router = express.Router();
 router.use(verifyJWT);
 router.use(checkModuleAccess("settings"));
 
+router.post("/upload-logo", settingsController.uploadLogo);
 router.get("/", settingsController.getSettings);
 router.get("/:key", settingsController.getSettingByKey);
 router.post("/", settingsController.createSetting);
@@ -15,4 +16,3 @@ router.put("/:key", settingsController.updateSetting);
 router.delete("/:key", settingsController.deleteSetting);
 
 module.exports = router;
-

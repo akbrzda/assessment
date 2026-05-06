@@ -7,17 +7,14 @@
     </PageHeader>
 
     <!-- Фильтры -->
-    <div class="filters-row mb-4 flex flex-wrap gap-3">
-      <input v-model="filters.search" class="filter-input" type="text" placeholder="ID пользователя или курса..." @keyup.enter="loadCertificates" />
-      <select v-model="filters.status" class="filter-select" @change="loadCertificates">
-        <option value="">Все статусы</option>
-        <option value="issued">Выдан</option>
-        <option value="pending">Генерируется</option>
-        <option value="generation_failed">Ошибка</option>
-        <option value="revoked">Аннулирован</option>
-      </select>
-      <Button size="sm" variant="secondary" @click="loadCertificates">Применить</Button>
-    </div>
+    <FilterBar
+      v-model="filters"
+      search-key="search"
+      search-placeholder="Поиск по имени или курсу..."
+      :filter-defs="filterDefs"
+      class="mb-4"
+      @change="onFilterChange"
+    />
 
     <!-- Загрузка -->
     <SkeletonTable v-if="isLoading" :rows="10" :cols="5" />
@@ -35,16 +32,16 @@
     <!-- Таблица -->
     <div v-else>
       <Table>
-        <TableHead>
+        <TableHeader>
           <TableRow>
-            <TableHeader>Пользователь</TableHeader>
-            <TableHeader>Курс</TableHeader>
-            <TableHeader>Статус</TableHeader>
-            <TableHeader>Результат</TableHeader>
-            <TableHeader>Дата</TableHeader>
-            <TableHeader>Действия</TableHeader>
+            <TableHead>Пользователь</TableHead>
+            <TableHead>Курс</TableHead>
+            <TableHead>Статус</TableHead>
+            <TableHead>Результат</TableHead>
+            <TableHead>Дата</TableHead>
+            <TableHead>Действия</TableHead>
           </TableRow>
-        </TableHead>
+        </TableHeader>
         <TableBody>
           <TableRow v-for="cert in certificates" :key="cert.id">
             <TableCell>{{ cert.first_name }} {{ cert.last_name }}</TableCell>
@@ -58,8 +55,8 @@
             <TableCell>{{ formatDate(cert.issued_at) }}</TableCell>
             <TableCell>
               <div class="actions-cell">
-                <Button v-if="cert.status === 'issued'" size="xs" variant="secondary" @click="handleDownload(cert)">Скачать</Button>
-                <Button v-if="cert.status === 'issued'" size="xs" variant="danger" @click="confirmRevoke(cert)">Аннулировать</Button>
+                <Button v-if="cert.status === 'issued'" size="sm" variant="secondary" @click="handleDownload(cert)">Скачать</Button>
+                <Button v-if="cert.status === 'issued'" size="sm" variant="danger" @click="confirmRevoke(cert)">Аннулировать</Button>
               </div>
             </TableCell>
           </TableRow>
@@ -67,23 +64,30 @@
       </Table>
 
       <!-- Пагинация -->
-      <div class="pagination-row mt-4 flex items-center gap-3">
-        <Button size="sm" variant="secondary" :disabled="pagination.page <= 1" @click="prevPage">←</Button>
-        <span class="text-sm text-gray-600">Стр. {{ pagination.page }} / {{ totalPages }}</span>
-        <Button size="sm" variant="secondary" :disabled="pagination.page >= totalPages" @click="nextPage">→</Button>
-      </div>
+      <Pagination
+        :total="total"
+        :page="pagination.page"
+        :limit="pagination.limit"
+        @update:page="
+          pagination.page = $event;
+          loadCertificates();
+        "
+        @update:limit="
+          pagination.limit = $event;
+          pagination.page = 1;
+          loadCertificates();
+        "
+      />
     </div>
 
     <!-- Модальное окно выдачи -->
     <Modal :show="showIssueModal" title="Выдать сертификат" @close="closeModals">
-      <div class="modal-form">
-        <label class="modal-label">ID пользователя</label>
-        <input v-model="issueForm.userId" class="filter-input w-full mb-3" type="number" placeholder="Введите ID пользователя" />
-        <label class="modal-label">ID курса</label>
-        <input v-model="issueForm.courseId" class="filter-input w-full mb-4" type="number" placeholder="Введите ID курса" />
-        <Alert v-if="issueError" variant="error" :message="issueError" class="mb-3" />
-        <div class="flex gap-3">
-          <Button :disabled="isIssuing" @click="handleIssue">{{ isIssuing ? "Выдача..." : "Выдать" }}</Button>
+      <div class="flex flex-col gap-3">
+        <Input v-model="issueForm.userId" label="ID пользователя" type="number" placeholder="Введите ID пользователя" />
+        <Input v-model="issueForm.courseId" label="ID курса" type="number" placeholder="Введите ID курса" />
+        <Alert v-if="issueError" variant="error" :message="issueError" />
+        <div class="flex gap-3 pt-1">
+          <Button :loading="isIssuing" @click="handleIssue">Выдать</Button>
           <Button variant="secondary" @click="closeModals">Отмена</Button>
         </div>
       </div>
@@ -91,11 +95,11 @@
 
     <!-- Подтверждение аннулирования -->
     <ConfirmDialog
-      :show="showRevokeDialog"
+      v-model="showRevokeDialog"
       title="Аннулировать сертификат?"
-      :message="`Сертификат пользователя ${revokeTarget?.first_name} ${revokeTarget?.last_name} по курсу «${revokeTarget?.course_title}» будет аннулирован. Это действие необратимо.`"
-      confirm-label="Аннулировать"
-      confirm-variant="danger"
+      :message="`Сертификат пользователя ${revokeTarget?.first_name || '—'} ${revokeTarget?.last_name || ''} по курсу «${revokeTarget?.course_title || '—'}» будет аннулирован. Это действие необратимо.`"
+      confirm-text="Аннулировать"
+      variant="danger"
       @confirm="handleRevoke"
       @cancel="showRevokeDialog = false"
     />
@@ -103,7 +107,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, onMounted } from "vue";
 import PageHeader from "@/components/ui/PageHeader.vue";
 import Button from "@/components/ui/Button.vue";
 import Badge from "@/components/ui/Badge.vue";
@@ -112,9 +116,14 @@ import EmptyState from "@/components/ui/EmptyState.vue";
 import SkeletonTable from "@/components/ui/SkeletonTable.vue";
 import Modal from "@/components/ui/Modal.vue";
 import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
+import Input from "@/components/ui/Input.vue";
+import FilterBar from "@/components/ui/FilterBar.vue";
+import Pagination from "@/components/ui/Pagination.vue";
+import { useToast } from "@/composables/useToast";
 import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "@/components/ui";
 import { getCertificates, revokeCertificate, issueCertificate, downloadCertificate } from "@/api/certificates";
 
+const { showToast } = useToast();
 const certificates = ref([]);
 const isLoading = ref(false);
 const errorMessage = ref("");
@@ -123,14 +132,31 @@ const pagination = ref({ page: 1, limit: 20 });
 
 const filters = ref({ status: "", search: "" });
 
+const filterDefs = [
+  {
+    key: "status",
+    label: "Статус",
+    placeholder: "Все статусы",
+    options: [
+      { value: "issued", label: "Выдан" },
+      { value: "pending", label: "Генерируется" },
+      { value: "generation_failed", label: "Ошибка" },
+      { value: "revoked", label: "Аннулирован" },
+    ],
+  },
+];
+
+function onFilterChange() {
+  pagination.value.page = 1;
+  loadCertificates();
+}
+
 const showIssueModal = ref(false);
 const showRevokeDialog = ref(false);
 const revokeTarget = ref(null);
 const isIssuing = ref(false);
 const issueError = ref("");
 const issueForm = ref({ userId: "", courseId: "" });
-
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pagination.value.limit)));
 
 async function loadCertificates() {
   isLoading.value = true;
@@ -146,23 +172,9 @@ async function loadCertificates() {
     total.value = result.total || 0;
   } catch (err) {
     console.error("[CertificatesView] ошибка загрузки:", err);
-    errorMessage.value = err.message || "Ошибка загрузки";
+    errorMessage.value = err?.response?.data?.error || err.message || "Ошибка загрузки";
   } finally {
     isLoading.value = false;
-  }
-}
-
-function prevPage() {
-  if (pagination.value.page > 1) {
-    pagination.value.page--;
-    loadCertificates();
-  }
-}
-
-function nextPage() {
-  if (pagination.value.page < totalPages.value) {
-    pagination.value.page++;
-    loadCertificates();
   }
 }
 
@@ -190,8 +202,10 @@ async function handleRevoke() {
     showRevokeDialog.value = false;
     revokeTarget.value = null;
     await loadCertificates();
+    showToast("Сертификат аннулирован", "success");
   } catch (err) {
     console.error("[CertificatesView] ошибка аннулирования:", err);
+    showToast(err?.response?.data?.error || "Не удалось аннулировать сертификат", "error");
   }
 }
 
@@ -208,8 +222,12 @@ async function handleIssue() {
     await issueCertificate({ userId, courseId });
     closeModals();
     await loadCertificates();
+    showToast("Сертификат выдан", "success");
   } catch (err) {
-    issueError.value = err.message || "Не удалось выдать сертификат";
+    issueError.value = err?.response?.data?.error || err.message || "Не удалось выдать сертификат";
+    showToast(issueError.value, "error");
+    // Перезагружаем список — сертификат мог быть создан в статусе generation_failed
+    await loadCertificates();
   } finally {
     isIssuing.value = false;
   }
@@ -221,13 +239,14 @@ async function handleDownload(cert) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `certificate-${cert.uuid}.pdf`;
+    a.download = `certificate-${cert.uuid}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   } catch (err) {
     console.error("[CertificatesView] ошибка скачивания:", err);
+    showToast(err?.response?.data?.error || "Не удалось скачать сертификат", "error");
   }
 }
 

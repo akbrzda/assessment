@@ -1,5 +1,13 @@
 const settingsService = require("./service");
 
+async function uploadLogo(req, res, next) {
+  try {
+    return await settingsService.uploadLogo(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function getSettings(req, res, next) {
   try {
     return await settingsService.getSettings(req, res, next);
@@ -41,13 +49,10 @@ async function deleteSetting(req, res, next) {
 }
 
 module.exports = {
+  uploadLogo,
   getSettings,
   getSettingByKey,
   createSetting,
   updateSetting,
   deleteSetting,
 };
-
-
-
-

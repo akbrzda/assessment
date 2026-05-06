@@ -67,13 +67,26 @@
 
       <div class="menu-divider"></div>
 
-      <button class="menu-item" @click="handleSettings">
+      <button class="menu-item" @click="toggleNotificationSettings">
         <span class="menu-icon-wrap">
-          <Settings :size="20" class="menu-icon" />
+          <Bell :size="20" class="menu-icon" />
         </span>
-        <span class="menu-label">Настройки</span>
-        <ChevronRight :size="18" class="menu-chevron" />
+        <span class="menu-label">Уведомления</span>
+        <ChevronDown v-if="showNotifications" :size="18" class="menu-chevron" />
+        <ChevronRight v-else :size="18" class="menu-chevron" />
       </button>
+
+      <div v-if="showNotifications" class="notifications-settings">
+        <div v-if="isNotifLoading" class="notif-loading">Загрузка...</div>
+        <label v-else class="notif-toggle-row">
+          <span class="notif-toggle-label">Получать уведомления от бота</span>
+          <span class="notif-toggle-wrap">
+            <input type="checkbox" class="notif-checkbox" :checked="notificationsEnabled" :disabled="isNotifSaving" @change="handleNotifToggle" />
+            <span class="notif-toggle-track"><span class="notif-toggle-thumb"></span></span>
+          </span>
+        </label>
+        <p v-if="notifError" class="notif-error">{{ notifError }}</p>
+      </div>
 
       <div class="menu-divider"></div>
 
@@ -90,7 +103,7 @@
 
 <script>
 import { ref, computed, onMounted } from "vue";
-import { Settings, Star, Clock, Award, LogOut, ChevronRight } from "lucide-vue-next";
+import { Settings, Star, Clock, Award, LogOut, ChevronRight, Bell, ChevronDown } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 import { useRouter } from "vue-router";
@@ -107,6 +120,8 @@ export default {
     Award,
     LogOut,
     ChevronRight,
+    Bell,
+    ChevronDown,
     SkeletonBlock,
     SkeletonList,
   },
@@ -180,12 +195,52 @@ export default {
 
     function handleCertificates() {
       telegramStore.hapticFeedback("impact", "light");
-      telegramStore.showAlert("Раздел «Сертификаты» будет доступен в следующем обновлении");
+      router.push({ name: "certificates" });
     }
 
-    function handleSettings() {
+    const showNotifications = ref(false);
+    const notificationsEnabled = ref(true);
+    const isNotifLoading = ref(false);
+    const isNotifSaving = ref(false);
+    const notifError = ref("");
+
+    async function loadNotificationSettings() {
+      isNotifLoading.value = true;
+      notifError.value = "";
+      try {
+        const data = await apiClient.getNotificationSettings();
+        notificationsEnabled.value = data.notificationsEnabled !== false;
+      } catch (err) {
+        console.error("[ProfileView] ошибка загрузки настроек уведомлений:", err);
+        notifError.value = "Не удалось загрузить настройки";
+      } finally {
+        isNotifLoading.value = false;
+      }
+    }
+
+    async function toggleNotificationSettings() {
       telegramStore.hapticFeedback("impact", "light");
-      telegramStore.showAlert("Раздел «Настройки» будет доступен в следующем обновлении");
+      showNotifications.value = !showNotifications.value;
+      if (showNotifications.value && !isNotifLoading.value) {
+        await loadNotificationSettings();
+      }
+    }
+
+    async function handleNotifToggle(event) {
+      const enabled = event.target.checked;
+      isNotifSaving.value = true;
+      notifError.value = "";
+      try {
+        await apiClient.updateNotificationSettings({ notificationsEnabled: enabled });
+        notificationsEnabled.value = enabled;
+        telegramStore.hapticFeedback("notification", "success");
+      } catch (err) {
+        console.error("[ProfileView] ошибка сохранения настроек уведомлений:", err);
+        notifError.value = "Не удалось сохранить";
+        notificationsEnabled.value = !enabled;
+      } finally {
+        isNotifSaving.value = false;
+      }
     }
 
     async function handleLogout() {
@@ -207,7 +262,13 @@ export default {
       handleAchievements,
       handleHistory,
       handleCertificates,
-      handleSettings,
+      showNotifications,
+      notificationsEnabled,
+      isNotifLoading,
+      isNotifSaving,
+      notifError,
+      toggleNotificationSettings,
+      handleNotifToggle,
       handleLogout,
     };
   },
@@ -414,5 +475,77 @@ export default {
 .profile-skeleton__stats {
   height: 86px;
   border-radius: 14px;
+}
+
+.notifications-settings {
+  padding: 12px 16px 12px 68px;
+  background-color: var(--bg-primary);
+}
+
+.notif-loading {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.notif-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.notif-toggle-label {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.notif-toggle-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.notif-checkbox {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.notif-toggle-track {
+  display: block;
+  width: 44px;
+  height: 26px;
+  background-color: var(--divider);
+  border-radius: 13px;
+  transition: background-color 0.2s ease;
+  position: relative;
+}
+
+.notif-checkbox:checked ~ .notif-toggle-track {
+  background-color: var(--accent);
+}
+
+.notif-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background-color: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.notif-checkbox:checked ~ .notif-toggle-track .notif-toggle-thumb {
+  transform: translateX(18px);
+}
+
+.notif-error {
+  font-size: 12px;
+  color: var(--error);
+  margin-top: 8px;
 }
 </style>

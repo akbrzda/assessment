@@ -7,7 +7,7 @@ async function findById(courseId, options = {}) {
   const executor = options.connection || pool;
   const lock = options.forUpdate ? " FOR UPDATE" : "";
   const [rows] = await executor.execute(
-    `SELECT id, title, description, cover_url, category, tags, availability_mode, availability_days, availability_from, availability_to, status, version, final_assessment_id,
+    `SELECT id, title, description, cover_url, category, tags, availability_mode, availability_days, availability_from, availability_to, status, version, final_assessment_id, certificate_enabled,
             created_by, updated_by, published_at, archived_at, created_at, updated_at
        FROM courses WHERE id = ?${lock}`,
     [courseId],
@@ -31,7 +31,7 @@ async function listCoursesForAdmin({ status, search } = {}) {
 
   const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
   const [rows] = await pool.execute(
-    `SELECT c.id, c.title, c.description, c.cover_url, c.category, c.tags, c.availability_mode, c.availability_days, c.availability_from, c.availability_to, c.status, c.version, c.final_assessment_id,
+    `SELECT c.id, c.title, c.description, c.cover_url, c.category, c.tags, c.availability_mode, c.availability_days, c.availability_from, c.availability_to, c.status, c.version, c.final_assessment_id, c.certificate_enabled,
             c.created_by, c.updated_by, c.published_at, c.archived_at, c.created_at, c.updated_at,
             (SELECT COUNT(*) FROM course_sections cs WHERE cs.course_id = c.id) AS sections_count
        FROM courses c ${where}

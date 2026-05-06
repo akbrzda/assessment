@@ -1,7 +1,7 @@
 const path = require("path");
 const logger = require("../../utils/logger");
 const repository = require("../../modules/certificates/repository");
-const pdfGenerator = require("./pdfGenerator");
+const pngGenerator = require("./pdfGenerator");
 
 const BASE_URL = process.env.BACKEND_URL || "";
 
@@ -27,7 +27,7 @@ async function generateCertificate(userId, courseId, attemptId, { firstName, las
 }
 
 /**
- * Внутренняя генерация PDF и обновление статуса.
+ * Внутренняя генерация PNG и обновление статуса.
  */
 async function _doGenerate(record, { firstName, lastName, courseTitle, scorePercent }) {
   const { id, uuid } = record;
@@ -35,7 +35,7 @@ async function _doGenerate(record, { firstName, lastName, courseTitle, scorePerc
   const issuedAt = new Date();
 
   try {
-    const { filePath, fileName } = await pdfGenerator.generatePdf({
+    const { filePath, fileName } = await pngGenerator.generatePng({
       uuid,
       fullName,
       courseTitle,

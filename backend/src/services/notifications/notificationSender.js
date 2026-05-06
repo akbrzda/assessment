@@ -2,6 +2,7 @@ const https = require("https");
 const config = require("../../config/env");
 const logger = require("../../utils/logger");
 const notificationService = require("./notificationService");
+const { pool } = require("../../config/database");
 
 const BOT_TOKEN = config.botToken;
 const BOT_USERNAME = process.env.BOT_USERNAME || "theorica_bot";
@@ -213,9 +214,15 @@ async function sendOne(notification) {
     await notificationService.updateStatus(id, "sent");
   } catch (err) {
     if (err.httpStatus === 403) {
-      // Пользователь заблокировал бота
+      // Пользователь заблокировал бота — отключаем уведомления
       logger.warn("Бот заблокирован пользователем telegram_id=%s, notificationId=%d", chatId, id);
       await notificationService.updateStatus(id, "blocked", { errorMessage: err.message });
+      // Снимаем флаг уведомлений, чтобы не делать повторных попыток
+      try {
+        await pool.execute(`UPDATE users SET notifications_enabled = 0 WHERE telegram_id = ?`, [String(chatId)]);
+      } catch (dbErr) {
+        logger.error("Не удалось обновить notifications_enabled для telegram_id=%s: %s", chatId, dbErr.message);
+      }
     } else if (err.httpStatus === 429 && err.retryAfter) {
       // Rate limit: ждём указанное время, затем завершаем — следующий cron попробует снова
       logger.warn("Telegram rate limit: retry_after=%ds, notificationId=%d", err.retryAfter, id);

@@ -39,10 +39,6 @@
           @input="handleSearchInput"
           @blur="hideSearch"
         />
-        <span
-          class="pointer-events-none absolute right-2 rounded-md border border-border bg-muted/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
-          >⌘K</span
-        >
         <div
           v-if="showSearchResults"
           class="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-border bg-card shadow-md"

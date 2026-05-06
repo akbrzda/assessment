@@ -29,6 +29,7 @@ export function useBackButton() {
     "learning-history": "/profile",
     leaderboard: "/dashboard",
     assessments: "/dashboard",
+    certificates: "/profile",
     "course-details": "/assessments",
     "course-topic": (currentRoute) => `/courses/${currentRoute.params.courseId}`,
     "course-subtopic": (currentRoute) => `/courses/${currentRoute.params.courseId}/topics/${currentRoute.params.sectionId}`,

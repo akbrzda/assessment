@@ -30,4 +30,14 @@ export default {
     const response = await apiClient.delete(`/admin/settings/${key}`);
     return response.data;
   },
+
+  // Загрузить логотип компании
+  async uploadLogo(file) {
+    const form = new FormData();
+    form.append("logo", file);
+    const response = await apiClient.post("/admin/settings/upload-logo", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
 };
