@@ -74,7 +74,7 @@ async function listUsers(req, res, next) {
       LEFT JOIN roles r ON u.role_id = r.id
     `;
 
-    let whereClause = "WHERE 1=1";
+    let whereClause = "WHERE u.deleted_at IS NULL";
 
     const params = [];
 
@@ -390,8 +390,9 @@ async function getUserDetailedStats(req, res, next) {
       LEFT JOIN branches b ON u.branch_id = b.id
       LEFT JOIN positions p ON u.position_id = p.id
       LEFT JOIN roles r ON u.role_id = r.id
-      WHERE u.id = ?`,
-      [userId]
+      WHERE u.id = ?
+        AND u.deleted_at IS NULL`,
+      [userId],
     );
 
     if (!users || users.length === 0) {
@@ -415,7 +416,7 @@ async function getUserDetailedStats(req, res, next) {
       FROM assessment_attempts aa
       JOIN assessments a ON a.id = aa.assessment_id
       WHERE aa.user_id = ?`,
-      [userId]
+      [userId],
     );
 
     // Сводка по аттестациям
@@ -433,7 +434,7 @@ async function getUserDetailedStats(req, res, next) {
       WHERE aa.user_id = ?
       GROUP BY a.id, a.title, a.pass_score_percent
       ORDER BY last_attempt_at DESC`,
-      [userId]
+      [userId],
     );
 
     // Бейджи
@@ -445,16 +446,16 @@ async function getUserDetailedStats(req, res, next) {
       JOIN badges b ON ub.badge_id = b.id
       WHERE ub.user_id = ?
       ORDER BY ub.awarded_at DESC`,
-      [userId]
+      [userId],
     );
 
     // Рейтинг
     const [rankData] = await pool.query(
       `SELECT 
-        (SELECT COUNT(*) + 1 FROM users WHERE points > ?) as user_rank,
-        (SELECT COUNT(*) FROM users WHERE role_id IN (SELECT id FROM roles WHERE name = 'employee')) as total_users
+        (SELECT COUNT(*) + 1 FROM users WHERE points > ? AND deleted_at IS NULL) as user_rank,
+        (SELECT COUNT(*) FROM users WHERE role_id IN (SELECT id FROM roles WHERE name = 'employee') AND deleted_at IS NULL) as total_users
       FROM DUAL`,
-      [users[0].points]
+      [users[0].points],
     );
 
     const [invitationRows] = await pool.query(
@@ -474,7 +475,7 @@ async function getUserDetailedStats(req, res, next) {
        WHERE level_number > ? 
        ORDER BY level_number ASC 
        LIMIT 1`,
-      [users[0].level]
+      [users[0].level],
     );
 
     const nextLevel = levels[0] || null;
@@ -643,7 +644,6 @@ async function exportUsersToExcel(req, res, next) {
   }
 }
 
-
 /**
  * Сбросить прогресс пользователя по аттестации
  */
@@ -676,7 +676,7 @@ async function resetAssessmentProgress(req, res, next) {
       `SELECT id, attempt_number, status, score_percent 
        FROM assessment_attempts 
        WHERE user_id = ? AND assessment_id = ?`,
-      [userId, assessmentId]
+      [userId, assessmentId],
     );
 
     // Удаляем ответы на вопросы
@@ -684,7 +684,7 @@ async function resetAssessmentProgress(req, res, next) {
       `DELETE aa FROM assessment_answers aa
        INNER JOIN assessment_attempts at ON aa.attempt_id = at.id
        WHERE at.user_id = ? AND at.assessment_id = ?`,
-      [userId, assessmentId]
+      [userId, assessmentId],
     );
 
     // Удаляем попытки
@@ -697,10 +697,12 @@ async function resetAssessmentProgress(req, res, next) {
 
     // Логируем действие
     await logAndSend({
-      action: "reset_assessment_progress",
-      entityType: "assessment_attempt",
+      req,
+      actor: buildActorFromRequest(req),
+      action: "user.assessment_progress_reset",
+      entity: "assessment_attempt",
       entityId: assessmentId,
-      changes: {
+      metadata: {
         userId,
         assessmentId,
         deletedAttempts: attempts.length,
@@ -709,8 +711,6 @@ async function resetAssessmentProgress(req, res, next) {
           status: a.status,
           scorePercent: a.score_percent,
         })),
-      },
-      metadata: {
         userName: `${users[0].first_name} ${users[0].last_name}`,
         assessmentTitle: assessments[0].title,
         resetBy: req.user.id,
@@ -774,7 +774,7 @@ async function createUser(req, res, next) {
         telegram_id, first_name, last_name, position_id, branch_id, role_id, login, password, level, points
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
-      [telegramId, firstName, lastName, positionId, branchId, roleId, login, hashedPassword, 1, 0]
+      [telegramId, firstName, lastName, positionId, branchId, roleId, login, hashedPassword, 1, 0],
     );
 
     const [newUser] = await pool.query(
@@ -788,7 +788,7 @@ async function createUser(req, res, next) {
       LEFT JOIN roles r ON u.role_id = r.id
       WHERE u.id = ?
     `,
-      [result.insertId]
+      [result.insertId],
     );
 
     await logAndSend({
@@ -835,8 +835,9 @@ async function resetPassword(req, res, next) {
       `SELECT u.*, r.name as role_name 
        FROM users u 
        JOIN roles r ON u.role_id = r.id 
-       WHERE u.id = ?`,
-      [userId]
+       WHERE u.id = ?
+         AND u.deleted_at IS NULL`,
+      [userId],
     );
     if (users.length === 0) {
       return res.status(404).json({ error: "Пользователь не найден" });
@@ -892,8 +893,9 @@ async function getUserById(req, res, next) {
       LEFT JOIN positions p ON u.position_id = p.id
       LEFT JOIN roles r ON u.role_id = r.id
       WHERE u.id = ?
+        AND u.deleted_at IS NULL
     `,
-      [userId]
+      [userId],
     );
 
     if (users.length === 0) {
@@ -910,7 +912,7 @@ async function getUserById(req, res, next) {
       FROM assessment_attempts aa
       WHERE aa.user_id = ?
     `,
-      [userId]
+      [userId],
     );
 
     const user = {
@@ -1112,10 +1114,7 @@ async function setPermissionOverride(req, res, next) {
       return res.status(404).json({ error: "Пользователь не найден" });
     }
 
-    const [permissions] = await connection.query(
-      "SELECT id FROM permissions WHERE id = ? AND is_active = 1 LIMIT 1",
-      [value.permissionId],
-    );
+    const [permissions] = await connection.query("SELECT id FROM permissions WHERE id = ? AND is_active = 1 LIMIT 1", [value.permissionId]);
     if (!permissions.length) {
       return res.status(422).json({ error: "Право не найдено или неактивно" });
     }
@@ -1164,10 +1163,7 @@ async function deletePermissionOverride(req, res, next) {
       return res.status(400).json({ error: "Некорректные параметры" });
     }
 
-    const [result] = await pool.query(
-      "DELETE FROM user_permission_overrides WHERE id = ? AND user_id = ? LIMIT 1",
-      [overrideId, userId],
-    );
+    const [result] = await pool.query("DELETE FROM user_permission_overrides WHERE id = ? AND user_id = ? LIMIT 1", [overrideId, userId]);
 
     if (!result.affectedRows) {
       return res.status(404).json({ error: "Переопределение не найдено" });
@@ -1265,10 +1261,7 @@ async function removeUserRole(req, res, next) {
       return res.status(400).json({ error: "Некорректные параметры" });
     }
 
-    const [result] = await pool.query(
-      "DELETE FROM user_roles WHERE user_id = ? AND role_id = ? LIMIT 1",
-      [userId, roleId],
-    );
+    const [result] = await pool.query("DELETE FROM user_roles WHERE user_id = ? AND role_id = ? LIMIT 1", [userId, roleId]);
 
     if (!result.affectedRows) {
       return res.status(404).json({ error: "Роль пользователя не найдена" });

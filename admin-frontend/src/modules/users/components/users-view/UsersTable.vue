@@ -42,10 +42,15 @@
             />
           </TableCell>
           <TableCell>
-            <div class="cursor-pointer" @click="emit('open-profile-page', user)">
+            <button
+              type="button"
+              class="cursor-pointer text-left bg-transparent border-none p-0 w-full focus-visible:shadow-[var(--focus-ring)] rounded"
+              :aria-label="`Открыть профиль ${user.first_name} ${user.last_name}`"
+              @click="emit('open-profile-page', user)"
+            >
               <div class="font-semibold text-foreground">{{ user.first_name }} {{ user.last_name }}</div>
               <div class="text-sm text-muted-foreground">{{ user.login || "—" }}</div>
-            </div>
+            </button>
           </TableCell>
           <TableCell muted>{{ user.login || "—" }}</TableCell>
           <TableCell muted>{{ user.position_name || "—" }}</TableCell>
@@ -70,7 +75,7 @@
                 size="sm"
                 :icon-only="true"
                 icon="pencil"
-                title="Редактировать"
+                :aria-label="`Редактировать ${user.first_name} ${user.last_name}`"
                 @click="emit('open-edit-modal', user)"
               />
               <Button
@@ -79,7 +84,7 @@
                 size="sm"
                 :icon-only="true"
                 icon="trash"
-                title="Удалить"
+                :aria-label="`Удалить ${user.first_name} ${user.last_name}`"
                 @click="emit('open-delete-modal', user)"
               />
             </div>
@@ -91,7 +96,14 @@
         <div v-for="user in visibleUsers" :key="user.id" class="p-4 space-y-3">
           <div class="flex items-start justify-between gap-3">
             <div>
-              <h3 class="font-semibold text-foreground cursor-pointer" @click="emit('open-profile-page', user)">{{ user.first_name }} {{ user.last_name }}</h3>
+              <button
+                type="button"
+                class="font-semibold text-foreground cursor-pointer text-left bg-transparent border-none p-0 focus-visible:shadow-[var(--focus-ring)] rounded"
+                :aria-label="`Открыть профиль ${user.first_name} ${user.last_name}`"
+                @click="emit('open-profile-page', user)"
+              >
+                {{ user.first_name }} {{ user.last_name }}
+              </button>
               <p class="text-sm text-muted-foreground">ID: {{ user.id }}</p>
             </div>
             <Badge :variant="getRoleBadgeVariant(user.role_name)" size="sm">

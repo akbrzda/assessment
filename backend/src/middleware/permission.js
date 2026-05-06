@@ -1,4 +1,5 @@
 const permissionService = require("../services/PermissionService");
+const { logAccessDenied } = require("../services/auditService");
 const config = require("../config/env");
 
 const LEGACY_ALLOWED_ROLES = new Set(["superadmin", "manager"]);
@@ -18,6 +19,11 @@ function requirePermission(moduleCode, entityCode, actionCode, options = {}) {
 
       if (!decision.allowed) {
         const status = req.user?.id ? 403 : 401;
+        logAccessDenied({
+          req,
+          reason: decision.reason || "permission_denied",
+          metadata: { moduleCode, entityCode, actionCode, source: decision.source },
+        }).catch(() => {});
         return res.status(status).json({
           error: "Доступ запрещен",
           code: decision.reason,

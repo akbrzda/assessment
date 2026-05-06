@@ -3,6 +3,7 @@ const fs = require("fs");
 const logger = require("../../utils/logger");
 const repository = require("./repository");
 const certificateService = require("../../services/certificates/certificateService");
+const { logAndSend } = require("../../services/auditService");
 
 /**
  * GET /api/certificates/my
@@ -96,6 +97,13 @@ async function revokeCertificate(req, res, next) {
     if (!success) {
       return res.status(404).json({ error: "Сертификат не найден или уже аннулирован" });
     }
+    await logAndSend({
+      req,
+      actor: { id: adminId },
+      action: "certificate.revoked",
+      entity: "certificate",
+      entityId: id,
+    });
     res.json({ success: true });
   } catch (err) {
     next(err);
@@ -131,7 +139,14 @@ async function issueCertificate(req, res, next) {
     if (!cert) {
       return res.status(500).json({ error: "Не удалось сгенерировать сертификат" });
     }
-
+    await logAndSend({
+      req,
+      actor: { id: req.user?.id },
+      action: "certificate.issued",
+      entity: "certificate",
+      entityId: cert.id || null,
+      metadata: { userId, courseId },
+    });
     res.status(201).json(cert);
   } catch (err) {
     next(err);

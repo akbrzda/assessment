@@ -1,5 +1,6 @@
 const userModel = require("../../../models/userModel");
 const { body, validationResult } = require("express-validator");
+const { logAndSend } = require("../../../services/auditService");
 
 // Получить профиль текущего пользователя
 const getProfile = async (req, res) => {
@@ -35,8 +36,16 @@ const updateProfile = [
 
       await userModel.updateProfile(userId, { firstName, lastName });
 
-      // Получаем обновленные данные пользователя
       const updatedUser = await userModel.findById(userId);
+
+      await logAndSend({
+        req,
+        actor: { id: userId },
+        action: "admin.profile_updated",
+        entity: "user",
+        entityId: userId,
+        metadata: { firstName, lastName },
+      });
 
       res.json({
         message: "Профиль успешно обновлен",

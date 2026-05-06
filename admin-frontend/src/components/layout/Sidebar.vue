@@ -98,6 +98,7 @@ import {
   LogOut as LogOutIcon,
   X as XIcon,
   Award as AwardIcon,
+  ScrollText as ScrollTextIcon,
 } from "lucide-vue-next";
 
 const authStore = useAuthStore();
@@ -165,6 +166,7 @@ const navSections = computed(() => {
         has("branches") && { label: "Филиалы", to: "/branches", icon: Building2Icon },
         has("positions") && { label: "Должности", to: "/positions", icon: BriefcaseIcon },
         has("settings") && { label: "Настройки", to: "/settings", icon: SettingsIcon },
+        authStore.isSuperAdmin && { label: "Журнал действий", to: "/audit-logs", icon: ScrollTextIcon },
       ].filter(Boolean),
     },
   ];

@@ -1228,19 +1228,19 @@ onMounted(async () => {
 }
 
 .warning-text {
-  color: #f59e0b;
-  background: #fef3c7;
+  color: hsl(var(--accent-orange));
+  background: hsl(var(--color-warning-subtle));
   padding: 12px;
   border-radius: 6px;
-  border-left: 4px solid #f59e0b;
+  border-left: 4px solid hsl(var(--color-warning-border));
 }
 
 .delete-warning {
   display: flex;
   gap: 12px;
-  background: #fff1f2;
-  border: 1px solid #fecdd3;
-  border-left: 4px solid #ef4444;
+  background: hsl(var(--color-danger-subtle));
+  border: 1px solid hsl(var(--color-danger-border) / 0.3);
+  border-left: 4px solid hsl(var(--destructive));
   border-radius: 8px;
   padding: 14px 16px;
   margin-bottom: 20px;
@@ -1255,7 +1255,7 @@ onMounted(async () => {
 .delete-warning-title {
   font-weight: 600;
   font-size: 14px;
-  color: #b91c1c;
+  color: hsl(var(--destructive));
   margin: 0 0 6px;
 }
 
@@ -1263,14 +1263,14 @@ onMounted(async () => {
   margin: 0 0 8px;
   padding-left: 18px;
   font-size: 13px;
-  color: #7f1d1d;
+  color: hsl(var(--destructive) / 0.75);
   line-height: 1.6;
 }
 
 .delete-warning-note {
   font-size: 13px;
   font-weight: 600;
-  color: #b91c1c;
+  color: hsl(var(--destructive));
   margin: 0;
 }
 
@@ -1334,8 +1334,8 @@ onMounted(async () => {
   font-size: 13px;
   color: var(--text-secondary);
   margin: 0;
-  background: #fef3c7;
-  border-left: 3px solid #f59e0b;
+  background: hsl(var(--color-warning-subtle));
+  border-left: 3px solid hsl(var(--color-warning-border));
   padding: 8px 12px;
   border-radius: 4px;
 }

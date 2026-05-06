@@ -129,7 +129,7 @@ const flattenedSearchResults = computed(() =>
       route: `/users/${u.id}/profile`,
     })),
     ...(searchResults.value.assessments || []).map((a) => ({ key: `a-${a.id}`, type: "Аттестация", title: a.title, route: `/assessments/${a.id}` })),
-    ...(searchResults.value.courses || []).map((c) => ({ key: `c-${c.id}`, type: "Курс", title: c.title, route: `/courses/${c.id}` })),
+    ...(searchResults.value.courses || []).map((c) => ({ key: `c-${c.id}`, type: "Курс", title: c.title, route: `/courses/${c.id}/statistics` })),
     ...(searchResults.value.questions || []).map((q) => ({ key: `q-${q.id}`, type: "Вопрос", title: q.question_text, route: `/questions/${q.id}` })),
   ].slice(0, 10),
 );

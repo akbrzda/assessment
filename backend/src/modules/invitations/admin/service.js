@@ -214,6 +214,13 @@ async function deleteInvitation(invitationId, actor, req) {
   await ensureAccess(actor, invitation);
   ensureUnused(invitation, "delete");
 
+  if (invitation.invited_user_id) {
+    await invitationsRepository.removePendingInvitedUserIfUnused({
+      userId: Number(invitation.invited_user_id),
+      currentInvitationId: invitationId,
+    });
+  }
+
   await invitationsRepository.removeInvitation(invitationId);
 
   await createLog(

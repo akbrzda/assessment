@@ -1,5 +1,6 @@
 const { pool } = require("../config/database");
 const { hasDefaultModuleAccess } = require("../config/roleModules");
+const { logAccessDenied } = require("../services/auditService");
 
 /**
  * Middleware для проверки доступа пользователя к модулю
@@ -37,6 +38,7 @@ const checkModuleAccess = (moduleCode) => {
         if (permissions[0].has_access) {
           return next();
         }
+        logAccessDenied({ req, reason: "module_access_denied", metadata: { moduleCode } }).catch(() => {});
         return res.status(403).json({ error: "Доступ запрещен" });
       }
 
@@ -47,6 +49,7 @@ const checkModuleAccess = (moduleCode) => {
         return next();
       }
 
+      logAccessDenied({ req, reason: "module_access_denied", metadata: { moduleCode } }).catch(() => {});
       return res.status(403).json({ error: "Доступ запрещен" });
     } catch (error) {
       next(error);

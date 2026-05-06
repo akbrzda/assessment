@@ -29,6 +29,7 @@ async function loadUserForPolicy(req, res, next) {
        FROM users u
        LEFT JOIN roles r ON r.id = u.role_id
        WHERE u.id = ?
+         AND u.deleted_at IS NULL
        LIMIT 1`,
       [targetUserId],
     );

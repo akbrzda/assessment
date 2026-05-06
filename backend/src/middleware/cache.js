@@ -48,23 +48,37 @@ const cacheMiddleware = (options = {}) => {
  */
 const invalidateCacheMiddleware = (pattern) => {
   return (req, res, next) => {
-    // Сохраняем оригинальный метод json
+    // Сохраняем оригинальные методы ответа
     const originalJson = res.json.bind(res);
+    const originalSend = res.send.bind(res);
+    let cacheInvalidated = false;
+
+    const invalidateCache = () => {
+      if (cacheInvalidated) {
+        return;
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        return;
+      }
+      cacheInvalidated = true;
+      if (typeof pattern === "function") {
+        const computedPattern = pattern(req);
+        if (computedPattern) {
+          cacheService.invalidate(computedPattern).catch(() => {});
+        }
+      } else {
+        cacheService.invalidate(pattern).catch(() => {});
+      }
+    };
 
     res.json = (data) => {
-      // Инвалидируем кеш после успешного ответа
-      if (res.statusCode >= 200 && res.statusCode < 300) {
-        if (typeof pattern === "function") {
-          const computedPattern = pattern(req);
-          if (computedPattern) {
-            cacheService.invalidate(computedPattern).catch(() => {});
-          }
-        } else {
-          cacheService.invalidate(pattern).catch(() => {});
-        }
-      }
-
+      invalidateCache();
       return originalJson(data);
+    };
+
+    res.send = (data) => {
+      invalidateCache();
+      return originalSend(data);
     };
 
     next();

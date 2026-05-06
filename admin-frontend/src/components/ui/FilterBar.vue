@@ -28,6 +28,8 @@
         <!-- Select фильтр -->
         <div v-if="def.type === 'select' || !def.type" class="relative shrink-0 hidden md:block">
           <button
+            :aria-expanded="openDropdown === def.key"
+            aria-haspopup="true"
             :class="[
               'flex items-center gap-1 px-2.5 py-1.5 rounded-xl border-none cursor-pointer text-sm whitespace-nowrap transition-all duration-150',
               modelValue[def.key] || openDropdown === def.key
@@ -86,6 +88,8 @@
         <!-- Дата-фильтр (range) -->
         <div v-else-if="def.type === 'daterange'" class="relative shrink-0 hidden md:block">
           <button
+            :aria-expanded="openDropdown === def.key"
+            aria-haspopup="true"
             :class="[
               'flex items-center gap-1 px-2.5 py-1.5 rounded-xl border-none cursor-pointer text-sm whitespace-nowrap transition-all duration-150',
               modelValue[def.keyFrom] || modelValue[def.keyTo] || openDropdown === def.key

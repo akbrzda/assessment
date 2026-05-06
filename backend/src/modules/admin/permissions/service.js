@@ -1,11 +1,7 @@
 const Joi = require("joi");
 const { pool } = require("../../../config/database");
 const { logAndSend } = require("../../../services/auditService");
-const {
-  hasDefaultModuleAccess,
-  getDefaultModulesForRole,
-  getDefaultModulesMap,
-} = require("../../../config/roleModules");
+const { hasDefaultModuleAccess, getDefaultModulesForRole, getDefaultModulesMap } = require("../../../config/roleModules");
 
 const updatePermissionsSchema = Joi.object({
   modules: Joi.array()
@@ -13,16 +9,13 @@ const updatePermissionsSchema = Joi.object({
       Joi.object({
         moduleId: Joi.number().integer().positive().required(),
         hasAccess: Joi.boolean().required(),
-      })
+      }),
     )
     .required(),
 });
 
 async function getRoleNameByUserId(connection, userId) {
-  const [roles] = await connection.query(
-    "SELECT r.name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ? LIMIT 1",
-    [userId]
-  );
+  const [roles] = await connection.query("SELECT r.name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ? LIMIT 1", [userId]);
   return roles[0]?.name || null;
 }
 
@@ -32,7 +25,7 @@ async function getSystemModules(req, res, next) {
       `SELECT id, code, name, description, is_active
        FROM system_modules
        WHERE is_active = 1
-       ORDER BY name ASC`
+       ORDER BY name ASC`,
     );
 
     res.json({ modules });
@@ -69,14 +62,14 @@ async function getUserPermissions(req, res, next) {
       `SELECT id, code, name, description
        FROM system_modules
        WHERE is_active = 1
-       ORDER BY name ASC`
+       ORDER BY name ASC`,
     );
 
     const [permissions] = await pool.query(
       `SELECT module_id, has_access, granted_by, granted_at
        FROM user_permissions
        WHERE user_id = ?`,
-      [userId]
+      [userId],
     );
 
     const permissionsMap = {};
@@ -159,7 +152,7 @@ async function updateUserPermissions(req, res, next) {
         await connection.query(
           `INSERT INTO user_permissions (user_id, module_id, has_access, granted_by)
            VALUES ?`,
-          [insertValues]
+          [insertValues],
         );
       }
     }
@@ -167,13 +160,13 @@ async function updateUserPermissions(req, res, next) {
     await connection.commit();
 
     await logAndSend({
-      action: "update_user_permissions",
-      entityType: "user",
+      req,
+      actor: { id: req.user?.id },
+      action: "user.permissions_updated",
+      entity: "user",
       entityId: userId,
-      changes: {
-        modules: value.modules,
-      },
       metadata: {
+        modules: value.modules,
         changedBy: req.user?.id || null,
         userName: `${users[0].first_name} ${users[0].last_name}`,
       },
@@ -207,7 +200,7 @@ async function checkUserAccess(req, res, next) {
        FROM users u
        JOIN roles r ON u.role_id = r.id
        WHERE u.id = ?`,
-      [userId]
+      [userId],
     );
 
     if (users.length === 0) {
@@ -228,10 +221,7 @@ async function checkUserAccess(req, res, next) {
 
     const moduleId = modules[0].id;
 
-    const [permissions] = await pool.query(
-      "SELECT has_access FROM user_permissions WHERE user_id = ? AND module_id = ?",
-      [userId, moduleId]
-    );
+    const [permissions] = await pool.query("SELECT has_access FROM user_permissions WHERE user_id = ? AND module_id = ?", [userId, moduleId]);
 
     if (permissions.length > 0) {
       return res.json({

@@ -31,7 +31,7 @@ async function refresh(req, res, next) {
 
 async function logout(req, res, next) {
   try {
-    const response = await authService.logout(req.user, res);
+    const response = await authService.logout(req.user, res, req);
     res.json(response);
   } catch (error) {
     handleKnownError(error, res, next);

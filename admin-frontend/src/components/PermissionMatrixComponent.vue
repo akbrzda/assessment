@@ -55,11 +55,15 @@
             </td>
             <td>
               <textarea
-                class="permission-matrix__textarea"
+                :class="['permission-matrix__textarea', resolveJsonError(permission.permissionId) && 'permission-matrix__textarea--error']"
                 :value="resolveConditions(permission.permissionId)"
+                :aria-invalid="Boolean(resolveJsonError(permission.permissionId))"
                 placeholder='{"branchId":1}'
                 @change="updateConditions(permission.permissionId, $event.target.value)"
               />
+              <p v-if="resolveJsonError(permission.permissionId)" class="permission-matrix__json-error">
+                {{ resolveJsonError(permission.permissionId) }}
+              </p>
             </td>
             <td>
               <input
@@ -80,7 +84,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 const props = defineProps({
   permissions: {
@@ -102,6 +106,8 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["update:modelValue"]);
+
+const jsonErrors = ref(new Map());
 
 const normalizedPermissions = computed(() =>
   (props.permissions || []).map((item) => ({
@@ -126,7 +132,10 @@ const normalizedValueMap = computed(() => {
 });
 
 function emitNext(nextMap) {
-  emit("update:modelValue", Array.from(nextMap.values()).filter((item) => item.effect));
+  emit(
+    "update:modelValue",
+    Array.from(nextMap.values()).filter((item) => item.effect),
+  );
 }
 
 function resolveEffect(permissionId) {
@@ -158,6 +167,10 @@ function resolveExpiresAt(permissionId) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function resolveJsonError(permissionId) {
+  return jsonErrors.value.get(Number(permissionId)) || null;
+}
+
 function updateEffect(permissionId, effect) {
   const key = Number(permissionId);
   const nextMap = new Map(normalizedValueMap.value);
@@ -173,12 +186,19 @@ function updateConditions(permissionId, rawValue) {
   const prev = nextMap.get(key) || { permissionId: key, effect: null, conditions: null, expiresAt: null };
 
   const value = String(rawValue || "").trim();
+  const nextErrors = new Map(jsonErrors.value);
   if (!value) {
     prev.conditions = null;
+    nextErrors.delete(key);
+    jsonErrors.value = nextErrors;
   } else {
     try {
       prev.conditions = JSON.parse(value);
+      nextErrors.delete(key);
+      jsonErrors.value = nextErrors;
     } catch {
+      nextErrors.set(key, "Некорректный JSON");
+      jsonErrors.value = nextErrors;
       return;
     }
   }
@@ -272,5 +292,16 @@ function updateExpiresAt(permissionId, rawValue) {
 .permission-matrix__empty {
   color: hsl(var(--muted-foreground));
   text-align: center;
+}
+
+.permission-matrix__textarea--error {
+  border-color: hsl(var(--field-border-error));
+  background: hsl(var(--field-error-bg));
+}
+
+.permission-matrix__json-error {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: hsl(var(--destructive));
 }
 </style>

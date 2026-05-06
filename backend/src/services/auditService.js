@@ -113,11 +113,32 @@ async function logCrudEvent({ req, actor, action, entity, entityId, before = nul
   });
 }
 
+// Логирование отказа в доступе (401/403 из middleware).
+async function logAccessDenied({ req, reason = "permission_denied", metadata = {} }) {
+  return logAndSend({
+    req,
+    actor: buildActorFromRequest(req),
+    scope: "admin_panel",
+    action: "access.denied",
+    entity: null,
+    entityId: null,
+    metadata: {
+      path: req?.originalUrl || req?.url || null,
+      method: req?.method || null,
+      reason,
+      ...metadata,
+    },
+    result: "failure",
+  });
+}
+
 module.exports = {
   buildAuditEntry,
   logAuditEvent,
   logAndSend,
   logCrudEvent,
+  logAccessDenied,
   buildActorFromRequest,
 };
+
 const auditRepository = require("./auditRepository");

@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const config = require("../../../config/env");
 const authRepository = require("./repository");
-const { createLog } = require("../../../services/adminLogService");
+const { logAndSend } = require("../../../services/auditService");
 const { pool } = require("../../../config/database");
 
 const ACCESS_TOKEN_TTL = process.env.JWT_ACCESS_TTL || "30m";
@@ -96,19 +96,54 @@ async function login(payload, req, res) {
 
   const user = await authRepository.findUserByLogin(login);
   if (!user) {
+    await logAndSend({
+      req,
+      actor: { id: null },
+      action: "admin.login_failed",
+      entity: "auth",
+      metadata: { login, reason: "user_not_found" },
+      result: "failure",
+    });
     throw buildError("Неверный логин или пароль", 401);
   }
 
   if (user.role_name !== "manager" && user.role_name !== "superadmin") {
+    await logAndSend({
+      req,
+      actor: { id: user.id, role: user.role_name },
+      action: "admin.login_failed",
+      entity: "auth",
+      entityId: user.id,
+      metadata: { login, reason: "insufficient_role" },
+      result: "failure",
+    });
     throw buildError("Доступ запрещён", 403);
   }
 
   if (!user.password) {
+    await logAndSend({
+      req,
+      actor: { id: user.id, role: user.role_name },
+      action: "admin.login_failed",
+      entity: "auth",
+      entityId: user.id,
+      metadata: { login, reason: "password_not_set" },
+      result: "failure",
+    });
     throw buildError("Пароль не установлен. Обратитесь к администратору", 401);
   }
 
   const isValid = await bcrypt.compare(password, user.password);
   if (!isValid) {
+    await logAndSend({
+      req,
+      actor: { id: user.id, role: user.role_name },
+      action: "admin.login_failed",
+      entity: "auth",
+      entityId: user.id,
+      metadata: { login, reason: "wrong_password" },
+      result: "failure",
+    });
     throw buildError("Неверный логин или пароль", 401);
   }
 
@@ -116,7 +151,14 @@ async function login(payload, req, res) {
   const refreshToken = createRefreshToken(user.id);
 
   await authRepository.updateRefreshToken(user.id, refreshToken);
-  await createLog(user.id, "LOGIN", `Вход в админ-панель (${user.role_name})`, "auth", user.id, req);
+  await logAndSend({
+    req,
+    actor: { id: user.id, role: user.role_name, name: `${user.first_name} ${user.last_name}`.trim() },
+    action: "admin.login",
+    entity: "auth",
+    entityId: user.id,
+    metadata: { role: user.role_name },
+  });
   await recordLoginHistory({ userId: user.id, req });
 
   setRefreshCookie(res, refreshToken);
@@ -157,13 +199,20 @@ async function refresh(payload, req, res) {
   };
 }
 
-async function logout(currentUser, res) {
+async function logout(currentUser, res, req) {
   if (!currentUser?.id) {
     throw buildError("Пользователь не найден", 401);
   }
 
   await authRepository.clearRefreshToken(currentUser.id);
   clearRefreshCookie(res);
+  await logAndSend({
+    req: req || null,
+    actor: { id: currentUser.id, role: currentUser.role },
+    action: "admin.logout",
+    entity: "auth",
+    entityId: currentUser.id,
+  });
 
   return { message: "Выход выполнен успешно" };
 }

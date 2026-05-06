@@ -51,8 +51,9 @@
         <button
           v-if="props.type === 'password'"
           type="button"
-          tabindex="-1"
-          class="flex items-center text-muted-foreground hover:text-foreground transition-colors bg-transparent border-none cursor-pointer p-0"
+          :aria-label="showPassword ? 'Скрыть пароль' : 'Показать пароль'"
+          :aria-pressed="showPassword"
+          class="flex items-center text-muted-foreground hover:text-foreground transition-colors bg-transparent border-none cursor-pointer p-0 rounded focus-visible:shadow-[var(--focus-ring)]"
           @click="showPassword = !showPassword"
         >
           <Icon :name="showPassword ? 'EyeOff' : 'Eye'" :size="15" />

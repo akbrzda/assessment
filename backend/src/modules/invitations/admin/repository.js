@@ -85,6 +85,26 @@ async function removeInvitation(invitationId) {
   return invitationModel.deleteInvitation(invitationId);
 }
 
+async function removePendingInvitedUserIfUnused({ userId, currentInvitationId }) {
+  if (!userId) {
+    return;
+  }
+
+  await pool.execute(
+    `DELETE FROM users
+     WHERE id = ?
+       AND telegram_id IS NULL
+       AND deleted_at IS NULL
+       AND NOT EXISTS (
+         SELECT 1
+         FROM invitations
+         WHERE invited_user_id = ?
+           AND id <> ?
+       )`,
+    [userId, userId, currentInvitationId],
+  );
+}
+
 async function findUserBranchId(userId) {
   const [rows] = await pool.query("SELECT branch_id FROM users WHERE id = ? LIMIT 1", [userId]);
   return rows[0]?.branch_id || null;
@@ -121,6 +141,7 @@ module.exports = {
   createInvitation,
   updateInvitation,
   removeInvitation,
+  removePendingInvitedUserIfUnused,
   findUserBranchId,
   findManagerBranchIds,
   updatePendingUserProfile,
