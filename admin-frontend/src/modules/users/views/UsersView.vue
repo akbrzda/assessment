@@ -319,7 +319,11 @@ const canManagePasswordInEditModal = computed(() => {
     return false;
   }
 
-  return Number(selectedUser.value.id) === Number(authStore.user.id);
+  if (authStore.isManager) {
+    return Number(selectedUser.value.id) === Number(authStore.user.id);
+  }
+
+  return true;
 });
 
 const defaultForm = () => ({
@@ -702,7 +706,11 @@ const syncCreateCredentials = () => {
 const openResetPasswordModal = (user) => {
   const targetUserId = Number(user?.id || 0);
   const currentUserId = Number(authStore.user?.id || 0);
-  if (!targetUserId || targetUserId !== currentUserId) {
+  if (!targetUserId) {
+    showToast("Не удалось определить пользователя", "warning");
+    return;
+  }
+  if (authStore.isManager && targetUserId !== currentUserId) {
     showToast("Смена пароля доступна только для вашего профиля", "warning");
     return;
   }

@@ -240,10 +240,13 @@ export default {
         }
 
         if (context.type === "final") {
-          await apiClient.completeCourseFinalAssessmentAttempt(Number(context.courseId), attemptId);
+          const finalResponse = await apiClient.completeCourseFinalAssessmentAttempt(Number(context.courseId), attemptId);
           relatedCourseId.value = Number(context.courseId);
           clearCompletionContext();
-          return context;
+          return {
+            ...context,
+            progressReset: Boolean(finalResponse?.course?.progressReset),
+          };
         }
       } catch (error) {
         console.warn("Не удалось синхронизировать прогресс курса", error);
@@ -287,6 +290,10 @@ export default {
         }
 
         const completionContext = await completeCourseStepIfNeeded(id, attemptId);
+        if (completionContext?.type === "final" && completionContext.progressReset && Number(completionContext.courseId) > 0) {
+          router.replace(`/courses/${Number(completionContext.courseId)}/status/attempts_exhausted`);
+          return;
+        }
 
         const statusMap = { active: "open", pending: "pending", closed: "closed" };
         const mappedStatus = summaryItem.value ? statusMap[summaryItem.value.status] || summaryItem.value.status : "closed";

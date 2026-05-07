@@ -22,5 +22,6 @@ adminRouter.get("/", controller.listCertificates);
 adminRouter.get("/:uuid/download", controller.downloadCertificate);
 adminRouter.post("/issue", controller.issueCertificate);
 adminRouter.post("/:id/revoke", controller.revokeCertificate);
+adminRouter.post("/:id/requalify", controller.sendToRequalification);
 
 module.exports = { verifyRouter, publicRouter, adminRouter };

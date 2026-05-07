@@ -2,6 +2,7 @@ const path = require("path");
 const logger = require("../../utils/logger");
 const repository = require("../../modules/certificates/repository");
 const pngGenerator = require("./pdfGenerator");
+const settingsService = require("../settingsService");
 
 const BASE_URL = process.env.BACKEND_URL || "";
 
@@ -33,6 +34,9 @@ async function _doGenerate(record, { firstName, lastName, courseTitle, scorePerc
   const { id, uuid } = record;
   const fullName = [firstName, lastName].filter(Boolean).join(" ") || "Сотрудник";
   const issuedAt = new Date();
+  const validityDaysRaw = await settingsService.getSetting("CERTIFICATE_VALIDITY_DAYS", "365");
+  const validityDays = Math.max(1, Number(validityDaysRaw) || 365);
+  const expiresAt = new Date(issuedAt.getTime() + validityDays * 24 * 60 * 60 * 1000);
 
   try {
     const { filePath, fileName } = await pngGenerator.generatePng({
@@ -52,6 +56,7 @@ async function _doGenerate(record, { firstName, lastName, courseTitle, scorePerc
       filePath,
       fileUrl,
       issuedAt,
+      expiresAt,
     });
 
     logger.info("certificateService: выдан сертификат id=%s uuid=%s userId=%s", id, uuid, record.user_id);

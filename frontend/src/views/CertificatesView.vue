@@ -23,13 +23,21 @@
           <div class="cert-card__info">
             <h2 class="cert-card__title">{{ cert.course_title }}</h2>
             <p class="cert-card__date">{{ formatDate(cert.issued_at) }}</p>
+            <p v-if="(cert.display_status || cert.status) === 'expired'" class="cert-card__expired">
+              Просрочен {{ formatDate(cert.expires_at) }}
+            </p>
           </div>
         </div>
         <div v-if="cert.score_percent != null" class="cert-card__score">
           Результат: <strong>{{ Number(cert.score_percent).toFixed(0) }}%</strong>
         </div>
-        <button class="cert-download-btn" type="button" :disabled="downloading[cert.uuid]" @click="openPreview(cert)">
-          {{ downloading[cert.uuid] ? "Загрузка..." : "Предпросмотр и скачать PNG" }}
+        <button
+          class="cert-download-btn"
+          type="button"
+          :disabled="downloading[cert.uuid] || (cert.display_status || cert.status) === 'expired'"
+          @click="openPreview(cert)"
+        >
+          {{ (cert.display_status || cert.status) === "expired" ? "Скачивание недоступно" : downloading[cert.uuid] ? "Загрузка..." : "Предпросмотр и скачать PNG" }}
         </button>
       </article>
     </div>
@@ -251,6 +259,12 @@ export default {
   font-size: 13px;
   color: var(--color-text-secondary, #888);
   margin: 0;
+}
+
+.cert-card__expired {
+  font-size: 12px;
+  color: #b45309;
+  margin: 4px 0 0;
 }
 
 .cert-card__score {

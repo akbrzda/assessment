@@ -217,15 +217,27 @@ async function handleFinalAttemptCompletion({ courseId, userId, attemptId }) {
     const aggregate = await progressRepo.getCourseProgressAggregate({ courseId, userId, connection });
     await progressRepo.syncCourseProgress({ courseId, userId, aggregate, connection });
 
+    let progressReset = false;
     if (finalAttempt.passed) {
       await progressRepo.completeCourseProgress({ courseId, userId, totalSections: aggregate.totalRequiredSections, connection });
+    } else {
+      const [assessmentRows] = await connection.execute("SELECT max_attempts FROM assessments WHERE id = ? LIMIT 1", [finalAttempt.finalAssessmentId]);
+      const maxAttempts = assessmentRows.length ? Number(assessmentRows[0].max_attempts || 0) : 0;
+      const attemptsExhausted = maxAttempts > 0 && Number(finalAttempt.attemptNumber) >= maxAttempts;
+
+      if (attemptsExhausted) {
+        await progressRepo.resetUserProgressForCourse(courseId, userId, connection);
+        progressReset = true;
+      }
     }
 
     await connection.commit();
     if (finalAttempt.passed) {
       eventsRepo.insertCourseEvent({ courseId, userId, eventType: "course.completed" });
+    } else if (progressReset) {
+      eventsRepo.insertCourseEvent({ courseId, userId, eventType: "course.progress_reset_after_final_failure" });
     }
-    return { finalAttempt, passedCourse: finalAttempt.passed };
+    return { finalAttempt, passedCourse: finalAttempt.passed, progressReset };
   } catch (error) {
     await connection.rollback();
     throw error;

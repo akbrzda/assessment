@@ -327,6 +327,7 @@ async function completeFinalAttempt({ courseId, attemptId, userId }) {
     course: {
       id: result.finalAttempt.courseId,
       completed: result.passedCourse,
+      progressReset: Boolean(result.progressReset),
     },
   };
 }
