@@ -38,7 +38,8 @@
             <TableHead>Курс</TableHead>
             <TableHead>Статус</TableHead>
             <TableHead>Результат</TableHead>
-            <TableHead>Дата</TableHead>
+            <TableHead>Выдан</TableHead>
+            <TableHead>Действует до</TableHead>
             <TableHead>Действия</TableHead>
           </TableRow>
         </TableHeader>
@@ -53,6 +54,7 @@
               {{ cert.score_percent != null ? Number(cert.score_percent).toFixed(0) + "%" : "—" }}
             </TableCell>
             <TableCell>{{ formatDate(cert.issued_at) }}</TableCell>
+            <TableCell>{{ formatDate(cert.expires_at) }}</TableCell>
             <TableCell>
               <div class="actions-cell">
                 <Button v-if="cert.status === 'issued'" size="sm" variant="secondary" @click="handleDownload(cert)">Скачать</Button>

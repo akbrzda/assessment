@@ -11,22 +11,21 @@ exports.getOverallStats = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    let whereConditions = ['aa.status = "completed"'];
+    let whereConditions = ["1=1"];
     const params = [];
 
-    // Фильтр для управляющего - только его филиал
     if (userRole === "manager") {
       whereConditions.push("u.branch_id = (SELECT branch_id FROM users WHERE id = ?)");
       params.push(userId);
     }
 
     if (dateFrom) {
-      whereConditions.push("aa.completed_at >= ?");
+      whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
       params.push(dateFrom);
     }
 
     if (dateTo) {
-      whereConditions.push("aa.completed_at <= ?");
+      whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
       params.push(dateTo);
     }
 
@@ -42,20 +41,18 @@ exports.getOverallStats = async (req, res, next) => {
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
-    // Общая статистика
     const [stats] = await pool.query(
       `
       SELECT 
-        COUNT(DISTINCT aa.id) as total_attempts,
-        COUNT(DISTINCT aa.user_id) as unique_users,
-        COUNT(DISTINCT aa.assessment_id) as unique_assessments,
-        AVG(aa.score_percent) as avg_score,
-        AVG(TIMESTAMPDIFF(SECOND, aa.started_at, aa.completed_at)) as avg_duration_seconds,
-        SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as passed_count,
-        COUNT(aa.id) as total_count
-      FROM assessment_attempts aa
-      JOIN assessments a ON aa.assessment_id = a.id
-      JOIN users u ON aa.user_id = u.id
+        COUNT(DISTINCT cup.id) as total_attempts,
+        COUNT(DISTINCT cup.user_id) as unique_users,
+        COUNT(DISTINCT cup.course_id) as unique_assessments,
+        AVG(cup.progress_percent) as avg_score,
+        AVG(TIMESTAMPDIFF(SECOND, cup.started_at, cup.completed_at)) as avg_duration_seconds,
+        SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as passed_count,
+        COUNT(cup.id) as total_count
+      FROM course_user_progress cup
+      JOIN users u ON cup.user_id = u.id
       ${whereClause}
     `,
       params
@@ -77,16 +74,16 @@ exports.getBranchAnalytics = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    const attemptConditions = ['aa.status = "completed"'];
+    const attemptConditions = ["1=1"];
     const attemptParams = [];
 
     if (dateFrom) {
-      attemptConditions.push("aa.completed_at >= ?");
+      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
       attemptParams.push(dateFrom);
     }
 
     if (dateTo) {
-      attemptConditions.push("aa.completed_at <= ?");
+      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
       attemptParams.push(dateTo);
     }
 
@@ -97,15 +94,14 @@ exports.getBranchAnalytics = async (req, res, next) => {
       SELECT 
         b.id,
         b.name as branch_name,
-        COUNT(DISTINCT aa.id) as total_attempts,
-        COUNT(DISTINCT aa.user_id) as unique_users,
-        AVG(aa.score_percent) as avg_score,
-        SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as passed_count,
-        COUNT(aa.id) as total_count
+        COUNT(DISTINCT cup.id) as total_attempts,
+        COUNT(DISTINCT cup.user_id) as unique_users,
+        AVG(cup.progress_percent) as avg_score,
+        SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as passed_count,
+        COUNT(cup.id) as total_count
       FROM branches b
       LEFT JOIN users u ON b.id = u.branch_id
-      LEFT JOIN assessment_attempts aa ON u.id = aa.user_id${attemptConditionsSql}
-      LEFT JOIN assessments a ON aa.assessment_id = a.id
+      LEFT JOIN course_user_progress cup ON u.id = cup.user_id${attemptConditionsSql}
       ${userRole === "manager" ? "WHERE b.id = (SELECT branch_id FROM users WHERE id = ?)" : ""}
       GROUP BY b.id
       ORDER BY avg_score DESC
@@ -129,16 +125,16 @@ exports.getPositionAnalytics = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    const attemptConditions = ['aa.status = "completed"'];
+    const attemptConditions = ["1=1"];
     const attemptParams = [];
 
     if (dateFrom) {
-      attemptConditions.push("aa.completed_at >= ?");
+      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
       attemptParams.push(dateFrom);
     }
 
     if (dateTo) {
-      attemptConditions.push("aa.completed_at <= ?");
+      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
       attemptParams.push(dateTo);
     }
 
@@ -164,16 +160,15 @@ exports.getPositionAnalytics = async (req, res, next) => {
       SELECT 
         p.id,
         p.name as position_name,
-        COUNT(DISTINCT aa.id) as total_attempts,
-        COUNT(DISTINCT aa.user_id) as unique_users,
-        AVG(aa.score_percent) as avg_score,
-        SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as passed_count,
-        COUNT(aa.id) as total_count
+        COUNT(DISTINCT cup.id) as total_attempts,
+        COUNT(DISTINCT cup.user_id) as unique_users,
+        AVG(cup.progress_percent) as avg_score,
+        SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as passed_count,
+        COUNT(cup.id) as total_count
       FROM positions p
       LEFT JOIN users u ON p.id = u.position_id
       LEFT JOIN branches b ON u.branch_id = b.id
-      LEFT JOIN assessment_attempts aa ON u.id = aa.user_id${attemptConditionsSql}
-      LEFT JOIN assessments a ON aa.assessment_id = a.id
+      LEFT JOIN course_user_progress cup ON u.id = cup.user_id${attemptConditionsSql}
       ${whereClause}
       GROUP BY p.id
       ORDER BY avg_score DESC
@@ -197,7 +192,7 @@ exports.getTopUsers = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    let whereConditions = ['aa.status = "completed"'];
+    let whereConditions = ["1=1"];
     const params = [];
 
     if (userRole === "manager") {
@@ -206,12 +201,12 @@ exports.getTopUsers = async (req, res, next) => {
     }
 
     if (dateFrom) {
-      whereConditions.push("aa.completed_at >= ?");
+      whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
       params.push(dateFrom);
     }
 
     if (dateTo) {
-      whereConditions.push("aa.completed_at <= ?");
+      whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
       params.push(dateTo);
     }
 
@@ -235,15 +230,14 @@ exports.getTopUsers = async (req, res, next) => {
         u.last_name,
         b.name as branch_name,
         p.name as position_name,
-        COUNT(DISTINCT aa.assessment_id) as total_assessments,
-        COUNT(aa.id) as total_attempts,
-        AVG(aa.score_percent) as avg_score,
-        SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as passed_count
+        SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as total_assessments,
+        COUNT(cup.id) as total_attempts,
+        AVG(cup.progress_percent) as avg_score,
+        SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as passed_count
       FROM users u
       LEFT JOIN branches b ON u.branch_id = b.id
       LEFT JOIN positions p ON u.position_id = p.id
-      JOIN assessment_attempts aa ON u.id = aa.user_id
-      JOIN assessments a ON aa.assessment_id = a.id
+      JOIN course_user_progress cup ON u.id = cup.user_id
       ${whereClause}
       GROUP BY u.id
       ORDER BY avg_score DESC, total_assessments DESC
@@ -264,11 +258,11 @@ exports.getTopUsers = async (req, res, next) => {
  */
 exports.getAssessmentTrends = async (req, res, next) => {
   try {
-    const { dateFrom, dateTo, branchId, assessmentId } = req.query;
+    const { dateFrom, dateTo, branchId } = req.query;
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    let whereConditions = ['aa.status = "completed"'];
+    let whereConditions = ["cup.completed_at IS NOT NULL"];
     const params = [];
 
     if (userRole === "manager") {
@@ -277,12 +271,12 @@ exports.getAssessmentTrends = async (req, res, next) => {
     }
 
     if (dateFrom) {
-      whereConditions.push("aa.completed_at >= ?");
+      whereConditions.push("cup.completed_at >= ?");
       params.push(dateFrom);
     }
 
     if (dateTo) {
-      whereConditions.push("aa.completed_at <= ?");
+      whereConditions.push("cup.completed_at <= ?");
       params.push(dateTo);
     }
 
@@ -291,25 +285,19 @@ exports.getAssessmentTrends = async (req, res, next) => {
       params.push(branchId);
     }
 
-    if (assessmentId) {
-      whereConditions.push("aa.assessment_id = ?");
-      params.push(assessmentId);
-    }
-
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
     const [trends] = await pool.query(
       `
       SELECT 
-        DATE(aa.completed_at) as date,
-        COUNT(aa.id) as attempts_count,
-        AVG(aa.score_percent) as avg_score,
-        SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as passed_count
-      FROM assessment_attempts aa
-      JOIN assessments a ON aa.assessment_id = a.id
-      JOIN users u ON aa.user_id = u.id
+        DATE(cup.completed_at) as date,
+        COUNT(cup.id) as attempts_count,
+        AVG(cup.progress_percent) as avg_score,
+        COUNT(cup.id) as passed_count
+      FROM course_user_progress cup
+      JOIN users u ON cup.user_id = u.id
       ${whereClause}
-      GROUP BY DATE(aa.completed_at)
+      GROUP BY DATE(cup.completed_at)
       ORDER BY date ASC
     `,
       params
@@ -348,16 +336,16 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    const attemptConditions = ['aa.status = "completed"'];
+    const attemptConditions = ["1=1"];
     const attemptParams = [];
 
     if (dateFrom) {
-      attemptConditions.push("aa.completed_at >= ?");
+      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
       attemptParams.push(dateFrom);
     }
 
     if (dateTo) {
-      attemptConditions.push("aa.completed_at <= ?");
+      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
       attemptParams.push(dateTo);
     }
 
@@ -368,17 +356,16 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
       SELECT 
         b.id,
         b.name as branch_name,
-        COUNT(DISTINCT aa.id) as total_attempts,
-        COUNT(DISTINCT aa.user_id) as unique_users,
-        AVG(aa.score_percent) as avg_score,
-        SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as passed_count,
-        SUM(CASE WHEN aa.score_percent >= 90 THEN 1 ELSE 0 END) as excellent_count,
-        SUM(CASE WHEN aa.score_percent >= a.pass_score_percent AND aa.score_percent < 90 THEN 1 ELSE 0 END) as good_count,
-        COUNT(aa.id) as total_count
+        COUNT(DISTINCT cup.id) as total_attempts,
+        COUNT(DISTINCT cup.user_id) as unique_users,
+        AVG(cup.progress_percent) as avg_score,
+        SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as passed_count,
+        SUM(CASE WHEN cup.status = 'completed' AND cup.progress_percent >= 90 THEN 1 ELSE 0 END) as excellent_count,
+        SUM(CASE WHEN cup.status = 'completed' AND cup.progress_percent >= 70 AND cup.progress_percent < 90 THEN 1 ELSE 0 END) as good_count,
+        COUNT(cup.id) as total_count
       FROM branches b
       LEFT JOIN users u ON b.id = u.branch_id
-      LEFT JOIN assessment_attempts aa ON u.id = aa.user_id${attemptConditionsSql}
-      LEFT JOIN assessments a ON aa.assessment_id = a.id
+      LEFT JOIN course_user_progress cup ON u.id = cup.user_id${attemptConditionsSql}
       ${userRole === "manager" ? "WHERE b.id = (SELECT branch_id FROM users WHERE id = ?)" : ""}
       GROUP BY b.id
       ORDER BY avg_score DESC
@@ -393,13 +380,13 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
           // Получаем медиану
           const [medianResult] = await pool.query(
             `
-            SELECT aa.score_percent
-            FROM assessment_attempts aa
-            JOIN users u ON aa.user_id = u.id
-            WHERE u.branch_id = ? AND aa.status = 'completed'
-            ${dateFrom ? "AND aa.completed_at >= ?" : ""}
-            ${dateTo ? "AND aa.completed_at <= ?" : ""}
-            ORDER BY aa.score_percent
+            SELECT cup.progress_percent
+            FROM course_user_progress cup
+            JOIN users u ON cup.user_id = u.id
+            WHERE u.branch_id = ? AND cup.status = 'completed'
+            ${dateFrom ? "AND cup.completed_at >= ?" : ""}
+            ${dateTo ? "AND cup.completed_at <= ?" : ""}
+            ORDER BY cup.progress_percent
             LIMIT 1 OFFSET ?
           `,
             [branch.id, ...(dateFrom ? [dateFrom] : []), ...(dateTo ? [dateTo] : []), Math.floor(branch.total_attempts / 2)]
@@ -407,7 +394,7 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
 
           return {
             ...branch,
-            median_score: medianResult[0]?.score_percent || 0,
+            median_score: medianResult[0]?.progress_percent || 0,
             excellent_percent: ((branch.excellent_count / branch.total_count) * 100).toFixed(2),
             good_percent: ((branch.good_count / branch.total_count) * 100).toFixed(2),
             pass_percent: ((branch.passed_count / branch.total_count) * 100).toFixed(2),
@@ -433,16 +420,16 @@ exports.getCombinedAnalytics = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    const attemptConditions = ['aa.status = "completed"'];
+    const attemptConditions = ["1=1"];
     const attemptParams = [];
 
     if (dateFrom) {
-      attemptConditions.push("aa.completed_at >= ?");
+      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
       attemptParams.push(dateFrom);
     }
 
     if (dateTo) {
-      attemptConditions.push("aa.completed_at <= ?");
+      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
       attemptParams.push(dateTo);
     }
 
@@ -470,15 +457,14 @@ exports.getCombinedAnalytics = async (req, res, next) => {
         b.name as branch_name,
         p.id as position_id,
         p.name as position_name,
-        COUNT(DISTINCT aa.id) as total_attempts,
-        AVG(aa.score_percent) as avg_score,
-        SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as passed_count,
-        COUNT(aa.id) as total_count
+        COUNT(DISTINCT cup.id) as total_attempts,
+        AVG(cup.progress_percent) as avg_score,
+        SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as passed_count,
+        COUNT(cup.id) as total_count
       FROM branches b
       CROSS JOIN positions p
       LEFT JOIN users u ON b.id = u.branch_id AND p.id = u.position_id
-      LEFT JOIN assessment_attempts aa ON u.id = aa.user_id${attemptConditionsSql}
-      LEFT JOIN assessments a ON aa.assessment_id = a.id
+      LEFT JOIN course_user_progress cup ON u.id = cup.user_id${attemptConditionsSql}
       ${whereClause}
       GROUP BY b.id, p.id
       HAVING total_attempts > 0
@@ -503,37 +489,51 @@ exports.getAssessmentReport = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    // Основная информация об аттестации
-    const [assessments] = await pool.query(
+    // Для совместимости роут оставляем прежним, но считаем отчет по курсу.
+    const courseId = Number(assessmentId);
+    const [courses] = await pool.query(
       `
     SELECT 
-      a.*,
-      b.name as branch_name,
-      (SELECT COUNT(*) FROM assessment_attempts WHERE assessment_id = a.id AND status = 'completed') as completed_count,
-      (SELECT AVG(score_percent) FROM assessment_attempts WHERE assessment_id = a.id AND status = 'completed') as avg_score,
-      (SELECT COUNT(*) FROM assessment_attempts WHERE assessment_id = a.id AND status = 'completed' AND score_percent >= a.pass_score_percent) as passed_count
-    FROM assessments a
-    LEFT JOIN branches b ON a.branch_id = b.id
-    WHERE a.id = ?
+      c.id,
+      c.title,
+      c.status,
+      (SELECT COUNT(*) FROM course_user_progress WHERE course_id = c.id) as total_count,
+      (SELECT COUNT(*) FROM course_user_progress WHERE course_id = c.id AND status = 'completed') as completed_count,
+      (SELECT AVG(progress_percent) FROM course_user_progress WHERE course_id = c.id) as avg_score
+    FROM courses c
+    WHERE c.id = ?
   `,
-      [assessmentId]
+      [courseId]
     );
 
-    if (assessments.length === 0) {
-      return res.status(404).json({ error: "Аттестация не найдена" });
+    if (courses.length === 0) {
+      return res.status(404).json({ error: "Курс не найден" });
     }
 
-    const assessment = assessments[0];
+    const course = courses[0];
 
-    // Проверка прав доступа
+    // Проверка прав доступа по филиалу для manager
     if (userRole === "manager") {
-      const [userBranch] = await pool.query("SELECT branch_id FROM users WHERE id = ?", [userId]);
-      if (userBranch[0].branch_id !== assessment.branch_id) {
-        return res.status(403).json({ error: "Нет доступа к этой аттестации" });
+      const [managerRows] = await pool.query("SELECT branch_id FROM users WHERE id = ?", [userId]);
+      const managerBranchId = managerRows?.[0]?.branch_id;
+      const [courseBranches] = await pool.query(
+        `
+        SELECT DISTINCT u.branch_id
+        FROM course_user_progress cup
+        JOIN users u ON u.id = cup.user_id
+        WHERE cup.course_id = ? AND u.branch_id IS NOT NULL
+        LIMIT 1
+      `,
+        [courseId]
+      );
+
+      const courseBranchId = courseBranches?.[0]?.branch_id || null;
+      if (!managerBranchId || (courseBranchId && Number(managerBranchId) !== Number(courseBranchId))) {
+        return res.status(403).json({ error: "Нет доступа к этому курсу" });
       }
     }
 
-    // Участники с результатами
+    // Участники с прогрессом по курсу
     const [participants] = await pool.query(
       `
       SELECT 
@@ -543,56 +543,39 @@ exports.getAssessmentReport = async (req, res, next) => {
         u.avatar_url,
         b.name as branch_name,
         p.name as position_name,
-        aa.score_percent,
-        aa.status,
-        aa.started_at,
-        aa.completed_at,
-        TIMESTAMPDIFF(SECOND, aa.started_at, aa.completed_at) as duration_seconds
-      FROM assessment_attempts aa
-      JOIN users u ON aa.user_id = u.id
+        cup.progress_percent as score_percent,
+        cup.status,
+        cup.started_at,
+        cup.completed_at,
+        TIMESTAMPDIFF(SECOND, cup.started_at, cup.completed_at) as duration_seconds
+      FROM course_user_progress cup
+      JOIN users u ON cup.user_id = u.id
       LEFT JOIN branches b ON u.branch_id = b.id
       LEFT JOIN positions p ON u.position_id = p.id
-      WHERE aa.assessment_id = ?
-      ORDER BY aa.score_percent DESC, aa.completed_at ASC
+      WHERE cup.course_id = ?
+      ORDER BY cup.progress_percent DESC, cup.completed_at ASC
     `,
-      [assessmentId]
+      [courseId]
     );
 
-    // Статистика по вопросам
-    const [questionStats] = await pool.query(
-      `
-      SELECT 
-        q.id,
-        q.question_text,
-        q.question_type,
-        COUNT(DISTINCT aa.id) as total_answers,
-        SUM(CASE WHEN aua.is_correct = 1 THEN 1 ELSE 0 END) as correct_answers,
-        ROUND((SUM(CASE WHEN aua.is_correct = 1 THEN 1 ELSE 0 END) / COUNT(DISTINCT aa.id)) * 100, 2) as correct_percent
-      FROM questions q
-      JOIN assessment_questions aq ON q.id = aq.question_id
-      JOIN assessment_attempts aa ON aq.assessment_id = aa.assessment_id
-      LEFT JOIN assessment_user_answers aua ON q.id = aua.question_id AND aa.id = aua.attempt_id
-      WHERE aq.assessment_id = ? AND aa.status = 'completed'
-      GROUP BY q.id
-      ORDER BY correct_percent ASC
-    `,
-      [assessmentId]
-    );
+    // Для совместимости структуры оставляем questionStats пустым.
+    const questionStats = [];
 
     res.json({
-      assessment,
+      assessment: course,
       participants,
       questionStats,
       summary: {
         total_participants: participants.length,
-        completed_count: assessment.completed_count,
-        avg_score: assessment.avg_score,
-        passed_count: assessment.passed_count,
-        pass_percent: assessment.completed_count > 0 ? ((assessment.passed_count / assessment.completed_count) * 100).toFixed(2) : 0,
+        completed_count: Number(course.completed_count || 0),
+        avg_score: course.avg_score,
+        passed_count: Number(course.completed_count || 0),
+        pass_percent:
+          Number(course.total_count || 0) > 0 ? ((Number(course.completed_count || 0) / Number(course.total_count || 0)) * 100).toFixed(2) : 0,
       },
     });
   } catch (error) {
-    console.error("Get assessment report error:", error);
+    console.error("Get course report error:", error);
     next(error);
   }
 };
@@ -670,44 +653,43 @@ exports.getUserReport = async (req, res, next) => {
     const params = [targetUserId];
 
     if (dateFrom) {
-      dateCondition += " AND aa.completed_at >= ?";
+      dateCondition += " AND COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?";
       params.push(dateFrom);
     }
 
     if (dateTo) {
-      dateCondition += " AND aa.completed_at <= ?";
+      dateCondition += " AND COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?";
       params.push(dateTo);
     }
 
-    // Статистика по аттестациям
+    // Статистика по курсам
     const [stats] = await pool.query(
       `
       SELECT 
-        COUNT(aa.id) as total_attempts,
-        AVG(aa.score_percent) as avg_score,
-        MAX(aa.score_percent) as max_score,
-        MIN(aa.score_percent) as min_score,
-        SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as passed_count
-      FROM assessment_attempts aa
-      JOIN assessments a ON aa.assessment_id = a.id
-      WHERE aa.user_id = ? AND aa.status = 'completed'${dateCondition}
+        COUNT(cup.id) as total_attempts,
+        AVG(cup.progress_percent) as avg_score,
+        MAX(cup.progress_percent) as max_score,
+        MIN(cup.progress_percent) as min_score,
+        SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as passed_count
+      FROM course_user_progress cup
+      WHERE cup.user_id = ?${dateCondition}
     `,
       params
     );
 
-    // История аттестаций
+    // История курсов
     const [attempts] = await pool.query(
       `
       SELECT 
-        a.id as assessment_id,
-        a.title as assessment_title,
-        aa.score_percent,
-        aa.completed_at,
-        CASE WHEN aa.score_percent >= a.pass_score_percent THEN 'Пройдено' ELSE 'Не пройдено' END as status
-      FROM assessment_attempts aa
-      JOIN assessments a ON aa.assessment_id = a.id
-      WHERE aa.user_id = ? AND aa.status = 'completed'${dateCondition}
-      ORDER BY aa.completed_at DESC
+        c.id as assessment_id,
+        c.title as assessment_title,
+        cup.progress_percent as score_percent,
+        COALESCE(cup.completed_at, cup.updated_at, cup.created_at) as completed_at,
+        CASE WHEN cup.status = 'completed' THEN 'Пройдено' ELSE 'В процессе' END as status
+      FROM course_user_progress cup
+      JOIN courses c ON c.id = cup.course_id
+      WHERE cup.user_id = ?${dateCondition}
+      ORDER BY COALESCE(cup.completed_at, cup.updated_at, cup.created_at) DESC
     `,
       params
     );
@@ -716,11 +698,11 @@ exports.getUserReport = async (req, res, next) => {
     const [trends] = await pool.query(
       `
       SELECT 
-        DATE(aa.completed_at) as date,
-        AVG(aa.score_percent) as avg_score
-      FROM assessment_attempts aa
-      WHERE aa.user_id = ? AND aa.status = 'completed'${dateCondition}
-      GROUP BY DATE(aa.completed_at)
+        DATE(COALESCE(cup.completed_at, cup.updated_at, cup.created_at)) as date,
+        AVG(cup.progress_percent) as avg_score
+      FROM course_user_progress cup
+      WHERE cup.user_id = ?${dateCondition}
+      GROUP BY DATE(COALESCE(cup.completed_at, cup.updated_at, cup.created_at))
       ORDER BY date ASC
     `,
       params
@@ -730,11 +712,13 @@ exports.getUserReport = async (req, res, next) => {
     const [comparison] = await pool.query(
       `
       SELECT 
-        AVG(aa.score_percent) as avg_score_peers,
-        COUNT(DISTINCT aa.user_id) as total_peers
-      FROM assessment_attempts aa
-      JOIN users u ON aa.user_id = u.id
-      WHERE u.position_id = ? AND u.id != ? AND aa.status = 'completed'${dateCondition}
+        AVG(cup.progress_percent) as avg_score_peers,
+        COUNT(DISTINCT cup.user_id) as total_peers
+      FROM course_user_progress cup
+      JOIN users u ON cup.user_id = u.id
+      WHERE u.position_id = ? AND u.id != ?
+      ${dateFrom ? "AND COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?" : ""}
+      ${dateTo ? "AND COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?" : ""}
     `,
       [user.position_id, targetUserId, ...(dateFrom ? [dateFrom] : []), ...(dateTo ? [dateTo] : [])]
     );
@@ -769,7 +753,7 @@ exports.exportToExcel = async (req, res, next) => {
       // Экспорт аналитики по филиалам
       const sheet = workbook.addWorksheet("Филиалы");
 
-      let whereConditions = ['aa.status = "completed"'];
+      let whereConditions = ["1=1"];
       const params = [];
 
       if (userRole === "manager") {
@@ -778,12 +762,12 @@ exports.exportToExcel = async (req, res, next) => {
       }
 
       if (dateFrom) {
-        whereConditions.push("aa.completed_at >= ?");
+        whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
         params.push(dateFrom);
       }
 
       if (dateTo) {
-        whereConditions.push("aa.completed_at <= ?");
+        whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
         params.push(dateTo);
       }
 
@@ -793,15 +777,14 @@ exports.exportToExcel = async (req, res, next) => {
         `
         SELECT 
           b.name as 'Филиал',
-          COUNT(DISTINCT aa.id) as 'Всего попыток',
-          COUNT(DISTINCT aa.user_id) as 'Уникальных пользователей',
-          ROUND(AVG(aa.score_percent), 2) as 'Средний балл',
-          SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as 'Прошли',
-          ROUND((SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) / COUNT(aa.id)) * 100, 2) as 'Процент успеха'
+          COUNT(DISTINCT cup.id) as 'Всего курсов',
+          COUNT(DISTINCT cup.user_id) as 'Уникальных пользователей',
+          ROUND(AVG(cup.progress_percent), 2) as 'Средний прогресс',
+          SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as 'Завершено',
+          ROUND((SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) / COUNT(cup.id)) * 100, 2) as 'Процент успеха'
         FROM branches b
         LEFT JOIN users u ON b.id = u.branch_id
-        LEFT JOIN assessment_attempts aa ON u.id = aa.user_id ${whereConditions.length > 0 ? "AND " + whereConditions.slice(1).join(" AND ") : ""}
-        LEFT JOIN assessments a ON aa.assessment_id = a.id
+        LEFT JOIN course_user_progress cup ON u.id = cup.user_id ${whereConditions.length > 0 ? "AND " + whereConditions.slice(1).join(" AND ") : ""}
         ${userRole === "manager" ? "WHERE b.id = (SELECT branch_id FROM users WHERE id = ?)" : ""}
         GROUP BY b.id
       `,
@@ -823,7 +806,7 @@ exports.exportToExcel = async (req, res, next) => {
       // Экспорт по пользователям
       const sheet = workbook.addWorksheet("Сотрудники");
 
-      let whereConditions = ['aa.status = "completed"'];
+      let whereConditions = ["1=1"];
       const params = [];
 
       if (userRole === "manager") {
@@ -832,12 +815,12 @@ exports.exportToExcel = async (req, res, next) => {
       }
 
       if (dateFrom) {
-        whereConditions.push("aa.completed_at >= ?");
+        whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
         params.push(dateFrom);
       }
 
       if (dateTo) {
-        whereConditions.push("aa.completed_at <= ?");
+        whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
         params.push(dateTo);
       }
 
@@ -860,18 +843,17 @@ exports.exportToExcel = async (req, res, next) => {
           u.last_name as 'Фамилия',
           b.name as 'Филиал',
           p.name as 'Должность',
-          COUNT(DISTINCT aa.assessment_id) as 'Пройдено аттестаций',
-          COUNT(aa.id) as 'Всего попыток',
-          ROUND(AVG(aa.score_percent), 2) as 'Средний балл',
-          SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as 'Прошли'
+          SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as 'Завершено курсов',
+          COUNT(cup.id) as 'Всего курсов',
+          ROUND(AVG(cup.progress_percent), 2) as 'Средний прогресс',
+          SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as 'Успешно завершено'
         FROM users u
         LEFT JOIN branches b ON u.branch_id = b.id
         LEFT JOIN positions p ON u.position_id = p.id
-        JOIN assessment_attempts aa ON u.id = aa.user_id
-        JOIN assessments a ON aa.assessment_id = a.id
+        JOIN course_user_progress cup ON u.id = cup.user_id
         ${whereClause}
         GROUP BY u.id
-        ORDER BY AVG(aa.score_percent) DESC
+        ORDER BY AVG(cup.progress_percent) DESC
       `,
         params
       );
@@ -916,13 +898,13 @@ exports.exportToPDF = async (req, res, next) => {
     doc.pipe(res);
 
     // Заголовок
-    doc.fontSize(20).text("Отчёт по аттестациям", { align: "center" });
+    doc.fontSize(20).text("Отчёт по курсам", { align: "center" });
     doc.moveDown();
     doc.fontSize(12).text(`Дата формирования: ${new Date().toLocaleDateString("ru-RU")}`, { align: "center" });
     doc.moveDown(2);
 
     if (type === "branches") {
-      let whereConditions = ['aa.status = "completed"'];
+      let whereConditions = ["1=1"];
       const params = [];
 
       if (userRole === "manager") {
@@ -931,12 +913,12 @@ exports.exportToPDF = async (req, res, next) => {
       }
 
       if (dateFrom) {
-        whereConditions.push("aa.completed_at >= ?");
+        whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
         params.push(dateFrom);
       }
 
       if (dateTo) {
-        whereConditions.push("aa.completed_at <= ?");
+        whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
         params.push(dateTo);
       }
 
@@ -946,14 +928,13 @@ exports.exportToPDF = async (req, res, next) => {
         `
         SELECT 
           b.name,
-          COUNT(DISTINCT aa.id) as total_attempts,
-          ROUND(AVG(aa.score_percent), 2) as avg_score,
-          SUM(CASE WHEN aa.score_percent >= a.pass_score_percent THEN 1 ELSE 0 END) as passed_count,
-          COUNT(aa.id) as total_count
+          COUNT(DISTINCT cup.id) as total_attempts,
+          ROUND(AVG(cup.progress_percent), 2) as avg_score,
+          SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as passed_count,
+          COUNT(cup.id) as total_count
         FROM branches b
         LEFT JOIN users u ON b.id = u.branch_id
-        LEFT JOIN assessment_attempts aa ON u.id = aa.user_id ${whereConditions.length > 0 ? "AND " + whereConditions.slice(1).join(" AND ") : ""}
-        LEFT JOIN assessments a ON aa.assessment_id = a.id
+        LEFT JOIN course_user_progress cup ON u.id = cup.user_id ${whereConditions.length > 0 ? "AND " + whereConditions.slice(1).join(" AND ") : ""}
         ${userRole === "manager" ? "WHERE b.id = (SELECT branch_id FROM users WHERE id = ?)" : ""}
         GROUP BY b.id
       `,
@@ -965,9 +946,9 @@ exports.exportToPDF = async (req, res, next) => {
 
       branches.forEach((branch, index) => {
         doc.fontSize(12).text(`${index + 1}. ${branch.name}`, { bold: true });
-        doc.fontSize(10).text(`   Всего попыток: ${branch.total_attempts}`);
-        doc.text(`   Средний балл: ${branch.avg_score}%`);
-        doc.text(`   Прошли: ${branch.passed_count} из ${branch.total_count}`);
+        doc.fontSize(10).text(`   Всего курсов: ${branch.total_attempts}`);
+        doc.text(`   Средний прогресс: ${branch.avg_score}%`);
+        doc.text(`   Завершено: ${branch.passed_count} из ${branch.total_count}`);
         doc.moveDown();
       });
     }
@@ -988,15 +969,15 @@ exports.getFailureReasons = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    const where = ["aa.status = 'completed'", "aa.score_percent < a.pass_score_percent"];
+    const where = ["1=1"];
     const params = [];
 
     if (dateFrom) {
-      where.push("aa.completed_at >= ?");
+      where.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
       params.push(dateFrom);
     }
     if (dateTo) {
-      where.push("aa.completed_at <= ?");
+      where.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
       params.push(dateTo);
     }
     if (userRole === "manager") {
@@ -1010,28 +991,11 @@ exports.getFailureReasons = async (req, res, next) => {
     const [rows] = await pool.query(
       `
       SELECT
-        SUM(
-          CASE
-            WHEN a.time_limit_minutes IS NOT NULL
-              AND aa.time_spent_seconds IS NOT NULL
-              AND aa.time_spent_seconds >= (a.time_limit_minutes * 60)
-            THEN 1 ELSE 0
-          END
-        ) AS timeout_count,
-        SUM(
-          CASE
-            WHEN NOT (
-              a.time_limit_minutes IS NOT NULL
-              AND aa.time_spent_seconds IS NOT NULL
-              AND aa.time_spent_seconds >= (a.time_limit_minutes * 60)
-            )
-            THEN 1 ELSE 0
-          END
-        ) AS wrong_answers_count,
-        COUNT(*) AS total_failed
-      FROM assessment_attempts aa
-      JOIN assessments a ON a.id = aa.assessment_id
-      JOIN users u ON u.id = aa.user_id
+        SUM(CASE WHEN cup.status = 'closed' THEN 1 ELSE 0 END) AS timeout_count,
+        SUM(CASE WHEN cup.status IN ('not_started','in_progress') THEN 1 ELSE 0 END) AS wrong_answers_count,
+        SUM(CASE WHEN cup.status <> 'completed' THEN 1 ELSE 0 END) AS total_failed
+      FROM course_user_progress cup
+      JOIN users u ON u.id = cup.user_id
       WHERE ${where.join(" AND ")}
       `,
       params,

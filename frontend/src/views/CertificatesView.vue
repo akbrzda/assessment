@@ -23,8 +23,11 @@
           <div class="cert-card__info">
             <h2 class="cert-card__title">{{ cert.course_title }}</h2>
             <p class="cert-card__date">{{ formatDate(cert.issued_at) }}</p>
+            <p class="cert-card__expires">
+              Действует до: {{ formatDate(cert.expires_at) }}
+            </p>
             <p v-if="(cert.display_status || cert.status) === 'expired'" class="cert-card__expired">
-              Просрочен {{ formatDate(cert.expires_at) }}
+              Просрочен
             </p>
           </div>
         </div>
@@ -259,6 +262,12 @@ export default {
   font-size: 13px;
   color: var(--color-text-secondary, #888);
   margin: 0;
+}
+
+.cert-card__expires {
+  font-size: 12px;
+  color: var(--color-text-secondary, #888);
+  margin: 4px 0 0;
 }
 
 .cert-card__expired {
