@@ -28,20 +28,67 @@ function isInitDataFresh(initDataString) {
   return nowSeconds - authDate <= INIT_DATA_MAX_AGE_SECONDS;
 }
 
+function parseInviteCodeCandidate(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const lower = trimmed.toLowerCase();
+  let candidate = trimmed;
+
+  if (lower.startsWith("invite_")) {
+    candidate = trimmed.slice(7);
+  } else if (lower.startsWith("invite-")) {
+    candidate = trimmed.slice(7);
+  } else if (lower.startsWith("code-")) {
+    candidate = trimmed.slice(5);
+  }
+
+  const normalized = candidate.trim().toUpperCase();
+  if (!/^[A-Z0-9]{4,16}$/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function getLocationParams() {
+  if (typeof window === "undefined") {
+    return new URLSearchParams();
+  }
+
+  const combined = new URLSearchParams(window.location.search);
+  const hash = (window.location.hash || "").replace(/^#/, "");
+  if (hash) {
+    const hashParams = new URLSearchParams(hash);
+    for (const [key, value] of hashParams.entries()) {
+      if (!combined.has(key)) {
+        combined.set(key, value);
+      }
+    }
+  }
+
+  return combined;
+}
+
 function extractInviteFromUrl() {
   if (typeof window === "undefined") {
     return null;
   }
 
-  const params = new URLSearchParams(window.location.search);
-  const direct = params.get("invite") || params.get("code");
-  if (direct) {
-    return direct;
-  }
+  const params = getLocationParams();
+  const candidates = [params.get("invite"), params.get("code"), params.get("startapp"), params.get("start_param"), params.get("tgWebAppStartParam")];
 
-  const startApp = params.get("startapp");
-  if (startApp && startApp.startsWith("invite_")) {
-    return startApp.replace("invite_", "");
+  for (const candidate of candidates) {
+    const inviteCode = parseInviteCodeCandidate(candidate);
+    if (inviteCode) {
+      return inviteCode;
+    }
   }
 
   return null;
@@ -138,13 +185,9 @@ export const useTelegramStore = defineStore("telegram", () => {
       initDataLength: currentInitData.length,
     });
 
-    if (typeof tgWebAppStartParam === "string" && tgWebAppStartParam.startsWith("invite_")) {
-      inviteCode = tgWebAppStartParam.replace("invite_", "");
-    } else if (typeof startApp === "string" && startApp.startsWith("invite_")) {
-      inviteCode = startApp.replace("invite_", "");
-    } else if (typeof startParam === "string" && startParam.startsWith("invite_")) {
-      inviteCode = startParam.replace("invite_", "");
-    } else if (urlInvite) {
+    inviteCode = parseInviteCodeCandidate(tgWebAppStartParam) || parseInviteCodeCandidate(startApp) || parseInviteCodeCandidate(startParam) || null;
+
+    if (!inviteCode && urlInvite) {
       inviteCode = urlInvite;
     }
 

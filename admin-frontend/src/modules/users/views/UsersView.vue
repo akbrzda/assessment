@@ -556,7 +556,7 @@ const handleInviteCreate = async () => {
     const code = data?.invitation?.code;
     if (code) {
       const botUsername = BOT_USERNAME || "";
-      inviteLink.value = botUsername ? `https://t.me/${botUsername}?startapp=${code}` : `Код приглашения: ${code}`;
+      inviteLink.value = botUsername ? `https://t.me/${botUsername}?startapp=invite_${code}` : `Код приглашения: ${code}`;
     }
 
     await loadUsers({ forceFresh: true });

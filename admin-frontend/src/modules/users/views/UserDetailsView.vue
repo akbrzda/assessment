@@ -342,7 +342,7 @@ const invitationLink = computed(() => {
   const code = profile.value?.invitation?.code;
   if (!code) return "";
   const botUsername = BOT_USERNAME || "";
-  return botUsername ? `https://t.me/${botUsername}?startapp=${code}` : `Код приглашения: ${code}`;
+  return botUsername ? `https://t.me/${botUsername}?startapp=invite_${code}` : `Код приглашения: ${code}`;
 });
 
 const userStatusLabel = computed(() => (profile.value?.user?.telegram_id ? "Активен" : "Ожидает"));
