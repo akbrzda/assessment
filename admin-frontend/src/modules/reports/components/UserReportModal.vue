@@ -14,19 +14,19 @@
 
         <div class="stats-grid-4">
           <div class="stat-item">
-            <div class="stat-label">Всего попыток</div>
+            <div class="stat-label">Всего курсов</div>
             <div class="stat-value">{{ report.stats.total_attempts || 0 }}</div>
           </div>
           <div class="stat-item">
-            <div class="stat-label">Средний балл</div>
+            <div class="stat-label">Средний прогресс</div>
             <div class="stat-value score-blue">{{ formatPercent(report.stats.avg_score, 2) }}</div>
           </div>
           <div class="stat-item">
-            <div class="stat-label">Максимальный балл</div>
+            <div class="stat-label">Максимальный прогресс</div>
             <div class="stat-value score-green">{{ formatPercent(report.stats.max_score, 2) }}</div>
           </div>
           <div class="stat-item">
-            <div class="stat-label">Пройдено</div>
+            <div class="stat-label">Завершено</div>
             <div class="stat-value score-green">{{ report.stats.passed_count || 0 }}</div>
           </div>
         </div>
@@ -37,14 +37,14 @@
         <h4 class="card-section-title">Сравнение с коллегами</h4>
         <div class="comparison-content">
           <div class="comparison-item">
-            <div class="comparison-label">Средний балл сотрудника</div>
+            <div class="comparison-label">Средний прогресс сотрудника</div>
             <div class="comparison-bar">
               <div class="comparison-bar-fill user" :style="{ width: `${getPercentWidth(report.stats.avg_score)}%` }"></div>
               <span class="comparison-value">{{ formatPercent(report.stats.avg_score, 2) }}</span>
             </div>
           </div>
           <div class="comparison-item">
-            <div class="comparison-label">Средний балл коллег ({{ report.user.position_name }})</div>
+            <div class="comparison-label">Средний прогресс коллег ({{ report.user.position_name }})</div>
             <div class="comparison-bar">
               <div class="comparison-bar-fill peers" :style="{ width: `${getPercentWidth(report.comparison.avg_score_peers)}%` }"></div>
               <span class="comparison-value">{{ formatPercent(report.comparison.avg_score_peers, 2) }}</span>
@@ -63,16 +63,16 @@
         </div>
       </div>
 
-      <!-- История аттестаций -->
+      <!-- История курсов -->
       <div class="card-wrapper">
-        <h4 class="card-section-title">История аттестаций</h4>
+        <h4 class="card-section-title">История курсов</h4>
         <div class="table-wrapper">
           <table class="report-table">
             <thead>
               <tr>
                 <th>№</th>
-                <th>Аттестация</th>
-                <th>Балл</th>
+                <th>Курс</th>
+                <th>Прогресс</th>
                 <th>Статус</th>
                 <th>Дата</th>
               </tr>
@@ -242,7 +242,7 @@ const handleExport = () => {
     `Всего попыток: ${report.value.stats.total_attempts}`,
     `Средний балл: ${formatPercent(report.value.stats.avg_score, 2)}`,
     "",
-    "История аттестаций:",
+    "История курсов:",
     ...report.value.attempts.map(
       (attempt, index) =>
         `${index + 1}. ${attempt.assessment_title} — ${formatPercent(attempt.score_percent, 2)} (${attempt.status}) ${formatDate(attempt.completed_at)}`,

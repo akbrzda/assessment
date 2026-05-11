@@ -10,6 +10,11 @@ export const revokeCertificate = async (id) => {
   return response.data;
 };
 
+export const sendToRequalification = async (id, payload) => {
+  const response = await axios.post(`/admin/certificates/${id}/requalify`, payload || {});
+  return response.data;
+};
+
 export const issueCertificate = async (payload) => {
   const response = await axios.post("/admin/certificates/issue", payload);
   return response.data;

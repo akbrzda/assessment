@@ -111,7 +111,7 @@
           :class="{ 'wysiwyg-btn-active': isActive('blockquote') }"
           title="Цитата"
           aria-label="Цитата"
-          @mousedown.prevent="run('toggleBlockquote')"
+          @mousedown.prevent="toggleQuote"
         >
           <Quote class="wysiwyg-btn-icon" />
         </button>
@@ -341,6 +341,7 @@ import Color from "@tiptap/extension-color";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
+import Blockquote from "@tiptap/extension-blockquote";
 import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table";
 import {
   Bold,
@@ -478,6 +479,7 @@ const editor = ref(
       FontSize,
       Color,
       Underline,
+      Blockquote,
       Link.configure({
         openOnClick: false,
         autolink: true,
@@ -549,6 +551,14 @@ const isActive = (name) => Boolean(editor.value?.isActive(name));
 const run = (command) => {
   if (!editor.value || sourceMode.value) return;
   editor.value.chain().focus()[command]().run();
+};
+
+const toggleQuote = () => {
+  if (!editor.value || sourceMode.value) return;
+  const toggled = editor.value.chain().focus().toggleBlockquote().run();
+  if (!toggled && !editor.value.isActive("blockquote")) {
+    editor.value.chain().focus().setBlockquote().run();
+  }
 };
 
 const setHeading = (value) => {

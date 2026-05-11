@@ -32,15 +32,16 @@ async function create({ userId, courseId, attemptId = null, scorePercent = null 
 /**
  * Обновляет статус сертификата.
  */
-async function updateStatus(id, { status, filePath = null, fileUrl = null, issuedAt = null }) {
+async function updateStatus(id, { status, filePath = null, fileUrl = null, issuedAt = null, expiresAt = null }) {
   await pool.execute(
     `UPDATE certificates
      SET status = ?,
          file_path = COALESCE(?, file_path),
          file_url = COALESCE(?, file_url),
-         issued_at = COALESCE(?, issued_at)
+         issued_at = COALESCE(?, issued_at),
+         expires_at = COALESCE(?, expires_at)
      WHERE id = ?`,
-    [status, filePath, fileUrl, issuedAt, id],
+    [status, filePath, fileUrl, issuedAt, expiresAt, id],
   );
 }
 
@@ -56,7 +57,7 @@ async function saveSnapshot(id, snapshotData) {
  */
 async function findByUserId(userId) {
   const [rows] = await pool.execute(
-    `SELECT c.id, c.uuid, c.status, c.score_percent, c.issued_at, c.file_url,
+    `SELECT c.id, c.uuid, c.status, c.score_percent, c.issued_at, c.expires_at, c.file_url,
             co.title AS course_title, co.id AS course_id
      FROM certificates c
      JOIN courses co ON co.id = c.course_id
@@ -72,7 +73,7 @@ async function findByUserId(userId) {
  */
 async function findByUuid(uuid) {
   const [rows] = await pool.execute(
-    `SELECT c.id, c.uuid, c.status, c.score_percent, c.issued_at, c.file_path, c.file_url,
+    `SELECT c.id, c.uuid, c.status, c.score_percent, c.issued_at, c.expires_at, c.file_path, c.file_url,
             c.snapshot_data, c.revoked_at, c.revoked_by,
             co.title AS course_title, co.id AS course_id,
             u.first_name, u.last_name
@@ -100,7 +101,7 @@ async function revoke(id, revokedBy) {
 /**
  * Список для администратора с фильтрами.
  */
-async function findAll({ userId = null, courseId = null, status = null, page = 1, limit = 20 }) {
+async function findAll({ userId = null, courseId = null, status = null, page = 1, limit = 20, graceDays = 0 }) {
   const offset = (page - 1) * limit;
   const conditions = [];
   const params = [];
@@ -114,8 +115,13 @@ async function findAll({ userId = null, courseId = null, status = null, page = 1
     params.push(courseId);
   }
   if (status) {
-    conditions.push("c.status = ?");
-    params.push(status);
+    if (status === "expired") {
+      conditions.push("c.status = 'issued' AND c.expires_at IS NOT NULL AND DATE_ADD(c.expires_at, INTERVAL ? DAY) < UTC_TIMESTAMP()");
+      params.push(Math.max(0, Number(graceDays) || 0));
+    } else {
+      conditions.push("c.status = ?");
+      params.push(status);
+    }
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -124,7 +130,7 @@ async function findAll({ userId = null, courseId = null, status = null, page = 1
   const total = countRows[0].total;
 
   const [rows] = await pool.execute(
-    `SELECT c.id, c.uuid, c.status, c.score_percent, c.issued_at, c.revoked_at, c.file_url,
+    `SELECT c.id, c.uuid, c.status, c.score_percent, c.issued_at, c.expires_at, c.revoked_at, c.file_url,
             co.title AS course_title,
             u.first_name, u.last_name
      FROM certificates c
@@ -202,4 +208,81 @@ module.exports = {
   findFailed,
   findLastByTelegramId,
   findAllByTelegramId,
+  resolveDisplayStatus,
+  resetCourseProgressByCertificateId,
 };
+
+function resolveDisplayStatus(cert, graceDays = 0) {
+  if (!cert || cert.status !== "issued") {
+    return cert?.status || null;
+  }
+  if (!cert.expires_at) {
+    return "issued";
+  }
+  const expiresAt = new Date(cert.expires_at).getTime();
+  const graceUntil = expiresAt + Math.max(0, Number(graceDays) || 0) * 24 * 60 * 60 * 1000;
+  if (Date.now() > graceUntil) {
+    return "expired";
+  }
+  return "issued";
+}
+
+async function resetCourseProgressByCertificateId(id, { requestedBy = null, reason = "", comment = "", graceDays = 0 } = {}) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [rows] = await connection.execute(
+      `SELECT id, user_id, course_id, status, expires_at
+       FROM certificates
+       WHERE id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [id],
+    );
+    if (!rows.length) {
+      await connection.rollback();
+      return { ok: false, reason: "not_found" };
+    }
+
+    const cert = rows[0];
+    if (cert.status !== "issued") {
+      await connection.rollback();
+      return { ok: false, reason: "invalid_status" };
+    }
+
+    if (!cert.expires_at) {
+      await connection.rollback();
+      return { ok: false, reason: "not_expired" };
+    }
+
+    const expiresAtTs = new Date(cert.expires_at).getTime();
+    const graceUntilTs = expiresAtTs + Math.max(0, Number(graceDays) || 0) * 24 * 60 * 60 * 1000;
+    if (Date.now() <= graceUntilTs) {
+      await connection.rollback();
+      return { ok: false, reason: "not_expired" };
+    }
+
+    await connection.execute("DELETE FROM course_topic_user_progress WHERE course_id = ? AND user_id = ?", [cert.course_id, cert.user_id]);
+    await connection.execute("DELETE FROM course_section_user_progress WHERE course_id = ? AND user_id = ?", [cert.course_id, cert.user_id]);
+    await connection.execute("DELETE FROM course_user_progress WHERE course_id = ? AND user_id = ?", [cert.course_id, cert.user_id]);
+    await connection.execute("DELETE FROM course_user_snapshots WHERE course_id = ? AND user_id = ?", [cert.course_id, cert.user_id]);
+    await connection.execute(
+      `UPDATE certificates
+       SET requalification_requested_at = UTC_TIMESTAMP(),
+           requalification_requested_by = ?,
+           requalification_reason = ?,
+           requalification_comment = ?
+       WHERE id = ?`,
+      [requestedBy, reason, comment || null, cert.id],
+    );
+
+    await connection.commit();
+    return { ok: true, userId: Number(cert.user_id), courseId: Number(cert.course_id), certificateId: Number(cert.id) };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}

@@ -38,7 +38,8 @@
             <TableHead>Курс</TableHead>
             <TableHead>Статус</TableHead>
             <TableHead>Результат</TableHead>
-            <TableHead>Дата</TableHead>
+            <TableHead>Выдан</TableHead>
+            <TableHead>Действует до</TableHead>
             <TableHead>Действия</TableHead>
           </TableRow>
         </TableHeader>
@@ -47,16 +48,20 @@
             <TableCell>{{ cert.first_name }} {{ cert.last_name }}</TableCell>
             <TableCell>{{ cert.course_title }}</TableCell>
             <TableCell>
-              <Badge :variant="statusVariant(cert.status)">{{ statusLabel(cert.status) }}</Badge>
+              <Badge :variant="statusVariant(cert.display_status || cert.status)">{{ statusLabel(cert.display_status || cert.status) }}</Badge>
             </TableCell>
             <TableCell>
               {{ cert.score_percent != null ? Number(cert.score_percent).toFixed(0) + "%" : "—" }}
             </TableCell>
             <TableCell>{{ formatDate(cert.issued_at) }}</TableCell>
+            <TableCell>{{ formatDate(cert.expires_at) }}</TableCell>
             <TableCell>
               <div class="actions-cell">
                 <Button v-if="cert.status === 'issued'" size="sm" variant="secondary" @click="handleDownload(cert)">Скачать</Button>
                 <Button v-if="cert.status === 'issued'" size="sm" variant="danger" @click="confirmRevoke(cert)">Аннулировать</Button>
+                <Button v-if="(cert.display_status || cert.status) === 'expired'" size="sm" @click="handleRequalification(cert)">
+                  На переквалификацию
+                </Button>
               </div>
             </TableCell>
           </TableRow>
@@ -103,6 +108,18 @@
       @confirm="handleRevoke"
       @cancel="showRevokeDialog = false"
     />
+
+    <Modal :show="showRequalifyModal" title="Отправить на переквалификацию" @close="closeRequalifyModal">
+      <div class="flex flex-col gap-3">
+        <Input v-model="requalifyForm.reason" label="Причина" placeholder="Например: Истек срок сертификата" />
+        <Input v-model="requalifyForm.comment" label="Комментарий" placeholder="Дополнительные детали (опционально)" />
+        <Alert v-if="requalifyError" variant="error" :message="requalifyError" />
+        <div class="flex gap-3 pt-1">
+          <Button :loading="isRequalifying" @click="submitRequalification">Подтвердить</Button>
+          <Button variant="secondary" @click="closeRequalifyModal">Отмена</Button>
+        </div>
+      </div>
+    </Modal>
   </div>
 </template>
 
@@ -121,7 +138,7 @@ import FilterBar from "@/components/ui/FilterBar.vue";
 import Pagination from "@/components/ui/Pagination.vue";
 import { useToast } from "@/composables/useToast";
 import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "@/components/ui";
-import { getCertificates, revokeCertificate, issueCertificate, downloadCertificate } from "@/api/certificates";
+import { getCertificates, revokeCertificate, issueCertificate, downloadCertificate, sendToRequalification } from "@/api/certificates";
 
 const { showToast } = useToast();
 const certificates = ref([]);
@@ -142,6 +159,7 @@ const filterDefs = [
       { value: "pending", label: "Генерируется" },
       { value: "generation_failed", label: "Ошибка" },
       { value: "revoked", label: "Аннулирован" },
+      { value: "expired", label: "Просрочен" },
     ],
   },
 ];
@@ -154,9 +172,14 @@ function onFilterChange() {
 const showIssueModal = ref(false);
 const showRevokeDialog = ref(false);
 const revokeTarget = ref(null);
+const showRequalifyModal = ref(false);
+const requalifyTarget = ref(null);
 const isIssuing = ref(false);
+const isRequalifying = ref(false);
 const issueError = ref("");
+const requalifyError = ref("");
 const issueForm = ref({ userId: "", courseId: "" });
+const requalifyForm = ref({ reason: "", comment: "" });
 
 async function loadCertificates() {
   isLoading.value = true;
@@ -233,6 +256,46 @@ async function handleIssue() {
   }
 }
 
+async function handleRequalification(cert) {
+  requalifyTarget.value = cert;
+  requalifyForm.value = { reason: "Истек срок действия сертификата", comment: "" };
+  requalifyError.value = "";
+  showRequalifyModal.value = true;
+}
+
+function closeRequalifyModal() {
+  showRequalifyModal.value = false;
+  requalifyTarget.value = null;
+  requalifyForm.value = { reason: "", comment: "" };
+  requalifyError.value = "";
+}
+
+async function submitRequalification() {
+  const cert = requalifyTarget.value;
+  if (!cert) return;
+  const reason = String(requalifyForm.value.reason || "").trim();
+  const comment = String(requalifyForm.value.comment || "").trim();
+  if (!reason) {
+    requalifyError.value = "Укажите причину переквалификации";
+    return;
+  }
+
+  isRequalifying.value = true;
+  requalifyError.value = "";
+  try {
+    await sendToRequalification(cert.id, { reason, comment });
+    await loadCertificates();
+    closeRequalifyModal();
+    showToast("Пользователь отправлен на переквалификацию", "success");
+  } catch (err) {
+    console.error("[CertificatesView] ошибка переквалификации:", err);
+    requalifyError.value = err?.response?.data?.error || "Не удалось отправить на переквалификацию";
+    showToast(requalifyError.value, "error");
+  } finally {
+    isRequalifying.value = false;
+  }
+}
+
 async function handleDownload(cert) {
   try {
     const blob = await downloadCertificate(cert.uuid);
@@ -256,12 +319,12 @@ function formatDate(iso) {
 }
 
 function statusLabel(status) {
-  const map = { issued: "Выдан", pending: "Генерируется", generation_failed: "Ошибка", revoked: "Аннулирован" };
+  const map = { issued: "Выдан", pending: "Генерируется", generation_failed: "Ошибка", revoked: "Аннулирован", expired: "Просрочен" };
   return map[status] || status;
 }
 
 function statusVariant(status) {
-  const map = { issued: "success", pending: "default", generation_failed: "error", revoked: "warning" };
+  const map = { issued: "success", pending: "default", generation_failed: "error", revoked: "warning", expired: "warning" };
   return map[status] || "default";
 }
 

@@ -29,13 +29,13 @@
       <div class="stats-grid">
         <Card class="stat-card blue" padding="none">
           <div class="stat-content">
-            <div class="stat-label">Всего попыток</div>
+            <div class="stat-label">Всего курсов</div>
             <div class="stat-value">{{ stats.total_attempts || 0 }}</div>
           </div>
         </Card>
         <Card class="stat-card green" padding="none">
           <div class="stat-content">
-            <div class="stat-label">Средний балл</div>
+            <div class="stat-label">Средний прогресс</div>
             <div class="stat-value">{{ formatAvgScore(stats.avg_score) }}%</div>
           </div>
         </Card>
@@ -47,7 +47,7 @@
         </Card>
         <Card class="stat-card orange" padding="none">
           <div class="stat-content">
-            <div class="stat-label">Процент успеха</div>
+            <div class="stat-label">Процент завершения</div>
             <div class="stat-value">{{ formatSuccessRate(stats.passed_count, stats.total_count) }}%</div>
           </div>
         </Card>
@@ -56,7 +56,7 @@
       <!-- Графики -->
       <div class="charts-grid">
         <!-- График по филиалам с детальной информацией -->
-        <Card title="Средний балл по филиалам">
+        <Card title="Средний прогресс по филиалам">
           <div class="chart-container">
             <BarChart
               v-if="detailedBranchAnalytics.length > 0"
@@ -71,7 +71,7 @@
         </Card>
 
         <!-- График по должностям -->
-        <Card title="Средний балл по должностям">
+        <Card title="Средний прогресс по должностям">
           <div class="chart-container">
             <BarChart v-if="positionAnalytics.length > 0" :data="positionAnalytics" labelKey="position_name" valueKey="avg_score" color="#ff9f40cc" />
             <div v-else class="chart-empty">Нет данных</div>
@@ -87,13 +87,55 @@
         </Card>
 
         <!-- График динамики с процентами изменения -->
-        <Card title="Динамика попыток" class="chart-wide">
+        <Card title="Динамика завершений курсов" class="chart-wide">
           <div class="chart-container">
             <LineChart v-if="trends.length > 0" :data="trends" labelKey="date" valueKey="attempts_count" color="#4bc0c0cc" />
             <div v-else class="chart-empty">Нет данных</div>
           </div>
         </Card>
       </div>
+
+      <Card title="Порог прохождений по ресторанам" padding="none">
+        <div class="threshold-legend">
+          <div class="legend-item legend-item-low">Низкий: &lt; {{ PASS_RATE_THRESHOLDS.ACCEPTABLE_MIN }}%</div>
+          <div class="legend-item legend-item-acceptable">
+            Приемлемый: {{ PASS_RATE_THRESHOLDS.ACCEPTABLE_MIN }}–84.9%
+          </div>
+          <div class="legend-item legend-item-expected">Ожидаемый: ≥ {{ PASS_RATE_THRESHOLDS.EXPECTED_MIN }}%</div>
+        </div>
+        <div class="threshold-summary">
+          <span class="summary-chip summary-chip-low">Низкий: {{ thresholdCounts.low }}</span>
+          <span class="summary-chip summary-chip-acceptable">Приемлемый: {{ thresholdCounts.acceptable }}</span>
+          <span class="summary-chip summary-chip-expected">Ожидаемый: {{ thresholdCounts.expected }}</span>
+        </div>
+        <div class="table-wrapper hide-mobile">
+          <table class="top-users-table">
+            <thead>
+              <tr>
+                <th>Ресторан</th>
+                <th style="width: 120px">Прохождений</th>
+                <th style="width: 140px">Успешных</th>
+                <th style="width: 160px">% прохождения</th>
+                <th style="width: 160px">Порог</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="branchCompletionReport.length === 0">
+                <td colspan="5" class="empty-state">Нет данных</td>
+              </tr>
+              <tr v-for="branch in branchCompletionReport" :key="branch.id">
+                <td>{{ branch.branch_name }}</td>
+                <td>{{ branch.total_count }}</td>
+                <td>{{ branch.passed_count }}</td>
+                <td>{{ branch.pass_rate.toFixed(1) }}%</td>
+                <td>
+                  <span :class="['threshold-badge', `threshold-badge-${branch.thresholdKey}`]">{{ branch.thresholdLabel }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       <!-- Топ сотрудников -->
       <Card title="Топ-10 сотрудников" padding="none">
@@ -106,8 +148,8 @@
                 <th>Сотрудник</th>
                 <th>Филиал</th>
                 <th>Должность</th>
-                <th style="width: 120px">Пройдено</th>
-                <th style="width: 140px">Средний балл</th>
+                <th style="width: 120px">Завершено</th>
+                <th style="width: 140px">Средний прогресс</th>
                 <th style="width: 100px">Действия</th>
               </tr>
             </thead>
@@ -173,11 +215,11 @@
               <span class="mobile-value">{{ user.position_name || "—" }}</span>
             </div>
             <div class="mobile-card-row">
-              <span class="mobile-label">Пройдено</span>
+              <span class="mobile-label">Завершено</span>
               <span class="mobile-value">{{ user.total_assessments }}</span>
             </div>
             <div class="mobile-card-row">
-              <span class="mobile-label">Средний балл</span>
+              <span class="mobile-label">Средний прогресс</span>
               <span class="mobile-value score-cell">{{ formatUserScore(user.avg_score) }}%</span>
             </div>
             <Button @click="openUserReport(user.id)" size="sm" variant="secondary" icon="file-text" class="mt-2">Отчёт</Button>
@@ -243,6 +285,10 @@ const positionAnalytics = ref([]);
 const combinedAnalytics = ref([]);
 const topUsers = ref([]);
 const trends = ref([]);
+const PASS_RATE_THRESHOLDS = {
+  ACCEPTABLE_MIN: 70,
+  EXPECTED_MIN: 85,
+};
 
 const toNumber = (value) => {
   if (value === null || value === undefined || value === "") {
@@ -285,12 +331,52 @@ const formatUserScore = (value) => {
   return numeric.toFixed(1);
 };
 
+const resolvePassThreshold = (passRate) => {
+  const numeric = toNumber(passRate) ?? 0;
+  if (numeric >= PASS_RATE_THRESHOLDS.EXPECTED_MIN) {
+    return { key: "expected", label: "Ожидаемый" };
+  }
+  if (numeric >= PASS_RATE_THRESHOLDS.ACCEPTABLE_MIN) {
+    return { key: "acceptable", label: "Приемлемый" };
+  }
+  return { key: "low", label: "Низкий" };
+};
+
+const branchCompletionReport = computed(() =>
+  (detailedBranchAnalytics.value || [])
+    .map((branch) => {
+      const total = Number(branch.total_count || 0);
+      const passed = Number(branch.passed_count || 0);
+      const passRate = total > 0 ? (passed / total) * 100 : 0;
+      const threshold = resolvePassThreshold(passRate);
+      return {
+        ...branch,
+        total_count: total,
+        passed_count: passed,
+        pass_rate: passRate,
+        thresholdKey: threshold.key,
+        thresholdLabel: threshold.label,
+      };
+    })
+    .sort((a, b) => b.pass_rate - a.pass_rate)
+);
+
+const thresholdCounts = computed(() => {
+  return branchCompletionReport.value.reduce(
+    (acc, item) => {
+      acc[item.thresholdKey] += 1;
+      return acc;
+    },
+    { low: 0, acceptable: 0, expected: 0 }
+  );
+});
+
 // Детальные поля для BarChart по филиалам
 const branchDetailFields = [
   { key: "unique_users", label: "Участников" },
-  { key: "median_score", label: "Медиана", format: (v) => formatPercentValue(v, 1) },
-  { key: "excellent_percent", label: "Отличных", format: (v) => formatPercentValue(v, 0) },
-  { key: "pass_percent", label: "Успешных", format: (v) => formatPercentValue(v, 0) },
+  { key: "median_score", label: "Медиана прогресса", format: (v) => formatPercentValue(v, 1) },
+  { key: "excellent_percent", label: "90%+ прогресса", format: (v) => formatPercentValue(v, 0) },
+  { key: "pass_percent", label: "Завершенных", format: (v) => formatPercentValue(v, 0) },
 ];
 
 // Опции для Select
@@ -573,6 +659,88 @@ onMounted(async () => {
 /* Таблица топ пользователей */
 .table-wrapper {
   overflow-x: auto;
+}
+
+.threshold-legend {
+  display: flex;
+  gap: 8px;
+  padding: 14px 16px 0;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 999px;
+}
+
+.legend-item-low {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.legend-item-acceptable {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.legend-item-expected {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.threshold-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 16px 12px;
+}
+
+.summary-chip {
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.summary-chip-low {
+  background: #fecaca;
+  color: #7f1d1d;
+}
+
+.summary-chip-acceptable {
+  background: #fed7aa;
+  color: #7c2d12;
+}
+
+.summary-chip-expected {
+  background: #bbf7d0;
+  color: #14532d;
+}
+
+.threshold-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.threshold-badge-low {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.threshold-badge-acceptable {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.threshold-badge-expected {
+  background: #dcfce7;
+  color: #166534;
 }
 
 .top-users-table {
