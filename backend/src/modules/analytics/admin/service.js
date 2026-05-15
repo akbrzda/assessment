@@ -2,6 +2,8 @@ const { pool } = require("../../../config/database");
 const ExcelJS = require("exceljs");
 const PDFDocument = require("pdfkit");
 
+const ACTIVE_USER_CONDITION = "u.deleted_at IS NULL AND COALESCE(u.is_active, 1) = 1";
+
 /**
  * Получить общую статистику
  */
@@ -11,7 +13,7 @@ exports.getOverallStats = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    let whereConditions = ["1=1"];
+    let whereConditions = ["1=1", ACTIVE_USER_CONDITION];
     const params = [];
 
     if (userRole === "manager") {
@@ -100,7 +102,7 @@ exports.getBranchAnalytics = async (req, res, next) => {
         SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as passed_count,
         COUNT(cup.id) as total_count
       FROM branches b
-      LEFT JOIN users u ON b.id = u.branch_id
+      LEFT JOIN users u ON b.id = u.branch_id AND ${ACTIVE_USER_CONDITION}
       LEFT JOIN course_user_progress cup ON u.id = cup.user_id${attemptConditionsSql}
       ${userRole === "manager" ? "WHERE b.id = (SELECT branch_id FROM users WHERE id = ?)" : ""}
       GROUP BY b.id
@@ -166,7 +168,7 @@ exports.getPositionAnalytics = async (req, res, next) => {
         SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as passed_count,
         COUNT(cup.id) as total_count
       FROM positions p
-      LEFT JOIN users u ON p.id = u.position_id
+      LEFT JOIN users u ON p.id = u.position_id AND ${ACTIVE_USER_CONDITION}
       LEFT JOIN branches b ON u.branch_id = b.id
       LEFT JOIN course_user_progress cup ON u.id = cup.user_id${attemptConditionsSql}
       ${whereClause}
@@ -192,7 +194,7 @@ exports.getTopUsers = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    let whereConditions = ["1=1"];
+    let whereConditions = ["1=1", ACTIVE_USER_CONDITION];
     const params = [];
 
     if (userRole === "manager") {
@@ -262,7 +264,7 @@ exports.getAssessmentTrends = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    let whereConditions = ["cup.completed_at IS NOT NULL"];
+    let whereConditions = ["cup.completed_at IS NOT NULL", ACTIVE_USER_CONDITION];
     const params = [];
 
     if (userRole === "manager") {
@@ -364,7 +366,7 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
         SUM(CASE WHEN cup.status = 'completed' AND cup.progress_percent >= 70 AND cup.progress_percent < 90 THEN 1 ELSE 0 END) as good_count,
         COUNT(cup.id) as total_count
       FROM branches b
-      LEFT JOIN users u ON b.id = u.branch_id
+      LEFT JOIN users u ON b.id = u.branch_id AND ${ACTIVE_USER_CONDITION}
       LEFT JOIN course_user_progress cup ON u.id = cup.user_id${attemptConditionsSql}
       ${userRole === "manager" ? "WHERE b.id = (SELECT branch_id FROM users WHERE id = ?)" : ""}
       GROUP BY b.id
@@ -383,7 +385,7 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
             SELECT cup.progress_percent
             FROM course_user_progress cup
             JOIN users u ON cup.user_id = u.id
-            WHERE u.branch_id = ? AND cup.status = 'completed'
+            WHERE u.branch_id = ? AND cup.status = 'completed' AND ${ACTIVE_USER_CONDITION}
             ${dateFrom ? "AND cup.completed_at >= ?" : ""}
             ${dateTo ? "AND cup.completed_at <= ?" : ""}
             ORDER BY cup.progress_percent
@@ -463,7 +465,7 @@ exports.getCombinedAnalytics = async (req, res, next) => {
         COUNT(cup.id) as total_count
       FROM branches b
       CROSS JOIN positions p
-      LEFT JOIN users u ON b.id = u.branch_id AND p.id = u.position_id
+      LEFT JOIN users u ON b.id = u.branch_id AND p.id = u.position_id AND ${ACTIVE_USER_CONDITION}
       LEFT JOIN course_user_progress cup ON u.id = cup.user_id${attemptConditionsSql}
       ${whereClause}
       GROUP BY b.id, p.id
@@ -550,6 +552,7 @@ exports.getAssessmentReport = async (req, res, next) => {
         TIMESTAMPDIFF(SECOND, cup.started_at, cup.completed_at) as duration_seconds
       FROM course_user_progress cup
       JOIN users u ON cup.user_id = u.id
+      AND ${ACTIVE_USER_CONDITION}
       LEFT JOIN branches b ON u.branch_id = b.id
       LEFT JOIN positions p ON u.position_id = p.id
       WHERE cup.course_id = ?
@@ -716,7 +719,7 @@ exports.getUserReport = async (req, res, next) => {
         COUNT(DISTINCT cup.user_id) as total_peers
       FROM course_user_progress cup
       JOIN users u ON cup.user_id = u.id
-      WHERE u.position_id = ? AND u.id != ?
+      WHERE u.position_id = ? AND u.id != ? AND ${ACTIVE_USER_CONDITION}
       ${dateFrom ? "AND COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?" : ""}
       ${dateTo ? "AND COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?" : ""}
     `,
@@ -753,7 +756,7 @@ exports.exportToExcel = async (req, res, next) => {
       // Экспорт аналитики по филиалам
       const sheet = workbook.addWorksheet("Филиалы");
 
-      let whereConditions = ["1=1"];
+      let whereConditions = ["1=1", ACTIVE_USER_CONDITION];
       const params = [];
 
       if (userRole === "manager") {
@@ -783,7 +786,7 @@ exports.exportToExcel = async (req, res, next) => {
           SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as 'Завершено',
           ROUND((SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) / COUNT(cup.id)) * 100, 2) as 'Процент успеха'
         FROM branches b
-        LEFT JOIN users u ON b.id = u.branch_id
+        LEFT JOIN users u ON b.id = u.branch_id AND ${ACTIVE_USER_CONDITION}
         LEFT JOIN course_user_progress cup ON u.id = cup.user_id ${whereConditions.length > 0 ? "AND " + whereConditions.slice(1).join(" AND ") : ""}
         ${userRole === "manager" ? "WHERE b.id = (SELECT branch_id FROM users WHERE id = ?)" : ""}
         GROUP BY b.id
@@ -806,7 +809,7 @@ exports.exportToExcel = async (req, res, next) => {
       // Экспорт по пользователям
       const sheet = workbook.addWorksheet("Сотрудники");
 
-      let whereConditions = ["1=1"];
+      let whereConditions = ["1=1", ACTIVE_USER_CONDITION];
       const params = [];
 
       if (userRole === "manager") {
@@ -904,7 +907,7 @@ exports.exportToPDF = async (req, res, next) => {
     doc.moveDown(2);
 
     if (type === "branches") {
-      let whereConditions = ["1=1"];
+      let whereConditions = ["1=1", ACTIVE_USER_CONDITION];
       const params = [];
 
       if (userRole === "manager") {
@@ -933,7 +936,7 @@ exports.exportToPDF = async (req, res, next) => {
           SUM(CASE WHEN cup.status = 'completed' THEN 1 ELSE 0 END) as passed_count,
           COUNT(cup.id) as total_count
         FROM branches b
-        LEFT JOIN users u ON b.id = u.branch_id
+        LEFT JOIN users u ON b.id = u.branch_id AND ${ACTIVE_USER_CONDITION}
         LEFT JOIN course_user_progress cup ON u.id = cup.user_id ${whereConditions.length > 0 ? "AND " + whereConditions.slice(1).join(" AND ") : ""}
         ${userRole === "manager" ? "WHERE b.id = (SELECT branch_id FROM users WHERE id = ?)" : ""}
         GROUP BY b.id
@@ -969,7 +972,7 @@ exports.getFailureReasons = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    const where = ["1=1"];
+    const where = ["1=1", ACTIVE_USER_CONDITION];
     const params = [];
 
     if (dateFrom) {
@@ -1029,7 +1032,7 @@ exports.exportToCsv = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    let whereConditions = ['aa.status = "completed"'];
+    let whereConditions = ['aa.status = "completed"', ACTIVE_USER_CONDITION];
     const params = [];
 
     if (userRole === "manager") {
@@ -1055,7 +1058,7 @@ exports.exportToCsv = async (req, res, next) => {
                COUNT(DISTINCT aa.id) AS attempts,
                ROUND(AVG(aa.score_percent), 2) AS avg_score
         FROM branches b
-        LEFT JOIN users u ON u.branch_id = b.id
+        LEFT JOIN users u ON u.branch_id = b.id AND ${ACTIVE_USER_CONDITION}
         LEFT JOIN assessment_attempts aa ON aa.user_id = u.id
         LEFT JOIN assessments a ON a.id = aa.assessment_id
         WHERE ${whereConditions.join(" AND ")}
