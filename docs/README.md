@@ -12,6 +12,8 @@
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------- | ------------------------- |
 | [product/courses-requirements.md](product/courses-requirements.md) | Бизнес-требования к модулю «Курсы»: терминология, структура, сценарии     | Product, аналитики        |
 | [product/bot-features.md](product/bot-features.md)                 | Спецификация доработки Telegram-бота: онбординг, уведомления, сертификаты | Product, разработчики, QA |
+| [product/max-telegram-unified-integration.md](product/max-telegram-unified-integration.md) | Инструкция по унификации MAX и Telegram: приглашения, подтверждение аккаунта, идентификация по номеру | Product, Backend, Frontend, QA |
+| [product/max-telegram-unified-roadmap.md](product/max-telegram-unified-roadmap.md) | Roadmap по спринтам и задачам для внедрения интеграции MAX + Telegram | PM, Product, Tech Lead |
 
 ### Модуль «Курсы»
 
