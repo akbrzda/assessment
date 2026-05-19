@@ -48,6 +48,13 @@ module.exports = {
     lastName: process.env.TELEGRAM_BYPASS_LAST_NAME || "Tester",
     username: process.env.TELEGRAM_BYPASS_USERNAME || "dev_tester",
   },
+  maxInitDataBypass: (process.env.MAX_INITDATA_BYPASS || "").toLowerCase() === "true" && (process.env.NODE_ENV || "development") !== "production",
+  maxBypassUser: {
+    id: String(process.env.MAX_BYPASS_USER_ID || "999000002"),
+    firstName: process.env.MAX_BYPASS_FIRST_NAME || "Max",
+    lastName: process.env.MAX_BYPASS_LAST_NAME || "Tester",
+    username: process.env.MAX_BYPASS_USERNAME || "max_tester",
+  },
   port: Number(process.env.PORT || 3001),
   db: {
     host: process.env.DB_HOST,
@@ -58,6 +65,8 @@ module.exports = {
     connectTimeoutMs: Number(process.env.DB_CONNECT_TIMEOUT_MS || 10000),
   },
   botToken: process.env.BOT_TOKEN,
+  maxBotToken: process.env.MAX_BOT_TOKEN || process.env.BOT_TOKEN,
+  maxBotName: process.env.MAX_BOT_NAME || "",
   jwtSecret: process.env.JWT_SECRET,
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
   allowedOrigins: parseList(process.env.ALLOWED_ORIGINS),

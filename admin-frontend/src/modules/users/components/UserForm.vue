@@ -18,6 +18,17 @@
       @blur="validateFieldAndUpdate('lastName')"
     />
 
+    <Input
+      v-if="isEdit"
+      v-model="localData.phone"
+      label="Номер телефона"
+      placeholder="+7 (999) 000-00-00"
+      required
+      :error="errors.phone"
+      @blur="validateFieldAndUpdate('phone')"
+      @input="handlePhoneInput"
+    />
+
     <Select
       v-model.number="localData.branchId"
       label="Филиал"
@@ -128,6 +139,25 @@ const validationSchema = {
       },
     },
   ],
+  phone: [
+    {
+      custom: (value) => {
+        if (props.isEdit && (!value || !String(value).trim())) {
+          return "Укажите номер телефона";
+        }
+
+        if (!value) {
+          return null;
+        }
+
+        const digits = String(value).replace(/\D/g, "");
+        if (digits.length !== 11) {
+          return "Введите номер полностью: +7 (999) 000-00-00";
+        }
+        return null;
+      },
+    },
+  ],
 };
 
 const validateFieldAndUpdate = (fieldName) => {
@@ -160,6 +190,37 @@ const validateFieldAndUpdate = (fieldName) => {
   if (!hasError) {
     clearFieldError(fieldName);
   }
+};
+
+const formatPhoneMask = (value) => {
+  const digitsRaw = String(value || "").replace(/\D/g, "");
+  if (!digitsRaw) {
+    return "";
+  }
+
+  let digits = digitsRaw;
+  if (digits.startsWith("8")) {
+    digits = `7${digits.slice(1)}`;
+  } else if (!digits.startsWith("7")) {
+    digits = `7${digits}`;
+  }
+
+  digits = digits.slice(0, 11);
+  const local = digits.slice(1);
+
+  if (!local) return "+7";
+  if (local.length <= 3) return `+7 (${local}`;
+  if (local.length <= 6) return `+7 (${local.slice(0, 3)}) ${local.slice(3)}`;
+  if (local.length <= 8) return `+7 (${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
+  return `+7 (${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6, 8)}-${local.slice(8, 10)}`;
+};
+
+const handlePhoneInput = () => {
+  const formatted = formatPhoneMask(localData.value.phone);
+  if (formatted !== localData.value.phone) {
+    localData.value.phone = formatted;
+  }
+  validateFieldAndUpdate("phone");
 };
 
 const branchOptions = computed(() => [

@@ -1,12 +1,24 @@
 const config = require("../../../config/env");
 const { normalizeInviteCode } = require("../../../utils/inviteCode");
+const { normalizePhoneToE164Ru } = require("../../../utils/phone");
+const logger = require("../../../utils/logger");
 const { buildAuditEntry, logAuditEvent } = require("../../../services/auditService");
 const authRepository = require("./repository");
+
+const PHONE_MISMATCH_ERROR_MESSAGE = "Номер телефона не совпадает с приглашением";
+const PHONE_CONFLICT_ERROR_MESSAGE = "Обнаружен конфликт профилей по номеру телефона. Обратитесь к администратору";
 
 function buildError(message, status) {
   const error = new Error(message);
   error.status = status;
   return error;
+}
+
+function maskPhone(phone) {
+  if (!phone) return null;
+  const digits = String(phone).replace(/\D/g, "");
+  if (digits.length < 4) return "***";
+  return `***${digits.slice(-4)}`;
 }
 
 function resolveInviteCode(context, inviteCodeFromPayload = null) {
@@ -19,6 +31,64 @@ function resolveInviteCode(context, inviteCodeFromPayload = null) {
   const inviteCodeFromParam = normalizeInviteCode(inviteParam);
 
   return inviteCodeHeader || inviteCodeFromParam || null;
+}
+
+function verifyInviteContact({ contact, platformUser, clientPlatform }) {
+  logger.info("[invite-flow] verifyInviteContact:start", {
+    platform: clientPlatform,
+    hasContact: Boolean(contact),
+    contactSource: contact?.source || null,
+    hasPhone: Boolean(contact?.phoneNumber),
+    contactPhoneMasked: maskPhone(contact?.phoneNumber),
+    hasPlatformUser: Boolean(platformUser?.id),
+  });
+
+  if (!contact) {
+    logger.warn("[invite-flow] verifyInviteContact:missing_contact", { platform: clientPlatform });
+    throw buildError("Для активации по приглашению подтвердите номер телефона", 422);
+  }
+
+  if (!platformUser?.id) {
+    throw buildError("Отсутствуют данные пользователя платформы", 400);
+  }
+
+  const expectedSource = clientPlatform === "max" ? "max_contact" : "telegram_contact";
+  if (contact.source !== expectedSource) {
+    logger.warn("[invite-flow] verifyInviteContact:invalid_source", {
+      platform: clientPlatform,
+      expectedSource,
+      actualSource: contact.source || null,
+    });
+    throw buildError("Неподдерживаемый источник подтверждения телефона", 422);
+  }
+
+  if (String(contact.userId) !== String(platformUser.id)) {
+    logger.warn("[invite-flow] verifyInviteContact:user_mismatch", {
+      platform: clientPlatform,
+      platformUserId: String(platformUser.id),
+      contactUserId: String(contact.userId || ""),
+    });
+    throw buildError("Контактные данные не прошли проверку подлинности", 403);
+  }
+
+  const normalizedPhone = normalizePhoneToE164Ru(contact.phoneNumber);
+  if (!normalizedPhone || !/^\+7\d{10}$/.test(normalizedPhone)) {
+    logger.warn("[invite-flow] verifyInviteContact:invalid_phone", {
+      platform: clientPlatform,
+      contactPhoneMasked: maskPhone(contact.phoneNumber),
+    });
+    throw buildError("Телефон должен быть в формате +7XXXXXXXXXX", 422);
+  }
+
+  logger.info("[invite-flow] verifyInviteContact:ok", {
+    platform: clientPlatform,
+    normalizedPhoneMasked: maskPhone(normalizedPhone),
+  });
+
+  return {
+    normalizedPhone,
+    source: contact.source,
+  };
 }
 
 async function getStatus(context) {
@@ -73,43 +143,223 @@ async function register(context, payload) {
     throw buildError("User already registered", 400);
   }
 
-  const telegramUser = context.telegramUser;
-  console.log("[authService.register] telegramUser=%O", telegramUser);
-  if (!telegramUser) {
-    console.log("[authService.register] ERROR: Missing Telegram user data");
-    throw buildError("Missing Telegram user data", 400);
+  const platformUser = context.telegramUser;
+  const clientPlatform = context.clientPlatform === "max" ? "max" : "telegram";
+  if (!platformUser) {
+    throw buildError("Missing platform user data", 400);
   }
 
-  const telegramId = String(telegramUser.id);
-  console.log("[authService.register] telegramId=%s, firstName=%s, lastName=%s", telegramId, payload.firstName, payload.lastName);
-  const avatarUrl = telegramUser.photo_url || null;
-  const existingUser = await authRepository.findUserByTelegramId(telegramId);
+  const platformUserId = String(platformUser.id);
+  const avatarUrl = platformUser.photo_url || null;
+  const existingUser = await authRepository.findUserByPlatformIdentity(clientPlatform, platformUserId);
 
   if (existingUser) {
-    console.log("[authService.register] User already exists: id=%s", existingUser.id);
     throw buildError("Вы уже зарегистрированы в системе", 400);
   }
 
   const inviteCode = resolveInviteCode(context, payload.inviteCode);
+  logger.info("[invite-flow] register:start", {
+    platform: clientPlatform,
+    platformUserId,
+    hasInviteCode: Boolean(inviteCode),
+    hasContactPayload: Boolean(payload?.contact),
+  });
 
   if (inviteCode) {
     // Поток приглашения сотрудника
     const invitation = await authRepository.findActiveInvitationByCode(inviteCode);
     if (!invitation) {
+      logger.warn("[invite-flow] register:invitation_not_found", { platform: clientPlatform, inviteCode });
       throw buildError("Приглашение недействительно или истекло", 400);
+    }
+
+    const verification = verifyInviteContact({
+      contact: payload.contact,
+      platformUser,
+      clientPlatform,
+    });
+
+    const invitationPhone = normalizePhoneToE164Ru(invitation.phone);
+    logger.info("[invite-flow] register:phone_compare", {
+      platform: clientPlatform,
+      inviteId: invitation.id,
+      invitationPhoneMasked: maskPhone(invitationPhone),
+      providedPhoneMasked: maskPhone(verification.normalizedPhone),
+    });
+    if (!invitationPhone || invitationPhone !== verification.normalizedPhone) {
+      logger.warn("[invite-flow] register:phone_mismatch", {
+        platform: clientPlatform,
+        inviteId: invitation.id,
+        invitationPhoneMasked: maskPhone(invitationPhone),
+        providedPhoneMasked: maskPhone(verification.normalizedPhone),
+      });
+      if (invitation.invited_user_id) {
+        await authRepository.markPhoneVerificationRejected(invitation.invited_user_id, {
+          phoneE164: verification.normalizedPhone,
+          source: verification.source,
+        });
+      }
+
+      await logAuditEvent(
+        buildAuditEntry({
+          scope: "miniapp",
+          action: "invite.phone_verification.failed",
+          entity: "invitation",
+          entityId: invitation.id,
+          actor: {
+            id: invitation.invited_user_id || null,
+            role: null,
+            name: `${invitation.first_name || ""} ${invitation.last_name || ""}`.trim() || null,
+          },
+          metadata: {
+            platformUserId,
+            platform: clientPlatform,
+            inviteCode: invitation.code,
+            invitationPhone,
+            providedPhone: verification.normalizedPhone,
+            reason: "phone_mismatch",
+          },
+          result: "failure",
+        }),
+      );
+
+      throw buildError(PHONE_MISMATCH_ERROR_MESSAGE, 403);
+    }
+
+    const linkedUsers = await authRepository.findVerifiedActiveUsersByPhoneE164(verification.normalizedPhone);
+    const linkCandidates = linkedUsers.filter((candidate) => Number(candidate.id) !== Number(invitation.invited_user_id || 0));
+    logger.info("[invite-flow] register:auto_link_candidates", {
+      platform: clientPlatform,
+      inviteId: invitation.id,
+      candidatesCount: linkCandidates.length,
+      candidates: linkCandidates.map((candidate) => candidate.id),
+    });
+
+    if (linkCandidates.length > 1) {
+      await logAuditEvent(
+        buildAuditEntry({
+          scope: "miniapp",
+          action: "identity.auto_link.conflict",
+          entity: "invitation",
+          entityId: invitation.id,
+          actor: {
+            id: invitation.invited_user_id || null,
+            role: null,
+            name: `${invitation.first_name || ""} ${invitation.last_name || ""}`.trim() || null,
+          },
+          metadata: {
+            platformUserId,
+            platform: clientPlatform,
+            inviteCode: invitation.code,
+            phoneE164: verification.normalizedPhone,
+            candidates: linkCandidates.map((candidate) => candidate.id),
+          },
+          result: "failure",
+        }),
+      );
+      throw buildError(PHONE_CONFLICT_ERROR_MESSAGE, 409);
+    }
+
+    if (linkCandidates.length === 1) {
+      const targetUserId = Number(linkCandidates[0].id);
+      await authRepository.upsertPlatformIdentity({
+        userId: targetUserId,
+        platform: clientPlatform,
+        platformUserId,
+        platformUsername: platformUser.username || null,
+        isVerified: true,
+        verifiedAt: new Date(),
+      });
+      const usedRows = await authRepository.markInvitationUsed(invitation.id, targetUserId);
+      if (usedRows === 0) {
+        logger.warn("[invite-flow] register:invite_already_used_auto_link", {
+          platform: clientPlatform,
+          inviteId: invitation.id,
+          targetUserId,
+        });
+        throw buildError("Приглашение уже использовано в другом сеансе", 409);
+      }
+      const user = await authRepository.getDashboardData(targetUserId);
+
+      await logAuditEvent(
+        buildAuditEntry({
+          scope: "miniapp",
+          action: "identity.auto_link.succeeded",
+          entity: "invitation",
+          entityId: invitation.id,
+          actor: { id: user.id, role: user.roleName, name: `${user.firstName} ${user.lastName}` },
+          metadata: {
+            platformUserId,
+            platform: clientPlatform,
+            inviteCode: invitation.code,
+            phoneE164: verification.normalizedPhone,
+            source: verification.source,
+          },
+        }),
+      );
+
+      return { registered: true, user };
     }
 
     // Если у приглашения есть заранее созданный pending-профиль — активируем его
     if (invitation.invited_user_id) {
-      await authRepository.activatePendingUser(invitation.invited_user_id, { telegramId, avatarUrl });
+      const affectedRows = await authRepository.activatePendingUser(invitation.invited_user_id, {
+        telegramId: clientPlatform === "telegram" ? platformUserId : null,
+        avatarUrl,
+      });
+      if (affectedRows === 0) {
+        logger.warn("[invite-flow] register:pending_already_activated", {
+          platform: clientPlatform,
+          inviteId: invitation.id,
+          pendingUserId: invitation.invited_user_id,
+        });
+        throw buildError("Профиль уже активирован в другом сеансе", 409);
+      }
+      await authRepository.markPhoneVerified(invitation.invited_user_id, {
+        phoneE164: verification.normalizedPhone,
+        source: verification.source,
+      });
+      await authRepository.upsertPlatformIdentity({
+        userId: invitation.invited_user_id,
+        platform: clientPlatform,
+        platformUserId,
+        platformUsername: platformUser.username || null,
+        isVerified: true,
+        verifiedAt: new Date(),
+      });
       await authRepository.completeOnboarding(invitation.invited_user_id);
       await authRepository.assignUserToMatchingAssessments({
         userId: invitation.invited_user_id,
         branchId: invitation.branch_id ? Number(invitation.branch_id) : null,
         positionId: invitation.position_id ? Number(invitation.position_id) : null,
       });
-      await authRepository.markInvitationUsed(invitation.id, invitation.invited_user_id);
+      const usedRows = await authRepository.markInvitationUsed(invitation.id, invitation.invited_user_id);
+      if (usedRows === 0) {
+        logger.warn("[invite-flow] register:invite_already_used_pending", {
+          platform: clientPlatform,
+          inviteId: invitation.id,
+          pendingUserId: invitation.invited_user_id,
+        });
+        throw buildError("Приглашение уже использовано в другом сеансе", 409);
+      }
       const user = await authRepository.getDashboardData(invitation.invited_user_id);
+
+      await logAuditEvent(
+        buildAuditEntry({
+          scope: "miniapp",
+          action: "invite.phone_verification.succeeded",
+          entity: "invitation",
+          entityId: invitation.id,
+          actor: { id: user.id, role: user.roleName, name: `${user.firstName} ${user.lastName}` },
+          metadata: {
+            platformUserId,
+            platform: clientPlatform,
+            inviteCode: invitation.code,
+            phoneE164: verification.normalizedPhone,
+            source: verification.source,
+          },
+        }),
+      );
 
       const auditEntry = buildAuditEntry({
         scope: "miniapp",
@@ -117,59 +367,14 @@ async function register(context, payload) {
         entity: "user",
         entityId: user.id,
         actor: { id: user.id, role: user.roleName, name: `${user.firstName} ${user.lastName}` },
-        metadata: { branch: user.branchName, role: user.roleName, telegramId, invitedBy: invitation.created_by },
+        metadata: { branch: user.branchName, role: user.roleName, platformUserId, platform: clientPlatform, invitedBy: invitation.created_by },
       });
       await logAuditEvent(auditEntry);
 
       return { registered: true, user };
     }
 
-    // Fallback: старый поток — создаём нового пользователя
-    const targetRoleId = invitation.role_id;
-    const targetBranchId = invitation.branch_id || payload.branchId;
-    let targetPositionId = invitation.position_id || (payload.positionId ? Number(payload.positionId) : null);
-
-    if (!targetPositionId) {
-      const defaultPosition = await authRepository.getPositionByName("Управляющий");
-      if (!defaultPosition) {
-        throw buildError("Manager position not configured", 500);
-      }
-      targetPositionId = defaultPosition.id;
-    }
-
-    const userId = await authRepository.createUser({
-      telegramId,
-      firstName: invitation.first_name,
-      lastName: invitation.last_name,
-      avatarUrl,
-      positionId: Number(targetPositionId),
-      branchId: targetBranchId,
-      roleId: targetRoleId,
-    });
-    console.log("[authService.register] User created with invitation: userId=%s, telegramId=%s", userId, telegramId);
-
-    await authRepository.completeOnboarding(userId);
-    console.log("[authService.register] Onboarding marked as complete for userId=%s", userId);
-    await authRepository.assignUserToMatchingAssessments({
-      userId,
-      branchId: targetBranchId ? Number(targetBranchId) : null,
-      positionId: targetPositionId ? Number(targetPositionId) : null,
-    });
-    await authRepository.markInvitationUsed(invitation.id, userId);
-    const user = await authRepository.getDashboardData(userId);
-    console.log("[authService.register] User retrieved: telegramId=%s, firstName=%s", user.telegramId, user.firstName);
-
-    const auditEntry = buildAuditEntry({
-      scope: "miniapp",
-      action: "user.registered",
-      entity: "user",
-      entityId: user.id,
-      actor: { id: user.id, role: user.roleName, name: `${user.firstName} ${user.lastName}` },
-      metadata: { branch: user.branchName, role: user.roleName, telegramId, invitedBy: invitation.created_by },
-    });
-    await logAuditEvent(auditEntry);
-
-    return { registered: true, user };
+    throw buildError("Приглашение не готово к активации: отсутствует pending-профиль", 409);
   }
 
   // Поток без приглашения (самостоятельная регистрация)
@@ -182,7 +387,7 @@ async function register(context, payload) {
   }
 
   const superAdminIds = config.superAdminIds || [];
-  if (!targetRoleId && superAdminIds.includes(telegramId)) {
+  if (!targetRoleId && superAdminIds.includes(platformUserId)) {
     const superRole = await authRepository.getRoleByName("superadmin");
     if (!superRole) {
       throw buildError("Superadmin role not configured", 500);
@@ -217,13 +422,22 @@ async function register(context, payload) {
   }
 
   const userId = await authRepository.createUser({
-    telegramId,
+    telegramId: clientPlatform === "telegram" ? platformUserId : null,
     firstName: payload.firstName,
     lastName: payload.lastName,
     avatarUrl,
     positionId: Number(targetPositionId),
     branchId: targetBranchId,
     roleId: targetRoleId,
+  });
+
+  await authRepository.upsertPlatformIdentity({
+    userId,
+    platform: clientPlatform,
+    platformUserId,
+    platformUsername: platformUser.username || null,
+    isVerified: true,
+    verifiedAt: new Date(),
   });
 
   await authRepository.completeOnboarding(userId);
@@ -241,7 +455,7 @@ async function register(context, payload) {
     entity: "user",
     entityId: user.id,
     actor: { id: user.id, role: user.roleName, name: `${user.firstName} ${user.lastName}` },
-    metadata: { branch: user.branchName, role: user.roleName, telegramId, invitedBy: null },
+    metadata: { branch: user.branchName, role: user.roleName, platformUserId, platform: clientPlatform, invitedBy: null },
   });
   await logAuditEvent(auditEntry);
 

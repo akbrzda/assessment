@@ -186,7 +186,7 @@ import TableHead from "@/components/ui/TableHead.vue";
 import TableHeader from "@/components/ui/TableHeader.vue";
 import TableCell from "@/components/ui/TableCell.vue";
 import TableRow from "@/components/ui/TableRow.vue";
-import { BOT_USERNAME } from "@/env";
+import { BOT_USERNAME, MAX_BOT_NAME } from "@/env";
 import { useToast } from "@/composables/useToast";
 import { formatBranchLabel } from "@/utils/branch";
 import { useAuthStore } from "@/stores/auth";
@@ -198,9 +198,11 @@ const saving = ref(false);
 
 const references = ref({ branches: [] });
 const invitations = ref([]);
-const BOT_USERNAME_FROM_ENV = BOT_USERNAME || "your_bot";
+const BOT_USERNAME_FROM_ENV = BOT_USERNAME || "";
+const MAX_BOT_NAME_FROM_ENV = MAX_BOT_NAME || "";
 
 const botUsername = ref(BOT_USERNAME_FROM_ENV);
+const maxBotName = ref(MAX_BOT_NAME_FROM_ENV);
 
 const filters = ref({
   search: "",
@@ -313,6 +315,7 @@ const loadData = async () => {
     invitations.value = (invitationsResponse.data?.invitations || []).map(normalizeInvitation);
 
     botUsername.value = BOT_USERNAME_FROM_ENV;
+    maxBotName.value = MAX_BOT_NAME_FROM_ENV;
   } catch (error) {
     console.error("Ошибка загрузки приглашений", error);
     invitations.value = [];
@@ -479,8 +482,29 @@ const formatDate = (value) => {
   });
 };
 
+const generateInviteLinks = (code) => {
+  const payload = `invite_${code}`;
+  const telegramLink = botUsername.value ? `https://t.me/${botUsername.value}?startapp=${payload}` : "";
+  const maxLink = maxBotName.value ? `https://max.ru/${maxBotName.value}?startapp=${payload}` : "";
+  return {
+    telegramLink,
+    maxLink,
+    fallbackCode: `Код приглашения: ${code}`,
+  };
+};
+
 const generateInviteLink = (code) => {
-  return `https://t.me/${botUsername.value}?startapp=invite_${code}`;
+  const links = generateInviteLinks(code);
+  if (links.telegramLink && links.maxLink) {
+    return `Telegram: ${links.telegramLink}\nMAX: ${links.maxLink}`;
+  }
+  if (links.telegramLink) {
+    return links.telegramLink;
+  }
+  if (links.maxLink) {
+    return links.maxLink;
+  }
+  return links.fallbackCode;
 };
 
 const copyLink = async (code) => {
@@ -500,11 +524,12 @@ const copyLink = async (code) => {
 };
 
 const sendToTelegram = (invitation) => {
-  const link = generateInviteLink(invitation.code);
+  const { telegramLink, maxLink, fallbackCode } = generateInviteLinks(invitation.code);
+  const link = telegramLink || maxLink || fallbackCode;
   const message = `Приглашение для ${invitation.firstName} ${invitation.lastName}\nФилиал: ${invitation.branchName}\n\nПерейдите по ссылке для регистрации:\n${link}`;
 
   // Открываем Telegram Web с предзаполненным сообщением
-  const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(
+  const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(telegramLink || link)}&text=${encodeURIComponent(
     `Приглашение для ${invitation.firstName} ${invitation.lastName} (${invitation.branchName})`,
   )}`;
   window.open(telegramUrl, "_blank");

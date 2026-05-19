@@ -8,7 +8,9 @@ async function resolveUser(req, res, next) {
   }
 
   try {
-    const user = await userModel.findByTelegramId(String(telegramUser.id));
+    const platform = req.clientPlatform === "max" ? "max" : "telegram";
+    const platformUserId = String(telegramUser.id);
+    const user = await userModel.findByPlatformIdentity(platform, platformUserId);
     if (user) {
       if (!user.avatarUrl && telegramUser.photo_url) {
         try {
@@ -21,6 +23,8 @@ async function resolveUser(req, res, next) {
       req.currentUser = {
         id: user.id,
         telegramId: user.telegramId,
+        platform,
+        platformUserId,
         roleId: user.roleId,
         roleName: user.roleName,
         branchId: user.branchId,

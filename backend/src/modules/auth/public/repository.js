@@ -2,13 +2,18 @@ const userModel = require("../../../models/userModel");
 const assessmentModel = require("../../../models/assessmentModel");
 const referenceModel = require("../../../models/referenceModel");
 const invitationModel = require("../../../models/invitationModel");
+const platformIdentityModel = require("../../../models/platformIdentityModel");
 
 async function getDashboardData(userId) {
   return userModel.getDashboardData(userId);
 }
 
-async function findUserByTelegramId(telegramId) {
-  return userModel.findByTelegramId(telegramId);
+async function findUserByPlatformIdentity(platform, platformUserId) {
+  return userModel.findByPlatformIdentity(platform, platformUserId);
+}
+
+async function findVerifiedActiveUsersByPhoneE164(phoneE164) {
+  return userModel.findVerifiedActiveUsersByPhoneE164(phoneE164);
 }
 
 async function createUser(payload) {
@@ -75,9 +80,22 @@ async function activatePendingUser(userId, payload) {
   return userModel.activatePendingUser(userId, payload);
 }
 
+async function upsertPlatformIdentity(payload) {
+  return platformIdentityModel.upsertIdentity(payload);
+}
+
+async function markPhoneVerified(userId, payload) {
+  return userModel.markPhoneVerified(userId, payload);
+}
+
+async function markPhoneVerificationRejected(userId, payload) {
+  return userModel.markPhoneVerificationRejected(userId, payload);
+}
+
 module.exports = {
   getDashboardData,
-  findUserByTelegramId,
+  findUserByPlatformIdentity,
+  findVerifiedActiveUsersByPhoneE164,
   createUser,
   activatePendingUser,
   assignUserToMatchingAssessments,
@@ -94,4 +112,7 @@ module.exports = {
   updateProfile,
   updateTimezone,
   completeOnboarding,
+  upsertPlatformIdentity,
+  markPhoneVerified,
+  markPhoneVerificationRejected,
 };

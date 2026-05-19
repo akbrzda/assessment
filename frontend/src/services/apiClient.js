@@ -1,5 +1,5 @@
 import { getInitData } from "./telegram";
-import { getTelegramInviteCode } from "./telegramRuntimeState";
+import { getClientPlatform, getTelegramInviteCode } from "./telegramRuntimeState";
 import { API_BASE_URL } from "@/env";
 
 const envBaseUrl = (API_BASE_URL || "").trim();
@@ -15,8 +15,14 @@ async function request(path, options = {}) {
   }
 
   const initData = getInitData();
+  const clientPlatform = getClientPlatform();
+  headers.set("x-client-platform", clientPlatform);
   if (initData) {
-    headers.set("x-telegram-init-data", initData);
+    if (clientPlatform === "max") {
+      headers.set("x-max-init-data", initData);
+    } else {
+      headers.set("x-telegram-init-data", initData);
+    }
   }
 
   // Добавляем код приглашения через отдельный заголовок

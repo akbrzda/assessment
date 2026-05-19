@@ -12,6 +12,7 @@
     "schema:check:courses": "node scripts/check-required-schema.js --tables=course_sections,course_section_user_progress,assessment_attempt_questions",
     "phase0:diagnostics": "node scripts/phase0-diagnostics.js",
     "phase1:recalculate-matching": "node scripts/recalculate-matching-attempts.js",
+    "sprint4:dedupe-identities": "node scripts/sprint4-dedupe-identities.js",
     "phase4:explain": "node scripts/phase4-explain-top5.js",
     "test:smoke:admin": "node --test tests/admin-smoke.test.js",
     "test:assessment": "node --test tests/assessment.score-answer.test.js",

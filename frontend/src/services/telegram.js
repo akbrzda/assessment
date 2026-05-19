@@ -1,5 +1,6 @@
 import { API_BASE_URL as ENV_API_BASE_URL } from "@/env";
 import {
+  getClientPlatform,
   getTelegramInitDataOverride,
   getTelegramStartParam,
 } from "./telegramRuntimeState";
@@ -17,8 +18,12 @@ function resolveWebApp() {
   if (webAppInstance) {
     return webAppInstance;
   }
-  if (typeof window !== "undefined" && window.Telegram?.WebApp) {
-    webAppInstance = window.Telegram.WebApp;
+  if (typeof window !== "undefined") {
+    if (window.Telegram?.WebApp) {
+      webAppInstance = window.Telegram.WebApp;
+    } else if (window.WebApp && typeof window.WebApp === "object") {
+      webAppInstance = window.WebApp;
+    }
   }
   return webAppInstance;
 }
@@ -132,8 +137,14 @@ async function requestCloudStorageFallback(path, { method = "POST", body } = {})
   const url = `${BASE_URL}${path}`;
   const headers = new Headers({ "Content-Type": "application/json" });
   const initData = getInitData();
+  const clientPlatform = getClientPlatform();
+  headers.set("x-client-platform", clientPlatform);
   if (initData) {
-    headers.set("x-telegram-init-data", initData);
+    if (clientPlatform === "max") {
+      headers.set("x-max-init-data", initData);
+    } else {
+      headers.set("x-telegram-init-data", initData);
+    }
   }
 
   const response = await fetch(url, {

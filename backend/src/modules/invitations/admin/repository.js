@@ -120,11 +120,17 @@ async function findManagerBranchIds(userId) {
   return rows.map((item) => Number(item.branchId)).filter((item) => item > 0);
 }
 
-async function updatePendingUserProfile(userId, { firstName, lastName, branchId, positionId }) {
+async function updatePendingUserProfile(userId, { firstName, lastName, branchId, positionId, phoneE164 }) {
   await pool.execute(
-    `UPDATE users SET first_name = ?, last_name = ?, branch_id = ?, position_id = COALESCE(?, position_id), updated_at = NOW()
+    `UPDATE users
+     SET first_name = ?,
+         last_name = ?,
+         branch_id = ?,
+         position_id = COALESCE(?, position_id),
+         phone_e164 = ?,
+         updated_at = NOW()
      WHERE id = ? AND telegram_id IS NULL`,
-    [firstName, lastName, branchId, positionId || null, userId],
+    [firstName, lastName, branchId, positionId || null, phoneE164, userId],
   );
 }
 

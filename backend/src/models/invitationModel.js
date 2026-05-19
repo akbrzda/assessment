@@ -4,7 +4,7 @@ async function createInvitation({ code, roleId, branchId, firstName, lastName, p
   const [result] = await pool.execute(
     `INSERT INTO invitations (code, role_id, branch_id, first_name, last_name, phone, position_id, created_by, invited_user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [code, roleId, branchId, firstName, lastName, phone || null, positionId || null, createdBy, invitedUserId || null],
+    [code, roleId, branchId, firstName, lastName, phone, positionId || null, createdBy, invitedUserId || null],
   );
   return result.insertId;
 }
@@ -42,12 +42,14 @@ async function findById(id) {
 }
 
 async function markUsed(invitationId, userId) {
-  await pool.execute(
+  const [result] = await pool.execute(
     `UPDATE invitations
      SET used_by = ?, used_at = NOW(), invited_user_id = NULL
-     WHERE id = ?`,
+     WHERE id = ?
+       AND used_by IS NULL`,
     [userId, invitationId],
   );
+  return Number(result.affectedRows || 0);
 }
 
 async function findAll() {
@@ -131,7 +133,7 @@ async function deleteInvitation(invitationId) {
 async function updateInvitation(invitationId, { firstName, lastName, branchId, phone, positionId }) {
   await pool.execute(
     `UPDATE invitations SET first_name = ?, last_name = ?, branch_id = ?, phone = ?, position_id = ?, updated_at = NOW() WHERE id = ?`,
-    [firstName, lastName, branchId, phone || null, positionId || null, invitationId],
+    [firstName, lastName, branchId, phone, positionId || null, invitationId],
   );
 }
 

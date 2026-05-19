@@ -20,6 +20,10 @@ function mapUserRow(row) {
     points: row.points,
     timezone: row.timezone || "UTC",
     onboardingCompletedAt: row.onboarding_completed_at || null,
+    phoneE164: row.phone_e164 || null,
+    phoneVerificationStatus: row.phone_verification_status || "unverified",
+    phoneVerifiedAt: row.phone_verified_at || null,
+    phoneVerificationSource: row.phone_verification_source || null,
     isFirstLogin: !row.onboarding_completed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -29,7 +33,9 @@ function mapUserRow(row) {
 async function findByTelegramId(telegramId) {
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at,
+            u.phone_e164, u.phone_verification_status, u.phone_verified_at, u.phone_verification_source,
+            u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -42,6 +48,56 @@ async function findByTelegramId(telegramId) {
     [telegramId],
   );
   return mapUserRow(rows[0]);
+}
+
+async function findByPlatformIdentity(platform, platformUserId) {
+  const [rows] = await pool.execute(
+    `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
+            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at,
+            u.phone_e164, u.phone_verification_status, u.phone_verified_at, u.phone_verification_source,
+            u.created_at, u.updated_at,
+            r.name AS role_name,
+            b.name AS branch_name,
+            p.name AS position_name
+     FROM user_platform_identities upi
+     INNER JOIN users u ON u.id = upi.user_id
+     LEFT JOIN roles r ON r.id = u.role_id
+     LEFT JOIN branches b ON b.id = u.branch_id
+     LEFT JOIN positions p ON p.id = u.position_id
+     WHERE upi.platform = ? AND upi.platform_user_id = ?
+       AND u.deleted_at IS NULL
+       AND COALESCE(u.is_active, 1) = 1
+     LIMIT 1`,
+    [platform, platformUserId],
+  );
+  return mapUserRow(rows[0]);
+}
+
+async function findVerifiedActiveUsersByPhoneE164(phoneE164) {
+  if (!phoneE164) {
+    return [];
+  }
+
+  const [rows] = await pool.execute(
+    `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
+            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at,
+            u.phone_e164, u.phone_verification_status, u.phone_verified_at, u.phone_verification_source,
+            u.created_at, u.updated_at,
+            r.name AS role_name,
+            b.name AS branch_name,
+            p.name AS position_name
+     FROM users u
+     LEFT JOIN roles r ON r.id = u.role_id
+     LEFT JOIN branches b ON b.id = u.branch_id
+     LEFT JOIN positions p ON p.id = u.position_id
+     WHERE u.deleted_at IS NULL
+       AND u.phone_e164 = ?
+       AND u.phone_verification_status = 'verified'
+     ORDER BY u.id ASC`,
+    [phoneE164],
+  );
+
+  return rows.map(mapUserRow);
 }
 
 async function createUser({ telegramId, firstName, lastName, avatarUrl, positionId, branchId, roleId }) {
@@ -60,7 +116,9 @@ async function updateProfile(userId, { firstName, lastName }) {
 async function getDashboardData(userId) {
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at,
+            u.phone_e164, u.phone_verification_status, u.phone_verified_at, u.phone_verification_source,
+            u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -78,7 +136,9 @@ async function getDashboardData(userId) {
 async function listUsers() {
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at,
+            u.phone_e164, u.phone_verification_status, u.phone_verified_at, u.phone_verification_source,
+            u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -94,7 +154,9 @@ async function listUsers() {
 async function findById(userId) {
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at,
+            u.phone_e164, u.phone_verification_status, u.phone_verified_at, u.phone_verification_source,
+            u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -109,7 +171,7 @@ async function findById(userId) {
   return mapUserRow(rows[0]);
 }
 
-async function updateUserByAdmin(userId, { firstName, lastName, positionId, branchId, roleId, login, level, points }) {
+async function updateUserByAdmin(userId, { firstName, lastName, positionId, branchId, roleId, login, phoneE164, level, points }) {
   const fields = [];
   const values = [];
 
@@ -119,6 +181,11 @@ async function updateUserByAdmin(userId, { firstName, lastName, positionId, bran
   if (login !== undefined) {
     fields.push("login = ?");
     values.push(login);
+  }
+
+  if (phoneE164 !== undefined) {
+    fields.push("phone_e164 = ?");
+    values.push(phoneE164);
   }
 
   if (level !== undefined) {
@@ -178,7 +245,9 @@ async function findByIds(ids) {
   const placeholders = ids.map(() => "?").join(",");
   const [rows] = await pool.execute(
     `SELECT u.id, u.telegram_id, u.first_name, u.last_name, u.avatar_url, u.position_id, u.branch_id,
-            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at, u.created_at, u.updated_at,
+            u.role_id, u.level, u.points, u.timezone, u.onboarding_completed_at,
+            u.phone_e164, u.phone_verification_status, u.phone_verified_at, u.phone_verification_source,
+            u.created_at, u.updated_at,
             r.name AS role_name,
             b.name AS branch_name,
             p.name AS position_name
@@ -203,29 +272,69 @@ async function completeOnboarding(userId) {
 }
 
 // Создание pending-профиля без telegram_id (для flow приглашений)
-async function createPendingUser({ firstName, lastName, positionId, branchId, roleId }) {
+async function createPendingUser({ firstName, lastName, positionId, branchId, roleId, phoneE164 }) {
   const [result] = await pool.execute(
-    `INSERT INTO users (telegram_id, first_name, last_name, position_id, branch_id, role_id)
-     VALUES (NULL, ?, ?, ?, ?, ?)`,
-    [firstName, lastName, positionId, branchId, roleId],
+    `INSERT INTO users (
+      telegram_id,
+      first_name,
+      last_name,
+      position_id,
+      branch_id,
+      role_id,
+      phone_e164,
+      phone_verification_status,
+      phone_verification_source
+    )
+    VALUES (NULL, ?, ?, ?, ?, ?, ?, 'pending', 'unknown')`,
+    [firstName, lastName, positionId, branchId, roleId, phoneE164],
   );
   return result.insertId;
 }
 
 // Активация pending-профиля: привязать telegram_id и аватар
 async function activatePendingUser(userId, { telegramId, avatarUrl }) {
-  await pool.execute(`UPDATE users SET telegram_id = ?, avatar_url = ?, updated_at = NOW() WHERE id = ? AND telegram_id IS NULL`, [
+  const [result] = await pool.execute(`UPDATE users SET telegram_id = ?, avatar_url = ?, updated_at = NOW() WHERE id = ? AND telegram_id IS NULL`, [
     telegramId,
     avatarUrl || null,
     userId,
   ]);
+  return Number(result.affectedRows || 0);
+}
+
+async function markPhoneVerified(userId, { phoneE164, source }) {
+  await pool.execute(
+    `UPDATE users
+     SET phone_e164 = ?,
+         phone_verification_status = 'verified',
+         phone_verified_at = NOW(),
+         phone_verification_source = ?,
+         updated_at = NOW()
+     WHERE id = ?`,
+    [phoneE164, source, userId],
+  );
+}
+
+async function markPhoneVerificationRejected(userId, { phoneE164, source }) {
+  await pool.execute(
+    `UPDATE users
+     SET phone_e164 = COALESCE(phone_e164, ?),
+         phone_verification_status = 'rejected',
+         phone_verification_source = ?,
+         updated_at = NOW()
+     WHERE id = ?`,
+    [phoneE164, source, userId],
+  );
 }
 
 module.exports = {
   findByTelegramId,
+  findByPlatformIdentity,
+  findVerifiedActiveUsersByPhoneE164,
   createUser,
   createPendingUser,
   activatePendingUser,
+  markPhoneVerified,
+  markPhoneVerificationRejected,
   updateProfile,
   getDashboardData,
   listUsers,

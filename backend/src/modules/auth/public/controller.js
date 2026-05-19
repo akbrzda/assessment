@@ -16,11 +16,12 @@ function handleKnownError(error, res, next) {
 
 function createAuthContext(req) {
   return {
+    clientPlatform: req.clientPlatform || "telegram",
     inviteCodeHeader: req.headers["x-invite-code"] || null,
-    startParam: req.telegramInitData?.start_param || null,
-    startApp: req.telegramInitData?.startapp || null,
-    startParamHash: req.telegramInitData?.start_param_hash || null,
-    telegramUser: req.telegramInitData?.user || null,
+    startParam: req.platformInitData?.start_param || req.telegramInitData?.start_param || null,
+    startApp: req.platformInitData?.startapp || req.telegramInitData?.startapp || null,
+    startParamHash: req.platformInitData?.start_param_hash || req.telegramInitData?.start_param_hash || null,
+    telegramUser: req.platformInitData?.user || req.telegramInitData?.user || null,
     currentUser: req.currentUser || null,
   };
 }

@@ -132,6 +132,7 @@ async function createInvitation(payload, actor, req) {
       positionId: payload.positionId || null,
       branchId: payload.branchId,
       roleId: employeeRole.id,
+      phoneE164: payload.phone,
     });
   }
 
@@ -141,7 +142,7 @@ async function createInvitation(payload, actor, req) {
     branchId: payload.branchId,
     firstName: payload.firstName,
     lastName: payload.lastName,
-    phone: payload.phone || null,
+    phone: payload.phone,
     positionId: payload.positionId || null,
     createdBy: actor.id,
     invitedUserId,
@@ -174,7 +175,7 @@ async function updateInvitation(invitationId, payload, actor, req) {
     firstName: payload.firstName,
     lastName: payload.lastName,
     branchId: payload.branchId,
-    phone: payload.phone || null,
+    phone: payload.phone,
     positionId: payload.positionId || null,
   });
 
@@ -185,6 +186,7 @@ async function updateInvitation(invitationId, payload, actor, req) {
       lastName: payload.lastName,
       branchId: payload.branchId,
       positionId: payload.positionId || null,
+      phoneE164: payload.phone,
     });
   }
 

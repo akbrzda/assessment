@@ -92,7 +92,7 @@
       <div v-else class="space-y-4">
         <Input v-model="inviteForm.lastName" label="Фамилия" placeholder="Иванов" required />
         <Input v-model="inviteForm.firstName" label="Имя" placeholder="Иван" required />
-        <Input v-model="inviteForm.phone" label="Номер телефона" placeholder="+7 (999) 000-00-00" />
+        <Input v-model="inviteForm.phone" label="Номер телефона" placeholder="+7 (999) 000-00-00" required @input="handleInvitePhoneInput" />
         <Select v-model.number="inviteForm.positionId" label="Должность" :options="invitePositionOptions" placeholder="Выберите должность" required />
         <Select v-model.number="inviteForm.branchId" label="Филиал" :options="inviteBranchOptions" placeholder="Выберите филиал" required />
       </div>
@@ -228,7 +228,7 @@ import { useAuthStore } from "@/stores/auth";
 import apiClient from "@/utils/axios";
 import { getUsers, getReferences, createUser, updateUser, deleteUser, resetPassword, resetAssessmentProgress } from "@/api/users";
 import { createInvitation } from "@/api/invitations";
-import { BOT_USERNAME } from "@/env";
+import { BOT_USERNAME, MAX_BOT_NAME } from "@/env";
 import { Badge, Button, FilterBar, Input, Modal, PageHeader, Select, Tabs } from "@/components/ui";
 import UserForm from "@/modules/users/components/UserForm.vue";
 import UserPermissionsManager from "@/modules/users/components/UserPermissionsManager.vue";
@@ -285,6 +285,23 @@ const showInviteModal = ref(false);
 const inviteLink = ref("");
 const inviteForm = ref({ firstName: "", lastName: "", phone: "", positionId: "", branchId: "" });
 
+const buildInviteLinksText = (code) => {
+  const payload = `invite_${code}`;
+  const telegramLink = BOT_USERNAME ? `https://t.me/${BOT_USERNAME}?startapp=${payload}` : "";
+  const maxLink = MAX_BOT_NAME ? `https://max.ru/${MAX_BOT_NAME}?startapp=${payload}` : "";
+
+  if (telegramLink && maxLink) {
+    return `Telegram: ${telegramLink}\nMAX: ${maxLink}`;
+  }
+  if (telegramLink) {
+    return telegramLink;
+  }
+  if (maxLink) {
+    return maxLink;
+  }
+  return `Код приглашения: ${code}`;
+};
+
 const canOpenInvitations = computed(() => authStore.isSuperAdmin || authStore.hasModuleAccess("invitations"));
 
 const inviteBranchOptions = computed(() =>
@@ -329,6 +346,7 @@ const canManagePasswordInEditModal = computed(() => {
 const defaultForm = () => ({
   firstName: "",
   lastName: "",
+  phone: "",
   branchId: "",
   positionId: "",
   roleId: "",
@@ -527,6 +545,57 @@ const openInviteModal = () => {
   showInviteModal.value = true;
 };
 
+const formatPhoneMask = (value) => {
+  const digitsRaw = String(value || "").replace(/\D/g, "");
+  if (!digitsRaw) {
+    return "";
+  }
+
+  let digits = digitsRaw;
+  if (digits.startsWith("8")) {
+    digits = `7${digits.slice(1)}`;
+  } else if (!digits.startsWith("7")) {
+    digits = `7${digits}`;
+  }
+
+  digits = digits.slice(0, 11);
+  const local = digits.slice(1);
+
+  if (!local) return "+7";
+  if (local.length <= 3) return `+7 (${local}`;
+  if (local.length <= 6) return `+7 (${local.slice(0, 3)}) ${local.slice(3)}`;
+  if (local.length <= 8) return `+7 (${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
+  return `+7 (${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6, 8)}-${local.slice(8, 10)}`;
+};
+
+const handleInvitePhoneInput = () => {
+  const formatted = formatPhoneMask(inviteForm.value.phone);
+  if (formatted !== inviteForm.value.phone) {
+    inviteForm.value.phone = formatted;
+  }
+};
+
+const normalizePhoneForApi = (value) => {
+  const digitsRaw = String(value || "").replace(/\D/g, "");
+  if (!digitsRaw) {
+    return null;
+  }
+
+  let digits = digitsRaw;
+  if (digits.startsWith("8")) {
+    digits = `7${digits.slice(1)}`;
+  } else if (!digits.startsWith("7")) {
+    digits = `7${digits}`;
+  }
+
+  digits = digits.slice(0, 11);
+  if (digits.length !== 11) {
+    return null;
+  }
+
+  return `+${digits}`;
+};
+
 const closeInviteModal = () => {
   showInviteModal.value = false;
   inviteLink.value = "";
@@ -535,6 +604,16 @@ const closeInviteModal = () => {
 const validateInviteForm = () => {
   if (!inviteForm.value.firstName?.trim() || !inviteForm.value.lastName?.trim()) {
     showToast("Укажите имя и фамилию", "warning");
+    return false;
+  }
+  const phone = String(inviteForm.value.phone || "").trim();
+  const digits = phone.replace(/\D/g, "");
+  if (!phone) {
+    showToast("Укажите номер телефона", "warning");
+    return false;
+  }
+  if (digits.length !== 11) {
+    showToast("Введите номер полностью: +7 (999) 000-00-00", "warning");
     return false;
   }
   if (!inviteForm.value.positionId || !inviteForm.value.branchId) {
@@ -549,18 +628,18 @@ const handleInviteCreate = async () => {
 
   actionLoading.value = true;
   try {
+    const normalizedPhone = normalizePhoneForApi(inviteForm.value.phone);
     const { data } = await createInvitation({
       firstName: inviteForm.value.firstName.trim(),
       lastName: inviteForm.value.lastName.trim(),
-      phone: inviteForm.value.phone?.trim() || undefined,
+      phone: normalizedPhone || undefined,
       positionId: Number(inviteForm.value.positionId),
       branchId: Number(inviteForm.value.branchId),
     });
 
     const code = data?.invitation?.code;
     if (code) {
-      const botUsername = BOT_USERNAME || "";
-      inviteLink.value = botUsername ? `https://t.me/${botUsername}?startapp=invite_${code}` : `Код приглашения: ${code}`;
+      inviteLink.value = buildInviteLinksText(code);
     }
 
     await loadUsers({ forceFresh: true });
@@ -683,6 +762,7 @@ const openEditModal = (user) => {
   formData.value = {
     firstName: user.first_name,
     lastName: user.last_name,
+    phone: user.phone_e164 || "",
     branchId: String(user.branch_id || ""),
     positionId: String(user.position_id || ""),
     roleId: String(user.role_id || ""),
@@ -755,6 +835,19 @@ const validateForm = () => {
     showToast("Выберите филиал, должность и роль", "warning");
     return false;
   }
+
+  if (showEditModal.value) {
+    const phone = String(formData.value.phone || "").trim();
+    const digits = phone.replace(/\D/g, "");
+    if (!phone) {
+      showToast("Укажите номер телефона", "warning");
+      return false;
+    }
+    if (digits.length !== 11) {
+      showToast("Введите номер полностью: +7 (999) 000-00-00", "warning");
+      return false;
+    }
+  }
   return true;
 };
 
@@ -810,6 +903,7 @@ const handleUpdate = async () => {
     const updateData = {
       firstName: formData.value.firstName.trim(),
       lastName: formData.value.lastName.trim(),
+      phone: formData.value.phone?.trim(),
       branchId: Number(formData.value.branchId),
       positionId: Number(formData.value.positionId),
       roleId: Number(formData.value.roleId),

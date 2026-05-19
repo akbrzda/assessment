@@ -6,6 +6,13 @@ const registrationSchema = Joi.object({
   positionId: Joi.number().integer().positive().optional().allow(null),
   branchId: Joi.number().integer().positive().required(),
   inviteCode: Joi.string().trim().allow("", null),
+  contact: Joi.object({
+    source: Joi.string().trim().valid("telegram_contact", "max_contact").required(),
+    userId: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string().trim().min(1)).required(),
+    phoneNumber: Joi.string().trim().min(6).max(32).required(),
+  })
+    .optional()
+    .allow(null),
 });
 
 const profileUpdateSchema = Joi.object({

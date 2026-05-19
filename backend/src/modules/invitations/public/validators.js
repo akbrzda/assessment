@@ -4,6 +4,9 @@ const createSchema = Joi.object({
   firstName: Joi.string().trim().min(2).max(64).required(),
   lastName: Joi.string().trim().min(2).max(64).required(),
   branchId: Joi.number().integer().positive().required(),
+  phone: Joi.string().trim().pattern(/^\+7\d{10}$/).required().messages({
+    "string.pattern.base": "Телефон должен быть в формате +7XXXXXXXXXX",
+  }),
   role: Joi.string().trim().optional().valid("manager"),
 });
 
@@ -11,6 +14,9 @@ const updateSchema = Joi.object({
   firstName: Joi.string().trim().min(2).max(64).required(),
   lastName: Joi.string().trim().min(2).max(64).required(),
   branchId: Joi.number().integer().positive().required(),
+  phone: Joi.string().trim().pattern(/^\+7\d{10}$/).required().messages({
+    "string.pattern.base": "Телефон должен быть в формате +7XXXXXXXXXX",
+  }),
 });
 
 const extendSchema = Joi.object({

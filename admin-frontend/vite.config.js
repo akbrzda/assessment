@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
     define: {
       __API_BASE_URL__: JSON.stringify(env.API_BASE_URL || ""),
       __BOT_USERNAME__: JSON.stringify(env.BOT_USERNAME || ""),
+      __MAX_BOT_NAME__: JSON.stringify(env.MAX_BOT_NAME || ""),
     },
     plugins: [vue()],
     server: {

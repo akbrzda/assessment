@@ -156,6 +156,16 @@ export default {
         payload.inviteCode = form.inviteCode;
       }
 
+      if (payload.inviteCode) {
+        try {
+          payload.contact = await telegramStore.requestContactPayload();
+        } catch (contactError) {
+          telegramStore.showAlert(contactError.message || "Не удалось подтвердить номер телефона");
+          telegramStore.hapticFeedback("notification", "error");
+          return;
+        }
+      }
+
       const result = await userStore.register(payload);
 
       if (result.success) {

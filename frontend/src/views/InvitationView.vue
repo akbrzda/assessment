@@ -20,16 +20,6 @@
       </div>
 
       <div v-else-if="invitation" class="card invitation-card">
-        <div class="invitation-intro">
-          <div class="invitation-icon invitation-icon--violet">
-            <Hand />
-          </div>
-          <div>
-            <h2 class="title-medium invitation-intro-title">Вы приглашены!</h2>
-            <p class="body-medium text-secondary">Проверьте данные и подтвердите участие</p>
-          </div>
-        </div>
-
         <div class="invitation-details">
           <div class="detail-item">
             <div class="detail-icon detail-icon--violet">
@@ -62,21 +52,36 @@
           </div>
         </div>
 
-        <div class="invite-note">
-          <div class="detail-icon detail-icon--violet">
-            <ShieldCheck />
+        <div class="invite-steps">
+          <div class="invite-step">
+            <CheckCircle2 />
+            <span>Шаг 1: убедитесь, что ФИО, должность и филиал указаны верно.</span>
           </div>
-          <div>
-            <p class="title-small invite-note-title">Проверьте данные</p>
-            <p class="body-medium text-secondary">Если всё верно — нажмите кнопку для подтверждения.</p>
+          <div class="invite-step">
+            <Phone />
+            <span>Шаг 2: нажмите кнопку ниже и поделитесь номером телефона.</span>
+          </div>
+          <div class="invite-step">
+            <ShieldCheck />
+            <span>Шаг 3: система сверит номер с приглашением и активирует доступ.</span>
           </div>
         </div>
 
+        <label class="invite-confirm">
+          <input v-model="confirmDataChecked" type="checkbox" />
+          <span>Подтверждаю, что мои данные в приглашении указаны корректно.</span>
+        </label>
+
         <div class="invitation-actions">
-          <button class="btn btn-primary btn-full invitation-button" @click="acceptInvitation" :disabled="isLoading">
-            <span>{{ isLoading ? "Принимаем..." : "Подтвердить и войти" }}</span>
+          <button
+            class="btn btn-primary btn-full invitation-button"
+            @click="acceptInvitation"
+            :disabled="isLoading || isRequestingContact || !confirmDataChecked"
+          >
+            <span>{{ buttonText }}</span>
             <ArrowRight />
           </button>
+          <p class="invitation-actions-hint">После нажатия откроется системный запрос на передачу номера телефона.</p>
         </div>
       </div>
 
@@ -108,7 +113,7 @@
 <script>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { ArrowRight, BriefcaseBusiness, Building2, Hand, MailCheck, ShieldCheck, User, XCircle } from "lucide-vue-next";
+import { ArrowRight, BriefcaseBusiness, Building2, CheckCircle2, Hand, MailCheck, Phone, ShieldCheck, User, XCircle } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 
@@ -118,8 +123,10 @@ export default {
     ArrowRight,
     BriefcaseBusiness,
     Building2,
+    CheckCircle2,
     Hand,
     MailCheck,
+    Phone,
     ShieldCheck,
     User,
     XCircle,
@@ -130,6 +137,8 @@ export default {
     const telegramStore = useTelegramStore();
 
     const alreadyRegisteredError = ref(false);
+    const confirmDataChecked = ref(false);
+    const isRequestingContact = ref(false);
     const invitation = computed(() => userStore.invitation);
     const inviteFlow = computed(() => userStore.inviteFlow || { hasInviteCode: false, inviteCodeValid: false, registrationByInvitationOnly: true });
     const isLoading = computed(() => userStore.isLoading);
@@ -147,15 +156,40 @@ export default {
       const parts = [invitation.value.lastName, invitation.value.firstName, invitation.value.middleName].filter(Boolean);
       return parts.join(" ");
     });
+    const buttonText = computed(() => {
+      if (isRequestingContact.value) {
+        return "Ожидаем подтверждение номера...";
+      }
+      if (isLoading.value) {
+        return "Подтверждаем приглашение...";
+      }
+      return "Подтвердить данные и войти";
+    });
 
     async function acceptInvitation() {
       if (!invitation.value) {
         telegramStore.showAlert("Приглашение недоступно.");
         return;
       }
+      if (!confirmDataChecked.value) {
+        telegramStore.showAlert("Отметьте подтверждение данных, чтобы продолжить.");
+        return;
+      }
 
       try {
-        const result = await userStore.acceptInvitation();
+        let contactPayload = null;
+        try {
+          isRequestingContact.value = true;
+          contactPayload = await telegramStore.requestContactPayload();
+        } catch (contactError) {
+          telegramStore.showAlert(contactError.message || "Чтобы продолжить, нужно поделиться номером телефона.");
+          telegramStore.hapticFeedback("notification", "error");
+          return;
+        } finally {
+          isRequestingContact.value = false;
+        }
+
+        const result = await userStore.acceptInvitation(contactPayload);
         if (result.success) {
           telegramStore.hapticFeedback("notification", "success");
           router.replace({ name: "dashboard" });
@@ -183,9 +217,12 @@ export default {
       invitation,
       inviteFlow,
       isLoading,
+      isRequestingContact,
       welcomeText,
       fullName,
       alreadyRegisteredError,
+      confirmDataChecked,
+      buttonText,
       acceptInvitation,
     };
   },
@@ -217,9 +254,9 @@ export default {
 }
 
 .invite-hero-art {
-  width: 124px;
-  height: 124px;
-  border-radius: 28px;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -231,21 +268,8 @@ export default {
 }
 
 .invite-hero-art svg {
-  width: 62px;
-  height: 62px;
-}
-
-.invitation-card {
-  padding: 20px;
-  border-radius: 20px;
-}
-
-.invitation-intro {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--divider);
+  width: 32px;
+  height: 32px;
 }
 
 .invitation-intro-title {
@@ -308,30 +332,53 @@ export default {
 }
 
 .detail-label {
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-secondary);
 }
 
 .detail-value {
-  font-size: 21px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.invite-note {
+.invite-steps {
+  margin: 0 0 14px;
+  padding: 0 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.invite-step {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 20px;
-  padding: 14px;
-  border-radius: 16px;
-  background: rgba(99, 85, 245, 0.06);
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1.4;
 }
-
-.invite-note-title {
-  margin-bottom: 4px;
-  font-size: 18px;
+.invite-step svg {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  color: #6355f5;
+  flex-shrink: 0;
+}
+.invite-confirm {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(99, 85, 245, 0.06);
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.35;
+}
+.invite-confirm input {
+  margin-top: 2px;
 }
 
 .invitation-actions {
@@ -355,6 +402,11 @@ export default {
 .invitation-button svg {
   width: 22px;
   height: 22px;
+}
+.invitation-actions-hint {
+  margin: 10px 2px 0;
+  color: var(--text-secondary);
+  font-size: 14px;
 }
 
 .empty-state {
@@ -383,14 +435,14 @@ export default {
   }
 
   .invite-hero-art {
-    width: 94px;
-    height: 94px;
-    border-radius: 20px;
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
   }
 
   .invite-hero-art svg {
-    width: 46px;
-    height: 46px;
+    width: 32px;
+    height: 32px;
   }
 
   .invite-subtitle {
@@ -403,6 +455,9 @@ export default {
     padding: 16px;
   }
 
+  .detail-item:first-child {
+    padding-top: 0;
+  }
   .detail-item {
     gap: 10px;
     padding: 14px 0;
@@ -416,12 +471,20 @@ export default {
   }
 
   .detail-value {
-    font-size: 19px;
+    font-size: 14px;
   }
 
   .invitation-button {
     min-height: 54px;
     font-size: 16px;
+  }
+
+  .invite-step {
+    font-size: 14px;
+  }
+
+  .invite-confirm {
+    font-size: 14px;
   }
 }
 </style>

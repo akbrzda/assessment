@@ -7,6 +7,7 @@ const referenceModel = require("../../../models/referenceModel");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
 const { listPublishedCoursesForUser } = require("../../courses/userCourseView.repository");
 const permissionService = require("../../../services/PermissionService");
+const { normalizePhoneToE164Ru } = require("../../../utils/phone");
 
 const updateSchema = Joi.object({
   firstName: Joi.string().trim().min(2).max(64).required(),
@@ -14,6 +15,7 @@ const updateSchema = Joi.object({
   branchId: Joi.number().integer().positive().required(),
   positionId: Joi.number().integer().positive().required(),
   roleId: Joi.number().integer().positive().required(),
+  phone: Joi.string().trim().required(),
   login: Joi.string().trim().min(3).max(50).optional().allow(""),
   level: Joi.number().integer().min(1).default(1),
   points: Joi.number().integer().min(0).default(0),
@@ -59,6 +61,7 @@ async function listUsers(req, res, next) {
         u.first_name, 
         u.last_name, 
         u.login,
+        u.phone_e164,
         u.level, 
         u.points, 
         u.created_at,
@@ -296,12 +299,28 @@ async function updateUser(req, res, next) {
       points: value.points ?? existing.points,
     };
 
+    if (!value.phone || !String(value.phone).trim()) {
+      return res.status(422).json({ error: "Телефон обязателен" });
+    }
+    const normalizedPhone = normalizePhoneToE164Ru(value.phone);
+    if (!normalizedPhone || !/^\+7\d{10}$/.test(normalizedPhone)) {
+      return res.status(422).json({ error: "Телефон должен быть в формате +7XXXXXXXXXX" });
+    }
+    payload.phoneE164 = normalizedPhone;
+
     // Добавляем логин в payload, если он был передан
     if (value.login !== undefined) {
       payload.login = value.login.trim() || null;
     }
 
     await userModel.updateUserByAdmin(userId, payload);
+    await pool.query(
+      `UPDATE invitations
+       SET phone = ?, updated_at = NOW()
+       WHERE invited_user_id = ?
+         AND used_by IS NULL`,
+      [payload.phoneE164, userId],
+    );
     await assessmentModel.assignUserToMatchingAssessments({
       userId,
       branchId: value.branchId,
@@ -319,6 +338,7 @@ async function updateUser(req, res, next) {
         branchId: value.branchId,
         positionId: value.positionId,
         roleId: value.roleId,
+        phoneE164: payload.phoneE164 ?? existing.phoneE164 ?? null,
         level: value.level ?? existing.level,
         points: value.points ?? existing.points,
       },
@@ -385,6 +405,7 @@ async function getUserDetailedStats(req, res, next) {
       `SELECT 
         u.id, u.telegram_id, u.first_name, u.last_name, u.login,
         u.level, u.points, u.created_at,
+        u.phone_e164, u.phone_verification_status, u.phone_verified_at, u.phone_verification_source,
         b.name as branch_name, p.name as position_name, r.name as role_name
       FROM users u
       LEFT JOIN branches b ON u.branch_id = b.id
@@ -468,6 +489,37 @@ async function getUserDetailedStats(req, res, next) {
       [userId],
     );
 
+    const [platformIdentities] = await pool.query(
+      `SELECT platform, platform_user_id, platform_username, is_verified, verified_at
+       FROM user_platform_identities
+       WHERE user_id = ?
+       ORDER BY platform ASC`,
+      [userId],
+    );
+
+    let phoneConflict = {
+      hasConflict: false,
+      conflictingUserIds: [],
+      conflictingProfilesCount: 0,
+    };
+    if (users[0].phone_e164 && users[0].phone_verification_status === "verified") {
+      const [phoneConflictRows] = await pool.query(
+        `SELECT id
+         FROM users
+         WHERE deleted_at IS NULL
+           AND phone_e164 = ?
+           AND phone_verification_status = 'verified'
+         ORDER BY id ASC`,
+        [users[0].phone_e164],
+      );
+      const conflictingIds = phoneConflictRows.map((row) => Number(row.id)).filter((id) => id !== userId);
+      phoneConflict = {
+        hasConflict: conflictingIds.length > 0,
+        conflictingUserIds: conflictingIds,
+        conflictingProfilesCount: conflictingIds.length,
+      };
+    }
+
     // Прогресс до следующего уровня
     const [levels] = await pool.query(
       `SELECT level_number, min_points 
@@ -490,6 +542,12 @@ async function getUserDetailedStats(req, res, next) {
       badges,
       rank: rankData[0] || { user_rank: 0, total_users: 0 },
       invitation: invitationRows[0] || null,
+      identities: platformIdentities,
+      identityDiagnostics: {
+        phoneE164: users[0].phone_e164 || null,
+        phoneVerificationStatus: users[0].phone_verification_status || "unverified",
+        phoneConflict,
+      },
       nextLevel,
       progressToNextLevel: Math.min(100, Math.max(0, progressToNextLevel)),
     });

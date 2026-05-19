@@ -222,7 +222,7 @@ export const useUserStore = defineStore("user", () => {
     }
   }
 
-  async function acceptInvitation() {
+  async function acceptInvitation(contact) {
     if (!invitation.value) {
       throw new Error("Нет активного приглашения");
     }
@@ -241,6 +241,10 @@ export const useUserStore = defineStore("user", () => {
         branchId: invitation.value.branchId,
         inviteCode: invitation.value.code,
       };
+
+      if (contact) {
+        payload.contact = contact;
+      }
 
       // Выполняем регистрацию
       const response = await apiClient.register(payload);

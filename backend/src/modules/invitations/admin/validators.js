@@ -5,7 +5,9 @@ const createSchema = Joi.object({
   lastName: Joi.string().trim().min(2).max(64).required(),
   branchId: Joi.number().integer().positive().required(),
   positionId: Joi.number().integer().positive().required(),
-  phone: Joi.string().trim().max(20).optional().allow("", null),
+  phone: Joi.string().trim().pattern(/^\+7\d{10}$/).required().messages({
+    "string.pattern.base": "Телефон должен быть в формате +7XXXXXXXXXX",
+  }),
   existingUserId: Joi.number().integer().positive().optional(),
 });
 
@@ -14,7 +16,9 @@ const updateSchema = Joi.object({
   lastName: Joi.string().trim().min(2).max(64).required(),
   branchId: Joi.number().integer().positive().required(),
   positionId: Joi.number().integer().positive().optional(),
-  phone: Joi.string().trim().max(20).optional().allow("", null),
+  phone: Joi.string().trim().pattern(/^\+7\d{10}$/).required().messages({
+    "string.pattern.base": "Телефон должен быть в формате +7XXXXXXXXXX",
+  }),
 });
 
 function buildValidationError(error) {

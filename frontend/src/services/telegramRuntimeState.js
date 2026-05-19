@@ -2,9 +2,10 @@ const runtimeState = {
   initDataOverride: "",
   startParam: null,
   inviteCode: null,
+  clientPlatform: "telegram",
 };
 
-export function setTelegramRuntimeState({ initDataOverride, startParam, inviteCode } = {}) {
+export function setTelegramRuntimeState({ initDataOverride, startParam, inviteCode, clientPlatform } = {}) {
   if (typeof initDataOverride === "string") {
     runtimeState.initDataOverride = initDataOverride;
   }
@@ -15,6 +16,10 @@ export function setTelegramRuntimeState({ initDataOverride, startParam, inviteCo
 
   if (inviteCode !== undefined) {
     runtimeState.inviteCode = inviteCode || null;
+  }
+
+  if (clientPlatform !== undefined) {
+    runtimeState.clientPlatform = clientPlatform || "telegram";
   }
 }
 
@@ -30,8 +35,13 @@ export function getTelegramInviteCode() {
   return runtimeState.inviteCode || null;
 }
 
+export function getClientPlatform() {
+  return runtimeState.clientPlatform || "telegram";
+}
+
 export function clearTelegramRuntimeState() {
   runtimeState.initDataOverride = "";
   runtimeState.startParam = null;
   runtimeState.inviteCode = null;
+  runtimeState.clientPlatform = "telegram";
 }

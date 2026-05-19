@@ -32,6 +32,7 @@ async function createInvitation(payload, actor) {
     branchId: payload.branchId,
     firstName: payload.firstName,
     lastName: payload.lastName,
+    phone: payload.phone,
     createdBy: actor.id,
   });
 
@@ -75,6 +76,7 @@ async function updateInvitation(invitationId, payload, actor) {
     firstName: payload.firstName,
     lastName: payload.lastName,
     branchId: payload.branchId,
+    phone: payload.phone,
   });
 
   return invitationsRepository.findById(invitationId);

@@ -44,10 +44,13 @@
       <div v-if="activeTab === 'general'" class="grid-two">
         <Card class="info-card">
           <h3>Контактные данные</h3>
-          <div class="kv-row"><span>Телефон</span><strong>—</strong></div>
+          <div class="kv-row"><span>Телефон</span><strong>{{ profile.user?.phone_e164 || "—" }}</strong></div>
           <div class="kv-row"><span>Email</span><strong>—</strong></div>
           <div class="kv-row">
             <span>Telegram</span><strong>{{ profile.user?.telegram_id || "—" }}</strong>
+          </div>
+          <div class="kv-row">
+            <span>Статус верификации</span><strong>{{ profile.user?.phone_verification_status || "unverified" }}</strong>
           </div>
         </Card>
         <Card class="info-card">
@@ -76,6 +79,26 @@
             </div>
           </div>
           <p class="invite-profile-hint">Профиль станет активным после перехода сотрудника по ссылке.</p>
+        </Card>
+
+        <Card class="activity-card">
+          <h3>Диагностика идентичности</h3>
+          <div class="kv-row">
+            <span>Платформенные identity</span>
+            <strong>{{ Array.isArray(profile.identities) ? profile.identities.length : 0 }}</strong>
+          </div>
+          <div v-if="Array.isArray(profile.identities) && profile.identities.length" class="identity-list">
+            <div v-for="identity in profile.identities" :key="`${identity.platform}-${identity.platform_user_id}`" class="identity-row">
+              <span>{{ identity.platform }}: {{ identity.platform_user_id }}</span>
+              <span>{{ identity.is_verified ? "verified" : "unverified" }}</span>
+            </div>
+          </div>
+          <div
+            v-if="profile.identityDiagnostics?.phoneConflict?.hasConflict"
+            class="identity-conflict"
+          >
+            Конфликт по телефону. Дубли профилей: {{ profile.identityDiagnostics.phoneConflict.conflictingUserIds.join(", ") }}
+          </div>
         </Card>
 
         <Card class="activity-card">
@@ -289,7 +312,7 @@ import {
   removeUserPermissionOverride,
   removeUserRoleAssignment,
 } from "@/api/users";
-import { BOT_USERNAME } from "@/env";
+import { BOT_USERNAME, MAX_BOT_NAME } from "@/env";
 
 const route = useRoute();
 const router = useRouter();
@@ -341,8 +364,20 @@ const initials = computed(() => {
 const invitationLink = computed(() => {
   const code = profile.value?.invitation?.code;
   if (!code) return "";
-  const botUsername = BOT_USERNAME || "";
-  return botUsername ? `https://t.me/${botUsername}?startapp=invite_${code}` : `Код приглашения: ${code}`;
+  const payload = `invite_${code}`;
+  const telegramLink = BOT_USERNAME ? `https://t.me/${BOT_USERNAME}?startapp=${payload}` : "";
+  const maxLink = MAX_BOT_NAME ? `https://max.ru/${MAX_BOT_NAME}?startapp=${payload}` : "";
+
+  if (telegramLink && maxLink) {
+    return `Telegram: ${telegramLink}\nMAX: ${maxLink}`;
+  }
+  if (telegramLink) {
+    return telegramLink;
+  }
+  if (maxLink) {
+    return maxLink;
+  }
+  return `Код приглашения: ${code}`;
 });
 
 const userStatusLabel = computed(() => (profile.value?.user?.telegram_id ? "Активен" : "Ожидает"));
@@ -834,6 +869,26 @@ onMounted(async () => {
   margin: 10px 0 0;
   font-size: 13px;
   color: hsl(var(--muted-foreground));
+}
+.identity-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.identity-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+.identity-conflict {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  background: hsl(var(--color-danger-subtle));
+  color: hsl(var(--destructive));
+  border: 1px solid hsl(var(--color-danger-border) / 0.5);
+  font-size: 13px;
 }
 
 @media (max-width: 1024px) {

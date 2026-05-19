@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { clearTelegramRuntimeState, setTelegramRuntimeState } from "../services/telegramRuntimeState";
+import { clearTelegramRuntimeState, getClientPlatform, setTelegramRuntimeState } from "../services/telegramRuntimeState";
 
 const INIT_DATA_MAX_AGE_SECONDS = 5 * 60;
 
@@ -94,6 +94,51 @@ function extractInviteFromUrl() {
   return null;
 }
 
+function extractPhoneFromContactQuery(rawValue) {
+  if (typeof rawValue !== "string" || !rawValue.trim()) {
+    return null;
+  }
+
+  try {
+    const params = new URLSearchParams(rawValue);
+    const contactRaw = params.get("contact");
+    if (!contactRaw) {
+      return null;
+    }
+
+    const parsedContact = JSON.parse(contactRaw);
+    return parsedContact?.phone_number || parsedContact?.phone || null;
+  } catch (error) {
+    console.error("Ошибка парсинга contact payload:", error);
+    return null;
+  }
+}
+
+function extractPhoneFromUnknownPayload(payload) {
+  if (!payload) {
+    return null;
+  }
+
+  if (typeof payload === "string") {
+    return extractPhoneFromContactQuery(payload);
+  }
+
+  if (typeof payload !== "object") {
+    return null;
+  }
+
+  return (
+    payload.phone ||
+    payload.phoneNumber ||
+    payload.phone_number ||
+    payload.contact?.phone_number ||
+    payload.contact?.phone ||
+    extractPhoneFromContactQuery(payload.result) ||
+    extractPhoneFromContactQuery(payload.response) ||
+    null
+  );
+}
+
 export const useTelegramStore = defineStore("telegram", () => {
   const tg = ref(null);
   const user = ref(null);
@@ -106,28 +151,44 @@ export const useTelegramStore = defineStore("telegram", () => {
   const theme = computed(() => tg.value?.colorScheme || "light");
   const platform = computed(() => tg.value?.platform || "unknown");
 
+  function detectMiniAppRuntime() {
+    if (typeof window === "undefined") {
+      return { provider: "none", webApp: null };
+    }
+
+    if (window.Telegram?.WebApp) {
+      return { provider: "telegram", webApp: window.Telegram.WebApp };
+    }
+
+    if (window.WebApp && typeof window.WebApp === "object") {
+      return { provider: "max", webApp: window.WebApp };
+    }
+
+    return { provider: "none", webApp: null };
+  }
+
   function initTelegram() {
     if (tg.value) {
       return;
     }
 
-    const hasWebApp = typeof window !== "undefined" && window.Telegram?.WebApp;
+    const { provider, webApp } = detectMiniAppRuntime();
     const urlInvite = extractInviteFromUrl();
 
-    if (!hasWebApp) {
-      console.error("Telegram WebApp API недоступен. Откройте мини-приложение внутри Telegram.");
+    if (!webApp) {
+      console.error("WebApp API недоступен. Откройте мини-приложение внутри Telegram или MAX.");
       if (urlInvite) {
         const token = `invite_${urlInvite}`;
         setTelegramRuntimeState({
           initDataOverride: "",
           startParam: token,
           inviteCode: urlInvite,
+          clientPlatform: "telegram",
         });
       }
       return;
     }
 
-    const webApp = window.Telegram.WebApp;
     tg.value = webApp;
 
     // Восстанавливаем initData из sessionStorage только если он еще актуален
@@ -211,6 +272,7 @@ export const useTelegramStore = defineStore("telegram", () => {
       setTelegramRuntimeState({
         startParam: token,
         inviteCode,
+        clientPlatform: provider,
       });
 
       console.log("✅ Токен приглашения сохранен:", token);
@@ -219,16 +281,20 @@ export const useTelegramStore = defineStore("telegram", () => {
       setTelegramRuntimeState({
         startParam: startParam || startApp || tgWebAppStartParam || null,
         inviteCode: null,
+        clientPlatform: provider,
       });
     }
 
     // Сохраняем оригинальный initData БЕЗ изменений (используем currentInitData, который может быть восстановлен)
     setTelegramRuntimeState({
       initDataOverride: currentInitData,
+      clientPlatform: provider,
     });
 
     webApp.ready();
-    webApp.expand();
+    if (typeof webApp.expand === "function") {
+      webApp.expand();
+    }
 
     if (typeof webApp.disableVerticalSwipes === "function") {
       webApp.disableVerticalSwipes();
@@ -240,7 +306,131 @@ export const useTelegramStore = defineStore("telegram", () => {
   }
 
   function resolveTelegramApp() {
-    return window.Telegram?.WebApp || tg.value || null;
+    const detected = detectMiniAppRuntime();
+    return detected.webApp || tg.value || null;
+  }
+
+  async function requestContactPayload() {
+    const app = resolveTelegramApp();
+    if (!app || typeof app.requestContact !== "function") {
+      throw new Error("Платформа не поддерживает запрос контакта");
+    }
+
+    const source = getClientPlatform() === "max" ? "max_contact" : "telegram_contact";
+    const currentUserId = user.value?.id || app?.initDataUnsafe?.user?.id;
+    if (!currentUserId) {
+      throw new Error("Не удалось определить пользователя платформы");
+    }
+
+    const timeoutMs = 10000;
+    const CONTACT_EVENT_NAMES = ["contactRequested", "contact_requested", "phoneRequested", "phone_requested", "custom_method_invoked", "web_app_method_invoked", "WebAppRequestPhone"];
+
+    const phoneFromRequest = await new Promise((resolve, reject) => {
+      let resolved = false;
+      let timerId = null;
+
+      const clearListeners = () => {
+        if (typeof app.offEvent !== "function") {
+          return;
+        }
+        CONTACT_EVENT_NAMES.forEach((eventName) => {
+          app.offEvent(eventName, onContactEvent);
+          app.offEvent(eventName, onCustomMethodEvent);
+        });
+      };
+
+      const finish = (phoneValue) => {
+        if (resolved) {
+          return;
+        }
+        resolved = true;
+        if (timerId) {
+          clearTimeout(timerId);
+        }
+        clearListeners();
+        resolve(phoneValue || null);
+      };
+
+      const onContactEvent = (payload) => {
+        const extractedPhone = extractPhoneFromUnknownPayload(payload);
+        if (extractedPhone) {
+          finish(extractedPhone);
+        }
+      };
+
+      const onCustomMethodEvent = (payload) => {
+        const extractedPhone = extractPhoneFromUnknownPayload(payload);
+        if (extractedPhone) {
+          finish(extractedPhone);
+        }
+      };
+
+      timerId = setTimeout(() => finish(null), timeoutMs);
+
+      if (typeof app.onEvent === "function") {
+        CONTACT_EVENT_NAMES.forEach((eventName) => {
+          app.onEvent(eventName, onContactEvent);
+          app.onEvent(eventName, onCustomMethodEvent);
+        });
+      }
+
+      try {
+        const directResult = app.requestContact((callbackPayload) => {
+          const callbackPhone = extractPhoneFromUnknownPayload(callbackPayload);
+          if (callbackPhone) {
+            finish(callbackPhone);
+          }
+        });
+
+        if (directResult === false) {
+          if (timerId) {
+            clearTimeout(timerId);
+          }
+          clearListeners();
+          resolved = true;
+          reject(new Error("Подтверждение номера отменено"));
+          return;
+        }
+
+        const directPhone = extractPhoneFromUnknownPayload(directResult);
+        if (directPhone) {
+          finish(directPhone);
+          return;
+        }
+
+        if (directResult && typeof directResult.then === "function") {
+          directResult
+            .then((resolvedPayload) => {
+              const resolvedPhone = extractPhoneFromUnknownPayload(resolvedPayload);
+              if (resolvedPhone) {
+                finish(resolvedPhone);
+              }
+            })
+            .catch((error) => {
+              console.error("Ошибка promise-режима requestContact:", error);
+            });
+        }
+      } catch (error) {
+        if (timerId) {
+          clearTimeout(timerId);
+        }
+        clearListeners();
+        resolved = true;
+        reject(error);
+      }
+    });
+
+    const phone = phoneFromRequest;
+
+    if (!phone) {
+      throw new Error("Платформа не вернула номер телефона. Проверьте доступ к контактам и повторите попытку.");
+    }
+
+    return {
+      source,
+      userId: currentUserId,
+      phoneNumber: phone,
+    };
   }
 
   function showAlert(message) {
@@ -452,5 +642,6 @@ export const useTelegramStore = defineStore("telegram", () => {
     enableClosingConfirmation,
     disableClosingConfirmation,
     clearSavedInitData,
+    requestContactPayload,
   };
 });
