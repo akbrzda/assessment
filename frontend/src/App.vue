@@ -90,6 +90,10 @@ export default {
     onMounted(async () => {
       telegramStore.initTelegram();
       themeStore.initTheme();
+      if (!telegramStore.hasValidInitData) {
+        telegramStore.showAlert("Не удалось получить данные Mini App. Откройте приложение из бота Telegram или MAX.");
+        return;
+      }
       try {
         await userStore.ensureStatus();
 

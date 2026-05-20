@@ -81,12 +81,21 @@
     </Modal>
 
     <Modal :show="showInviteModal" title="Пригласить сотрудника" @close="closeInviteModal">
-      <div v-if="inviteLink" class="invite-success">
+      <div v-if="hasInviteLinks" class="invite-success">
         <p class="invite-success-text">Приглашение создано. Отправьте ссылку сотруднику:</p>
-        <div class="invite-link-row">
-          <Input v-model="inviteLink" readonly label="Ссылка-приглашение" />
-          <Button size="sm" icon="Copy" variant="secondary" @click="copyInviteLink">Скопировать</Button>
+        <div v-if="inviteLinks.telegramLink" class="invite-link-row">
+          <Input :model-value="inviteLinks.telegramLink" readonly label="Ссылка для Telegram" />
+          <Button size="sm" icon="Copy" variant="secondary" @click="copyInviteLink(inviteLinks.telegramLink)">Скопировать</Button>
         </div>
+        <div v-if="inviteLinks.maxLink" class="invite-link-row">
+          <Input :model-value="inviteLinks.maxLink" readonly label="Ссылка для MAX" />
+          <Button size="sm" icon="Copy" variant="secondary" @click="copyInviteLink(inviteLinks.maxLink)">Скопировать</Button>
+        </div>
+        <div v-if="inviteLinks.fallbackCode && !inviteLinks.telegramLink && !inviteLinks.maxLink" class="invite-link-row">
+          <Input :model-value="inviteLinks.fallbackCode" readonly label="Код приглашения" />
+          <Button size="sm" icon="Copy" variant="secondary" @click="copyInviteLink(inviteLinks.fallbackCode)">Скопировать</Button>
+        </div>
+        <Button size="sm" icon="Copy" variant="secondary" @click="copyInviteLink()">Скопировать всё</Button>
         <p class="invite-hint">После перехода по ссылке сотрудник увидит заполненные данные и подтвердит приглашение.</p>
       </div>
       <div v-else class="space-y-4">
@@ -97,8 +106,8 @@
         <Select v-model.number="inviteForm.branchId" label="Филиал" :options="inviteBranchOptions" placeholder="Выберите филиал" required />
       </div>
       <template #footer>
-        <Button variant="secondary" @click="closeInviteModal">{{ inviteLink ? "Готово" : "Отмена" }}</Button>
-        <Button v-if="!inviteLink" :loading="actionLoading" @click="handleInviteCreate">Создать приглашение</Button>
+        <Button variant="secondary" @click="closeInviteModal">{{ hasInviteLinks ? "Готово" : "Отмена" }}</Button>
+        <Button v-if="!hasInviteLinks" :loading="actionLoading" @click="handleInviteCreate">Создать приглашение</Button>
       </template>
     </Modal>
 
@@ -237,6 +246,7 @@ import UsersTable from "@/modules/users/components/users-view/UsersTable.vue";
 import { useToast } from "@/composables/useToast";
 import { useSkeletonGate } from "@/composables/useSkeletonGate";
 import { formatBranchLabel } from "@/utils/branch";
+import { formatPhoneMask, normalizePhoneForApi } from "@/utils/phone";
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -282,25 +292,22 @@ const selectedUserIds = ref([]);
 const activeUserTab = ref("all");
 const isCreateCredentialsSynced = ref(false);
 const showInviteModal = ref(false);
-const inviteLink = ref("");
+const inviteLinks = ref({ telegramLink: "", maxLink: "", fallbackCode: "" });
 const inviteForm = ref({ firstName: "", lastName: "", phone: "", positionId: "", branchId: "" });
 
-const buildInviteLinksText = (code) => {
+const buildInviteLinks = (code) => {
   const payload = `invite_${code}`;
   const telegramLink = BOT_USERNAME ? `https://t.me/${BOT_USERNAME}?startapp=${payload}` : "";
   const maxLink = MAX_BOT_NAME ? `https://max.ru/${MAX_BOT_NAME}?startapp=${payload}` : "";
 
-  if (telegramLink && maxLink) {
-    return `Telegram: ${telegramLink}\nMAX: ${maxLink}`;
-  }
-  if (telegramLink) {
-    return telegramLink;
-  }
-  if (maxLink) {
-    return maxLink;
-  }
-  return `Код приглашения: ${code}`;
+  return {
+    telegramLink,
+    maxLink,
+    fallbackCode: `Код приглашения: ${code}`,
+  };
 };
+
+const hasInviteLinks = computed(() => Boolean(inviteLinks.value.telegramLink || inviteLinks.value.maxLink || inviteLinks.value.fallbackCode));
 
 const canOpenInvitations = computed(() => authStore.isSuperAdmin || authStore.hasModuleAccess("invitations"));
 
@@ -541,31 +548,8 @@ const openProfilePage = (user) => {
 
 const openInviteModal = () => {
   inviteForm.value = { firstName: "", lastName: "", phone: "", positionId: "", branchId: "" };
-  inviteLink.value = "";
+  inviteLinks.value = { telegramLink: "", maxLink: "", fallbackCode: "" };
   showInviteModal.value = true;
-};
-
-const formatPhoneMask = (value) => {
-  const digitsRaw = String(value || "").replace(/\D/g, "");
-  if (!digitsRaw) {
-    return "";
-  }
-
-  let digits = digitsRaw;
-  if (digits.startsWith("8")) {
-    digits = `7${digits.slice(1)}`;
-  } else if (!digits.startsWith("7")) {
-    digits = `7${digits}`;
-  }
-
-  digits = digits.slice(0, 11);
-  const local = digits.slice(1);
-
-  if (!local) return "+7";
-  if (local.length <= 3) return `+7 (${local}`;
-  if (local.length <= 6) return `+7 (${local.slice(0, 3)}) ${local.slice(3)}`;
-  if (local.length <= 8) return `+7 (${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
-  return `+7 (${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6, 8)}-${local.slice(8, 10)}`;
 };
 
 const handleInvitePhoneInput = () => {
@@ -575,30 +559,9 @@ const handleInvitePhoneInput = () => {
   }
 };
 
-const normalizePhoneForApi = (value) => {
-  const digitsRaw = String(value || "").replace(/\D/g, "");
-  if (!digitsRaw) {
-    return null;
-  }
-
-  let digits = digitsRaw;
-  if (digits.startsWith("8")) {
-    digits = `7${digits.slice(1)}`;
-  } else if (!digits.startsWith("7")) {
-    digits = `7${digits}`;
-  }
-
-  digits = digits.slice(0, 11);
-  if (digits.length !== 11) {
-    return null;
-  }
-
-  return `+${digits}`;
-};
-
 const closeInviteModal = () => {
   showInviteModal.value = false;
-  inviteLink.value = "";
+  inviteLinks.value = { telegramLink: "", maxLink: "", fallbackCode: "" };
 };
 
 const validateInviteForm = () => {
@@ -639,7 +602,7 @@ const handleInviteCreate = async () => {
 
     const code = data?.invitation?.code;
     if (code) {
-      inviteLink.value = buildInviteLinksText(code);
+      inviteLinks.value = buildInviteLinks(code);
     }
 
     await loadUsers({ forceFresh: true });
@@ -652,10 +615,18 @@ const handleInviteCreate = async () => {
   }
 };
 
-const copyInviteLink = async () => {
-  if (!inviteLink.value) return;
+const copyInviteLink = async (value = "") => {
+  const text = value || [
+    inviteLinks.value.telegramLink ? `Telegram: ${inviteLinks.value.telegramLink}` : "",
+    inviteLinks.value.maxLink ? `MAX: ${inviteLinks.value.maxLink}` : "",
+    !inviteLinks.value.telegramLink && !inviteLinks.value.maxLink ? inviteLinks.value.fallbackCode : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  if (!text) return;
   try {
-    await navigator.clipboard.writeText(inviteLink.value);
+    await navigator.clipboard.writeText(text);
     showToast("Ссылка скопирована", "success");
   } catch (error) {
     console.error("Ошибка копирования ссылки приглашения", error);
@@ -762,7 +733,7 @@ const openEditModal = (user) => {
   formData.value = {
     firstName: user.first_name,
     lastName: user.last_name,
-    phone: user.phone_e164 || "",
+    phone: formatPhoneMask(user.phone_e164 || ""),
     branchId: String(user.branch_id || ""),
     positionId: String(user.position_id || ""),
     roleId: String(user.role_id || ""),

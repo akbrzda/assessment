@@ -44,7 +44,7 @@
       <div v-if="activeTab === 'general'" class="grid-two">
         <Card class="info-card">
           <h3>Контактные данные</h3>
-          <div class="kv-row"><span>Телефон</span><strong>{{ profile.user?.phone_e164 || "—" }}</strong></div>
+          <div class="kv-row"><span>Телефон</span><strong>{{ formatPhoneForUi(profile.user?.phone_e164) }}</strong></div>
           <div class="kv-row"><span>Email</span><strong>—</strong></div>
           <div class="kv-row">
             <span>Telegram</span><strong>{{ profile.user?.telegram_id || "—" }}</strong>
@@ -69,15 +69,32 @@
           </div>
         </Card>
 
-        <Card v-if="invitationLink" class="activity-card">
+        <Card v-if="hasInvitationLinks" class="activity-card">
           <h3>Приглашение</h3>
-          <div class="invite-profile-row">
-            <span>Ссылка-приглашение</span>
-            <div class="invite-profile-actions">
-              <code>{{ invitationLink }}</code>
-              <Button size="sm" variant="secondary" icon="Copy" @click="copyInvitationLink">Копировать</Button>
+          <div class="invite-profile-links">
+            <div v-if="invitationLinks.telegramLink" class="invite-profile-row">
+              <span>Ссылка для Telegram</span>
+              <div class="invite-profile-actions">
+                <code>{{ invitationLinks.telegramLink }}</code>
+                <Button size="sm" variant="secondary" icon="Copy" @click="copyInvitationLink(invitationLinks.telegramLink)">Копировать</Button>
+              </div>
+            </div>
+            <div v-if="invitationLinks.maxLink" class="invite-profile-row">
+              <span>Ссылка для MAX</span>
+              <div class="invite-profile-actions">
+                <code>{{ invitationLinks.maxLink }}</code>
+                <Button size="sm" variant="secondary" icon="Copy" @click="copyInvitationLink(invitationLinks.maxLink)">Копировать</Button>
+              </div>
+            </div>
+            <div v-if="invitationLinks.fallbackCode && !invitationLinks.telegramLink && !invitationLinks.maxLink" class="invite-profile-row">
+              <span>Код приглашения</span>
+              <div class="invite-profile-actions">
+                <code>{{ invitationLinks.fallbackCode }}</code>
+                <Button size="sm" variant="secondary" icon="Copy" @click="copyInvitationLink(invitationLinks.fallbackCode)">Копировать</Button>
+              </div>
             </div>
           </div>
+          <Button size="sm" variant="secondary" icon="Copy" @click="copyInvitationLink()">Скопировать всё</Button>
           <p class="invite-profile-hint">Профиль станет активным после перехода сотрудника по ссылке.</p>
         </Card>
 
@@ -313,6 +330,7 @@ import {
   removeUserRoleAssignment,
 } from "@/api/users";
 import { BOT_USERNAME, MAX_BOT_NAME } from "@/env";
+import { formatPhoneForUi } from "@/utils/phone";
 
 const route = useRoute();
 const router = useRouter();
@@ -361,24 +379,24 @@ const initials = computed(() => {
   return `${first}${last}`.toUpperCase() || "?";
 });
 
-const invitationLink = computed(() => {
+const invitationLinks = computed(() => {
   const code = profile.value?.invitation?.code;
-  if (!code) return "";
+  if (!code) {
+    return { telegramLink: "", maxLink: "", fallbackCode: "" };
+  }
   const payload = `invite_${code}`;
   const telegramLink = BOT_USERNAME ? `https://t.me/${BOT_USERNAME}?startapp=${payload}` : "";
   const maxLink = MAX_BOT_NAME ? `https://max.ru/${MAX_BOT_NAME}?startapp=${payload}` : "";
 
-  if (telegramLink && maxLink) {
-    return `Telegram: ${telegramLink}\nMAX: ${maxLink}`;
-  }
-  if (telegramLink) {
-    return telegramLink;
-  }
-  if (maxLink) {
-    return maxLink;
-  }
-  return `Код приглашения: ${code}`;
+  return {
+    telegramLink,
+    maxLink,
+    fallbackCode: `Код приглашения: ${code}`,
+  };
 });
+const hasInvitationLinks = computed(() =>
+  Boolean(invitationLinks.value.telegramLink || invitationLinks.value.maxLink || invitationLinks.value.fallbackCode),
+);
 
 const userStatusLabel = computed(() => (profile.value?.user?.telegram_id ? "Активен" : "Ожидает"));
 const userStatusKey = computed(() => (profile.value?.user?.telegram_id ? "active" : "awaiting"));
@@ -442,10 +460,19 @@ const formatCourseStatus = (status) => {
   return map[status] || "—";
 };
 
-const copyInvitationLink = async () => {
-  if (!invitationLink.value) return;
+const copyInvitationLink = async (value = "") => {
+  const text =
+    value ||
+    [
+      invitationLinks.value.telegramLink ? `Telegram: ${invitationLinks.value.telegramLink}` : "",
+      invitationLinks.value.maxLink ? `MAX: ${invitationLinks.value.maxLink}` : "",
+      !invitationLinks.value.telegramLink && !invitationLinks.value.maxLink ? invitationLinks.value.fallbackCode : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  if (!text) return;
   try {
-    await navigator.clipboard.writeText(invitationLink.value);
+    await navigator.clipboard.writeText(text);
     showToast("Ссылка скопирована", "success");
   } catch {
     showToast("Не удалось скопировать ссылку", "error");
@@ -852,6 +879,12 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
+}
+.invite-profile-links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 .invite-profile-actions {
   display: flex;

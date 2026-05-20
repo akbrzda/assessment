@@ -1,4 +1,3 @@
-const config = require("../../../config/env");
 const { normalizeInviteCode } = require("../../../utils/inviteCode");
 const { normalizePhoneToE164Ru } = require("../../../utils/phone");
 const logger = require("../../../utils/logger");
@@ -7,6 +6,7 @@ const authRepository = require("./repository");
 
 const PHONE_MISMATCH_ERROR_MESSAGE = "Номер телефона не совпадает с приглашением";
 const PHONE_CONFLICT_ERROR_MESSAGE = "Обнаружен конфликт профилей по номеру телефона. Обратитесь к администратору";
+const INVITE_REQUIRED_ERROR_MESSAGE = "Пользователь с таким номером не найден. Нужна ссылка-приглашение от администратора";
 
 function buildError(message, status) {
   const error = new Error(message);
@@ -28,7 +28,16 @@ function resolveInviteCode(context, inviteCodeFromPayload = null) {
 
   const inviteCodeHeader = context.inviteCodeHeader;
   const inviteParam = context.startParam || context.startApp || context.startParamHash;
-  const inviteCodeFromParam = normalizeInviteCode(inviteParam);
+  const inviteCodeFromParam = (() => {
+    if (!inviteParam) {
+      return null;
+    }
+    const raw = String(inviteParam).trim().toLowerCase();
+    if (!raw.startsWith("invite_") && !raw.startsWith("invite-") && !raw.startsWith("code-")) {
+      return null;
+    }
+    return normalizeInviteCode(inviteParam);
+  })();
 
   return inviteCodeHeader || inviteCodeFromParam || null;
 }
@@ -119,7 +128,7 @@ async function getStatus(context) {
     inviteFlow: {
       hasInviteCode,
       inviteCodeValid: Boolean(invitation),
-      registrationByInvitationOnly: true,
+      registrationByInvitationOnly: false,
     },
     invitation: invitation
       ? {
@@ -377,87 +386,100 @@ async function register(context, payload) {
     throw buildError("Приглашение не готово к активации: отсутствует pending-профиль", 409);
   }
 
-  // Поток без приглашения (самостоятельная регистрация)
-  let targetRoleId;
-  const targetBranchId = payload.branchId;
-  const targetPositionId = payload.positionId ? Number(payload.positionId) : null;
-
-  if (!targetPositionId) {
-    throw buildError("Position is required for registration without invitation", 422);
+  // Поток без приглашения: только подтверждение телефона и auto-link.
+  if (!payload?.contact) {
+    throw buildError("Для входа без приглашения подтвердите номер телефона", 422);
   }
 
-  const superAdminIds = config.superAdminIds || [];
-  if (!targetRoleId && superAdminIds.includes(platformUserId)) {
-    const superRole = await authRepository.getRoleByName("superadmin");
-    if (!superRole) {
-      throw buildError("Superadmin role not configured", 500);
-    }
-    targetRoleId = superRole.id;
-  }
-
-  if (!targetRoleId) {
-    const defaultRole = await authRepository.getRoleByName("employee");
-    if (!defaultRole) {
-      throw buildError("Default role not configured", 500);
-    }
-    targetRoleId = defaultRole.id;
-  }
-
-  const [branchRecord, positionRecord, roleRecord] = await Promise.all([
-    authRepository.getBranchById(targetBranchId),
-    authRepository.getPositionById(targetPositionId),
-    authRepository.getRoleById(targetRoleId),
-  ]);
-
-  if (!branchRecord) {
-    throw buildError("Branch does not exist", 400);
-  }
-
-  if (!positionRecord) {
-    throw buildError("Position does not exist", 400);
-  }
-
-  if (!roleRecord) {
-    throw buildError("Role does not exist", 400);
-  }
-
-  const userId = await authRepository.createUser({
-    telegramId: clientPlatform === "telegram" ? platformUserId : null,
-    firstName: payload.firstName,
-    lastName: payload.lastName,
-    avatarUrl,
-    positionId: Number(targetPositionId),
-    branchId: targetBranchId,
-    roleId: targetRoleId,
+  const verification = verifyInviteContact({
+    contact: payload.contact,
+    platformUser,
+    clientPlatform,
   });
 
+  const linkedUsers = await authRepository.findVerifiedActiveUsersByPhoneE164(verification.normalizedPhone);
+  logger.info("[auth-flow] register:no_invite_auto_link_candidates", {
+    platform: clientPlatform,
+    candidatesCount: linkedUsers.length,
+    candidates: linkedUsers.map((candidate) => candidate.id),
+  });
+
+  if (linkedUsers.length > 1) {
+    await logAuditEvent(
+      buildAuditEntry({
+        scope: "miniapp",
+        action: "identity.auto_link.conflict",
+        entity: "user",
+        entityId: null,
+        actor: {
+          id: null,
+          role: null,
+          name: `${payload.firstName || ""} ${payload.lastName || ""}`.trim() || null,
+        },
+        metadata: {
+          platformUserId,
+          platform: clientPlatform,
+          phoneE164: verification.normalizedPhone,
+          candidates: linkedUsers.map((candidate) => candidate.id),
+          reason: "no_invite",
+        },
+        result: "failure",
+      }),
+    );
+    throw buildError(PHONE_CONFLICT_ERROR_MESSAGE, 409);
+  }
+
+  if (linkedUsers.length === 0) {
+    await logAuditEvent(
+      buildAuditEntry({
+        scope: "miniapp",
+        action: "identity.auto_link.not_found",
+        entity: "user",
+        entityId: null,
+        actor: {
+          id: null,
+          role: null,
+          name: `${payload.firstName || ""} ${payload.lastName || ""}`.trim() || null,
+        },
+        metadata: {
+          platformUserId,
+          platform: clientPlatform,
+          phoneE164: verification.normalizedPhone,
+          reason: "no_invite",
+        },
+        result: "failure",
+      }),
+    );
+    throw buildError(INVITE_REQUIRED_ERROR_MESSAGE, 403);
+  }
+
+  const targetUserId = Number(linkedUsers[0].id);
   await authRepository.upsertPlatformIdentity({
-    userId,
+    userId: targetUserId,
     platform: clientPlatform,
     platformUserId,
     platformUsername: platformUser.username || null,
     isVerified: true,
     verifiedAt: new Date(),
   });
+  const user = await authRepository.getDashboardData(targetUserId);
 
-  await authRepository.completeOnboarding(userId);
-  await authRepository.assignUserToMatchingAssessments({
-    userId,
-    branchId: targetBranchId ? Number(targetBranchId) : null,
-    positionId: targetPositionId ? Number(targetPositionId) : null,
-  });
-
-  const user = await authRepository.getDashboardData(userId);
-
-  const auditEntry = buildAuditEntry({
-    scope: "miniapp",
-    action: "user.registered",
-    entity: "user",
-    entityId: user.id,
-    actor: { id: user.id, role: user.roleName, name: `${user.firstName} ${user.lastName}` },
-    metadata: { branch: user.branchName, role: user.roleName, platformUserId, platform: clientPlatform, invitedBy: null },
-  });
-  await logAuditEvent(auditEntry);
+  await logAuditEvent(
+    buildAuditEntry({
+      scope: "miniapp",
+      action: "identity.auto_link.succeeded",
+      entity: "user",
+      entityId: targetUserId,
+      actor: { id: user.id, role: user.roleName, name: `${user.firstName} ${user.lastName}` },
+      metadata: {
+        platformUserId,
+        platform: clientPlatform,
+        phoneE164: verification.normalizedPhone,
+        source: verification.source,
+        reason: "no_invite",
+      },
+    }),
+  );
 
   return { registered: true, user };
 }

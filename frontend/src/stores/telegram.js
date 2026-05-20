@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
+import { ref, shallowRef, computed, markRaw } from "vue";
 import { clearTelegramRuntimeState, getClientPlatform, setTelegramRuntimeState } from "../services/telegramRuntimeState";
 
 const INIT_DATA_MAX_AGE_SECONDS = 5 * 60;
@@ -57,6 +57,24 @@ function parseInviteCodeCandidate(value) {
   return normalized;
 }
 
+function parseInviteCodeFromStartParam(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const lower = trimmed.toLowerCase();
+  if (!lower.startsWith("invite_") && !lower.startsWith("invite-") && !lower.startsWith("code-")) {
+    return null;
+  }
+
+  return parseInviteCodeCandidate(trimmed);
+}
+
 function getLocationParams() {
   if (typeof window === "undefined") {
     return new URLSearchParams();
@@ -76,22 +94,86 @@ function getLocationParams() {
   return combined;
 }
 
+function extractWebAppDataFromUrl() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const params = getLocationParams();
+  const rawValue =
+    params.get("WebAppData") ||
+    params.get("webAppData") ||
+    params.get("webapp_data") ||
+    params.get("initData") ||
+    "";
+  if (!rawValue) {
+    return "";
+  }
+
+  // URLSearchParams уже декодирует значение, повторный decode ломает hash подпись.
+  return rawValue;
+}
+
+function hasMaxUrlInitData() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const params = getLocationParams();
+  return Boolean(
+    String(
+      window.WebAppData ||
+        window.MAX?.WebAppData ||
+        window.Max?.WebAppData ||
+        params.get("WebAppData") ||
+        params.get("webAppData") ||
+        params.get("webapp_data") ||
+        params.get("initData") ||
+        ""
+    ).trim()
+  );
+}
+
+function extractUserFromInitData(initDataString) {
+  if (typeof initDataString !== "string" || !initDataString.trim()) {
+    return null;
+  }
+
+  try {
+    const params = new URLSearchParams(initDataString);
+    const rawUser = params.get("user");
+    if (!rawUser) {
+      return null;
+    }
+
+    const parsedUser = JSON.parse(rawUser);
+    if (!parsedUser || typeof parsedUser !== "object") {
+      return null;
+    }
+
+    return parsedUser;
+  } catch (_error) {
+    return null;
+  }
+}
+
 function extractInviteFromUrl() {
   if (typeof window === "undefined") {
     return null;
   }
 
   const params = getLocationParams();
-  const candidates = [params.get("invite"), params.get("code"), params.get("startapp"), params.get("start_param"), params.get("tgWebAppStartParam")];
-
-  for (const candidate of candidates) {
-    const inviteCode = parseInviteCodeCandidate(candidate);
-    if (inviteCode) {
-      return inviteCode;
-    }
+  const directInviteCode = parseInviteCodeCandidate(params.get("invite")) || parseInviteCodeCandidate(params.get("code"));
+  if (directInviteCode) {
+    return directInviteCode;
   }
 
-  return null;
+  const startParamInviteCode =
+    parseInviteCodeFromStartParam(params.get("startapp")) ||
+    parseInviteCodeFromStartParam(params.get("start_param")) ||
+    parseInviteCodeFromStartParam(params.get("tgWebAppStartParam"));
+
+  return startParamInviteCode || null;
 }
 
 function extractPhoneFromContactQuery(rawValue) {
@@ -139,8 +221,41 @@ function extractPhoneFromUnknownPayload(payload) {
   );
 }
 
+function hasTelegramAuthContext(webApp) {
+  if (!webApp || typeof webApp !== "object") {
+    return false;
+  }
+
+  const initData = String(webApp.initData || "").trim();
+  if (initData) {
+    return true;
+  }
+
+  const unsafe = webApp.initDataUnsafe || {};
+  const queryId = String(unsafe.query_id || "").trim();
+  if (queryId) {
+    return true;
+  }
+
+  return Boolean(unsafe.user?.id);
+}
+
+function hasMaxAuthContext(webApp) {
+  if (!webApp || typeof webApp !== "object") {
+    return false;
+  }
+
+  const initData = String(webApp.InitData || webApp.initData || "").trim();
+  if (initData) {
+    return true;
+  }
+
+  const unsafe = webApp.InitDataUnsafe || webApp.initDataUnsafe || {};
+  return Boolean(unsafe.user?.id);
+}
+
 export const useTelegramStore = defineStore("telegram", () => {
-  const tg = ref(null);
+  const tg = shallowRef(null);
   const user = ref(null);
   const initData = ref("");
   const inviteToken = ref(null);
@@ -150,18 +265,58 @@ export const useTelegramStore = defineStore("telegram", () => {
   const isReady = computed(() => Boolean(tg.value));
   const theme = computed(() => tg.value?.colorScheme || "light");
   const platform = computed(() => tg.value?.platform || "unknown");
+  const hasValidInitData = computed(() => Boolean(initData.value && String(initData.value).trim().length > 0));
+
+  function parseVersionTuple(version) {
+    const source = String(version || "0");
+    const [majorRaw, minorRaw = "0"] = source.split(".");
+    const major = Number.parseInt(majorRaw, 10);
+    const minor = Number.parseInt(minorRaw, 10);
+    return {
+      major: Number.isFinite(major) ? major : 0,
+      minor: Number.isFinite(minor) ? minor : 0,
+    };
+  }
+
+  function isAtLeastVersion(current, targetMajor, targetMinor = 0) {
+    const parsed = parseVersionTuple(current);
+    if (parsed.major > targetMajor) return true;
+    if (parsed.major < targetMajor) return false;
+    return parsed.minor >= targetMinor;
+  }
 
   function detectMiniAppRuntime() {
     if (typeof window === "undefined") {
       return { provider: "none", webApp: null };
     }
 
-    if (window.Telegram?.WebApp) {
-      return { provider: "telegram", webApp: window.Telegram.WebApp };
+    const telegramWebApp = window.Telegram?.WebApp || null;
+    const maxWebApp = (window.MAX?.WebApp || window.Max?.WebApp || window.WebApp || null);
+
+    // В MAX окружении иногда присутствует Telegram.WebApp shim без initData.
+    // В этом случае выбираем MAX runtime, если в нем есть auth-контекст.
+    if ((hasMaxAuthContext(maxWebApp) || hasMaxUrlInitData()) && !hasTelegramAuthContext(telegramWebApp)) {
+      return { provider: "max", webApp: maxWebApp };
+    }
+
+    if (telegramWebApp) {
+      return { provider: "telegram", webApp: telegramWebApp };
+    }
+
+    if (maxWebApp && typeof maxWebApp === "object") {
+      return { provider: "max", webApp: maxWebApp };
     }
 
     if (window.WebApp && typeof window.WebApp === "object") {
       return { provider: "max", webApp: window.WebApp };
+    }
+
+    if (window.MAX?.WebApp || window.Max?.WebApp) {
+      return { provider: "max", webApp: window.MAX?.WebApp || window.Max?.WebApp };
+    }
+
+    if (window.Telegram?.WebApp) {
+      return { provider: "telegram", webApp: window.Telegram.WebApp };
     }
 
     return { provider: "none", webApp: null };
@@ -176,24 +331,38 @@ export const useTelegramStore = defineStore("telegram", () => {
     const urlInvite = extractInviteFromUrl();
 
     if (!webApp) {
-      console.error("WebApp API недоступен. Откройте мини-приложение внутри Telegram или MAX.");
+      const urlInitData = extractWebAppDataFromUrl();
+      const hasMaxInitData = Boolean(urlInitData || window?.WebAppData || window?.MAX?.WebAppData || window?.Max?.WebAppData);
+
+      if (hasMaxInitData) {
+        initData.value = urlInitData || String(window.WebAppData || window.MAX?.WebAppData || window.Max?.WebAppData || "");
+        user.value = extractUserFromInitData(initData.value);
+        setTelegramRuntimeState({
+          initDataOverride: initData.value,
+          clientPlatform: "max",
+        });
+        console.warn("WebApp API недоступен, используем initData из URL/global переменных MAX.");
+      } else {
+        console.error("WebApp API недоступен. Откройте мини-приложение внутри Telegram или MAX.");
+      }
+
       if (urlInvite) {
         const token = `invite_${urlInvite}`;
         setTelegramRuntimeState({
-          initDataOverride: "",
+          initDataOverride: initData.value || "",
           startParam: token,
           inviteCode: urlInvite,
-          clientPlatform: "telegram",
+          clientPlatform: hasMaxInitData ? "max" : "telegram",
         });
       }
       return;
     }
 
-    tg.value = webApp;
+    tg.value = markRaw(webApp);
 
     // Восстанавливаем initData из sessionStorage только если он еще актуален
-    let currentInitData = webApp.initData || "";
-    let currentInitDataUnsafe = webApp.initDataUnsafe || {};
+    let currentInitData = webApp.initData || webApp.InitData || extractWebAppDataFromUrl() || "";
+    let currentInitDataUnsafe = webApp.initDataUnsafe || webApp.InitDataUnsafe || {};
 
     if (!currentInitData) {
       const savedInitData = sessionStorage.getItem("tg_init_data");
@@ -222,13 +391,17 @@ export const useTelegramStore = defineStore("telegram", () => {
       console.log("💾 Сохраняем initData в sessionStorage");
       sessionStorage.setItem("tg_init_data", currentInitData);
 
-      if (webApp.initDataUnsafe) {
-        sessionStorage.setItem("tg_init_data_unsafe", JSON.stringify(webApp.initDataUnsafe));
+      const liveInitDataUnsafe = webApp.initDataUnsafe || webApp.InitDataUnsafe;
+      if (liveInitDataUnsafe) {
+        sessionStorage.setItem("tg_init_data_unsafe", JSON.stringify(liveInitDataUnsafe));
       }
     }
 
     user.value = currentInitDataUnsafe?.user || null;
     initData.value = currentInitData;
+    if (!user.value) {
+      user.value = extractUserFromInitData(currentInitData);
+    }
 
     let inviteCode = null;
     // Проверяем start_param (для /start команды) и startapp (для прямого открытия MiniApp)
@@ -246,7 +419,11 @@ export const useTelegramStore = defineStore("telegram", () => {
       initDataLength: currentInitData.length,
     });
 
-    inviteCode = parseInviteCodeCandidate(tgWebAppStartParam) || parseInviteCodeCandidate(startApp) || parseInviteCodeCandidate(startParam) || null;
+    inviteCode =
+      parseInviteCodeFromStartParam(tgWebAppStartParam) ||
+      parseInviteCodeFromStartParam(startApp) ||
+      parseInviteCodeFromStartParam(startParam) ||
+      null;
 
     if (!inviteCode && urlInvite) {
       inviteCode = urlInvite;
@@ -296,28 +473,45 @@ export const useTelegramStore = defineStore("telegram", () => {
       webApp.expand();
     }
 
-    if (typeof webApp.disableVerticalSwipes === "function") {
+    const canUseAdvancedChromeApi = provider !== "telegram" || isAtLeastVersion(webApp.version, 6, 1);
+
+    if (canUseAdvancedChromeApi && typeof webApp.disableVerticalSwipes === "function") {
       webApp.disableVerticalSwipes();
     }
 
-    if (typeof webApp.disableClosingConfirmation === "function") {
+    if (canUseAdvancedChromeApi && typeof webApp.disableClosingConfirmation === "function") {
       webApp.disableClosingConfirmation();
     }
   }
 
   function resolveTelegramApp() {
+    if (tg.value) {
+      return tg.value;
+    }
+
+    if (getClientPlatform() === "max") {
+      return window?.WebApp || window?.MAX?.WebApp || window?.Max?.WebApp || null;
+    }
+
     const detected = detectMiniAppRuntime();
-    return detected.webApp || tg.value || null;
+    return detected.webApp || null;
+  }
+
+  function isTelegramShimInMaxMode(app) {
+    if (!app || typeof window === "undefined") {
+      return false;
+    }
+    return getClientPlatform() === "max" && app === window.Telegram?.WebApp;
   }
 
   async function requestContactPayload() {
     const app = resolveTelegramApp();
-    if (!app || typeof app.requestContact !== "function") {
-      throw new Error("Платформа не поддерживает запрос контакта");
+    if (!app || isTelegramShimInMaxMode(app) || typeof app.requestContact !== "function") {
+      throw new Error("Не удалось запросить контакт через MAX SDK. Откройте мини-приложение напрямую в приложении MAX и повторите попытку.");
     }
 
     const source = getClientPlatform() === "max" ? "max_contact" : "telegram_contact";
-    const currentUserId = user.value?.id || app?.initDataUnsafe?.user?.id;
+    const currentUserId = user.value?.id || app?.initDataUnsafe?.user?.id || app?.InitDataUnsafe?.user?.id;
     if (!currentUserId) {
       throw new Error("Не удалось определить пользователя платформы");
     }
@@ -437,9 +631,24 @@ export const useTelegramStore = defineStore("telegram", () => {
     const safeMessage = String(message || "").trim();
     if (!safeMessage) return;
     const telegramApp = resolveTelegramApp();
-    if (telegramApp?.showAlert) {
-      telegramApp.showAlert(safeMessage);
-    } else if (typeof window !== "undefined") {
+    if (isTelegramShimInMaxMode(telegramApp)) {
+      if (typeof window !== "undefined") {
+        window.alert(safeMessage);
+      }
+      return;
+    }
+
+    const canUseNativeAlert = telegramApp && (getClientPlatform() !== "telegram" || isAtLeastVersion(telegramApp.version, 6, 2));
+    if (canUseNativeAlert && telegramApp?.showAlert) {
+      try {
+        telegramApp.showAlert(safeMessage);
+        return;
+      } catch (_error) {
+        // На старых SDK showAlert может выбрасывать unsupported.
+      }
+    }
+
+    if (typeof window !== "undefined") {
       window.alert(safeMessage);
     }
   }
@@ -459,17 +668,33 @@ export const useTelegramStore = defineStore("telegram", () => {
 
   function hapticFeedback(type = "impact", style = "medium") {
     const telegramApp = resolveTelegramApp();
+    if (isTelegramShimInMaxMode(telegramApp)) {
+      return;
+    }
     const haptic = telegramApp?.HapticFeedback;
     if (!haptic) {
       return;
     }
 
+    const safeInvoke = (callback) => {
+      try {
+        const result = callback();
+        if (result && typeof result.then === "function") {
+          result.catch((error) => {
+            console.warn("Ошибка haptic feedback:", error);
+          });
+        }
+      } catch (error) {
+        console.warn("Ошибка haptic feedback:", error);
+      }
+    };
+
     if (type === "impact" && haptic.impactOccurred) {
-      haptic.impactOccurred(style);
+      safeInvoke(() => haptic.impactOccurred(style));
     } else if (type === "notification" && haptic.notificationOccurred) {
-      haptic.notificationOccurred(style);
+      safeInvoke(() => haptic.notificationOccurred(style));
     } else if (type === "selection" && haptic.selectionChanged) {
-      haptic.selectionChanged();
+      safeInvoke(() => haptic.selectionChanged());
     }
   }
 
@@ -527,8 +752,12 @@ export const useTelegramStore = defineStore("telegram", () => {
 
   function showBackButton(onClick) {
     const telegramApp = resolveTelegramApp();
+    if (isTelegramShimInMaxMode(telegramApp)) {
+      return false;
+    }
     const backButton = telegramApp?.BackButton;
-    if (!backButton) {
+    const canUseBackButton = telegramApp && (getClientPlatform() !== "telegram" || isAtLeastVersion(telegramApp.version, 6, 1));
+    if (!backButton || !canUseBackButton) {
       return false;
     }
 
@@ -550,8 +779,12 @@ export const useTelegramStore = defineStore("telegram", () => {
 
   function hideBackButton(onClick) {
     const telegramApp = resolveTelegramApp();
+    if (isTelegramShimInMaxMode(telegramApp)) {
+      return false;
+    }
     const backButton = telegramApp?.BackButton;
-    if (!backButton) {
+    const canUseBackButton = telegramApp && (getClientPlatform() !== "telegram" || isAtLeastVersion(telegramApp.version, 6, 1));
+    if (!backButton || !canUseBackButton) {
       return false;
     }
 
@@ -571,8 +804,12 @@ export const useTelegramStore = defineStore("telegram", () => {
 
   function setBackButtonHandler(onClick) {
     const telegramApp = resolveTelegramApp();
+    if (isTelegramShimInMaxMode(telegramApp)) {
+      return false;
+    }
     const backButton = telegramApp?.BackButton;
-    if (!backButton || typeof onClick !== "function" || typeof backButton.onClick !== "function") {
+    const canUseBackButton = telegramApp && (getClientPlatform() !== "telegram" || isAtLeastVersion(telegramApp.version, 6, 1));
+    if (!backButton || !canUseBackButton || typeof onClick !== "function" || typeof backButton.onClick !== "function") {
       return false;
     }
 
@@ -625,6 +862,7 @@ export const useTelegramStore = defineStore("telegram", () => {
     isReady,
     theme,
     platform,
+    hasValidInitData,
 
     // actions
     initTelegram,

@@ -223,7 +223,7 @@ function buildGuestNoInviteMessage(firstName, config) {
   const intro = firstName ? `👋 Привет, ${firstName}!` : "👋 Привет!";
   const body = String(config?.guestNoInviteText || "").replaceAll("\\n", "\n");
   const inviteHint = botUsername
-    ? `Для доступа к системе нужна персональная ссылка-приглашение. Попросите руководителя отправить её в Telegram.`
+    ? `Для доступа к системе нужна персональная ссылка-приглашение. Попросите руководителя отправить её в Telegram или MAX.`
     : "";
   return `${intro}\n\n${body}${inviteHint}`;
 }

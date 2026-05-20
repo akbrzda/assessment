@@ -4,7 +4,9 @@ export async function resolveAuthNavigation(to, userStore) {
   try {
     await userStore.ensureStatus();
   } catch (error) {
-    console.error("Не удалось проверить авторизацию", error);
+    if (error?.code !== "INIT_DATA_MISSING") {
+      console.error("Не удалось проверить авторизацию", error);
+    }
     if (to.meta.requiresAuth) {
       return { name: "invitation" };
     }
@@ -16,14 +18,26 @@ export async function resolveAuthNavigation(to, userStore) {
 
   const isAuthenticated = userStore.isAuthenticated;
   if (!isAuthenticated) {
-    if (to.name !== "invitation") {
+    const hasInviteCode = Boolean(userStore.inviteFlow?.hasInviteCode);
+    const registrationByInvitationOnly = Boolean(userStore.inviteFlow?.registrationByInvitationOnly);
+    const publicTarget = hasInviteCode || registrationByInvitationOnly ? "invitation" : "registration";
+
+    if (to.name !== "invitation" && to.name !== "registration") {
+      return { name: publicTarget };
+    }
+
+    if (hasInviteCode && to.name === "registration") {
       return { name: "invitation" };
+    }
+
+    if (!hasInviteCode && !registrationByInvitationOnly && to.name === "invitation") {
+      return { name: "registration" };
     }
 
     return null;
   }
 
-  if (to.name === "invitation") {
+  if (to.name === "invitation" || to.name === "registration") {
     // Если есть deep link на курс — открываем курс вместо dashboard
     const telegramStore = useTelegramStore();
     const courseId = telegramStore.pendingCourseId;

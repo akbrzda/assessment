@@ -14,15 +14,41 @@ const runtimeBaseUrl = typeof window !== "undefined" && window.location ? window
 const BASE_URL = (envBaseUrl || runtimeBaseUrl || "").replace(/\/$/, "");
 const CLOUD_STORAGE_ENDPOINT = "/cloud-storage";
 
+function readWebAppDataFromUrl() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+  const rawValue =
+    searchParams.get("WebAppData") ||
+    hashParams.get("WebAppData") ||
+    searchParams.get("webAppData") ||
+    hashParams.get("webAppData") ||
+    searchParams.get("webapp_data") ||
+    hashParams.get("webapp_data") ||
+    searchParams.get("initData") ||
+    hashParams.get("initData") ||
+    "";
+
+  if (!rawValue) {
+    return "";
+  }
+
+  // URLSearchParams уже возвращает декодированную строку.
+  return rawValue;
+}
+
 function resolveWebApp() {
   if (webAppInstance) {
     return webAppInstance;
   }
   if (typeof window !== "undefined") {
-    if (window.Telegram?.WebApp) {
-      webAppInstance = window.Telegram.WebApp;
-    } else if (window.WebApp && typeof window.WebApp === "object") {
+    if (window.WebApp && typeof window.WebApp === "object") {
       webAppInstance = window.WebApp;
+    } else if (window.Telegram?.WebApp) {
+      webAppInstance = window.Telegram.WebApp;
     }
   }
   return webAppInstance;
@@ -69,7 +95,21 @@ export function getInitData() {
   }
 
   const webApp = resolveWebApp();
-  return webApp?.initData || "";
+  const runtimeInitData = webApp?.initData || webApp?.InitData || "";
+  if (runtimeInitData) {
+    return runtimeInitData;
+  }
+
+  const initDataFromUrl = readWebAppDataFromUrl();
+  if (initDataFromUrl) {
+    return initDataFromUrl;
+  }
+
+  if (typeof window !== "undefined") {
+    return sessionStorage.getItem("tg_init_data") || "";
+  }
+
+  return "";
 }
 
 export function getStartParam() {
@@ -79,7 +119,7 @@ export function getStartParam() {
   }
 
   const webApp = resolveWebApp();
-  return webApp?.initDataUnsafe?.start_param || "";
+  return webApp?.initDataUnsafe?.start_param || webApp?.InitDataUnsafe?.start_param || "";
 }
 
 export function getInvitationCode() {

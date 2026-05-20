@@ -3,6 +3,7 @@ import { ref, computed } from "vue";
 import { apiClient } from "../services/apiClient";
 import { useTelegramStore } from "./telegram";
 import { getItem, setItem } from "../services/storage";
+import { getInitData } from "../services/telegram";
 
 const STORAGE_INVITE_ACCEPTED = "invite_accepted";
 
@@ -132,6 +133,13 @@ export const useUserStore = defineStore("user", () => {
     error.value = null;
 
     try {
+      const initData = getInitData();
+      if (!initData) {
+        const initDataError = new Error("Мини-приложение открыто без валидного initData. Откройте его из Telegram или MAX.");
+        initDataError.code = "INIT_DATA_MISSING";
+        throw initDataError;
+      }
+
       const accepted = await getItem(STORAGE_INVITE_ACCEPTED);
       invitationAccepted.value = Boolean(accepted);
 
@@ -197,8 +205,17 @@ export const useUserStore = defineStore("user", () => {
       return { success: true };
     } catch (err) {
       console.error("Ошибка регистрации", err);
-      error.value = err.message;
-      return { success: false, error: err.message };
+      const rawMessage = String(err?.message || "");
+      const requiredFieldsError =
+        rawMessage.includes('"firstName" is required') ||
+        rawMessage.includes('"lastName" is required') ||
+        rawMessage.includes('"branchId" is required');
+      const safeMessage = requiredFieldsError
+        ? "Профиль не найден. Для входа нужна персональная ссылка-приглашение от администратора."
+        : rawMessage;
+
+      error.value = safeMessage;
+      return { success: false, error: safeMessage };
     } finally {
       isLoading.value = false;
     }

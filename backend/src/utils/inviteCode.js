@@ -4,17 +4,27 @@ function normalizeInviteCode(raw) {
   }
 
   const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+
   const lower = trimmed.toLowerCase();
+  let candidate = trimmed;
 
   if (lower.startsWith('invite-')) {
-    return trimmed.slice(7).toUpperCase();
+    candidate = trimmed.slice(7);
+  } else if (lower.startsWith('invite_')) {
+    candidate = trimmed.slice(7);
+  } else if (lower.startsWith('code-')) {
+    candidate = trimmed.slice(5);
   }
 
-  if (lower.startsWith('code-')) {
-    return trimmed.slice(5).toUpperCase();
+  const normalized = candidate.trim().toUpperCase();
+  if (!/^[A-Z0-9]{4,16}$/.test(normalized)) {
+    return null;
   }
 
-  return trimmed.toUpperCase();
+  return normalized;
 }
 
 module.exports = {

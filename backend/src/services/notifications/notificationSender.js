@@ -3,9 +3,9 @@ const config = require("../../config/env");
 const logger = require("../../utils/logger");
 const notificationService = require("./notificationService");
 const { pool } = require("../../config/database");
+const { buildMiniAppButtons } = require("../../utils/miniAppLinks");
 
 const BOT_TOKEN = config.botToken;
-const BOT_USERNAME = process.env.BOT_USERNAME || "theorica_bot";
 const TELEGRAM_API_HOST = "api.telegram.org";
 
 // Время между сообщениями при пакетной отправке (мс) — не более 30 msg/s
@@ -105,22 +105,34 @@ function buildMessage(type, payload) {
   const passScore = payload.passScorePercent != null ? payload.passScorePercent : "";
   const remaining = payload.remainingAttempts;
 
-  const appUrl = (url) => `https://t.me/${BOT_USERNAME}/app?startapp=${url}`;
+  const appButtons = (appPayload) =>
+    buildMiniAppButtons({
+      payload: appPayload,
+      telegramText: "Открыть в Telegram",
+      maxText: "Открыть в MAX",
+    });
 
   if (type === "new_course") {
     const text = `👋 <b>${name}</b>, для вас добавлен новый курс!\n\n📚 <b>${courseTitle}</b>\n\nОткройте приложение, чтобы начать обучение.`;
-    const reply_markup = courseId ? { inline_keyboard: [[{ text: "Открыть курс", url: appUrl(`course_${courseId}`) }]] } : undefined;
+    const buttons = courseId ? appButtons(`course_${courseId}`) : [];
+    const reply_markup = buttons.length ? { inline_keyboard: [buttons] } : undefined;
     return { text, reply_markup };
   }
 
   if (type === "result_passed") {
     const text = `🎉 <b>${name}</b>, поздравляем!\n\nВы успешно прошли итоговую аттестацию курса <b>${courseTitle}</b>.\n\n✅ Результат: <b>${score}%</b> (порог: ${passScore}%)`;
-    const buttons = [];
+    const keyboard = [];
     if (courseId) {
-      buttons.push({ text: "Получить сертификат", url: appUrl(`course_${courseId}`) });
-      buttons.push({ text: "Открыть приложение", url: appUrl("home") });
+      const courseButtons = appButtons(`course_${courseId}`);
+      if (courseButtons.length) {
+        keyboard.push(courseButtons);
+      }
+      const homeButtons = appButtons("home");
+      if (homeButtons.length) {
+        keyboard.push(homeButtons);
+      }
     }
-    const reply_markup = buttons.length ? { inline_keyboard: [buttons] } : undefined;
+    const reply_markup = keyboard.length ? { inline_keyboard: keyboard } : undefined;
     return { text, reply_markup };
   }
 
@@ -129,19 +141,22 @@ function buildMessage(type, payload) {
     if (remaining !== null && remaining !== undefined) {
       text += `\n\nОсталось попыток: <b>${remaining}</b>`;
     }
-    const buttons = [];
+    const keyboard = [];
     if (remaining && courseId) {
-      buttons.push({ text: "Пересдать", url: appUrl(`course_${courseId}`) });
-      buttons.push({ text: "Изучить материалы", url: appUrl(`course_${courseId}`) });
+      const retryButtons = appButtons(`course_${courseId}`);
+      if (retryButtons.length) {
+        keyboard.push(retryButtons);
+      }
     }
-    const reply_markup = buttons.length ? { inline_keyboard: [buttons] } : undefined;
+    const reply_markup = keyboard.length ? { inline_keyboard: keyboard } : undefined;
     return { text, reply_markup };
   }
 
   if (type === "course_reminder") {
     const deadline = payload.deadline ? `\n\n📅 Дедлайн: ${new Date(payload.deadline).toLocaleDateString("ru-RU")}` : "";
     const text = `📚 <b>${name}</b>, не забудьте продолжить курс!\n\n<b>${courseTitle}</b>${deadline}\n\nВернитесь к обучению — вы почти у цели!`;
-    const reply_markup = courseId ? { inline_keyboard: [[{ text: "Продолжить курс", url: appUrl(`course_${courseId}`) }]] } : undefined;
+    const buttons = courseId ? appButtons(`course_${courseId}`) : [];
+    const reply_markup = buttons.length ? { inline_keyboard: [buttons] } : undefined;
     return { text, reply_markup };
   }
 
@@ -149,7 +164,8 @@ function buildMessage(type, payload) {
     const daysLeft = payload.daysLeft ?? "";
     const deadline = payload.deadline ? new Date(payload.deadline).toLocaleDateString("ru-RU") : "";
     const text = `⏰ <b>${name}</b>, до дедлайна курса осталось <b>${daysLeft} дн.</b>!\n\n📚 <b>${courseTitle}</b>\n📅 Дедлайн: ${deadline}\n\nНе откладывайте — завершите курс вовремя!`;
-    const reply_markup = courseId ? { inline_keyboard: [[{ text: "Открыть курс", url: appUrl(`course_${courseId}`) }]] } : undefined;
+    const buttons = courseId ? appButtons(`course_${courseId}`) : [];
+    const reply_markup = buttons.length ? { inline_keyboard: [buttons] } : undefined;
     return { text, reply_markup };
   }
 
@@ -162,7 +178,8 @@ function buildMessage(type, payload) {
   if (type === "certificate_ready") {
     const uuid = payload.uuid || "";
     const text = `🏆 <b>${name}</b>, ваш сертификат готов!\n\n📚 Курс: <b>${courseTitle}</b>\n\nСкачайте сертификат в приложении или через команду /certificate`;
-    const reply_markup = { inline_keyboard: [[{ text: "Скачать сертификат", url: appUrl(`certificate_${uuid}`) }]] };
+    const buttons = appButtons(`certificate_${uuid}`);
+    const reply_markup = buttons.length ? { inline_keyboard: [buttons] } : undefined;
     return { text, reply_markup };
   }
 

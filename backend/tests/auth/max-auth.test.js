@@ -73,3 +73,21 @@ test("validateInitData: просроченный auth_date отклоняетс�
 
   assert.equal(payload, null);
 });
+
+test("validateInitData: URL-encoded MAX initData проходит проверку", () => {
+  const targetPath = path.resolve(__dirname, "../../src/services/maxAuthService");
+  const token = "max-test-token";
+  const now = Math.floor(Date.now() / 1000);
+
+  const { validateInitData } = loadWithMocks(targetPath, {
+    "../config/env": { maxBotToken: token },
+    "../utils/logger": { warn: () => {} },
+  });
+
+  const initData = buildSignedInitData({ token, userId: 1002, authDate: now });
+  const encodedInitData = encodeURIComponent(initData);
+  const payload = validateInitData(encodedInitData);
+
+  assert.equal(payload.user.id, 1002);
+  assert.equal(payload.start_param, "invite_abc");
+});

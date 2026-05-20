@@ -32,7 +32,7 @@ jobs:
         working-directory: backend
         run: |
           cat << EOF > .env
-          NODE_ENV=${{ secrets.BACKEND_NODE_ENV }}
+          NODE_ENV=production
           PORT=${{ secrets.BACKEND_PORT }}
           ALLOWED_ORIGINS=${{ secrets.BACKEND_ALLOWED_ORIGINS }}
           BACKEND_URL=${{ secrets.BACKEND_URL }}
@@ -44,20 +44,20 @@ jobs:
           DB_PASSWORD=${{ secrets.BACKEND_DB_PASSWORD }}
 
           BOT_TOKEN=${{ secrets.BACKEND_BOT_TOKEN }}
+          MAX_BOT_TOKEN=${{ secrets.BACKEND_MAX_BOT_TOKEN }}
+          BOT_USERNAME=${{ secrets.BACKEND_BOT_USERNAME }}
+          MAX_BOT_NAME=${{ secrets.BACKEND_MAX_BOT_NAME }}
 
           JWT_SECRET=${{ secrets.BACKEND_JWT_SECRET }}
           JWT_REFRESH_SECRET=${{ secrets.BACKEND_JWT_REFRESH_SECRET }}
-          JWT_ACCESS_TTL=${{ secrets.BACKEND_JWT_ACCESS_TTL }}
-          JWT_REFRESH_TTL=${{ secrets.BACKEND_JWT_REFRESH_TTL }}
           COOKIE_DOMAIN=${{ secrets.BACKEND_COOKIE_DOMAIN }}
-          COOKIE_SAMESITE=${{ secrets.BACKEND_COOKIE_SAMESITE }}
 
-          INVITE_EXPIRATION_DAYS=${{ secrets.BACKEND_INVITE_EXPIRATION_DAYS }}
           SUPERADMIN_IDS=${{ secrets.BACKEND_SUPERADMIN_IDS }}
+          CERTIFICATES_UPLOAD_DIR=${{ secrets.BACKEND_CERTIFICATES_UPLOAD_DIR }}
 
           REDIS_HOST=${{ secrets.REDIS_HOST }}
-          REDIS_PORT=${{ secrets.REDIS_PORT }}
-          REDIS_DB=${{ secrets.REDIS_DB }}
+          REDIS_URL=${{ secrets.REDIS_URL }}
+          REDIS_USERNAME=${{ secrets.REDIS_USERNAME }}
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
           EOF
 

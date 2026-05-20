@@ -154,6 +154,8 @@
       <div class="form-grid">
         <Input v-model="form.firstName" label="Имя" placeholder="Введите имя" required />
         <Input v-model="form.lastName" label="Фамилия" placeholder="Введите фамилию" required />
+        <Input v-model="form.phone" label="Номер телефона" placeholder="+7 (999) 000-00-00" required @input="handlePhoneInput" />
+        <Select v-model.number="form.positionId" label="Должность" :options="positionSelectOptions" placeholder="Выберите должность" required />
         <Select v-model.number="form.branchId" label="Филиал" :options="branchSelectOptions" placeholder="Выберите филиал" required />
       </div>
       <template #footer>
@@ -191,12 +193,13 @@ import { useToast } from "@/composables/useToast";
 import { formatBranchLabel } from "@/utils/branch";
 import { useAuthStore } from "@/stores/auth";
 import { useSkeletonGate } from "@/composables/useSkeletonGate";
+import { formatPhoneMask, normalizePhoneForApi } from "@/utils/phone";
 
 const loading = ref(false);
 const { skeletonVisible } = useSkeletonGate(loading, { minDuration: 360, delay: 90 });
 const saving = ref(false);
 
-const references = ref({ branches: [] });
+const references = ref({ branches: [], positions: [] });
 const invitations = ref([]);
 const BOT_USERNAME_FROM_ENV = BOT_USERNAME || "";
 const MAX_BOT_NAME_FROM_ENV = MAX_BOT_NAME || "";
@@ -221,6 +224,8 @@ const editingInvitation = ref(null);
 const form = ref({
   firstName: "",
   lastName: "",
+  phone: "",
+  positionId: "",
   branchId: "",
 });
 
@@ -229,6 +234,10 @@ const authStore = useAuthStore();
 
 const availableBranches = computed(() => {
   return references.value.branches;
+});
+
+const availablePositions = computed(() => {
+  return references.value.positions;
 });
 
 const stats = computed(() => {
@@ -275,6 +284,14 @@ const branchSelectOptions = computed(() => [
   })),
 ]);
 
+const positionSelectOptions = computed(() => [
+  { value: "", label: "Выберите должность" },
+  ...availablePositions.value.map((p) => ({
+    value: p.id,
+    label: p.name,
+  })),
+]);
+
 const processedInvitations = computed(() =>
   invitations.value.map((item) => ({
     ...item,
@@ -311,7 +328,7 @@ const loadData = async () => {
   try {
     const [invitationsResponse, referencesData] = await Promise.all([listInvitations(), getReferences()]);
 
-    references.value = referencesData || { branches: [] };
+    references.value = referencesData || { branches: [], positions: [] };
     invitations.value = (invitationsResponse.data?.invitations || []).map(normalizeInvitation);
 
     botUsername.value = BOT_USERNAME_FROM_ENV;
@@ -334,6 +351,8 @@ const normalizeInvitation = (item) => {
     firstName: item.first_name,
     lastName: item.last_name,
     branchId: item.branch_id,
+    positionId: item.position_id,
+    phone: item.phone || "",
     branchName: formatBranchLabel({ name: item.branch_name || "", city: item.branch_city || "" }) || item.branch_name,
     createdAt: item.created_at ? new Date(item.created_at) : null,
     usedAt,
@@ -351,6 +370,8 @@ const openCreateModal = () => {
   form.value = {
     firstName: "",
     lastName: "",
+    phone: "",
+    positionId: "",
     branchId: defaultBranchId || "",
   };
   showFormModal.value = true;
@@ -361,6 +382,8 @@ const openEditModal = (invitation) => {
   form.value = {
     firstName: invitation.firstName,
     lastName: invitation.lastName,
+    phone: formatPhoneMask(invitation.phone),
+    positionId: invitation.positionId || "",
     branchId: invitation.branchId,
   };
   showFormModal.value = true;
@@ -371,8 +394,16 @@ const closeFormModal = () => {
   saving.value = false;
 };
 
+const handlePhoneInput = () => {
+  const formatted = formatPhoneMask(form.value.phone);
+  if (formatted !== form.value.phone) {
+    form.value.phone = formatted;
+  }
+};
+
 const submitForm = async () => {
-  if (!form.value.firstName.trim() || !form.value.lastName.trim() || !form.value.branchId) {
+  const normalizedPhone = normalizePhoneForApi(form.value.phone);
+  if (!form.value.firstName.trim() || !form.value.lastName.trim() || !form.value.branchId || !form.value.positionId || !normalizedPhone) {
     showToast("Заполните все обязательные поля", "warning");
     return;
   }
@@ -383,7 +414,9 @@ const submitForm = async () => {
       const { data } = await updateInvitation(editingInvitation.value.id, {
         firstName: form.value.firstName.trim(),
         lastName: form.value.lastName.trim(),
-        branchId: form.value.branchId,
+        phone: normalizedPhone,
+        positionId: Number(form.value.positionId),
+        branchId: Number(form.value.branchId),
       });
       updateList(data?.invitation);
       showToast("Приглашение обновлено", "success");
@@ -391,7 +424,9 @@ const submitForm = async () => {
       const { data } = await createInvitation({
         firstName: form.value.firstName.trim(),
         lastName: form.value.lastName.trim(),
-        branchId: form.value.branchId,
+        phone: normalizedPhone,
+        positionId: Number(form.value.positionId),
+        branchId: Number(form.value.branchId),
       });
       if (data?.invitation) {
         invitations.value.unshift(normalizeInvitation(data.invitation));

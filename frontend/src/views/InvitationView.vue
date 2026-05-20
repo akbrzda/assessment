@@ -104,14 +104,14 @@
         </div>
         <h3 class="title-small mb-8">Вход только по приглашению</h3>
         <p class="body-small text-secondary">{{ welcomeText }}</p>
-        <p class="body-small text-secondary mt-8">Попросите руководителя или администратора отправить персональную ссылку-приглашение в Telegram.</p>
+        <p class="body-small text-secondary mt-8">Попросите руководителя или администратора отправить персональную ссылку-приглашение.</p>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ArrowRight, BriefcaseBusiness, Building2, CheckCircle2, Hand, MailCheck, Phone, ShieldCheck, User, XCircle } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
@@ -212,6 +212,21 @@ export default {
     onMounted(async () => {
       // Страница отображает информацию о приглашении или сообщение об отсутствии
     });
+
+    watch(
+      () => ({
+        hasInviteCode: Boolean(inviteFlow.value?.hasInviteCode),
+        registrationByInvitationOnly: Boolean(inviteFlow.value?.registrationByInvitationOnly),
+        loading: Boolean(isLoading.value),
+      }),
+      (state) => {
+        // Если инвайта нет и регистрация без инвайта разрешена — уводим на регистрацию.
+        if (!state.loading && !state.hasInviteCode && !state.registrationByInvitationOnly) {
+          router.replace({ name: "registration" });
+        }
+      },
+      { immediate: true },
+    );
 
     return {
       invitation,

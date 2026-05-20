@@ -171,7 +171,6 @@ describe("SEC-006 — IDOR: доступ к чужим данным через c
    * В текущей реализации telegramId берётся из initData — это корректно.
    * Тест проверяет, что нельзя получить данные другого пользователя, передав чужой ключ.
    *
-   * Для корректного запуска нужен TELEGRAM_INITDATA_BYPASS=true в тестовой среде.
    */
   it("cloud-storage GET без initData возвращает 401", async () => {
     const r = await req("GET", "/cloud-storage/somekey");

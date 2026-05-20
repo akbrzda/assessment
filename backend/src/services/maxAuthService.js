@@ -2,12 +2,36 @@
 const logger = require("../utils/logger");
 const config = require("../config/env");
 
+function normalizeInitData(initDataString) {
+  const rawValue = String(initDataString || "").trim();
+  if (!rawValue) {
+    return "";
+  }
+
+  const candidates = [rawValue];
+  try {
+    candidates.push(decodeURIComponent(rawValue));
+  } catch (_error) {
+    // Игнорируем decode ошибки и продолжаем с исходным значением.
+  }
+
+  for (const candidate of candidates) {
+    const params = new URLSearchParams(candidate);
+    if (params.has("hash") && (params.has("user") || params.has("auth_date"))) {
+      return candidate;
+    }
+  }
+
+  return rawValue;
+}
+
 function validateInitData(initDataString) {
   if (!initDataString) {
     return null;
   }
 
-  const params = new URLSearchParams(initDataString);
+  const normalizedInitData = normalizeInitData(initDataString);
+  const params = new URLSearchParams(normalizedInitData);
   const receivedHash = params.get("hash");
   if (!receivedHash) {
     return null;
