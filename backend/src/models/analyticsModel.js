@@ -121,7 +121,7 @@ async function getSummary({ from = null, to = null, branchId = null, positionId 
 async function getBranchBreakdown({ from = null, to = null, branchId = null, positionId = null, managerBranchId = null }) {
   const attemptFilter = buildUserFilters({ branchId, positionId, managerBranchId });
   const dateFilter = buildDateFilters({ from, to }, "aa.completed_at");
-  const conditions = ['aa.status = "completed"', ...dateFilter.clauses];
+  const conditions = ['aa.status = "completed"', 'u.deleted_at IS NULL', ...dateFilter.clauses];
   const params = [...dateFilter.params];
 
   // Branch filtering behaves differently when a branch is provided: we still want individual rows per branch.
@@ -179,7 +179,7 @@ async function getEmployeePerformance({
   limit = 20,
 }) {
   const dateFilter = buildDateFilters({ from, to }, "aa.completed_at");
-  const conditions = ['aa.status = "completed"', ...dateFilter.clauses];
+  const conditions = ['aa.status = "completed"', 'u.deleted_at IS NULL', ...dateFilter.clauses];
   const params = [...dateFilter.params];
 
   if (branchId) {

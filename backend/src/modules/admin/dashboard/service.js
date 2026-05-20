@@ -103,7 +103,7 @@ exports.getMetrics = async (req, res) => {
     );
 
     // Всего сотрудников
-    const usersWhereConditions = ["1=1"];
+    const usersWhereConditions = ["deleted_at IS NULL"];
     const usersParams = [];
     const prevUsersParams = [prevDateTo];
 
