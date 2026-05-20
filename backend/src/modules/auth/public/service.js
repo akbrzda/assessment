@@ -387,6 +387,14 @@ async function register(context, payload) {
   }
 
   // Поток без приглашения: только подтверждение телефона и auto-link.
+  logger.info("[auth-flow] register:no_invite_start", {
+    platform: clientPlatform,
+    platformUserId,
+    hasContact: Boolean(payload?.contact),
+    rawPhoneMasked: maskPhone(payload?.contact?.phoneNumber),
+    contactSource: payload?.contact?.source || null,
+  });
+
   if (!payload?.contact) {
     throw buildError("Для входа без приглашения подтвердите номер телефона", 422);
   }
@@ -400,6 +408,7 @@ async function register(context, payload) {
   const linkedUsers = await authRepository.findVerifiedActiveUsersByPhoneE164(verification.normalizedPhone);
   logger.info("[auth-flow] register:no_invite_auto_link_candidates", {
     platform: clientPlatform,
+    normalizedPhoneMasked: maskPhone(verification.normalizedPhone),
     candidatesCount: linkedUsers.length,
     candidates: linkedUsers.map((candidate) => candidate.id),
   });

@@ -1,4 +1,4 @@
-const Joi = require("joi");
+﻿const Joi = require("joi");
 const bcrypt = require("bcrypt");
 const userModel = require("../../../models/userModel");
 const { pool } = require("../../../config/database");
@@ -72,7 +72,8 @@ async function listUsers(req, res, next) {
         p.name as position_name,
         p.id as position_id,
         r.name as role_name,
-        r.id as role_id
+        r.id as role_id,
+        EXISTS(SELECT 1 FROM user_platform_identities upi WHERE upi.user_id = u.id) as has_identity
       FROM users u
       LEFT JOIN branches b ON u.branch_id = b.id
       LEFT JOIN positions p ON u.position_id = p.id

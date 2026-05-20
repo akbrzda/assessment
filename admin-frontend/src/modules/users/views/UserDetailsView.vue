@@ -104,17 +104,22 @@
         </Card>
 
         <Card class="activity-card">
-          <h3>Диагностика идентичности</h3>
-          <div class="kv-row">
-            <span>Платформенные identity</span>
-            <strong>{{ Array.isArray(profile.identities) ? profile.identities.length : 0 }}</strong>
-          </div>
+          <h3>Платформенные аккаунты</h3>
+
           <div v-if="Array.isArray(profile.identities) && profile.identities.length" class="identity-list">
-            <div v-for="identity in profile.identities" :key="`${identity.platform}-${identity.platform_user_id}`" class="identity-row">
-              <span>{{ identity.platform }}: {{ identity.platform_user_id }}</span>
-              <span>{{ identity.is_verified ? "verified" : "unverified" }}</span>
+            <div v-for="identity in profile.identities" :key="identity.platform" class="identity-row">
+              <div class="identity-info">
+                <span class="identity-platform">{{ identity.platform === "telegram" ? "Telegram" : "MAX" }}</span>
+                <span class="identity-id">ID: {{ identity.platform_user_id }}</span>
+                <span v-if="identity.platform_username" class="identity-username">@{{ identity.platform_username }}</span>
+                <Badge :variant="identity.is_verified ? 'success' : 'warning'" size="sm">
+                  {{ identity.is_verified ? "Подтверждён" : "Не подтверждён" }}
+                </Badge>
+              </div>
             </div>
           </div>
+          <p v-else class="identity-empty">Платформенные аккаунты не привязаны</p>
+
           <div v-if="profile.identityDiagnostics?.phoneConflict?.hasConflict" class="identity-conflict">
             Конфликт по телефону. Дубли профилей: {{ profile.identityDiagnostics.phoneConflict.conflictingUserIds.join(", ") }}
           </div>
@@ -409,8 +414,9 @@ const hasInvitationLinks = computed(() =>
   Boolean(invitationLinks.value.telegramLink || invitationLinks.value.maxLink || invitationLinks.value.fallbackCode),
 );
 
-const userStatusLabel = computed(() => (profile.value?.user?.telegram_id ? "Активен" : "Ожидает"));
-const userStatusKey = computed(() => (profile.value?.user?.telegram_id ? "active" : "awaiting"));
+const userIsActive = computed(() => Boolean(profile.value?.user?.telegram_id) || profile.value?.identities?.length > 0);
+const userStatusLabel = computed(() => (userIsActive.value ? "Активен" : "Ожидает"));
+const userStatusKey = computed(() => (userIsActive.value ? "active" : "awaiting"));
 const permissionOptions = computed(() =>
   availablePermissions.value.map((item) => ({
     value: String(item.permissionId),
@@ -506,6 +512,8 @@ const loadProfile = async () => {
       badges: data?.badges || [],
       assessmentsSummary: data?.assessmentsSummary || [],
       invitation: data?.invitation || null,
+      identities: data?.identities || [],
+      identityDiagnostics: data?.identityDiagnostics || null,
     };
   } catch (error) {
     console.error("Ошибка загрузки профиля пользователя", error);
@@ -939,8 +947,31 @@ onMounted(async () => {
 }
 .identity-row {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: hsl(var(--muted) / 0.5);
   font-size: 14px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.identity-platform {
+  font-weight: 600;
+  min-width: 70px;
+}
+.identity-id {
+  color: hsl(var(--muted-foreground));
+  font-family: monospace;
+  font-size: 13px;
+}
+.identity-username {
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+}
+.identity-empty {
+  margin-top: 8px;
+  font-size: 13px;
+  color: hsl(var(--muted-foreground));
 }
 .identity-conflict {
   margin-top: 12px;

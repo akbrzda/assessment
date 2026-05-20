@@ -377,12 +377,12 @@ const stats = computed(() => {
   const superadmin = users.value.filter((user) => user.role_name === "superadmin").length;
   const manager = users.value.filter((user) => user.role_name === "manager").length;
   const employee = users.value.filter((user) => user.role_name === "employee").length;
-  const awaiting = users.value.filter((user) => !user.telegram_id).length;
+  const awaiting = users.value.filter((user) => !user.telegram_id && !user.has_identity).length;
   return { total, superadmin, manager, employee, awaiting };
 });
 
 const getUserStatus = (user) => {
-  if (!user.telegram_id) {
+  if (!user.telegram_id && !user.has_identity) {
     return { key: "awaiting", label: "Ожидает" };
   }
   return { key: "active", label: "Активен" };
@@ -403,7 +403,7 @@ const visibleUsers = computed(() => {
     return users.value;
   }
   if (activeUserTab.value === "awaiting") {
-    return users.value.filter((user) => !user.telegram_id);
+    return users.value.filter((user) => !user.telegram_id && !user.has_identity);
   }
   return users.value.filter((user) => user.role_name === activeUserTab.value);
 });
