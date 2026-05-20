@@ -57,7 +57,7 @@ exports.getOverallStats = async (req, res, next) => {
       JOIN users u ON cup.user_id = u.id
       ${whereClause}
     `,
-      params
+      params,
     );
 
     res.json({ stats: stats[0] });
@@ -108,7 +108,7 @@ exports.getBranchAnalytics = async (req, res, next) => {
       GROUP BY b.id
       ORDER BY avg_score DESC
     `,
-      userRole === "manager" ? [...attemptParams, userId] : attemptParams
+      userRole === "manager" ? [...attemptParams, userId] : attemptParams,
     );
 
     res.json({ branches });
@@ -175,7 +175,7 @@ exports.getPositionAnalytics = async (req, res, next) => {
       GROUP BY p.id
       ORDER BY avg_score DESC
     `,
-      [...attemptParams, ...filterParams]
+      [...attemptParams, ...filterParams],
     );
 
     res.json({ positions });
@@ -245,7 +245,7 @@ exports.getTopUsers = async (req, res, next) => {
       ORDER BY avg_score DESC, total_assessments DESC
       LIMIT ?
     `,
-      [...params, parseInt(limit)]
+      [...params, parseInt(limit)],
     );
 
     res.json({ users });
@@ -302,7 +302,7 @@ exports.getAssessmentTrends = async (req, res, next) => {
       GROUP BY DATE(cup.completed_at)
       ORDER BY date ASC
     `,
-      params
+      params,
     );
 
     // Рассчитываем проценты прироста/снижения
@@ -372,7 +372,7 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
       GROUP BY b.id
       ORDER BY avg_score DESC
     `,
-      userRole === "manager" ? [...attemptParams, userId] : attemptParams
+      userRole === "manager" ? [...attemptParams, userId] : attemptParams,
     );
 
     // Рассчитываем медиану и доли для каждого филиала
@@ -391,7 +391,7 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
             ORDER BY cup.progress_percent
             LIMIT 1 OFFSET ?
           `,
-            [branch.id, ...(dateFrom ? [dateFrom] : []), ...(dateTo ? [dateTo] : []), Math.floor(branch.total_attempts / 2)]
+            [branch.id, ...(dateFrom ? [dateFrom] : []), ...(dateTo ? [dateTo] : []), Math.floor(branch.total_attempts / 2)],
           );
 
           return {
@@ -403,7 +403,7 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
           };
         }
         return branch;
-      })
+      }),
     );
 
     res.json({ branches: detailedBranches });
@@ -472,7 +472,7 @@ exports.getCombinedAnalytics = async (req, res, next) => {
       HAVING total_attempts > 0
       ORDER BY b.name, p.name
     `,
-      [...attemptParams, ...filterParams]
+      [...attemptParams, ...filterParams],
     );
 
     res.json({ combined });
@@ -505,7 +505,7 @@ exports.getAssessmentReport = async (req, res, next) => {
     FROM courses c
     WHERE c.id = ?
   `,
-      [courseId]
+      [courseId],
     );
 
     if (courses.length === 0) {
@@ -526,7 +526,7 @@ exports.getAssessmentReport = async (req, res, next) => {
         WHERE cup.course_id = ? AND u.branch_id IS NOT NULL
         LIMIT 1
       `,
-        [courseId]
+        [courseId],
       );
 
       const courseBranchId = courseBranches?.[0]?.branch_id || null;
@@ -558,7 +558,7 @@ exports.getAssessmentReport = async (req, res, next) => {
       WHERE cup.course_id = ?
       ORDER BY cup.progress_percent DESC, cup.completed_at ASC
     `,
-      [courseId]
+      [courseId],
     );
 
     // Для совместимости структуры оставляем questionStats пустым.
@@ -609,7 +609,7 @@ exports.getUserReport = async (req, res, next) => {
         LEFT JOIN levels l ON u.level_id = l.id
         WHERE u.id = ?
       `,
-        [targetUserId]
+        [targetUserId],
       );
     } catch (error) {
       if (error.code === "ER_NO_SUCH_TABLE" && error.message.includes("levels")) {
@@ -625,7 +625,7 @@ exports.getUserReport = async (req, res, next) => {
           LEFT JOIN positions p ON u.position_id = p.id
           WHERE u.id = ?
         `,
-          [targetUserId]
+          [targetUserId],
         );
       } else {
         throw error;
@@ -677,7 +677,7 @@ exports.getUserReport = async (req, res, next) => {
       FROM course_user_progress cup
       WHERE cup.user_id = ?${dateCondition}
     `,
-      params
+      params,
     );
 
     // История курсов
@@ -694,7 +694,7 @@ exports.getUserReport = async (req, res, next) => {
       WHERE cup.user_id = ?${dateCondition}
       ORDER BY COALESCE(cup.completed_at, cup.updated_at, cup.created_at) DESC
     `,
-      params
+      params,
     );
 
     // Динамика результатов
@@ -708,7 +708,7 @@ exports.getUserReport = async (req, res, next) => {
       GROUP BY DATE(COALESCE(cup.completed_at, cup.updated_at, cup.created_at))
       ORDER BY date ASC
     `,
-      params
+      params,
     );
 
     // Сравнение с коллегами того же уровня/должности
@@ -723,7 +723,7 @@ exports.getUserReport = async (req, res, next) => {
       ${dateFrom ? "AND COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?" : ""}
       ${dateTo ? "AND COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?" : ""}
     `,
-      [user.position_id, targetUserId, ...(dateFrom ? [dateFrom] : []), ...(dateTo ? [dateTo] : [])]
+      [user.position_id, targetUserId, ...(dateFrom ? [dateFrom] : []), ...(dateTo ? [dateTo] : [])],
     );
 
     res.json({
@@ -791,7 +791,7 @@ exports.exportToExcel = async (req, res, next) => {
         ${userRole === "manager" ? "WHERE b.id = (SELECT branch_id FROM users WHERE id = ?)" : ""}
         GROUP BY b.id
       `,
-        userRole === "manager" ? [userId] : []
+        userRole === "manager" ? [userId] : [],
       );
 
       sheet.columns = Object.keys(branches[0] || {}).map((key) => ({ header: key, key, width: 20 }));
@@ -858,7 +858,7 @@ exports.exportToExcel = async (req, res, next) => {
         GROUP BY u.id
         ORDER BY AVG(cup.progress_percent) DESC
       `,
-        params
+        params,
       );
 
       sheet.columns = Object.keys(users[0] || {}).map((key) => ({ header: key, key, width: 20 }));
@@ -941,7 +941,7 @@ exports.exportToPDF = async (req, res, next) => {
         ${userRole === "manager" ? "WHERE b.id = (SELECT branch_id FROM users WHERE id = ?)" : ""}
         GROUP BY b.id
       `,
-        userRole === "manager" ? [userId] : []
+        userRole === "manager" ? [userId] : [],
       );
 
       doc.fontSize(16).text("Статистика по филиалам", { underline: true });
@@ -1032,7 +1032,12 @@ exports.exportToCsv = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    let whereConditions = ['aa.status = "completed"', ACTIVE_USER_CONDITION];
+    // Исключаем итоговые аттестации курсов из CSV-экспорта
+    let whereConditions = [
+      'aa.status = "completed"',
+      ACTIVE_USER_CONDITION,
+      "aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)",
+    ];
     const params = [];
 
     if (userRole === "manager") {

@@ -47,6 +47,9 @@ async function getSummary({ from = null, to = null, branchId = null, positionId 
   const attemptConditions = ['aa.status = "completed"', ...attemptFilter.clauses, ...dateFilter.clauses];
   const attemptParams = [...attemptFilter.params, ...dateFilter.params];
 
+  // Исключаем итоговые аттестации курсов — они учитываются в аналитике курсов
+  attemptConditions.push("aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)");
+
   const [attemptRows] = await pool.execute(
     `SELECT
        COUNT(*) AS completedAttempts,
@@ -66,10 +69,14 @@ async function getSummary({ from = null, to = null, branchId = null, positionId 
   const assessmentConditions = assessmentDateFilter.clauses;
   const assessmentParams = assessmentDateFilter.params;
 
+  // Исключаем итоговые аттестации курсов из счётчика аттестаций
+  const finalExcludeClause = "id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)";
+  const assessmentAllConditions = assessmentConditions.length ? [...assessmentConditions, finalExcludeClause] : [finalExcludeClause];
+
   const [assessmentCountRows] = await pool.execute(
     `SELECT COUNT(*) AS total_assessments
      FROM assessments
-     ${assessmentConditions.length ? `WHERE ${assessmentConditions.join(" AND ")}` : ""}`,
+     WHERE ${assessmentAllConditions.join(" AND ")}`,
     assessmentParams,
   );
 
@@ -137,6 +144,9 @@ async function getBranchBreakdown({ from = null, to = null, branchId = null, pos
     params.push(branchId);
   }
 
+  // Исключаем итоговые аттестации курсов из разбивки по филиалам
+  conditions.push("aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)");
+
   const [rows] = await pool.execute(
     `SELECT
        b.id AS branchId,
@@ -203,6 +213,9 @@ async function getEmployeePerformance({
   const order = allowedSort[sortBy] || allowedSort.score;
 
   const sanitizedLimit = Math.max(1, Math.min(Number(limit) || 20, 50));
+
+  // Исключаем итоговые аттестации курсов из рейтинга сотрудников
+  conditions.push("aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)");
 
   const [rows] = await pool.execute(
     `SELECT

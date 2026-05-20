@@ -423,7 +423,7 @@ async function getUserDetailedStats(req, res, next) {
       return res.status(404).json({ error: "Пользователь не найден" });
     }
 
-    // Статистика аттестаций
+    // Статистика standalone-аттестаций (без итоговых аттестаций курсов)
     const [assessmentStats] = await pool.query(
       `SELECT 
         COUNT(DISTINCT aa.assessment_id) as total_assessments,
@@ -439,11 +439,12 @@ async function getUserDetailedStats(req, res, next) {
         MAX(aa.completed_at) as last_attempt_date
       FROM assessment_attempts aa
       JOIN assessments a ON a.id = aa.assessment_id
-      WHERE aa.user_id = ?`,
+      WHERE aa.user_id = ?
+        AND aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)`,
       [userId],
     );
 
-    // Сводка по аттестациям
+    // Сводка по standalone-аттестациям
     const [assessmentSummary] = await pool.query(
       `SELECT 
         a.id,
@@ -456,6 +457,7 @@ async function getUserDetailedStats(req, res, next) {
       FROM assessment_attempts aa
       JOIN assessments a ON aa.assessment_id = a.id
       WHERE aa.user_id = ?
+        AND aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)
       GROUP BY a.id, a.title, a.pass_score_percent
       ORDER BY last_attempt_at DESC`,
       [userId],
@@ -956,7 +958,7 @@ async function getUserById(req, res, next) {
       return res.status(404).json({ error: "Пользователь не найден" });
     }
 
-    // Получить статистику пользователя
+    // Получить статистику пользователя (только standalone-аттестации)
     const [stats] = await pool.query(
       `
       SELECT 
@@ -965,6 +967,7 @@ async function getUserById(req, res, next) {
         AVG(aa.score) as avg_score
       FROM assessment_attempts aa
       WHERE aa.user_id = ?
+        AND aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)
     `,
       [userId],
     );

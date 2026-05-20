@@ -31,6 +31,7 @@ async function listBranches({ search }) {
     FROM branches b
     LEFT JOIN users u ON b.id = u.branch_id
     LEFT JOIN assessment_attempts aa ON u.id = aa.user_id AND aa.status = 'completed'
+        AND aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)
     LEFT JOIN branch_managers bm ON b.id = bm.branch_id
     LEFT JOIN users m ON bm.user_id = m.id
     LEFT JOIN roles mr ON m.role_id = mr.id
@@ -58,10 +59,7 @@ async function listBranches({ search }) {
 }
 
 async function findBranchById(branchId) {
-  const [rows] = await pool.query(
-    "SELECT id, name, city, is_visible_in_miniapp, created_at, updated_at FROM branches WHERE id = ?",
-    [branchId],
-  );
+  const [rows] = await pool.query("SELECT id, name, city, is_visible_in_miniapp, created_at, updated_at FROM branches WHERE id = ?", [branchId]);
   return rows[0] || null;
 }
 
@@ -69,10 +67,7 @@ async function findBranchByName(name, options = {}) {
   const { excludeId } = options;
 
   if (excludeId) {
-    const [rows] = await pool.query(
-      "SELECT id FROM branches WHERE name = ? AND id != ?",
-      [name, excludeId],
-    );
+    const [rows] = await pool.query("SELECT id FROM branches WHERE name = ? AND id != ?", [name, excludeId]);
     return rows[0] || null;
   }
 
@@ -89,16 +84,19 @@ async function getBranchStats(branchId) {
       AVG(aa.score_percent) AS avg_score
     FROM users u
     LEFT JOIN assessment_attempts aa ON u.id = aa.user_id AND aa.status = 'completed'
+        AND aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)
     WHERE u.branch_id = ?
   `,
     [branchId],
   );
 
-  return rows[0] || {
-    employees_count: 0,
-    assessments_completed: 0,
-    avg_score: null,
-  };
+  return (
+    rows[0] || {
+      employees_count: 0,
+      assessments_completed: 0,
+      avg_score: null,
+    }
+  );
 }
 
 async function listManagersByBranch(branchId) {
@@ -129,25 +127,25 @@ async function listManagers() {
 }
 
 async function createBranch({ name, city, isVisibleInMiniapp }) {
-  const [result] = await pool.query(
-    "INSERT INTO branches (name, city, is_visible_in_miniapp) VALUES (?, ?, ?)",
-    [name, city, isVisibleInMiniapp ? 1 : 0],
-  );
+  const [result] = await pool.query("INSERT INTO branches (name, city, is_visible_in_miniapp) VALUES (?, ?, ?)", [
+    name,
+    city,
+    isVisibleInMiniapp ? 1 : 0,
+  ]);
   return result.insertId;
 }
 
 async function updateBranch(branchId, { name, city, isVisibleInMiniapp }) {
-  await pool.query(
-    "UPDATE branches SET name = ?, city = ?, is_visible_in_miniapp = ? WHERE id = ?",
-    [name, city, isVisibleInMiniapp ? 1 : 0, branchId],
-  );
+  await pool.query("UPDATE branches SET name = ?, city = ?, is_visible_in_miniapp = ? WHERE id = ?", [
+    name,
+    city,
+    isVisibleInMiniapp ? 1 : 0,
+    branchId,
+  ]);
 }
 
 async function countUsersByBranch(branchId) {
-  const [rows] = await pool.query(
-    "SELECT COUNT(*) AS count FROM users WHERE branch_id = ?",
-    [branchId],
-  );
+  const [rows] = await pool.query("SELECT COUNT(*) AS count FROM users WHERE branch_id = ?", [branchId]);
   return Number(rows[0]?.count || 0);
 }
 
@@ -169,25 +167,16 @@ async function findUserWithRole(userId) {
 }
 
 async function findManagerAssignment(branchId, userId) {
-  const [rows] = await pool.query(
-    "SELECT id FROM branch_managers WHERE branch_id = ? AND user_id = ?",
-    [branchId, userId],
-  );
+  const [rows] = await pool.query("SELECT id FROM branch_managers WHERE branch_id = ? AND user_id = ?", [branchId, userId]);
   return rows[0] || null;
 }
 
 async function createManagerAssignment(branchId, userId) {
-  await pool.query("INSERT INTO branch_managers (branch_id, user_id) VALUES (?, ?)", [
-    branchId,
-    userId,
-  ]);
+  await pool.query("INSERT INTO branch_managers (branch_id, user_id) VALUES (?, ?)", [branchId, userId]);
 }
 
 async function deleteManagerAssignment(branchId, userId) {
-  const [result] = await pool.query(
-    "DELETE FROM branch_managers WHERE branch_id = ? AND user_id = ?",
-    [branchId, userId],
-  );
+  const [result] = await pool.query("DELETE FROM branch_managers WHERE branch_id = ? AND user_id = ?", [branchId, userId]);
   return result.affectedRows;
 }
 

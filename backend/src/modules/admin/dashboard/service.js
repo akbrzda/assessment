@@ -75,17 +75,19 @@ exports.getMetrics = async (req, res) => {
 
     const whereClause = filterConditions.length > 0 ? "AND " + filterConditions.join(" AND ") : "";
 
-    // Активные аттестации (текущий период)
+    // Активные аттестации (текущий период) — без итоговых аттестаций курсов
     const [activeAssessments] = await pool.query(
       `SELECT COUNT(*) as count FROM assessments 
-       WHERE open_at <= ? AND close_at >= ?`,
+       WHERE open_at <= ? AND close_at >= ?
+         AND id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)`,
       [dateTo, dateFrom],
     );
 
     // Активные аттестации (предыдущий период)
     const [prevActiveAssessments] = await pool.query(
       `SELECT COUNT(*) as count FROM assessments 
-       WHERE open_at <= ? AND close_at >= ?`,
+       WHERE open_at <= ? AND close_at >= ?
+         AND id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)`,
       [prevDateTo, prevDateFrom],
     );
 
@@ -152,6 +154,7 @@ exports.getMetrics = async (req, res) => {
     );
 
     // Средний процент успешности по филиалам
+    // Средний процент успешности — только standalone-аттестации
     const [avgSuccessRate] = await pool.query(
       `
       SELECT 
@@ -161,12 +164,13 @@ exports.getMetrics = async (req, res) => {
       JOIN users u ON aa.user_id = u.id
       WHERE aa.status = 'completed'
       AND aa.completed_at BETWEEN ? AND ?
+      AND aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)
       ${whereClause}
     `,
       [dateFrom, dateTo, ...filterParams],
     );
 
-    // Статистика по аттестациям (текущий период)
+    // Статистика по аттестациям (текущий период) — без итоговых аттестаций курсов
     const [assessmentStats] = await pool.query(
       `
       SELECT 
@@ -177,6 +181,7 @@ exports.getMetrics = async (req, res) => {
       FROM assessment_attempts aa
       JOIN users u ON aa.user_id = u.id
       WHERE aa.started_at BETWEEN ? AND ?
+      AND aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)
       ${whereClause}
     `,
       [dateFrom, dateTo, ...filterParams],
@@ -192,6 +197,7 @@ exports.getMetrics = async (req, res) => {
       FROM assessment_attempts aa
       JOIN users u ON aa.user_id = u.id
       WHERE aa.started_at BETWEEN ? AND ?
+      AND aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)
       ${whereClause}
     `,
       [prevDateFrom, prevDateTo, ...prevFilterParams],
@@ -309,6 +315,7 @@ exports.getActivityTrends = async (req, res) => {
       FROM assessment_attempts aa
       JOIN users u ON aa.user_id = u.id
       WHERE aa.started_at BETWEEN ? AND ?
+      AND aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)
       ${whereClause}
       GROUP BY DATE(aa.started_at)
       ORDER BY DATE(aa.started_at)
@@ -397,6 +404,7 @@ exports.getBranchKPI = async (req, res) => {
       LEFT JOIN users u ON b.id = u.branch_id
       LEFT JOIN assessment_attempts aa ON u.id = aa.user_id 
         AND aa.completed_at BETWEEN ? AND ?
+        AND aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)
       ${whereClause}
       GROUP BY b.id, b.name, b.city
       ORDER BY success_rate DESC
@@ -424,6 +432,7 @@ exports.getBranchKPI = async (req, res) => {
         WHERE ${sparklineConditions.join(" AND ")}
         AND aa.status = 'completed'
         AND aa.completed_at BETWEEN DATE_SUB(?, INTERVAL 7 DAY) AND ?
+        AND aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)
         GROUP BY DATE(aa.completed_at)
         ORDER BY DATE(aa.completed_at)
       `,
@@ -515,7 +524,8 @@ exports.getLatestAssessmentActivities = async (req, res) => {
       FROM assessment_attempts aa
       JOIN users u ON aa.user_id = u.id
       JOIN assessments a ON aa.assessment_id = a.id
-      ${whereClause}
+      WHERE aa.assessment_id NOT IN (SELECT final_assessment_id FROM courses WHERE final_assessment_id IS NOT NULL)
+      ${whereClause ? whereClause.replace(/^WHERE /, "AND ") : ""}
       ORDER BY aa.created_at DESC
       LIMIT ?
     `,
