@@ -105,7 +105,18 @@ async function getStatus(context) {
   const inviteCode = resolveInviteCode(context);
   const hasInviteCode = Boolean(inviteCode && inviteCode.length >= 4);
 
+  logger.info("[auth-flow] getStatus:entry", {
+    platform: context.clientPlatform,
+    platformUserId: telegramUser?.id ? String(telegramUser.id) : null,
+    isLoggedIn: Boolean(context.currentUser),
+    hasInviteCode,
+  });
+
   if (context.currentUser) {
+    logger.info("[auth-flow] getStatus:already_registered", {
+      platform: context.clientPlatform,
+      userId: context.currentUser.id,
+    });
     const user = await authRepository.getDashboardData(context.currentUser.id);
     return {
       registered: true,
@@ -149,20 +160,40 @@ async function getStatus(context) {
 
 async function register(context, payload) {
   if (context.currentUser) {
+    logger.warn("[auth-flow] register:already_logged_in", {
+      platform: context.clientPlatform,
+      userId: context.currentUser.id,
+    });
     throw buildError("User already registered", 400);
   }
 
   const platformUser = context.telegramUser;
   const clientPlatform = context.clientPlatform === "max" ? "max" : "telegram";
   if (!platformUser) {
+    logger.warn("[auth-flow] register:missing_platform_user", { platform: clientPlatform });
     throw buildError("Missing platform user data", 400);
   }
 
   const platformUserId = String(platformUser.id);
   const avatarUrl = platformUser.photo_url || null;
+
+  logger.info("[auth-flow] register:entry", {
+    platform: clientPlatform,
+    platformUserId,
+    hasInviteCodeHeader: Boolean(context.inviteCodeHeader),
+    hasStartParam: Boolean(context.startParam || context.startApp || context.startParamHash),
+    hasContactPayload: Boolean(payload?.contact),
+    hasInviteCodePayload: Boolean(payload?.inviteCode),
+  });
+
   const existingUser = await authRepository.findUserByPlatformIdentity(clientPlatform, platformUserId);
 
   if (existingUser) {
+    logger.warn("[auth-flow] register:already_registered", {
+      platform: clientPlatform,
+      platformUserId,
+      existingUserId: existingUser.id,
+    });
     throw buildError("Вы уже зарегистрированы в системе", 400);
   }
 
@@ -335,6 +366,13 @@ async function register(context, payload) {
         platformUsername: platformUser.username || null,
         isVerified: true,
         verifiedAt: new Date(),
+      });
+      logger.info("[invite-flow] register:pending_activated", {
+        platform: clientPlatform,
+        platformUserId,
+        userId: invitation.invited_user_id,
+        inviteId: invitation.id,
+        phoneMasked: maskPhone(verification.normalizedPhone),
       });
       await authRepository.completeOnboarding(invitation.invited_user_id);
       await authRepository.assignUserToMatchingAssessments({
