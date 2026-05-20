@@ -79,27 +79,27 @@ exports.getMetrics = async (req, res) => {
     const [activeAssessments] = await pool.query(
       `SELECT COUNT(*) as count FROM assessments 
        WHERE open_at <= ? AND close_at >= ?`,
-      [dateTo, dateFrom]
+      [dateTo, dateFrom],
     );
 
     // Активные аттестации (предыдущий период)
     const [prevActiveAssessments] = await pool.query(
       `SELECT COUNT(*) as count FROM assessments 
        WHERE open_at <= ? AND close_at >= ?`,
-      [prevDateTo, prevDateFrom]
+      [prevDateTo, prevDateFrom],
     );
 
     // Активные курсы (опубликованные) и тренд
     const [activeCourses] = await pool.query(
       `SELECT COUNT(*) as count FROM courses
        WHERE status = 'published' AND published_at <= ?`,
-      [dateTo]
+      [dateTo],
     );
 
     const [prevActiveCourses] = await pool.query(
       `SELECT COUNT(*) as count FROM courses
        WHERE status = 'published' AND published_at <= ?`,
-      [prevDateTo]
+      [prevDateTo],
     );
 
     // Всего сотрудников
@@ -129,10 +129,7 @@ exports.getMetrics = async (req, res) => {
 
     const [totalUsers] = await pool.query(`SELECT COUNT(*) as count FROM users WHERE ${usersWhereClause}`, usersParams);
 
-    const [prevTotalUsers] = await pool.query(
-      `SELECT COUNT(*) as count FROM users WHERE created_at <= ? AND ${usersWhereClause}`,
-      prevUsersParams,
-    );
+    const [prevTotalUsers] = await pool.query(`SELECT COUNT(*) as count FROM users WHERE created_at <= ? AND ${usersWhereClause}`, prevUsersParams);
 
     // Филиалы и должности
     const [totalBranches] = await pool.query("SELECT COUNT(*) as count FROM branches");
@@ -151,7 +148,7 @@ exports.getMetrics = async (req, res) => {
       ORDER BY u.points DESC
       LIMIT 3
     `,
-      filterParams
+      filterParams,
     );
 
     // Средний процент успешности по филиалам
@@ -166,7 +163,7 @@ exports.getMetrics = async (req, res) => {
       AND aa.completed_at BETWEEN ? AND ?
       ${whereClause}
     `,
-      [dateFrom, dateTo, ...filterParams]
+      [dateFrom, dateTo, ...filterParams],
     );
 
     // Статистика по аттестациям (текущий период)
@@ -182,7 +179,7 @@ exports.getMetrics = async (req, res) => {
       WHERE aa.started_at BETWEEN ? AND ?
       ${whereClause}
     `,
-      [dateFrom, dateTo, ...filterParams]
+      [dateFrom, dateTo, ...filterParams],
     );
 
     // Статистика по аттестациям (предыдущий период)
@@ -197,7 +194,7 @@ exports.getMetrics = async (req, res) => {
       WHERE aa.started_at BETWEEN ? AND ?
       ${whereClause}
     `,
-      [prevDateFrom, prevDateTo, ...prevFilterParams]
+      [prevDateFrom, prevDateTo, ...prevFilterParams],
     );
 
     // Вычисляем тренды
@@ -316,7 +313,7 @@ exports.getActivityTrends = async (req, res) => {
       GROUP BY DATE(aa.started_at)
       ORDER BY DATE(aa.started_at)
     `,
-      filterParams
+      filterParams,
     );
 
     res.json({
@@ -404,7 +401,7 @@ exports.getBranchKPI = async (req, res) => {
       GROUP BY b.id, b.name, b.city
       ORDER BY success_rate DESC
     `,
-      [dateFrom, dateTo, ...whereParams]
+      [dateFrom, dateTo, ...whereParams],
     );
 
     // Добавляем sparkline данные для каждого филиала (последние 7 дней)
@@ -430,7 +427,7 @@ exports.getBranchKPI = async (req, res) => {
         GROUP BY DATE(aa.completed_at)
         ORDER BY DATE(aa.completed_at)
       `,
-        [...sparklineParams, dateTo, dateTo]
+        [...sparklineParams, dateTo, dateTo],
       );
 
       branch.sparkline = sparklineData.map((d) => d.avg_score || 0);
@@ -522,7 +519,7 @@ exports.getLatestAssessmentActivities = async (req, res) => {
       ORDER BY aa.created_at DESC
       LIMIT ?
     `,
-      [...params, parseInt(limit)]
+      [...params, parseInt(limit)],
     );
 
     res.json({ latestActivities });

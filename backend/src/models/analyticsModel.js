@@ -58,7 +58,7 @@ async function getSummary({ from = null, to = null, branchId = null, positionId 
      JOIN assessments a ON a.id = aa.assessment_id
      JOIN users u ON u.id = aa.user_id
      WHERE ${attemptConditions.join(" AND ") || "1=1"}`,
-    attemptParams
+    attemptParams,
   );
 
   // Подсчёт ВСЕХ аттестаций (без фильтра по филиалу для управляющего)
@@ -70,7 +70,7 @@ async function getSummary({ from = null, to = null, branchId = null, positionId 
     `SELECT COUNT(*) AS total_assessments
      FROM assessments
      ${assessmentConditions.length ? `WHERE ${assessmentConditions.join(" AND ")}` : ""}`,
-    assessmentParams
+    assessmentParams,
   );
 
   // Подсчёт пользователей с учётом фильтра по филиалу (для управляющего)
@@ -82,7 +82,7 @@ async function getSummary({ from = null, to = null, branchId = null, positionId 
     `SELECT COUNT(*) AS total_users
      FROM users u
      ${userConditions.length ? `WHERE ${userConditions.join(" AND ")}` : ""}`,
-    userParams
+    userParams,
   );
 
   // Подсчёт активных аттестаций (открытые в данный момент)
@@ -93,7 +93,7 @@ async function getSummary({ from = null, to = null, branchId = null, positionId 
     `SELECT COUNT(*) AS active_assessments
      FROM assessments a
      WHERE a.open_at <= ? AND a.close_at >= ?`,
-    [nowIso, nowIso]
+    [nowIso, nowIso],
   );
 
   const attempts = attemptRows[0] || {};
@@ -121,7 +121,7 @@ async function getSummary({ from = null, to = null, branchId = null, positionId 
 async function getBranchBreakdown({ from = null, to = null, branchId = null, positionId = null, managerBranchId = null }) {
   const attemptFilter = buildUserFilters({ branchId, positionId, managerBranchId });
   const dateFilter = buildDateFilters({ from, to }, "aa.completed_at");
-  const conditions = ['aa.status = "completed"', 'u.deleted_at IS NULL', ...dateFilter.clauses];
+  const conditions = ['aa.status = "completed"', "u.deleted_at IS NULL", ...dateFilter.clauses];
   const params = [...dateFilter.params];
 
   // Branch filtering behaves differently when a branch is provided: we still want individual rows per branch.
@@ -154,7 +154,7 @@ async function getBranchBreakdown({ from = null, to = null, branchId = null, pos
      WHERE ${conditions.join(" AND ")}
      GROUP BY b.id, b.name
      ORDER BY attempts DESC`,
-    params
+    params,
   );
 
   return rows.map((row) => ({
@@ -179,7 +179,7 @@ async function getEmployeePerformance({
   limit = 20,
 }) {
   const dateFilter = buildDateFilters({ from, to }, "aa.completed_at");
-  const conditions = ['aa.status = "completed"', 'u.deleted_at IS NULL', ...dateFilter.clauses];
+  const conditions = ['aa.status = "completed"', "u.deleted_at IS NULL", ...dateFilter.clauses];
   const params = [...dateFilter.params];
 
   if (branchId) {
@@ -224,7 +224,7 @@ async function getEmployeePerformance({
      GROUP BY u.id, u.first_name, u.last_name, b.name, p.name
      ORDER BY ${order}, attempts DESC
      LIMIT ${sanitizedLimit}`,
-    params
+    params,
   );
 
   return rows.map((row) => {
