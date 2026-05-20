@@ -152,6 +152,14 @@ async function removeUserRole(req, res, next) {
   }
 }
 
+async function grantAppAccess(req, res, next) {
+  try {
+    return await moduleService.grantAppAccess(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   listUsers,
   getUserLoginHistory,
@@ -172,4 +180,5 @@ module.exports = {
   deletePermissionOverride,
   addUserRole,
   removeUserRole,
+  grantAppAccess,
 };

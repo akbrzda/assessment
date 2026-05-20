@@ -2,6 +2,9 @@
   <div class="user-details-page">
     <PageHeader title="Профиль пользователя">
       <template #actions>
+        <Button v-if="canGrantAppAccess" variant="secondary" icon="smartphone" :loading="grantingAccess" @click="handleGrantAppAccess"
+          >Выдать доступ в приложение</Button
+        >
         <Button type="button" variant="secondary" icon="arrow-left" @click="goBack">Назад</Button>
       </template>
     </PageHeader>
@@ -44,7 +47,9 @@
       <div v-if="activeTab === 'general'" class="grid-two">
         <Card class="info-card">
           <h3>Контактные данные</h3>
-          <div class="kv-row"><span>Телефон</span><strong>{{ formatPhoneForUi(profile.user?.phone_e164) }}</strong></div>
+          <div class="kv-row">
+            <span>Телефон</span><strong>{{ formatPhoneForUi(profile.user?.phone_e164) }}</strong>
+          </div>
           <div class="kv-row"><span>Email</span><strong>—</strong></div>
           <div class="kv-row">
             <span>Telegram</span><strong>{{ profile.user?.telegram_id || "—" }}</strong>
@@ -110,10 +115,7 @@
               <span>{{ identity.is_verified ? "verified" : "unverified" }}</span>
             </div>
           </div>
-          <div
-            v-if="profile.identityDiagnostics?.phoneConflict?.hasConflict"
-            class="identity-conflict"
-          >
+          <div v-if="profile.identityDiagnostics?.phoneConflict?.hasConflict" class="identity-conflict">
             Конфликт по телефону. Дубли профилей: {{ profile.identityDiagnostics.phoneConflict.conflictingUserIds.join(", ") }}
           </div>
         </Card>
@@ -328,6 +330,7 @@ import {
   getUserPermissions,
   removeUserPermissionOverride,
   removeUserRoleAssignment,
+  grantAppAccess,
 } from "@/api/users";
 import { BOT_USERNAME, MAX_BOT_NAME } from "@/env";
 import { formatPhoneForUi } from "@/utils/phone";
@@ -355,6 +358,14 @@ const overridesSaving = ref(false);
 const newRoleForm = ref({ roleId: "", expiresAt: "" });
 const newOverrideForm = ref({ permissionId: "", effect: "allow", reason: "", expiresAt: "" });
 const canManageRolesAndPermissions = computed(() => authStore.user?.role !== "manager");
+const grantingAccess = ref(false);
+const grantedLinks = ref(null);
+
+const canGrantAppAccess = computed(() => {
+  const roleName = profile.value?.user?.role_name;
+  const isAdmin = roleName === "superadmin" || roleName === "manager";
+  return authStore.user?.role === "superadmin" && isAdmin && !profile.value?.user?.telegram_id;
+});
 
 const tabsConfig = computed(() => {
   const baseTabs = [
@@ -684,6 +695,23 @@ const removeOverride = async (overrideId) => {
   } catch (error) {
     console.error("Ошибка удаления override", error);
     showToast("Не удалось удалить override", "error");
+  }
+};
+
+const handleGrantAppAccess = async () => {
+  grantingAccess.value = true;
+  try {
+    const userId = Number(route.params.id);
+    const result = await grantAppAccess(userId);
+    grantedLinks.value = result;
+    await loadProfile();
+    showToast("Приглашение создано", "success");
+  } catch (error) {
+    const msg = error?.response?.data?.error || "Не удалось выдать доступ";
+    showToast(msg, "error");
+    console.error("Ошибка выдачи доступа в приложение", error);
+  } finally {
+    grantingAccess.value = false;
   }
 };
 

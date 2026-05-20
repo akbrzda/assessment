@@ -4,6 +4,8 @@ const userModel = require("../../../models/userModel");
 const { pool } = require("../../../config/database");
 const assessmentModel = require("../../../models/assessmentModel");
 const referenceModel = require("../../../models/referenceModel");
+const invitationModel = require("../../../models/invitationModel");
+const { generateInviteCode } = require("../../../utils/tokenGenerator");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
 const { listPublishedCoursesForUser } = require("../../courses/userCourseView.repository");
 const permissionService = require("../../../services/PermissionService");
@@ -788,64 +790,55 @@ async function resetAssessmentProgress(req, res, next) {
 }
 
 /**
- * Создать нового пользователя (только для суперадмина)
+ * Создать нового пользователя-администратора (только для суперадмина).
+ * Сотрудников добавляют через инвайт-ссылку.
  */
 async function createUser(req, res, next) {
   try {
     const currentUser = req.user;
 
-    // Только superadmin может создавать пользователей
     if (currentUser.role !== "superadmin") {
       return res.status(403).json({ error: "У вас нет прав на создание пользователей" });
     }
 
-    const { firstName, lastName, branchId, positionId, roleId, login, password } = req.body;
+    const { firstName, lastName, branchId, positionId, roleId, login } = req.body;
 
-    // Валидация
     if (!firstName || !lastName || !branchId || !positionId || !roleId) {
       return res.status(400).json({ error: "Все поля обязательны" });
     }
 
-    // Проверка уникальности логина
-    if (login) {
-      const [existing] = await pool.query("SELECT id FROM users WHERE login = ?", [login]);
-      if (existing.length > 0) {
-        return res.status(400).json({ error: "Логин уже занят" });
-      }
+    // Авто-генерация логина из фамилии + первая буква имени
+    let resolvedLogin = (login || "").trim();
+    if (!resolvedLogin) {
+      const base = (String(lastName).trim() + String(firstName).trim()[0]).toLowerCase().replace(/[^a-zа-яё0-9_]/g, "");
+      resolvedLogin = base || `user_${Date.now()}`;
     }
 
-    // Хешируем пароль, если указан
-    let hashedPassword = null;
-    if (password) {
-      if (password.length < 8) {
-        return res.status(400).json({ error: "Пароль должен быть не менее 8 символов" });
-      }
-      hashedPassword = await bcrypt.hash(password, 10);
+    const [loginCheck] = await pool.query("SELECT id FROM users WHERE login = ?", [resolvedLogin]);
+    if (loginCheck.length > 0) {
+      return res.status(422).json({ error: "Логин уже занят, укажите другой" });
     }
 
-    // Генерируем уникальный telegram_id для ручного создания
-    const telegramId = "manual_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+    // Генерируем временный пароль
+    const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
+    const tempPassword = Array.from({ length: 12 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
+    // Создаём пользователя без telegram_id — он предназначен только для admin-панели
     const [result] = await pool.query(
-      `
-      INSERT INTO users (
-        telegram_id, first_name, last_name, position_id, branch_id, role_id, login, password, level, points
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-      [telegramId, firstName, lastName, positionId, branchId, roleId, login, hashedPassword, 1, 0],
+      `INSERT INTO users (first_name, last_name, position_id, branch_id, role_id, login, password, level, points)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0)`,
+      [firstName, lastName, positionId, branchId, roleId, resolvedLogin, hashedPassword],
     );
 
     const [newUser] = await pool.query(
-      `
-      SELECT 
-        u.id, u.first_name, u.last_name, u.login, u.level, u.points,
-        b.name as branch_name, p.name as position_name, r.name as role_name
-      FROM users u
-      LEFT JOIN branches b ON u.branch_id = b.id
-      LEFT JOIN positions p ON u.position_id = p.id
-      LEFT JOIN roles r ON u.role_id = r.id
-      WHERE u.id = ?
-    `,
+      `SELECT u.id, u.first_name, u.last_name, u.login, u.level, u.points,
+              b.name as branch_name, p.name as position_name, r.name as role_name
+       FROM users u
+       LEFT JOIN branches b ON u.branch_id = b.id
+       LEFT JOIN positions p ON u.position_id = p.id
+       LEFT JOIN roles r ON u.role_id = r.id
+       WHERE u.id = ?`,
       [result.insertId],
     );
 
@@ -855,12 +848,7 @@ async function createUser(req, res, next) {
       action: "user.created",
       entity: "user",
       entityId: newUser[0].id,
-      metadata: {
-        branchId,
-        positionId,
-        roleId,
-        login: login || null,
-      },
+      metadata: { branchId, positionId, roleId, login: resolvedLogin },
     });
 
     await assessmentModel.assignUserToMatchingAssessments({
@@ -869,7 +857,14 @@ async function createUser(req, res, next) {
       positionId,
     });
 
-    res.status(201).json({ user: newUser[0] });
+    res.status(201).json({
+      user: newUser[0],
+      credentials: {
+        login: resolvedLogin,
+        password: tempPassword,
+        message: `Данные для входа в административную панель:\nЛогин: ${resolvedLogin}\nПароль: ${tempPassword}\n\nПередайте пользователю и попросите сменить пароль после первого входа.`,
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -1340,12 +1335,102 @@ async function removeUserRole(req, res, next) {
   }
 }
 
+/**
+ * Выдать существующему admin/manager доступ в клиентское приложение (бот).
+ * Создаёт инвайт-приглашение, привязанное к уже существующему пользователю.
+ * Если активное приглашение уже есть — возвращает его код.
+ */
+async function grantAppAccess(req, res, next) {
+  try {
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({ error: "Доступ запрещён" });
+    }
+
+    const targetUserId = Number(req.params.id);
+    if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
+      return res.status(400).json({ error: "Некорректный ID пользователя" });
+    }
+
+    const user = await userModel.findById(targetUserId);
+    if (!user) {
+      return res.status(404).json({ error: "Пользователь не найден" });
+    }
+
+    const isAdmin = user.roleName === "superadmin" || user.roleName === "manager";
+    if (!isAdmin) {
+      return res.status(422).json({ error: "Сотрудникам доступ выдаётся через обычное приглашение" });
+    }
+
+    if (user.telegramId) {
+      return res.status(422).json({ error: "Пользователь уже подключён к приложению" });
+    }
+
+    // Проверяем существующее активное приглашение
+    const [activeRows] = await pool.query(`SELECT id, code FROM invitations WHERE invited_user_id = ? AND used_by IS NULL ORDER BY id DESC LIMIT 1`, [
+      targetUserId,
+    ]);
+
+    let code;
+    let invitationId;
+
+    if (activeRows.length) {
+      code = activeRows[0].code;
+      invitationId = activeRows[0].id;
+    } else {
+      const employeeRole = await referenceModel.getRoleByName("employee");
+      if (!employeeRole) {
+        return res.status(500).json({ error: "Роль employee не настроена в системе" });
+      }
+
+      // Генерируем уникальный код
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const candidate = generateInviteCode();
+        const [exists] = await pool.query("SELECT id FROM invitations WHERE code = ? AND used_by IS NULL LIMIT 1", [candidate]);
+        if (!exists.length) {
+          code = candidate;
+          break;
+        }
+      }
+      if (!code) {
+        return res.status(500).json({ error: "Не удалось сгенерировать уникальный код" });
+      }
+
+      invitationId = await invitationModel.createInvitation({
+        code,
+        roleId: employeeRole.id,
+        branchId: user.branchId,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phoneE164 || null,
+        positionId: user.positionId || null,
+        createdBy: req.user.id,
+        invitedUserId: targetUserId,
+      });
+    }
+
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "user.app_access_granted",
+      entity: "user",
+      entityId: targetUserId,
+      metadata: { invitationCode: code },
+    });
+
+    const invitation = await invitationModel.findById(invitationId);
+    return res.json({ code, invitation });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   listUsers,
   getUserLoginHistory,
   updateUser,
   deleteUser,
   createUser,
+  grantAppAccess,
   resetPassword,
   getUserById,
   getUserDetailedStats,

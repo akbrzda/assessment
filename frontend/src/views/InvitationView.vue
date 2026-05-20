@@ -82,6 +82,7 @@
             <ArrowRight />
           </button>
           <p class="invitation-actions-hint">После нажатия откроется системный запрос на передачу номера телефона.</p>
+          <div v-if="errorMessage" class="invite-error-banner" role="alert">{{ errorMessage }}</div>
         </div>
       </div>
 
@@ -139,6 +140,7 @@ export default {
     const alreadyRegisteredError = ref(false);
     const confirmDataChecked = ref(false);
     const isRequestingContact = ref(false);
+    const errorMessage = ref("");
     const invitation = computed(() => userStore.invitation);
     const inviteFlow = computed(() => userStore.inviteFlow || { hasInviteCode: false, inviteCodeValid: false, registrationByInvitationOnly: true });
     const isLoading = computed(() => userStore.isLoading);
@@ -167,11 +169,14 @@ export default {
     });
 
     async function acceptInvitation() {
+      errorMessage.value = "";
       if (!invitation.value) {
+        errorMessage.value = "Приглашение недоступно.";
         telegramStore.showAlert("Приглашение недоступно.");
         return;
       }
       if (!confirmDataChecked.value) {
+        errorMessage.value = "Отметьте подтверждение данных, чтобы продолжить.";
         telegramStore.showAlert("Отметьте подтверждение данных, чтобы продолжить.");
         return;
       }
@@ -182,7 +187,9 @@ export default {
           isRequestingContact.value = true;
           contactPayload = await telegramStore.requestContactPayload();
         } catch (contactError) {
-          telegramStore.showAlert(contactError.message || "Чтобы продолжить, нужно поделиться номером телефона.");
+          const msg = contactError.message || "Чтобы продолжить, нужно поделиться номером телефона.";
+          errorMessage.value = msg;
+          telegramStore.showAlert(msg);
           telegramStore.hapticFeedback("notification", "error");
           return;
         } finally {
@@ -194,16 +201,18 @@ export default {
           telegramStore.hapticFeedback("notification", "success");
           router.replace({ name: "dashboard" });
         } else {
-          const errorMsg = result.error || "Ошибка принятия приглашения";
-          if (errorMsg.includes("уже зарегистрирован") || errorMsg.includes("already registered")) {
+          const errMsg = result.error || "Ошибка принятия приглашения";
+          if (errMsg.includes("уже зарегистрирован") || errMsg.includes("already registered")) {
             alreadyRegisteredError.value = true;
           } else {
-            telegramStore.showAlert(errorMsg);
+            errorMessage.value = errMsg;
+            telegramStore.showAlert(errMsg);
           }
           telegramStore.hapticFeedback("notification", "error");
         }
       } catch (error) {
         console.error("Ошибка принятия приглашения", error);
+        errorMessage.value = "Ошибка принятия приглашения";
         telegramStore.showAlert("Ошибка принятия приглашения");
         telegramStore.hapticFeedback("notification", "error");
       }
@@ -237,6 +246,7 @@ export default {
       fullName,
       alreadyRegisteredError,
       confirmDataChecked,
+      errorMessage,
       buttonText,
       acceptInvitation,
     };
@@ -422,6 +432,17 @@ export default {
   margin: 10px 2px 0;
   color: var(--text-secondary);
   font-size: 14px;
+}
+
+.invite-error-banner {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .empty-state {

@@ -12,7 +12,7 @@
       </template>
       <template #actions>
         <Button v-if="canOpenInvitations" icon="user-plus" size="md" variant="secondary" @click="openInviteModal">Пригласить сотрудника</Button>
-        <Button v-if="authStore.isSuperAdmin" icon="plus" size="md" @click="openCreateModal"> Добавить пользователя </Button>
+        <Button v-if="authStore.isSuperAdmin" icon="shield-plus" size="md" @click="openCreateModal">Создать администратора</Button>
         <Button icon="file-chart-column" variant="secondary" size="md" @click="handleExportExcel">Экспорт Excel</Button>
       </template>
     </PageHeader>
@@ -58,9 +58,16 @@
     />
 
     <!-- Create modal -->
-    <Modal :show="showCreateModal" title="Создать пользователя" @close="closeModals">
-      <UserForm v-model="formData" :references="references" :current-user-role="authStore.user?.role" :current-user-id="authStore.user?.id" />
-      <p class="create-hint">Логин будет автоматически сформирован из фамилии и первой буквы имени. Пароль будет сгенерирован автоматически.</p>
+    <Modal :show="showCreateModal" title="Создать аккаунт администратора" @close="closeModals">
+      <p class="create-context-hint">Создаёт аккаунт для входа в панель управления. Сотрудников приглашайте через «Пригласить сотрудника».</p>
+      <UserForm
+        v-model="formData"
+        :references="references"
+        :current-user-role="authStore.user?.role"
+        :current-user-id="authStore.user?.id"
+        :admin-only="true"
+      />
+      <p class="create-hint">Логин будет сформирован из фамилии и первой буквы имени. Пароль будет сгенерирован автоматически.</p>
       <div class="modal-actions">
         <Button variant="secondary" @click="closeModals">Отмена</Button>
         <Button :loading="actionLoading" @click="handleCreate">Создать</Button>
@@ -386,7 +393,7 @@ const userTabs = computed(() => [
   { key: "superadmin", label: "Суперадмины", count: stats.value.superadmin },
   { key: "manager", label: "Управляющие", count: stats.value.manager },
   { key: "employee", label: "Сотрудники", count: stats.value.employee },
-  { key: "awaiting", label: "Ожидают приглашения", count: stats.value.awaiting },
+  { key: "awaiting", label: "Ожидают активации", count: stats.value.awaiting },
 ]);
 
 const userTabsConfig = computed(() => userTabs.value.map((t) => ({ value: t.key, label: t.label, badge: t.count })));
@@ -616,13 +623,15 @@ const handleInviteCreate = async () => {
 };
 
 const copyInviteLink = async (value = "") => {
-  const text = value || [
-    inviteLinks.value.telegramLink ? `Telegram: ${inviteLinks.value.telegramLink}` : "",
-    inviteLinks.value.maxLink ? `MAX: ${inviteLinks.value.maxLink}` : "",
-    !inviteLinks.value.telegramLink && !inviteLinks.value.maxLink ? inviteLinks.value.fallbackCode : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const text =
+    value ||
+    [
+      inviteLinks.value.telegramLink ? `Telegram: ${inviteLinks.value.telegramLink}` : "",
+      inviteLinks.value.maxLink ? `MAX: ${inviteLinks.value.maxLink}` : "",
+      !inviteLinks.value.telegramLink && !inviteLinks.value.maxLink ? inviteLinks.value.fallbackCode : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
 
   if (!text) return;
   try {
@@ -825,36 +834,26 @@ const validateForm = () => {
 const handleCreate = async () => {
   if (!validateForm()) return;
 
-  const autoLogin = formData.value.login?.trim() || generateLogin(formData.value.lastName, formData.value.firstName);
-  const autoPassword = formData.value.password?.trim() || generatePasswordFromForm();
-
   actionLoading.value = true;
   try {
     const safeFirstName = formData.value.firstName.trim();
     const safeLastName = formData.value.lastName.trim();
 
-    await createUser({
+    const result = await createUser({
       firstName: safeFirstName,
       lastName: safeLastName,
       branchId: Number(formData.value.branchId),
       positionId: Number(formData.value.positionId),
       roleId: Number(formData.value.roleId),
-      login: autoLogin || undefined,
-      password: autoPassword,
+      login: formData.value.login?.trim() || undefined,
     });
-
-    const credentialsMessage = [
-      `Логин: ${autoLogin || "—"}`,
-      `Пароль: ${autoPassword || "—"}`,
-      `Ссылка на админ-панель: ${getAdminPanelLink()}`,
-    ].join("\n");
 
     await loadUsers();
     createdCredentials.value = {
       name: `${safeLastName} ${safeFirstName}`,
-      login: autoLogin,
-      password: autoPassword,
-      message: credentialsMessage,
+      login: result?.credentials?.login || "—",
+      password: result?.credentials?.password || "—",
+      message: result?.credentials?.message || `Логин: ${result?.credentials?.login || "—"}\nПароль: ${result?.credentials?.password || "—"}`,
     };
     closeModals();
     showToast("Пользователь создан", "success");
@@ -1453,5 +1452,15 @@ onMounted(async () => {
   font-size: 13px;
   color: var(--text-secondary);
   margin: 12px 0 0;
+}
+
+.create-context-hint {
+  font-size: 13px;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0 0 12px;
 }
 </style>

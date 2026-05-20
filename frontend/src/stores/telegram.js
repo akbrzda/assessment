@@ -100,12 +100,7 @@ function extractWebAppDataFromUrl() {
   }
 
   const params = getLocationParams();
-  const rawValue =
-    params.get("WebAppData") ||
-    params.get("webAppData") ||
-    params.get("webapp_data") ||
-    params.get("initData") ||
-    "";
+  const rawValue = params.get("WebAppData") || params.get("webAppData") || params.get("webapp_data") || params.get("initData") || "";
   if (!rawValue) {
     return "";
   }
@@ -129,8 +124,8 @@ function hasMaxUrlInitData() {
         params.get("webAppData") ||
         params.get("webapp_data") ||
         params.get("initData") ||
-        ""
-    ).trim()
+        "",
+    ).trim(),
   );
 }
 
@@ -291,7 +286,7 @@ export const useTelegramStore = defineStore("telegram", () => {
     }
 
     const telegramWebApp = window.Telegram?.WebApp || null;
-    const maxWebApp = (window.MAX?.WebApp || window.Max?.WebApp || window.WebApp || null);
+    const maxWebApp = window.MAX?.WebApp || window.Max?.WebApp || window.WebApp || null;
 
     // В MAX окружении иногда присутствует Telegram.WebApp shim без initData.
     // В этом случае выбираем MAX runtime, если в нем есть auth-контекст.
@@ -517,7 +512,15 @@ export const useTelegramStore = defineStore("telegram", () => {
     }
 
     const timeoutMs = 10000;
-    const CONTACT_EVENT_NAMES = ["contactRequested", "contact_requested", "phoneRequested", "phone_requested", "custom_method_invoked", "web_app_method_invoked", "WebAppRequestPhone"];
+    const CONTACT_EVENT_NAMES = [
+      "contactRequested",
+      "contact_requested",
+      "phoneRequested",
+      "phone_requested",
+      "custom_method_invoked",
+      "web_app_method_invoked",
+      "WebAppRequestPhone",
+    ];
 
     const phoneFromRequest = await new Promise((resolve, reject) => {
       let resolved = false;
@@ -639,7 +642,8 @@ export const useTelegramStore = defineStore("telegram", () => {
     }
 
     const canUseNativeAlert = telegramApp && (getClientPlatform() !== "telegram" || isAtLeastVersion(telegramApp.version, 6, 2));
-    if (canUseNativeAlert && telegramApp?.showAlert) {
+    // Для MAX SDK нативный showAlert ненадёжен (no-op без callback) — используем window.alert напрямую
+    if (canUseNativeAlert && telegramApp?.showAlert && getClientPlatform() !== "max") {
       try {
         telegramApp.showAlert(safeMessage);
         return;

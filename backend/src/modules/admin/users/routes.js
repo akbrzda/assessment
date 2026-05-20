@@ -6,10 +6,7 @@ const canEditUser = require("../../../middleware/canEditUser");
 const { requirePermission } = require("../../../middleware/permission");
 const UserPolicy = require("../../../policies/UserPolicy");
 const { pool } = require("../../../config/database");
-const {
-  cacheMiddleware,
-  invalidateCacheMiddleware,
-} = require("../../../middleware/cache");
+const { cacheMiddleware, invalidateCacheMiddleware } = require("../../../middleware/cache");
 const usersController = require("./controller");
 
 const router = express.Router();
@@ -74,24 +71,12 @@ router.post(
   invalidateCacheMiddleware(/^http:GET:.*\/api\/admin\/users/),
   usersController.bulkTransferBranch,
 );
-router.post(
-  "/bulk/export",
-  verifyAdminRole(["superadmin", "manager"]),
-  usersController.bulkExportUsers,
-);
+router.post("/bulk/export", verifyAdminRole(["superadmin", "manager"]), usersController.bulkExportUsers);
 router.get("/:id/stats", cacheMiddleware({ ttl: 120 }), usersController.getUserDetailedStats);
 router.get("/:id/courses", cacheMiddleware({ ttl: 120 }), usersController.getUserCourses);
 router.get("/:id/permissions", requirePermission("users", "user", "read"), usersController.getPermissions);
-router.post(
-  "/:id/permissions/override",
-  requirePermission("users", "user", "update"),
-  usersController.setPermissionOverride,
-);
-router.delete(
-  "/:id/permissions/override/:overrideId",
-  requirePermission("users", "user", "update"),
-  usersController.deletePermissionOverride,
-);
+router.post("/:id/permissions/override", requirePermission("users", "user", "update"), usersController.setPermissionOverride);
+router.delete("/:id/permissions/override/:overrideId", requirePermission("users", "user", "update"), usersController.deletePermissionOverride);
 router.post("/:id/roles", requirePermission("users", "user", "update"), usersController.addUserRole);
 router.delete("/:id/roles/:roleId", requirePermission("users", "user", "update"), usersController.removeUserRole);
 router.get("/:id", requirePermission("users", "user", "read"), cacheMiddleware({ ttl: 120 }), usersController.getUserById);
@@ -107,9 +92,7 @@ router.patch(
   loadUserForPolicy,
   ensureUserUpdatePolicy,
   canEditUser,
-  invalidateCacheMiddleware(
-    (req) => new RegExp(`^http:GET:.*\/api\/admin\/(users|assessments)(\/|\\?|$)`),
-  ),
+  invalidateCacheMiddleware((req) => new RegExp(`^http:GET:.*\/api\/admin\/(users|assessments)(\/|\\?|$)`)),
   usersController.updateUser,
 );
 router.delete(
@@ -121,12 +104,11 @@ router.delete(
   usersController.deleteUser,
 );
 router.post("/:id/reset-password", canEditUser, usersController.resetPassword);
+router.post("/:id/grant-app-access", verifyAdminRole(["superadmin"]), usersController.grantAppAccess);
 router.delete(
   "/:userId/assessments/:assessmentId/progress",
   verifyAdminRole(["superadmin"]),
-  invalidateCacheMiddleware(
-    (req) => new RegExp(`^http:GET:.*\/api\/admin\/users\/${req.params.userId}`),
-  ),
+  invalidateCacheMiddleware((req) => new RegExp(`^http:GET:.*\/api\/admin\/users\/${req.params.userId}`)),
   usersController.resetAssessmentProgress,
 );
 

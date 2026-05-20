@@ -4,9 +4,7 @@
       <div class="registration-card">
         <div class="welcome-section">
           <h1 class="title-large mb-8">Вход в систему</h1>
-          <p class="body-medium text-secondary">
-            Подтвердите номер телефона. Если номер уже есть в системе, мы автоматически подключим ваш профиль.
-          </p>
+          <p class="body-medium text-secondary">Подтвердите номер телефона. Если номер уже есть в системе, мы автоматически подключим ваш профиль.</p>
         </div>
 
         <div class="registration-actions">
@@ -14,6 +12,8 @@
             {{ buttonText }}
           </button>
         </div>
+
+        <div v-if="errorMessage" class="error-banner" role="alert">{{ errorMessage }}</div>
 
         <p class="body-small text-secondary help-text">Если номер не найден, понадобится персональная ссылка-приглашение от администратора.</p>
       </div>
@@ -34,6 +34,7 @@ export default {
     const telegramStore = useTelegramStore();
     const userStore = useUserStore();
     const isRequestingContact = ref(false);
+    const errorMessage = ref("");
 
     const isLoading = computed(() => userStore.isLoading);
     const buttonText = computed(() => {
@@ -47,12 +48,15 @@ export default {
     });
 
     async function handlePhoneVerification() {
+      errorMessage.value = "";
       let contactPayload = null;
       try {
         isRequestingContact.value = true;
         contactPayload = await telegramStore.requestContactPayload();
       } catch (contactError) {
-        telegramStore.showAlert(contactError.message || "Не удалось подтвердить номер телефона");
+        const msg = contactError.message || "Не удалось подтвердить номер телефона";
+        errorMessage.value = msg;
+        telegramStore.showAlert(msg);
         telegramStore.hapticFeedback("notification", "error");
         return;
       } finally {
@@ -67,7 +71,9 @@ export default {
         return;
       }
 
-      telegramStore.showAlert(result.error || "Профиль не найден. Запросите ссылку-приглашение у администратора.");
+      const msg = result.error || "Профиль не найден. Запросите ссылку-приглашение у администратора.";
+      errorMessage.value = msg;
+      telegramStore.showAlert(msg);
       telegramStore.hapticFeedback("notification", "error");
     }
 
@@ -84,6 +90,7 @@ export default {
     return {
       isLoading,
       isRequestingContact,
+      errorMessage,
       buttonText,
       handlePhoneVerification,
     };
@@ -111,6 +118,17 @@ export default {
 
 .help-text {
   margin-top: 12px;
+  text-align: center;
+}
+
+.error-banner {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.5;
   text-align: center;
 }
 

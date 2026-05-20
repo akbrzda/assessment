@@ -52,7 +52,7 @@
 
     <Select
       v-model.number="localData.roleId"
-      label="Роль"
+      :label="props.adminOnly ? 'Роль в панели управления' : 'Роль'"
       :options="roleOptions"
       placeholder="Выберите роль"
       required
@@ -102,6 +102,10 @@ const props = defineProps({
   currentUserRole: {
     type: String,
     default: "",
+  },
+  adminOnly: {
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -219,10 +223,12 @@ const positionOptions = computed(() => [
 
 const roleOptions = computed(() => [
   { value: "", label: "Выберите роль" },
-  ...(props.references?.roles || []).map((role) => ({
-    value: role.id,
-    label: role.name,
-  })),
+  ...(props.references?.roles || [])
+    .filter((role) => !props.adminOnly || role.name !== "employee")
+    .map((role) => ({
+      value: role.id,
+      label: role.name,
+    })),
 ]);
 
 const isSelfEdit = computed(() => props.isEdit && Number(localData.value.id) > 0 && Number(props.currentUserId) === Number(localData.value.id));
