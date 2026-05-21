@@ -13,7 +13,18 @@ for (const filename of envFiles) {
   }
 }
 
-const requiredVars = ["PORT", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "BOT_TOKEN", "JWT_SECRET", "JWT_REFRESH_SECRET", "INTERNAL_API_SECRET"];
+const requiredVars = [
+  "PORT",
+  "DB_HOST",
+  "DB_PORT",
+  "DB_NAME",
+  "DB_USER",
+  "DB_PASSWORD",
+  "BOT_TOKEN",
+  "JWT_SECRET",
+  "JWT_REFRESH_SECRET",
+  "INTERNAL_API_SECRET",
+];
 
 const missingVars = requiredVars.filter((key) => !process.env[key]);
 
@@ -48,6 +59,16 @@ module.exports = {
     password: process.env.DB_PASSWORD,
     connectTimeoutMs: Number(process.env.DB_CONNECT_TIMEOUT_MS || 10000),
   },
+  dbReplica: process.env.DB_REPLICA_HOST
+    ? {
+        host: process.env.DB_REPLICA_HOST,
+        port: Number(process.env.DB_REPLICA_PORT || process.env.DB_PORT || 3306),
+        database: process.env.DB_NAME,
+        user: process.env.DB_REPLICA_USER || process.env.DB_USER,
+        password: process.env.DB_REPLICA_PASSWORD || process.env.DB_PASSWORD,
+        connectTimeoutMs: Number(process.env.DB_CONNECT_TIMEOUT_MS || 10000),
+      }
+    : null,
   botToken: process.env.BOT_TOKEN,
   internalApiSecret: process.env.INTERNAL_API_SECRET || "",
   maxBotToken: process.env.MAX_BOT_TOKEN || process.env.BOT_TOKEN,

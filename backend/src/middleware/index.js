@@ -1,6 +1,7 @@
 const cache = require("./cache");
 const canEditUser = require("./canEditUser");
 const checkModuleAccess = require("./checkModuleAccess");
+const correlationId = require("./correlationId");
 const errorHandler = require("./errorHandler");
 const permission = require("./permission");
 const requireCourseFinalAssessmentAccess = require("./requireCourseFinalAssessmentAccess");
@@ -15,6 +16,7 @@ module.exports = {
   cache,
   canEditUser,
   checkModuleAccess,
+  correlationId,
   errorHandler,
   permission,
   requireCourseFinalAssessmentAccess,

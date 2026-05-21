@@ -23,3 +23,24 @@ const telegramStore = useTelegramStore();
 telegramStore.initTelegram();
 
 app.mount("#app");
+
+// Регистрируем Service Worker для offline-кэширования и retry queue
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {
+    // SW не поддерживается в текущем окружении — продолжаем без него
+  });
+
+  // При восстановлении сети просим SW отправить накопленную очередь
+  window.addEventListener("online", () => {
+    navigator.serviceWorker.ready
+      .then((reg) => {
+        if (reg.sync) {
+          reg.sync.register("retry-queue").catch(() => {});
+        } else {
+          // Fallback если Background Sync API недоступен
+          reg.active?.postMessage({ type: "FLUSH_RETRY_QUEUE" });
+        }
+      })
+      .catch(() => {});
+  });
+}

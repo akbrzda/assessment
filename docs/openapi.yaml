@@ -1,0 +1,845 @@
+openapi: 3.1.0
+info:
+  title: Assessment Platform API
+  description: |
+    API платформы аттестации сотрудников.
+
+    Аутентификация:
+    - **MiniApp** (Telegram Web App): передаётся `initData` в заголовке `X-Init-Data`.
+    - **Admin** (сессия): cookie `accessToken` + `refreshToken`; JWT, выдаваемый при `/api/admin/auth/login`.
+
+    Все даты — ISO 8601 (UTC).
+  version: 1.0.0
+  contact:
+    name: Команда разработки
+
+servers:
+  - url: /api
+    description: Основной сервер
+
+tags:
+  - name: Аутентификация (MiniApp)
+    description: Вход и профиль пользователя через Telegram MiniApp
+  - name: Аутентификация (Admin)
+    description: Вход и токены для администраторов
+  - name: Курсы (MiniApp)
+    description: Просмотр и прохождение курсов пользователем
+  - name: Курсы (Admin)
+    description: Управление курсами администратором
+  - name: Сертификаты
+    description: Получение и верификация сертификатов
+  - name: Аналитика (Admin)
+    description: Аналитические данные и отчёты
+
+# ─────────────────────────────────────────────
+# PATHS
+# ─────────────────────────────────────────────
+paths:
+  # ── Auth: MiniApp ──────────────────────────
+  /auth/status:
+    post:
+      summary: Статус пользователя (MiniApp)
+      tags: [Аутентификация (MiniApp)]
+      security:
+        - initData: []
+      responses:
+        "200":
+          description: Статус и данные пользователя
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/register:
+    post:
+      summary: Регистрация / первичный вход (MiniApp)
+      tags: [Аутентификация (MiniApp)]
+      security:
+        - initData: []
+      responses:
+        "200":
+          description: Пользователь создан или уже существует
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/profile:
+    get:
+      summary: Профиль текущего пользователя (MiniApp)
+      tags: [Аутентификация (MiniApp)]
+      security:
+        - initData: []
+      responses:
+        "200":
+          description: Данные профиля
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      summary: Обновление профиля (MiniApp)
+      tags: [Аутентификация (MiniApp)]
+      security:
+        - initData: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+      responses:
+        "200":
+          description: Обновлённый профиль
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Auth: Admin ────────────────────────────
+  /admin/auth/login:
+    post:
+      summary: Вход администратора
+      tags: [Аутентификация (Admin)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login, password]
+              properties:
+                login:
+                  type: string
+                  example: admin@company.ru
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Успешный вход; куки accessToken и refreshToken устанавливаются
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAuthResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /admin/auth/refresh:
+    post:
+      summary: Обновление access-токена
+      tags: [Аутентификация (Admin)]
+      responses:
+        "200":
+          description: Новый access-токен в куке
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /admin/auth/logout:
+    post:
+      summary: Выход администратора
+      tags: [Аутентификация (Admin)]
+      security:
+        - cookieAuth: []
+      responses:
+        "204":
+          description: Сессия завершена
+
+  # ── Courses: MiniApp ───────────────────────
+  /courses:
+    get:
+      summary: Список доступных курсов (MiniApp)
+      tags: [Курсы (MiniApp)]
+      security:
+        - initData: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [assigned, in_progress, completed]
+      responses:
+        "200":
+          description: Список курсов с прогрессом
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  courses:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CourseListItem"
+                  total:
+                    type: integer
+
+  /courses/{courseId}:
+    get:
+      summary: Детали курса (MiniApp)
+      tags: [Курсы (MiniApp)]
+      security:
+        - initData: []
+      parameters:
+        - $ref: "#/components/parameters/CourseIdParam"
+      responses:
+        "200":
+          description: Полный объект курса
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /courses/{id}/start:
+    post:
+      summary: Начать прохождение курса
+      tags: [Курсы (MiniApp)]
+      security:
+        - initData: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Прогресс создан / уже существует
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /courses/{id}/progress:
+    get:
+      summary: Прогресс пользователя по курсу
+      tags: [Курсы (MiniApp)]
+      security:
+        - initData: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Объект прогресса
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseProgress"
+
+  /courses/{courseId}/topics/{topicId}/start:
+    post:
+      summary: Начать тему курса
+      tags: [Курсы (MiniApp)]
+      security:
+        - initData: []
+      parameters:
+        - $ref: "#/components/parameters/CourseIdParam"
+        - $ref: "#/components/parameters/TopicIdParam"
+      responses:
+        "200":
+          description: Тема открыта
+
+  /courses/{courseId}/topics/{topicId}/complete:
+    post:
+      summary: Завершить тему курса
+      tags: [Курсы (MiniApp)]
+      security:
+        - initData: []
+      parameters:
+        - $ref: "#/components/parameters/CourseIdParam"
+        - $ref: "#/components/parameters/TopicIdParam"
+      responses:
+        "200":
+          description: Тема отмечена завершённой
+
+  # ── Courses: Admin ─────────────────────────
+  /admin/courses:
+    get:
+      summary: Список курсов (Admin)
+      tags: [Курсы (Admin)]
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, closed]
+      responses:
+        "200":
+          description: Список курсов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  courses:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CourseListItem"
+                  total:
+                    type: integer
+
+    post:
+      summary: Создать курс
+      tags: [Курсы (Admin)]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseCreate"
+      responses:
+        "201":
+          description: Курс создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseDetail"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /admin/courses/{id}:
+    get:
+      summary: Детали курса (Admin)
+      tags: [Курсы (Admin)]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Полный объект курса
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      summary: Обновить курс
+      tags: [Курсы (Admin)]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseCreate"
+      responses:
+        "200":
+          description: Курс обновлён
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      summary: Удалить курс
+      tags: [Курсы (Admin)]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Удалено
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Certificates ───────────────────────────
+  /certificates/my:
+    get:
+      summary: Мои сертификаты (MiniApp)
+      tags: [Сертификаты]
+      security:
+        - initData: []
+      responses:
+        "200":
+          description: Список сертификатов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  certificates:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Certificate"
+
+  /certificates/{uuid}:
+    get:
+      summary: Публичная верификация сертификата
+      tags: [Сертификаты]
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Данные сертификата (публично)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Certificate"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /certificates/{uuid}/download:
+    get:
+      summary: Скачать PDF сертификата
+      tags: [Сертификаты]
+      security:
+        - initData: []
+        - cookieAuth: []
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: PDF-файл сертификата
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/certificates:
+    get:
+      summary: Список всех сертификатов (Admin)
+      tags: [Сертификаты]
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Список сертификатов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  certificates:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Certificate"
+                  total:
+                    type: integer
+
+  /admin/certificates/issue:
+    post:
+      summary: Выдать сертификат
+      tags: [Сертификаты]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, courseId]
+              properties:
+                userId:
+                  type: integer
+                courseId:
+                  type: integer
+      responses:
+        "201":
+          description: Сертификат выдан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Certificate"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  # ── Analytics: Admin ───────────────────────
+  /admin/analytics/overall:
+    get:
+      summary: Общая статистика (Admin)
+      tags: [Аналитика (Admin)]
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/DateFromParam"
+        - $ref: "#/components/parameters/DateToParam"
+        - name: branchId
+          in: query
+          schema:
+            type: integer
+        - name: positionId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Агрегированные показатели
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsOverall"
+
+  /admin/analytics/branches:
+    get:
+      summary: Аналитика по филиалам
+      tags: [Аналитика (Admin)]
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/DateFromParam"
+        - $ref: "#/components/parameters/DateToParam"
+      responses:
+        "200":
+          description: Разбивка по филиалам
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  branches:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BranchAnalytics"
+
+# ─────────────────────────────────────────────
+# COMPONENTS
+# ─────────────────────────────────────────────
+components:
+  securitySchemes:
+    initData:
+      type: apiKey
+      in: header
+      name: X-Init-Data
+      description: Telegram initData (подпись WebApp)
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: accessToken
+      description: JWT access-токен администратора в HttpOnly cookie
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    CourseIdParam:
+      name: courseId
+      in: path
+      required: true
+      schema:
+        type: integer
+    TopicIdParam:
+      name: topicId
+      in: path
+      required: true
+      schema:
+        type: integer
+    DateFromParam:
+      name: dateFrom
+      in: query
+      schema:
+        type: string
+        format: date
+        example: "2026-01-01"
+    DateToParam:
+      name: dateTo
+      in: query
+      schema:
+        type: string
+        format: date
+        example: "2026-12-31"
+
+  responses:
+    Unauthorized:
+      description: Не авторизован
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationError:
+      description: Ошибка валидации входных данных
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+    TooManyRequests:
+      description: Превышен лимит запросов
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+        validationErrors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    AuthStatus:
+      type: object
+      properties:
+        registered:
+          type: boolean
+        user:
+          $ref: "#/components/schemas/UserProfile"
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+          enum: [employee, manager, admin, superadmin]
+        branchId:
+          type: integer
+          nullable: true
+        positionId:
+          type: integer
+          nullable: true
+        timezone:
+          type: string
+          example: Europe/Moscow
+
+    AdminAuthResult:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+            login:
+              type: string
+            role:
+              type: string
+
+    CourseListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        status:
+          type: string
+          enum: [draft, published, closed]
+        progressPercent:
+          type: number
+          nullable: true
+        coverUrl:
+          type: string
+          nullable: true
+
+    CourseDetail:
+      allOf:
+        - $ref: "#/components/schemas/CourseListItem"
+        - type: object
+          properties:
+            description:
+              type: string
+              nullable: true
+            sections:
+              type: array
+              items:
+                $ref: "#/components/schemas/CourseSection"
+
+    CourseSection:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        order:
+          type: integer
+        topics:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseTopic"
+
+    CourseTopic:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        order:
+          type: integer
+        isOptional:
+          type: boolean
+        completed:
+          type: boolean
+
+    CourseCreate:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published, closed]
+          default: draft
+
+    CourseProgress:
+      type: object
+      properties:
+        courseId:
+          type: integer
+        progressPercent:
+          type: number
+        status:
+          type: string
+          enum: [not_started, in_progress, completed]
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    Certificate:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        userId:
+          type: integer
+        courseId:
+          type: integer
+        courseTitle:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+        downloadUrl:
+          type: string
+
+    AnalyticsOverall:
+      type: object
+      properties:
+        stats:
+          type: object
+          properties:
+            totalAttempts:
+              type: integer
+            uniqueUsers:
+              type: integer
+            passedCount:
+              type: integer
+            avgScore:
+              type: number
+              nullable: true
+
+    BranchAnalytics:
+      type: object
+      properties:
+        branchId:
+          type: integer
+        branchName:
+          type: string
+        totalUsers:
+          type: integer
+        completedCount:
+          type: integer
+        avgProgress:
+          type: number

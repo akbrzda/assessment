@@ -14,12 +14,11 @@ function isTransientDbError(err) {
 }
 
 function errorHandler(err, req, res, next) {
-  logger.error("Unhandled error: %s", err.stack || err.message);
+  const correlationId = req.correlationId || "-";
+  logger.error("Unhandled error: %s", err.stack || err.message, { correlationId, method: req.method, url: req.originalUrl });
   const derivedStatus = isTransientDbError(err) ? 503 : 500;
   const status = err.status || derivedStatus;
-  const message = status === 500
-    ? "Internal Server Error"
-    : (status === 503 ? "Service Unavailable" : err.message);
+  const message = status === 500 ? "Internal Server Error" : status === 503 ? "Service Unavailable" : err.message;
   const payload = { error: message };
   if (err.code && status !== 500) {
     payload.code = err.code;

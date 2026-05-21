@@ -5,6 +5,7 @@ const cookieParser = require("cookie-parser");
 const path = require("path");
 const config = require("./config/env");
 const { errorHandler, timezone: timezoneMiddleware } = require("./middleware");
+const correlationId = require("./middleware/correlationId");
 const verifyJWT = require("./middleware/verifyJWT");
 const { verifyCertificateLimiter, authLimiter, adminGlobalLimiter } = require("./middleware/rateLimit");
 
@@ -68,6 +69,7 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
+app.use(correlationId);
 
 // Защита от индексации поисковыми системами
 app.use((req, res, next) => {

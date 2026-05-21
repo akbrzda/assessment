@@ -5,7 +5,7 @@ const DEFAULT_CONNECT_TIMEOUT_MS = 10000;
 const connectTimeout =
   Number.isFinite(config.db.connectTimeoutMs) && config.db.connectTimeoutMs > 0 ? config.db.connectTimeoutMs : DEFAULT_CONNECT_TIMEOUT_MS;
 
-const pool = mysql.createPool({
+const poolConfig = {
   host: config.db.host,
   port: config.db.port,
   user: config.db.user,
@@ -19,7 +19,42 @@ const pool = mysql.createPool({
   keepAliveInitialDelay: 30000,
   dateStrings: true,
   timezone: "Z",
-});
+};
+
+const pool = mysql.createPool(poolConfig);
+
+// Read-replica pool: если DB_REPLICA_HOST не задан — используем primary как fallback
+let replicaPool;
+if (config.dbReplica) {
+  replicaPool = mysql.createPool({
+    ...poolConfig,
+    host: config.dbReplica.host,
+    port: config.dbReplica.port,
+    user: config.dbReplica.user,
+    password: config.dbReplica.password,
+    connectionLimit: 10,
+    connectTimeout: config.dbReplica.connectTimeoutMs,
+  });
+} else {
+  replicaPool = pool;
+}
+
+/**
+ * Возвращает replica pool для аналитических (read-only) запросов.
+ * При недоступности реплики автоматически падает обратно на primary.
+ */
+async function getReadPool() {
+  if (replicaPool === pool) {
+    return pool;
+  }
+  try {
+    const conn = await replicaPool.getConnection();
+    conn.release();
+    return replicaPool;
+  } catch {
+    return pool;
+  }
+}
 
 // Коды временных сетевых ошибок, при которых стоит повторить попытку
 const TRANSIENT_DB_CODES = new Set([
@@ -56,5 +91,7 @@ async function healthCheck({ retries = 5, delayMs = 2000 } = {}) {
 
 module.exports = {
   pool,
+  replicaPool,
+  getReadPool,
   healthCheck,
 };

@@ -1,9 +1,6 @@
 const authService = require("./service");
-const {
-  validateProfilePayload,
-  validateRegistrationPayload,
-  validateTimezonePayload,
-} = require("./validators");
+const { validateProfilePayload, validateRegistrationPayload, validateTimezonePayload } = require("./validators");
+const logger = require("../../../utils/logger");
 
 function handleKnownError(error, res, next) {
   if (error.status) {
@@ -41,6 +38,12 @@ async function register(req, res, next) {
     const result = await authService.register(createAuthContext(req), payload);
     res.status(201).json(result);
   } catch (error) {
+    logger.warn("[auth-flow] register:error", {
+      platform: req.clientPlatform || null,
+      status: error.status || 500,
+      message: error.message,
+      bodyKeys: Object.keys(req.body || {}),
+    });
     handleKnownError(error, res, next);
   }
 }

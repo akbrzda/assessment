@@ -32,12 +32,13 @@
 
 ### Инженерные регламенты
 
-| Файл                                                           | Содержание                                                               | Аудитория             |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------ | --------------------- |
-| [engineering/architecture.md](engineering/architecture.md)     | Архитектурный регламент: MVC + Layered, структура модулей, правила слоёв | Все разработчики      |
-| [engineering/api-guidelines.md](engineering/api-guidelines.md) | REST API регламент: структура URL, HTTP-методы, версионирование, ответы  | Backend-разработчики  |
-| [engineering/code-standards.md](engineering/code-standards.md) | Стандарты кода: принципы, ограничения размера, именование, async         | Все разработчики      |
-| [engineering/components.md](engineering/components.md)         | Базовые правила и описание UI-компонентов (включая PermissionMatrix API) | Frontend-разработчики |
+| Файл                                                           | Содержание                                                                | Аудитория             |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------- |
+| [engineering/architecture.md](engineering/architecture.md)     | Архитектурный регламент: MVC + Layered, структура модулей, правила слоёв  | Все разработчики      |
+| [engineering/api-guidelines.md](engineering/api-guidelines.md) | REST API регламент: структура URL, HTTP-методы, версионирование, ответы   | Backend-разработчики  |
+| [engineering/code-standards.md](engineering/code-standards.md) | Стандарты кода: принципы, ограничения размера, именование, async          | Все разработчики      |
+| [engineering/components.md](engineering/components.md)         | Базовые правила и описание UI-компонентов (включая PermissionMatrix API)  | Frontend-разработчики |
+| **[openapi.yaml](openapi.yaml)**                               | **OpenAPI 3.1 спецификация API** (auth, courses, certificates, analytics) | Все разработчики      |
 
 ### Мета-документы и аудит
 

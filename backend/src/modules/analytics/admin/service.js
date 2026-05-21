@@ -1,4 +1,4 @@
-const { pool } = require("../../../config/database");
+﻿const { pool, getReadPool } = require("../../../config/database");
 const ExcelJS = require("exceljs");
 const PDFDocument = require("pdfkit");
 
@@ -43,7 +43,9 @@ exports.getOverallStats = async (req, res, next) => {
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
-    const [stats] = await pool.query(
+    const [stats] = await (
+      await getReadPool()
+    ).query(
       `
       SELECT 
         COUNT(DISTINCT cup.id) as total_attempts,
@@ -91,7 +93,9 @@ exports.getBranchAnalytics = async (req, res, next) => {
 
     const attemptConditionsSql = attemptConditions.length > 0 ? ` AND ${attemptConditions.join(" AND ")}` : "";
 
-    const [branches] = await pool.query(
+    const [branches] = await (
+      await getReadPool()
+    ).query(
       `
       SELECT 
         b.id,
@@ -157,7 +161,9 @@ exports.getPositionAnalytics = async (req, res, next) => {
 
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
 
-    const [positions] = await pool.query(
+    const [positions] = await (
+      await getReadPool()
+    ).query(
       `
       SELECT 
         p.id,
@@ -224,7 +230,9 @@ exports.getTopUsers = async (req, res, next) => {
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
-    const [users] = await pool.query(
+    const [users] = await (
+      await getReadPool()
+    ).query(
       `
       SELECT 
         u.id,
@@ -289,7 +297,9 @@ exports.getAssessmentTrends = async (req, res, next) => {
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
-    const [trends] = await pool.query(
+    const [trends] = await (
+      await getReadPool()
+    ).query(
       `
       SELECT 
         DATE(cup.completed_at) as date,
@@ -353,7 +363,9 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
 
     const attemptConditionsSql = attemptConditions.length > 0 ? ` AND ${attemptConditions.join(" AND ")}` : "";
 
-    const [branches] = await pool.query(
+    const [branches] = await (
+      await getReadPool()
+    ).query(
       `
       SELECT 
         b.id,
@@ -380,7 +392,9 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
       branches.map(async (branch) => {
         if (branch.total_attempts > 0) {
           // Получаем медиану
-          const [medianResult] = await pool.query(
+          const [medianResult] = await (
+            await getReadPool()
+          ).query(
             `
             SELECT cup.progress_percent
             FROM course_user_progress cup
@@ -452,7 +466,9 @@ exports.getCombinedAnalytics = async (req, res, next) => {
 
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
 
-    const [combined] = await pool.query(
+    const [combined] = await (
+      await getReadPool()
+    ).query(
       `
       SELECT 
         b.id as branch_id,
@@ -493,7 +509,9 @@ exports.getAssessmentReport = async (req, res, next) => {
 
     // Для совместимости роут оставляем прежним, но считаем отчет по курсу.
     const courseId = Number(assessmentId);
-    const [courses] = await pool.query(
+    const [courses] = await (
+      await getReadPool()
+    ).query(
       `
     SELECT 
       c.id,
@@ -516,9 +534,11 @@ exports.getAssessmentReport = async (req, res, next) => {
 
     // Проверка прав доступа по филиалу для manager
     if (userRole === "manager") {
-      const [managerRows] = await pool.query("SELECT branch_id FROM users WHERE id = ?", [userId]);
+      const [managerRows] = await (await getReadPool()).query("SELECT branch_id FROM users WHERE id = ?", [userId]);
       const managerBranchId = managerRows?.[0]?.branch_id;
-      const [courseBranches] = await pool.query(
+      const [courseBranches] = await (
+        await getReadPool()
+      ).query(
         `
         SELECT DISTINCT u.branch_id
         FROM course_user_progress cup
@@ -536,7 +556,9 @@ exports.getAssessmentReport = async (req, res, next) => {
     }
 
     // Участники с прогрессом по курсу
-    const [participants] = await pool.query(
+    const [participants] = await (
+      await getReadPool()
+    ).query(
       `
       SELECT 
         u.id,
@@ -595,7 +617,9 @@ exports.getUserReport = async (req, res, next) => {
 
     // Получаем информацию о пользователе
     let users;
-    [users] = await pool.query(
+    [users] = await (
+      await getReadPool()
+    ).query(
       `
       SELECT
         u.*,
@@ -619,7 +643,7 @@ exports.getUserReport = async (req, res, next) => {
 
     // Проверка прав доступа
     if (userRole === "manager") {
-      const [userBranch] = await pool.query("SELECT branch_id FROM users WHERE id = ?", [userId]);
+      const [userBranch] = await (await getReadPool()).query("SELECT branch_id FROM users WHERE id = ?", [userId]);
       const managerBranchId = userBranch[0]?.branch_id;
 
       if (!managerBranchId) {
@@ -645,7 +669,9 @@ exports.getUserReport = async (req, res, next) => {
     }
 
     // Статистика по курсам
-    const [stats] = await pool.query(
+    const [stats] = await (
+      await getReadPool()
+    ).query(
       `
       SELECT 
         COUNT(cup.id) as total_attempts,
@@ -660,7 +686,9 @@ exports.getUserReport = async (req, res, next) => {
     );
 
     // История курсов
-    const [attempts] = await pool.query(
+    const [attempts] = await (
+      await getReadPool()
+    ).query(
       `
       SELECT 
         c.id as assessment_id,
@@ -677,7 +705,9 @@ exports.getUserReport = async (req, res, next) => {
     );
 
     // Динамика результатов
-    const [trends] = await pool.query(
+    const [trends] = await (
+      await getReadPool()
+    ).query(
       `
       SELECT 
         DATE(COALESCE(cup.completed_at, cup.updated_at, cup.created_at)) as date,
@@ -691,7 +721,9 @@ exports.getUserReport = async (req, res, next) => {
     );
 
     // Сравнение с коллегами того же уровня/должности
-    const [comparison] = await pool.query(
+    const [comparison] = await (
+      await getReadPool()
+    ).query(
       `
       SELECT 
         AVG(cup.progress_percent) as avg_score_peers,
@@ -755,7 +787,9 @@ exports.exportToExcel = async (req, res, next) => {
 
       const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
-      const [branches] = await pool.query(
+      const [branches] = await (
+        await getReadPool()
+      ).query(
         `
         SELECT 
           b.name as 'Филиал',
@@ -818,7 +852,9 @@ exports.exportToExcel = async (req, res, next) => {
 
       const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
-      const [users] = await pool.query(
+      const [users] = await (
+        await getReadPool()
+      ).query(
         `
         SELECT 
           u.first_name as 'Имя',
@@ -906,7 +942,9 @@ exports.exportToPDF = async (req, res, next) => {
 
       const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
-      const [branches] = await pool.query(
+      const [branches] = await (
+        await getReadPool()
+      ).query(
         `
         SELECT 
           b.name,
@@ -970,7 +1008,9 @@ exports.getFailureReasons = async (req, res, next) => {
       params.push(Number(branchId));
     }
 
-    const [rows] = await pool.query(
+    const [rows] = await (
+      await getReadPool()
+    ).query(
       `
       SELECT
         SUM(CASE WHEN cup.status = 'closed' THEN 1 ELSE 0 END) AS timeout_count,
@@ -1036,7 +1076,9 @@ exports.exportToCsv = async (req, res, next) => {
 
     let rows = [];
     if (type === "branches") {
-      [rows] = await pool.query(
+      [rows] = await (
+        await getReadPool()
+      ).query(
         `
         SELECT b.name AS branch_name,
                COUNT(DISTINCT aa.id) AS attempts,
@@ -1052,7 +1094,9 @@ exports.exportToCsv = async (req, res, next) => {
         params,
       );
     } else {
-      [rows] = await pool.query(
+      [rows] = await (
+        await getReadPool()
+      ).query(
         `
         SELECT u.id,
                u.first_name,
