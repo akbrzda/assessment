@@ -8,12 +8,12 @@
 
 ### Продуктовые требования
 
-| Файл                                                               | Содержание                                                                | Аудитория                 |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------- | ------------------------- |
-| [product/courses-requirements.md](product/courses-requirements.md) | Бизнес-требования к модулю «Курсы»: терминология, структура, сценарии     | Product, аналитики        |
-| [product/bot-features.md](product/bot-features.md)                 | Спецификация доработки Telegram-бота: онбординг, уведомления, сертификаты | Product, разработчики, QA |
+| Файл                                                                                       | Содержание                                                                                            | Аудитория                      |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ------------------------------ |
+| [product/courses-requirements.md](product/courses-requirements.md)                         | Бизнес-требования к модулю «Курсы»: терминология, структура, сценарии                                 | Product, аналитики             |
+| [product/bot-features.md](product/bot-features.md)                                         | Спецификация доработки Telegram-бота: онбординг, уведомления, сертификаты                             | Product, разработчики, QA      |
 | [product/max-telegram-unified-integration.md](product/max-telegram-unified-integration.md) | Инструкция по унификации MAX и Telegram: приглашения, подтверждение аккаунта, идентификация по номеру | Product, Backend, Frontend, QA |
-| [product/max-telegram-unified-roadmap.md](product/max-telegram-unified-roadmap.md) | Roadmap по спринтам и задачам для внедрения интеграции MAX + Telegram | PM, Product, Tech Lead |
+| [product/max-telegram-unified-roadmap.md](product/max-telegram-unified-roadmap.md)         | Roadmap по спринтам и задачам для внедрения интеграции MAX + Telegram                                 | PM, Product, Tech Lead         |
 
 ### Модуль «Курсы»
 
@@ -37,13 +37,14 @@
 | [engineering/architecture.md](engineering/architecture.md)     | Архитектурный регламент: MVC + Layered, структура модулей, правила слоёв | Все разработчики      |
 | [engineering/api-guidelines.md](engineering/api-guidelines.md) | REST API регламент: структура URL, HTTP-методы, версионирование, ответы  | Backend-разработчики  |
 | [engineering/code-standards.md](engineering/code-standards.md) | Стандарты кода: принципы, ограничения размера, именование, async         | Все разработчики      |
-| [engineering/components.md](engineering/components.md)         | Базовые правила и описание UI-компонентов                                | Frontend-разработчики |
+| [engineering/components.md](engineering/components.md)         | Базовые правила и описание UI-компонентов (включая PermissionMatrix API) | Frontend-разработчики |
 
-### Архив
+### Мета-документы и аудит
 
-| Файл                                                       | Содержание                                                      |
-| ---------------------------------------------------------- | --------------------------------------------------------------- |
-| [archive/features-backlog.md](archive/features-backlog.md) | Сырые заметки по планируемым фичам (неструктурированный бэклог) |
+| Файл                                 | Содержание                                                   |
+| ------------------------------------ | ------------------------------------------------------------ |
+| [INDEX.md](INDEX.md)                 | Карта всех документов, противоречия, дубликаты, рекомендации |
+| [PROJECT_AUDIT.md](PROJECT_AUDIT.md) | Архитектурный и безопасностный аудит проекта (2026-05-20)    |
 
 ---
 
@@ -62,4 +63,4 @@ assessment/
 
 ## Ссылки
 
-- Корневые файлы: [AGENTS.md](../AGENTS.md), [TASKS.md](../TASKS.md), [ROADMAP.md](../ROADMAP.md)
+- Корневые файлы: [AGENTS.md](../AGENTS.md), [TASKS.md](../TASKS.md), [ROADMAP.md](../ROADMAP.md), [PROJECT_TASKS_BACKLOG.md](../PROJECT_TASKS_BACKLOG.md)

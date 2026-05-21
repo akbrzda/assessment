@@ -12,38 +12,46 @@
 ## Базовые компоненты (admin-frontend)
 
 1. `Button.vue`
+
 - Назначение: единая кнопка действий.
 - Важные параметры: `variant`, `size`, `loading`, `disabled`, `icon`.
 
 2. `Input.vue`
+
 - Назначение: текстовые/поисковые/дата-поля.
 - Важные параметры: `modelValue`, `type`, `placeholder`, `label`.
 
 3. `Select.vue`
+
 - Назначение: единый селект с опциями `{ value, label }`.
 - Важные параметры: `modelValue`, `options`, `placeholder`.
 
 4. `Card.vue`
+
 - Назначение: контейнеры блоков и метрик.
 - Важные параметры: `title`, `icon`, `padding`.
 
 5. `Modal.vue`
+
 - Назначение: модальные формы и подтверждения.
 - Важные параметры: `show`, `title`, `size`.
 - События: `close`.
 
 6. `Badge.vue`
+
 - Назначение: компактные статусы.
 - Важные параметры: `variant`, `size`, `rounded`.
 
 ## Базовые компоненты (frontend)
 
 1. Экранные вью-компоненты должны:
+
 - использовать данные из `stores` и `services/apiClient`;
 - не дублировать сетевые запросы между экранами;
 - хранить только локальное UI-состояние.
 
 2. Для сложных экранов (например, аттестации):
+
 - состояние прогресса и восстановление попытки держать в отдельной группе функций;
 - любой ответ пользователя нормализовать перед отправкой.
 
@@ -52,3 +60,29 @@
 - Перед созданием нового UI-компонента проверить, можно ли расширить существующий.
 - Новый `variant` добавляется в существующий компонент, а не через дублирование.
 - Изменения визуального поведения должны проверяться и на desktop, и на mobile.
+
+## PermissionMatrixComponent (admin-frontend)
+
+Компонент: `admin-frontend/src/components/PermissionMatrixComponent.vue`
+
+### Назначение
+
+Отображает таблицу прав и позволяет задать для каждого права режим (`allow` / `deny` / `none`), условия (`conditions`) и срок действия (`expiresAt`).
+
+### Props
+
+- `permissions` (`Array`, optional, default: `[]`) — список прав. Поля элемента: `permissionId`/`id`, `moduleCode`/`module_code`, `entityCode`/`entity_code`, `actionCode`/`action_code`.
+- `modelValue` (`Array`, optional, default: `[]`) — текущие выбранные значения. Формат элемента: `permissionId` (Number), `effect` (`"allow" | "deny" | null`), `conditions` (Object | null), `expiresAt` (ISO string | null).
+- `title` (`String`, optional, default: `"Матрица прав"`)
+- `subtitle` (`String`, optional, default: `""`)
+
+### Emits
+
+- `update:modelValue` — отправляется при изменении режима, условий или даты истечения. Payload: обновлённый массив `modelValue` (элементы с `effect = null` исключаются).
+
+### Поведение
+
+- Для каждого права доступны радиокнопки `allow`, `deny`, `none`.
+- Поле `conditions` редактируется как JSON в `textarea`; при невалидном JSON изменение игнорируется.
+- Поле `expiresAt` задаётся через `datetime-local`, сохраняется как ISO-строка.
+- Компонент не выполняет сетевых запросов и не сохраняет данные самостоятельно.
