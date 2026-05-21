@@ -1,10 +1,10 @@
 const Joi = require("joi");
 
 const registrationSchema = Joi.object({
-  firstName: Joi.string().trim().min(2).max(64).required(),
-  lastName: Joi.string().trim().min(2).max(64).required(),
+  firstName: Joi.string().trim().min(2).max(64).optional().allow(null),
+  lastName: Joi.string().trim().min(2).max(64).optional().allow(null),
   positionId: Joi.number().integer().positive().optional().allow(null),
-  branchId: Joi.number().integer().positive().required(),
+  branchId: Joi.number().integer().positive().optional().allow(null),
   inviteCode: Joi.string().trim().allow("", null),
   contact: Joi.object({
     source: Joi.string().trim().valid("telegram_contact", "max_contact").required(),
