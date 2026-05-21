@@ -234,6 +234,21 @@ function buildGuestNoInviteMessage(firstName, config) {
   return `${intro}\n\n${body}${inviteHint}`;
 }
 
+function buildInviteWelcomeMessage(firstName, config) {
+  const intro = firstName ? `👋 Привет, ${firstName}!` : "👋 Привет!";
+  const body = String(
+    config?.inviteWelcomeText || "Вас пригласили в систему.\n\nНажмите кнопку ниже, чтобы активировать приглашение и войти.",
+  ).replaceAll("\\n", "\n");
+  return `${intro}\n\n${body}`;
+}
+
+function buildInviteKeyboard(webAppUrl, config) {
+  if (!webAppUrl) return { inline_keyboard: [] };
+  return {
+    inline_keyboard: [[{ text: String(config?.inviteCtaText || "🚀 Активировать приглашение"), web_app: { url: webAppUrl } }]],
+  };
+}
+
 function buildMainMenuMessage(firstName, config) {
   return applyNameTemplate(config?.mainMenuText || "Привет{{name}}! 👋\n\nЧто хотите сделать?", firstName).replaceAll("\\n", "\n");
 }
@@ -356,6 +371,18 @@ bot.start(async (ctx) => {
   );
 
   // Показываем сообщение про приглашение только если точно знаем, что пользователя нет в системе.
+  if (userStatus?.notFound && hasInvitePayload) {
+    // Новый пользователь пришёл по ссылке-приглашению — направляем в мини-приложение.
+    // Telegram передаёт startPayload как start_param в initDataUnsafe, поэтому
+    // мини-приложение автоматически получит код инвайта при открытии через web_app кнопку.
+    console.log("[bot /start] BRANCH: notFound с invite — отправляем кнопку активации");
+    await ctx.reply(buildInviteWelcomeMessage(userName, onboardingConfig), {
+      reply_markup: buildInviteKeyboard(webAppUrl, onboardingConfig),
+      parse_mode: "HTML",
+    });
+    return;
+  }
+
   if (userStatus?.notFound && !hasInvitePayload) {
     console.log("[bot /start] BRANCH: notFound без invite — отправляем сообщение про приглашение");
     await ctx.reply(buildGuestNoInviteMessage(userName, onboardingConfig), {

@@ -82,7 +82,7 @@
             <ArrowRight />
           </button>
           <p class="invitation-actions-hint">После нажатия откроется системный запрос на передачу номера телефона.</p>
-          <div v-if="errorMessage" class="invite-error-banner" role="alert">{{ errorMessage }}</div>
+          <div v-if="errorMessage" class="error-banner" role="alert">{{ errorMessage }}</div>
         </div>
       </div>
 
@@ -434,7 +434,7 @@ export default {
   font-size: 14px;
 }
 
-.invite-error-banner {
+.error-banner {
   margin-top: 12px;
   padding: 10px 14px;
   border-radius: 10px;

@@ -53,32 +53,10 @@ import { ChevronRight } from "lucide-vue-next";
 import { apiClient } from "../services/apiClient";
 import { calculateReadingSeconds } from "../utils/readingTime";
 import { getVisibleTopics } from "../utils/courseVisibility";
+import { sanitizeHtml } from "../utils/sanitizeHtml.js";
 import ReadingTimerNotice from "../components/courses/ReadingTimerNotice.vue";
 import SkeletonBlock from "../components/skeleton/SkeletonBlock.vue";
 import SkeletonText from "../components/skeleton/SkeletonText.vue";
-
-function sanitizeContent(html) {
-  if (!html) return "";
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, "text/html");
-
-  doc.querySelectorAll("script").forEach((node) => node.remove());
-  doc.querySelectorAll("*").forEach((node) => {
-    for (const attr of [...node.attributes]) {
-      const attrName = attr.name.toLowerCase();
-      const attrValue = String(attr.value || "")
-        .trim()
-        .toLowerCase();
-      if (attrName.startsWith("on")) {
-        node.removeAttribute(attr.name);
-      } else if ((attrName === "href" || attrName === "src") && attrValue.startsWith("javascript:")) {
-        node.removeAttribute(attr.name);
-      }
-    }
-  });
-
-  return doc.body.innerHTML;
-}
 
 export default {
   name: "SubtopicView",
@@ -133,13 +111,11 @@ export default {
       return numberLabel ? `${numberLabel} ${topic.value.title}` : topic.value.title;
     });
 
-    const sanitizedContent = computed(() => sanitizeContent(topic.value?.content || ""));
+    const sanitizedContent = computed(() => sanitizeHtml(topic.value?.content || ""));
     const timerCompleted = computed(() => remainingSeconds.value <= 0);
     const hasAssessment = computed(() => Boolean(topic.value?.assessmentId));
     const isCompleted = computed(() => topic.value?.progress?.status === "completed");
-    const shouldShowReadingTimerNotice = computed(
-      () => Boolean(topic.value) && requiredReadingSeconds.value > 0 && !isCompleted.value,
-    );
+    const shouldShowReadingTimerNotice = computed(() => Boolean(topic.value) && requiredReadingSeconds.value > 0 && !isCompleted.value);
 
     const canProceed = computed(() => {
       if (isCompleted.value) return true;

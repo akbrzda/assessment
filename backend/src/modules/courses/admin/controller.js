@@ -655,7 +655,12 @@ async function addAssignmentsBulk(req, res, next) {
       return res.status(400).json({ error: "Некорректный формат даты дедлайна" });
     }
 
-    await assignmentsRepo.addAssignmentsBulk(courseId, normalizedUserIds, req.user.id, deadlineAt ? deadlineAt.toISOString().slice(0, 19).replace("T", " ") : null);
+    await assignmentsRepo.addAssignmentsBulk(
+      courseId,
+      normalizedUserIds,
+      req.user.id,
+      deadlineAt ? deadlineAt.toISOString().slice(0, 19).replace("T", " ") : null,
+    );
     const assignments = await assignmentsRepo.getAssignments(courseId);
     res.status(201).json({ assignments, assignedCount: normalizedUserIds.length });
   } catch (error) {
@@ -826,6 +831,66 @@ async function getCourseProgressReport(req, res, next) {
   }
 }
 
+async function getCourseChangelog(req, res, next) {
+  try {
+    const courseId = Number(req.params.id);
+    if (!courseId || courseId <= 0) {
+      return res.status(400).json({ error: "Некорректный идентификатор курса" });
+    }
+
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+
+    const [[countRow]] = await pool.query(
+      `SELECT COUNT(*) AS total FROM audit_logs
+        WHERE (entity_type = 'course' AND entity_id = ?)
+           OR (entity_type IN ('course_section', 'course_topic')
+               AND JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.courseId')) = ?)`,
+      [courseId, String(courseId)],
+    );
+
+    const [rows] = await pool.query(
+      `SELECT id, actor_user_id, actor_name, actor_role, action, entity_type,
+              entity_id, before_json, after_json, metadata_json, status, created_at
+         FROM audit_logs
+        WHERE (entity_type = 'course' AND entity_id = ?)
+           OR (entity_type IN ('course_section', 'course_topic')
+               AND JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.courseId')) = ?)
+        ORDER BY id DESC
+        LIMIT ? OFFSET ?`,
+      [courseId, String(courseId), limit, offset],
+    );
+
+    return res.json({
+      total: Number(countRow.total),
+      page,
+      limit,
+      items: rows.map((r) => ({
+        id: Number(r.id),
+        actorName: r.actor_name || null,
+        actorRole: r.actor_role || null,
+        action: r.action,
+        entityType: r.entity_type,
+        entityId: r.entity_id !== null ? Number(r.entity_id) : null,
+        metadata: (() => {
+          if (r.metadata_json == null) return null;
+          if (typeof r.metadata_json === "object") return r.metadata_json;
+          try {
+            return JSON.parse(r.metadata_json);
+          } catch {
+            return null;
+          }
+        })(),
+        status: r.status,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   listCourses,
   listCourseMedia,
@@ -860,4 +925,5 @@ module.exports = {
   getAnalyticsFunnel,
   getSectionFailures,
   getCourseProgressReport,
+  getCourseChangelog,
 };

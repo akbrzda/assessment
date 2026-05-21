@@ -35,7 +35,7 @@
             </template>
             <template v-else>Материал темы</template>
           </h4>
-          <div v-if="activePreviewTopicContent" class="student-view-material-text" v-html="activePreviewTopicContent"></div>
+          <div v-if="sanitizedPreviewContent" class="student-view-material-text" v-html="sanitizedPreviewContent"></div>
           <div v-else class="student-view-empty">Материал пока не добавлен.</div>
         </div>
       </div>
@@ -72,7 +72,7 @@
             <template v-else>Материал темы</template>
           </h3>
 
-          <div v-if="activePreviewTopicContent" class="preview-material-text" v-html="activePreviewTopicContent"></div>
+          <div v-if="sanitizedPreviewContent" class="preview-material-text" v-html="sanitizedPreviewContent"></div>
           <div v-else class="preview-empty-state">Материал для выбранной подтемы пока не добавлен.</div>
         </section>
       </div>
@@ -117,10 +117,11 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { Button, Card } from "@/components/ui";
+import { sanitizeHtml } from "@/utils/sanitizeHtml.js";
 
-defineProps({
+const props = defineProps({
   currentStep: { type: Number, required: true },
   previewStepId: { type: Number, required: true },
   isEditMode: { type: Boolean, required: true },
@@ -140,6 +141,8 @@ defineProps({
 
 const emit = defineEmits(["publish", "update:active-preview-topic-id"]);
 const previewMode = ref("editor");
+
+const sanitizedPreviewContent = computed(() => sanitizeHtml(props.activePreviewTopicContent || ""));
 </script>
 
 <style scoped>

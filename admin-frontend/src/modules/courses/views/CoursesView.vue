@@ -101,6 +101,19 @@
               <div v-if="openMenuId === course.id" class="dropdown-menu">
                 <Button class="dropdown-item" variant="link" size="sm" icon="pencil" @click="goToEdit(course.id)">Редактировать</Button>
                 <Button
+                  class="dropdown-item"
+                  variant="link"
+                  size="sm"
+                  icon="clock"
+                  @click="
+                    changelogCourseId = course.id;
+                    changelogOpen = true;
+                    openMenuId = null;
+                  "
+                >
+                  История изменений
+                </Button>
+                <Button
                   v-if="course.status === 'published'"
                   class="dropdown-item"
                   variant="link"
@@ -371,6 +384,10 @@
       :loading="courseActionDialog.loading"
       @confirm="confirmCourseAction"
     />
+
+    <Modal v-model="changelogOpen" size="xl" title="История изменений" @close="changelogCourseId = null">
+      <CourseChangelogTab v-if="changelogOpen && changelogCourseId" :course-id="changelogCourseId" />
+    </Modal>
   </div>
 </template>
 
@@ -402,6 +419,7 @@ import {
 } from "@/components/ui";
 import ActionButton from "@/components/ui/ActionButton.vue";
 import AnalyticsSummaryCards from "@/components/courses/AnalyticsSummaryCards.vue";
+import CourseChangelogTab from "@/modules/courses/components/course-editor/CourseChangelogTab.vue";
 import { archiveCourse, deleteCourse, getCourses, getCourseAnalyticsFunnel } from "@/api/courses";
 import { useToast } from "@/composables/useToast";
 import { useSkeletonGate } from "@/composables/useSkeletonGate";
@@ -432,6 +450,8 @@ const courses = ref([]);
 const funnel = ref([]);
 const viewMode = ref(readSavedViewMode());
 const categoryManagerOpen = ref(false);
+const changelogOpen = ref(false);
+const changelogCourseId = ref(null);
 const categoryDraft = ref("");
 const courseCategories = ref(loadCourseCategories());
 

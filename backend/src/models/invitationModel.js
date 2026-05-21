@@ -42,14 +42,31 @@ async function findById(id) {
 }
 
 async function markUsed(invitationId, userId) {
-  const [result] = await pool.execute(
-    `UPDATE invitations
-     SET used_by = ?, used_at = NOW(), invited_user_id = NULL
-     WHERE id = ?
-       AND used_by IS NULL`,
-    [userId, invitationId],
-  );
-  return Number(result.affectedRows || 0);
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // SELECT ... FOR UPDATE — блокируем строку, исключая параллельную активацию
+    const [rows] = await connection.execute(`SELECT id FROM invitations WHERE id = ? AND used_by IS NULL FOR UPDATE`, [invitationId]);
+
+    if (!rows.length) {
+      await connection.rollback();
+      return 0;
+    }
+
+    const [result] = await connection.execute(`UPDATE invitations SET used_by = ?, used_at = NOW(), invited_user_id = NULL WHERE id = ?`, [
+      userId,
+      invitationId,
+    ]);
+
+    await connection.commit();
+    return Number(result.affectedRows || 0);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 async function findAll() {

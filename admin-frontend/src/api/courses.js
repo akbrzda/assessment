@@ -258,3 +258,8 @@ export const getCourseProgressReport = async (courseId) => {
   const response = await axios.get(`/admin/courses/${courseId}/analytics/progress-report`);
   return response.data;
 };
+
+export const getCourseChangelog = async (courseId, { page = 1, limit = 50 } = {}) => {
+  const response = await axios.get(`/admin/courses/${courseId}/changelog`, { params: { page, limit } });
+  return response.data;
+};

@@ -272,6 +272,7 @@ import {
   getCourseProgressReport,
   getCourseUserProgress,
   resetCourseUserProgress,
+  getCourseChangelog,
 } from "@/api/courses";
 import { getAssessments } from "@/api/assessments";
 import { getReferences } from "@/api/users";

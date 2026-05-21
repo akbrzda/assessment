@@ -146,6 +146,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle } from "lucide-vue-next";
 import { apiClient } from "../services/apiClient";
 import { useTelegramStore } from "../stores/telegram";
 import { sumReadingSeconds, formatReadingTime } from "../utils/readingTime";
+import { formatAndSanitize } from "../utils/sanitizeHtml.js";
 
 const route = useRoute();
 const router = useRouter();
@@ -210,10 +211,8 @@ function formatDate(isoDate) {
   }
 }
 
-function formatText(text) {
-  if (!text) return "";
-  return text.replace(/\n/g, "<br>");
-}
+// Форматирование текста перенесено в sanitizeHtml.js (formatAndSanitize)
+const formatText = formatAndSanitize;
 
 function handlePageScroll() {
   // Скролл больше не используется для отслеживания прочтения

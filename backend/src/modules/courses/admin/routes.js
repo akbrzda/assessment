@@ -48,6 +48,7 @@ router.get("/analytics/funnel", controller.getAnalyticsFunnel);
 router.post("/", ensureCourseWriteAccess, requirePermission("courses", "course", "create"), controller.createCourse);
 router.get("/:id", controller.getCourse);
 router.get("/:id/preview", controller.getCoursePreview);
+router.get("/:id/changelog", requirePermission("courses", "course", "read"), controller.getCourseChangelog);
 router.patch("/:id", ensureCourseWriteAccess, requirePermission("courses", "course", "update"), controller.updateCourse);
 router.post("/:id/upload-cover", ensureCourseWriteAccess, controller.uploadCourseCover);
 router.post("/upload-media", ensureCourseWriteAccess, controller.uploadCourseMedia);

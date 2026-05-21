@@ -538,6 +538,63 @@ async function resetUserProgressForCourse(courseId, userId, connection) {
   await connection.execute("DELETE FROM course_user_snapshots WHERE course_id = ? AND user_id = ?", [courseId, userId]);
 }
 
+/**
+ * Пересчитывает статус тем пользователей при изменении структуры курса.
+ *
+ * Если обязательная тема была пройдена, но в её раздел добавили новую обязательную
+ * тему с меньшим order_index, которую пользователь ещё не прошёл — тема переходит
+ * в completed_locked. После прохождения пропущенной темы статус восстанавливается.
+ */
+async function recalculateTopicProgressForAllUsers({ courseId, connection }) {
+  const executor = connection || pool;
+
+  // Заблокировать темы, у которых есть непройденная обязательная тема перед ними
+  await executor.execute(
+    `UPDATE course_topic_user_progress ctup
+        INNER JOIN course_topics ct ON ct.id = ctup.topic_id
+        SET ctup.status = 'completed_locked',
+            ctup.updated_at = UTC_TIMESTAMP()
+      WHERE ct.course_id = ?
+        AND ct.is_required = 1
+        AND ctup.status = 'completed'
+        AND EXISTS (
+          SELECT 1
+            FROM course_topics ct2
+            LEFT JOIN course_topic_user_progress ctup2
+                   ON ctup2.topic_id = ct2.id AND ctup2.user_id = ctup.user_id
+           WHERE ct2.course_id = ct.course_id
+             AND ct2.section_id = ct.section_id
+             AND ct2.is_required = 1
+             AND ct2.order_index < ct.order_index
+             AND (ctup2.status IS NULL OR ctup2.status NOT IN ('completed', 'completed_locked'))
+        )`,
+    [courseId],
+  );
+
+  // Восстановить темы, у которых все предшествующие обязательные темы пройдены
+  await executor.execute(
+    `UPDATE course_topic_user_progress ctup
+        INNER JOIN course_topics ct ON ct.id = ctup.topic_id
+        SET ctup.status = 'completed',
+            ctup.updated_at = UTC_TIMESTAMP()
+      WHERE ct.course_id = ?
+        AND ct.is_required = 1
+        AND ctup.status = 'completed_locked'
+        AND NOT EXISTS (
+          SELECT 1
+            FROM course_topics ct2
+            LEFT JOIN course_topic_user_progress ctup2
+                   ON ctup2.topic_id = ct2.id AND ctup2.user_id = ctup.user_id
+           WHERE ct2.course_id = ct.course_id
+             AND ct2.section_id = ct.section_id
+             AND ct2.is_required = 1
+             AND ct2.order_index < ct.order_index
+             AND (ctup2.status IS NULL OR ctup2.status NOT IN ('completed', 'completed_locked'))
+        )`,
+    [courseId],
+  );
+}
+
 module.exports = {
   findSectionWithCourse,
   findTopicWithSection,
@@ -558,6 +615,7 @@ module.exports = {
   completeCourseProgress,
   getCourseProgressStatus,
   recalculateCourseProgressForAllUsers,
+  recalculateTopicProgressForAllUsers,
   getAdminUsersProgress,
   getAdminUserDetailedProgress,
   resetUserProgressForCourse,
