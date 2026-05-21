@@ -1,5 +1,6 @@
 const botRepository = require("./repository");
 const settingsService = require("../../services/settingsService");
+const logger = require("../../utils/logger");
 
 function buildError(message, status) {
   const error = new Error(message);
@@ -59,11 +60,10 @@ async function updateNotificationSettings(currentUser, payload) {
  * Возвращает статус пользователя для внутренней проверки ботом.
  */
 async function getUserStatusByTelegramId(telegramId) {
-  console.log("[botService.getUserStatusByTelegramId] searching for telegramId=%s", telegramId);
+  logger.debug("[botService.getUserStatusByTelegramId] searching user status");
   const row = await botRepository.getUserStatusByTelegramId(telegramId);
-  console.log("[botService.getUserStatusByTelegramId] repository result=%O", row);
   if (!row) {
-    console.log("[botService.getUserStatusByTelegramId] row not found");
+    logger.debug("[botService.getUserStatusByTelegramId] user not found");
     return null;
   }
   const result = {
@@ -73,7 +73,7 @@ async function getUserStatusByTelegramId(telegramId) {
     notificationsEnabled: Boolean(row.notifications_enabled),
     onboardingCompleted: Boolean(row.onboarding_completed_at),
   };
-  console.log("[botService.getUserStatusByTelegramId] returning=%O", result);
+  logger.debug("[botService.getUserStatusByTelegramId] status resolved");
   return result;
 }
 

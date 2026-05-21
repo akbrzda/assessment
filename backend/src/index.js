@@ -15,7 +15,7 @@ async function bootstrap() {
     await healthCheck();
 
     const server = http.createServer(app);
-    initWebSocket(server);
+    await initWebSocket(server);
     startAttemptMaintenance();
     await connectRedis();
     startGamificationWorker();

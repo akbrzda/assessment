@@ -23,9 +23,7 @@
           <span class="question-counter">Вопрос {{ currentQuestionIndex + 1 }} из {{ questions.length }}</span>
           <span class="progress-percent">{{ Math.round(progressPercentage) }}%</span>
         </div>
-        <div class="progress-bar">
-          <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
-        </div>
+        <ProgressBar :value="progressPercentage" />
       </div>
     </div>
 
@@ -126,18 +124,35 @@
       </div>
     </div>
 
+    <div class="dots-section" v-if="questions.length > 1">
+      <div class="question-dots">
+        <button
+          v-for="(question, index) in questions"
+          :key="question.id"
+          type="button"
+          class="question-dot"
+          :class="{ current: currentQuestionIndex === index, answered: isAnsweredQuestion(index) }"
+          :aria-label="`Вопрос ${index + 1}`"
+          @click="navigateToQuestion(index)"
+        ></button>
+      </div>
+    </div>
+
     <!-- Navigation -->
     <div class="navigation-section">
       <div class="nav-buttons" v-if="currentQuestion">
-        <button
+        <BaseButton
           v-if="currentQuestionIndex < questions.length - 1"
-          class="btn btn-primary btn-next"
+          class="btn-next"
           :disabled="!canProceedCurrent || isSaving"
+          :loading="isSaving"
           @click="nextQuestion"
         >
           Далее
-        </button>
-        <button v-else class="btn btn-primary btn-next" :disabled="!canProceedCurrent || isSaving" @click="showFinishConfirmation">Завершить</button>
+        </BaseButton>
+        <BaseButton v-else class="btn-next" :disabled="!canProceedCurrent || isSaving" :loading="isSaving" @click="showFinishConfirmation">
+          Завершить
+        </BaseButton>
       </div>
     </div>
   </div>
@@ -148,7 +163,7 @@
       <div class="modal-body text-center">
         <h2 class="title-medium mb-16">Время вышло!</h2>
         <p class="body-medium mb-20">Аттестация будет завершена автоматически.</p>
-        <button class="btn btn-primary btn-full" @click="finishAssessment">Посмотреть результаты</button>
+        <BaseButton full-width @click="finishAssessment">Посмотреть результаты</BaseButton>
       </div>
     </div>
   </div>
@@ -160,8 +175,8 @@
         <h2 class="title-medium mb-16">Завершить аттестацию?</h2>
         <p class="body-medium mb-20">Вы уверены, что хотите завершить аттестацию и посмотреть результаты?</p>
         <div class="modal-buttons">
-          <button class="btn btn-secondary" @click="showFinishModal = false">Продолжить</button>
-          <button class="btn btn-primary" @click="confirmFinishAssessment">Завершить</button>
+          <BaseButton variant="secondary" @click="showFinishModal = false">Продолжить</BaseButton>
+          <BaseButton @click="confirmFinishAssessment">Завершить</BaseButton>
         </div>
       </div>
     </div>
@@ -182,8 +197,8 @@
           <li>• Ответы будут <strong>аннулированы</strong></li>
         </ul>
         <div class="modal-buttons">
-          <button class="btn btn-secondary" @click="showExitWarningModal = false">Продолжить тест</button>
-          <button class="btn btn-primary" @click="confirmEarlyExit">Всё равно выйти</button>
+          <BaseButton variant="secondary" @click="showExitWarningModal = false">Продолжить тест</BaseButton>
+          <BaseButton @click="confirmEarlyExit">Всё равно выйти</BaseButton>
         </div>
       </div>
     </div>
@@ -197,11 +212,15 @@ import { AlertTriangle } from "lucide-vue-next";
 import { useTelegramStore } from "../stores/telegram";
 import { useUserStore } from "../stores/user";
 import { apiClient } from "../services/apiClient";
+import BaseButton from "../components/ui/BaseButton.vue";
+import ProgressBar from "../components/ui/ProgressBar.vue";
 
 export default {
   name: "AssessmentProcessView",
   components: {
     AlertTriangle,
+    BaseButton,
+    ProgressBar,
   },
   setup() {
     const route = useRoute();
@@ -263,6 +282,24 @@ export default {
       }
       return selectedAnswer.value != null;
     });
+
+    const isAnsweredQuestion = (index) => {
+      const question = questions.value[index];
+      const stored = userAnswers.value[index];
+      if (!question || !stored) {
+        return false;
+      }
+      if (question.questionType === "text") {
+        return Boolean(String(stored.value || "").trim());
+      }
+      if (question.questionType === "matching") {
+        return Boolean(stored.value && Object.keys(stored.value).length > 0);
+      }
+      if (isMultiChoice(question.questionType)) {
+        return Array.isArray(stored.value) && stored.value.length > 0;
+      }
+      return stored.value != null;
+    };
 
     function formatTime(seconds) {
       if (seconds == null || seconds < 0) {
@@ -1158,6 +1195,7 @@ export default {
       toggleAnswer,
       nextQuestion,
       navigateToQuestion,
+      isAnsweredQuestion,
       finishAssessment,
       showFinishConfirmation,
       confirmFinishAssessment,
@@ -1549,6 +1587,8 @@ export default {
 .question-dot {
   width: 8px;
   height: 8px;
+  border: none;
+  padding: 0;
   border-radius: 50%;
   background-color: var(--divider);
   transition: all 0.2s ease;

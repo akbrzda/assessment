@@ -1,6 +1,17 @@
 const userModel = require("../../../models/userModel");
-const { body, validationResult } = require("express-validator");
+const Joi = require("joi");
 const { logAndSend } = require("../../../services/auditService");
+
+const updateProfileSchema = Joi.object({
+  firstName: Joi.string().trim().min(1).required().messages({
+    "string.empty": "Имя обязательно",
+    "any.required": "Имя обязательно",
+  }),
+  lastName: Joi.string().trim().min(1).required().messages({
+    "string.empty": "Фамилия обязательна",
+    "any.required": "Фамилия обязательна",
+  }),
+});
 
 // Получить профиль текущего пользователя
 const getProfile = async (req, res) => {
@@ -20,43 +31,42 @@ const getProfile = async (req, res) => {
 };
 
 // Обновить профиль текущего пользователя
-const updateProfile = [
-  body("firstName").trim().notEmpty().withMessage("Имя обязательно"),
-  body("lastName").trim().notEmpty().withMessage("Фамилия обязательна"),
+const updateProfile = async (req, res) => {
+  try {
+    const { value, error } = updateProfileSchema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
 
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const userId = req.user.id;
-      const { firstName, lastName } = req.body;
-
-      await userModel.updateProfile(userId, { firstName, lastName });
-
-      const updatedUser = await userModel.findById(userId);
-
-      await logAndSend({
-        req,
-        actor: { id: userId },
-        action: "admin.profile_updated",
-        entity: "user",
-        entityId: userId,
-        metadata: { firstName, lastName },
-      });
-
-      res.json({
-        message: "Профиль успешно обновлен",
-        user: updatedUser,
-      });
-    } catch (error) {
-      console.error("Update profile error:", error);
-      res.status(500).json({ message: "Ошибка при обновлении профиля" });
+    if (error) {
+      return res.status(400).json({ errors: error.details.map((detail) => detail.message) });
     }
-  },
-];
+
+    const userId = req.user.id;
+    const { firstName, lastName } = value;
+
+    await userModel.updateProfile(userId, { firstName, lastName });
+
+    const updatedUser = await userModel.findById(userId);
+
+    await logAndSend({
+      req,
+      actor: { id: userId },
+      action: "admin.profile_updated",
+      entity: "user",
+      entityId: userId,
+      metadata: { firstName, lastName },
+    });
+
+    res.json({
+      message: "Профиль успешно обновлен",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    res.status(500).json({ message: "Ошибка при обновлении профиля" });
+  }
+};
 
 module.exports = {
   getProfile,

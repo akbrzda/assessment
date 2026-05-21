@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { ref, shallowRef, computed, markRaw } from "vue";
 import { clearTelegramRuntimeState, getClientPlatform, setTelegramRuntimeState } from "../services/telegramRuntimeState";
 
-const INIT_DATA_MAX_AGE_SECONDS = 5 * 60;
+const INIT_DATA_MAX_AGE_SECONDS = 24 * 60 * 60;
 
 function extractAuthDateFromInitData(initDataString) {
   if (!initDataString) {

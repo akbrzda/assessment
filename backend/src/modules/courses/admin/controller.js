@@ -639,6 +639,30 @@ async function addAssignment(req, res, next) {
   }
 }
 
+async function addAssignmentsBulk(req, res, next) {
+  try {
+    const courseId = parseId(req.params.id);
+    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
+
+    const userIds = Array.isArray(req.body.userIds) ? req.body.userIds : [];
+    const normalizedUserIds = [...new Set(userIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
+    if (!normalizedUserIds.length) {
+      return res.status(400).json({ error: "Список userIds обязателен" });
+    }
+
+    const deadlineAt = req.body.deadlineAt ? new Date(req.body.deadlineAt) : null;
+    if (deadlineAt && Number.isNaN(deadlineAt.getTime())) {
+      return res.status(400).json({ error: "Некорректный формат даты дедлайна" });
+    }
+
+    await assignmentsRepo.addAssignmentsBulk(courseId, normalizedUserIds, req.user.id, deadlineAt ? deadlineAt.toISOString().slice(0, 19).replace("T", " ") : null);
+    const assignments = await assignmentsRepo.getAssignments(courseId);
+    res.status(201).json({ assignments, assignedCount: normalizedUserIds.length });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function closeAssignment(req, res, next) {
   try {
     const courseId = parseId(req.params.id);
@@ -827,6 +851,7 @@ module.exports = {
   updateTargets,
   getAssignments,
   addAssignment,
+  addAssignmentsBulk,
   closeAssignment,
   removeAssignment,
   getCourseUsers,

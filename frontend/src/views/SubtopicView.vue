@@ -23,6 +23,14 @@
           <p v-else class="empty-content">Материал отсутствует.</p>
         </div>
 
+        <ReadingTimerNotice
+          v-if="shouldShowReadingTimerNotice"
+          class="subtopic-reading-timer"
+          :remaining-seconds="remainingSeconds"
+          :required-seconds="requiredReadingSeconds"
+          :completed="timerCompleted || isCompleted"
+        />
+
         <div class="subtopic-footer">
           <div class="next-topic">
             <p class="next-topic__caption">Следующая подтема</p>
@@ -45,6 +53,7 @@ import { ChevronRight } from "lucide-vue-next";
 import { apiClient } from "../services/apiClient";
 import { calculateReadingSeconds } from "../utils/readingTime";
 import { getVisibleTopics } from "../utils/courseVisibility";
+import ReadingTimerNotice from "../components/courses/ReadingTimerNotice.vue";
 import SkeletonBlock from "../components/skeleton/SkeletonBlock.vue";
 import SkeletonText from "../components/skeleton/SkeletonText.vue";
 
@@ -75,6 +84,7 @@ export default {
   name: "SubtopicView",
   components: {
     ChevronRight,
+    ReadingTimerNotice,
     SkeletonBlock,
     SkeletonText,
   },
@@ -127,6 +137,9 @@ export default {
     const timerCompleted = computed(() => remainingSeconds.value <= 0);
     const hasAssessment = computed(() => Boolean(topic.value?.assessmentId));
     const isCompleted = computed(() => topic.value?.progress?.status === "completed");
+    const shouldShowReadingTimerNotice = computed(
+      () => Boolean(topic.value) && requiredReadingSeconds.value > 0 && !isCompleted.value,
+    );
 
     const canProceed = computed(() => {
       if (isCompleted.value) return true;
@@ -294,8 +307,13 @@ export default {
       isLoading,
       errorText,
       topic,
+      requiredReadingSeconds,
+      remainingSeconds,
       topicChipLabel,
       sanitizedContent,
+      timerCompleted,
+      isCompleted,
+      shouldShowReadingTimerNotice,
       canProceed,
       ctaLabel,
       showNextIcon,
@@ -355,6 +373,11 @@ export default {
 .subtopic-content {
   flex: 1;
   min-height: 0;
+}
+
+.subtopic-reading-timer {
+  margin-top: 12px;
+  margin-bottom: 12px;
 }
 
 .topic-content {

@@ -33,5 +33,5 @@ jobs:
       - name: Run security tests
         working-directory: backend
         env:
-          TEST_API_BASE: http://localhost:3001/api
+          TEST_API_BASE: http://localhost:3001/api/v1
         run: node --test tests/security.test.js

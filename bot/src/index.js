@@ -16,11 +16,17 @@ for (const filename of envFiles) {
   }
 }
 
-const { BOT_TOKEN, MINI_APP_URL, BACKEND_URL } = process.env;
+const { BOT_TOKEN, MINI_APP_URL, BACKEND_URL, INTERNAL_API_SECRET, BOT_WEBHOOK_DOMAIN, BOT_WEBHOOK_PATH, BOT_WEBHOOK_PORT } = process.env;
 const botUsername = (process.env.BOT_USERNAME || "").trim();
+const internalApiSecret = String(INTERNAL_API_SECRET || "").trim();
 
 if (!BOT_TOKEN) {
   console.error("[bot] BOT_TOKEN is not set. Check bot/.env.");
+  process.exit(1);
+}
+
+if (!internalApiSecret) {
+  console.error("[bot] INTERNAL_API_SECRET is not set. Check bot/.env.");
   process.exit(1);
 }
 
@@ -30,7 +36,7 @@ const miniAppUrl = (MINI_APP_URL || "").trim();
 const backendUrl = (BACKEND_URL || "").trim();
 
 /**
- * Выполняет GET-запрос к backend API с авторизацией по BOT_TOKEN.
+ * Выполняет GET-запрос к backend API с авторизацией по INTERNAL_API_SECRET.
  */
 function backendGet(urlPath) {
   return new Promise((resolve, reject) => {
@@ -44,7 +50,7 @@ function backendGet(urlPath) {
       path: url.pathname + url.search,
       method: "GET",
       headers: {
-        Authorization: `Bearer ${BOT_TOKEN}`,
+        Authorization: `Bearer ${internalApiSecret}`,
       },
     };
 
@@ -67,7 +73,7 @@ function backendGet(urlPath) {
 }
 
 /**
- * Выполняет PATCH-запрос к backend API с авторизацией по BOT_TOKEN.
+ * Выполняет PATCH-запрос к backend API с авторизацией по INTERNAL_API_SECRET.
  */
 function backendPatch(urlPath, payload) {
   return new Promise((resolve, reject) => {
@@ -82,7 +88,7 @@ function backendPatch(urlPath, payload) {
       path: url.pathname + url.search,
       method: "PATCH",
       headers: {
-        Authorization: `Bearer ${BOT_TOKEN}`,
+        Authorization: `Bearer ${internalApiSecret}`,
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(data),
       },
@@ -134,7 +140,7 @@ async function getUserStatus(telegramId) {
   }
 
   try {
-    const { status, body } = await backendGet(`/api/bot/internal/user-status?telegramId=${telegramId}`);
+    const { status, body } = await backendGet(`/api/v1/bot/internal/user-status?telegramId=${telegramId}`);
     if (status === 200 && body) {
       return {
         found: true,
@@ -160,7 +166,7 @@ async function getOnboardingConfig() {
     return null;
   }
   try {
-    const { status, body } = await backendGet("/api/bot/internal/onboarding-config");
+    const { status, body } = await backendGet("/api/v1/bot/internal/onboarding-config");
     if (status === 200 && body) {
       return body;
     }
@@ -176,7 +182,7 @@ async function getOnboardingConfig() {
 async function fetchCertificates(telegramId) {
   if (!backendUrl) return [];
   try {
-    const { status, body } = await backendGet(`/api/bot/internal/certificates?telegramId=${telegramId}`);
+    const { status, body } = await backendGet(`/api/v1/bot/internal/certificates?telegramId=${telegramId}`);
     if (status === 200 && body) return body.certificates || [];
     return [];
   } catch {
@@ -190,7 +196,7 @@ async function fetchCertificates(telegramId) {
 async function setNotificationsEnabled(telegramId, enabled) {
   if (!backendUrl) return false;
   try {
-    const { status } = await backendPatch(`/api/bot/internal/notifications/settings?telegramId=${telegramId}`, { notificationsEnabled: enabled });
+    const { status } = await backendPatch(`/api/v1/bot/internal/notifications/settings?telegramId=${telegramId}`, { notificationsEnabled: enabled });
     return status === 200;
   } catch {
     return false;
@@ -299,6 +305,29 @@ function buildOnboardingStep3Keyboard(webAppUrl, config) {
   };
 }
 
+const ONBOARDING_FSM = {
+  step1: {
+    next: "step2",
+    prev: null,
+  },
+  step2: {
+    next: "step3",
+    prev: "step1",
+  },
+  step3: {
+    next: null,
+    prev: "step2",
+  },
+};
+
+function resolveOnboardingState(rawState) {
+  if (rawState && ONBOARDING_FSM[rawState]) {
+    return rawState;
+  }
+
+  return "step1";
+}
+
 bot.start(async (ctx) => {
   const telegramFirstName = ctx.from?.first_name || "";
   const telegramId = String(ctx.from?.id || "");
@@ -355,7 +384,7 @@ bot.command("help", async (ctx) => {
 });
 
 bot.action(/^onboarding:(step1|step2|step3)$/, async (ctx) => {
-  const step = ctx.match[1];
+  const state = resolveOnboardingState(ctx.match[1]);
   const telegramFirstName = ctx.from?.first_name || "";
   const telegramId = String(ctx.from?.id || "");
   const onboardingConfig = await getOnboardingConfig();
@@ -377,7 +406,7 @@ bot.action(/^onboarding:(step1|step2|step3)$/, async (ctx) => {
     },
   };
 
-  const screen = screens[step] || screens.step1;
+  const screen = screens[state] || screens.step1;
 
   try {
     await ctx.editMessageText(screen.text, {
@@ -476,7 +505,7 @@ bot.hears("🔔 Уведомления", async (ctx) => {
   // Получаем текущий статус через user-status
   let enabled = true;
   try {
-    const { status, body } = await backendGet(`/api/bot/internal/user-status?telegramId=${telegramId}`);
+    const { status, body } = await backendGet(`/api/v1/bot/internal/user-status?telegramId=${telegramId}`);
     if (status === 200 && body) {
       enabled = body.notificationsEnabled !== false;
     }
@@ -536,8 +565,23 @@ bot.catch((err, ctx) => {
 
 async function launchBot() {
   try {
-    await bot.launch();
-    console.log("[bot] started");
+    const webhookDomain = String(BOT_WEBHOOK_DOMAIN || "").trim();
+    const webhookPath = String(BOT_WEBHOOK_PATH || "/telegram/webhook").trim();
+    const webhookPort = Number(BOT_WEBHOOK_PORT || 3001);
+
+    if (!webhookDomain) {
+      console.error("[bot] BOT_WEBHOOK_DOMAIN is not set. Webhook mode is required.");
+      process.exit(1);
+    }
+
+    await bot.launch({
+      webhook: {
+        domain: webhookDomain,
+        path: webhookPath,
+        port: webhookPort,
+      },
+    });
+    console.log("[bot] started in webhook mode: %s%s", webhookDomain, webhookPath);
   } catch (error) {
     console.error("[bot] Launch failed:", error.message);
     process.exit(1);

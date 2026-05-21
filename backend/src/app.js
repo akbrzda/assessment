@@ -6,7 +6,7 @@ const path = require("path");
 const config = require("./config/env");
 const { errorHandler, timezone: timezoneMiddleware } = require("./middleware");
 const verifyJWT = require("./middleware/verifyJWT");
-const { verifyCertificateLimiter, adminGlobalLimiter } = require("./middleware/rateLimit");
+const { verifyCertificateLimiter, authLimiter, adminGlobalLimiter } = require("./middleware/rateLimit");
 
 const authModule = require("./modules/auth");
 const invitationModule = require("./modules/invitations");
@@ -29,7 +29,7 @@ const adminPermissionsRoutes = require("./modules/admin/permissions");
 const adminRolesRoutes = require("./modules/admin/roles");
 const adminSearchRoutes = require("./modules/admin/search/routes");
 const adminAuditLogsRoutes = require("./modules/admin/audit-logs/routes");
-const { metricsMiddleware } = require("./services/metricsService");
+const { metricsMiddleware, toPrometheusMetrics } = require("./services/metricsService");
 const botModule = require("./modules/bot");
 const certificatesModule = require("./modules/certificates");
 const { registerAssessmentEvents } = require("./events/assessmentEvents");
@@ -77,6 +77,8 @@ app.use((req, res, next) => {
 
 // Доступ к сертификатам только для авторизованных пользователей
 app.use("/uploads/certificates", verifyJWT, express.static(path.join(__dirname, "../../uploads/certificates")));
+app.use("/uploads/courses", verifyJWT, express.static(path.join(__dirname, "../../uploads/courses")));
+app.use("/uploads/course-media", verifyJWT, express.static(path.join(__dirname, "../../uploads/course-media")));
 
 // Статические файлы (иконки, обложки, медиа)
 app.use("/uploads", express.static(path.join(__dirname, "../../uploads")));
@@ -97,7 +99,7 @@ apiRouter.get("/health", async (req, res, next) => {
   }
 });
 
-apiRouter.use("/auth", authModule.routes);
+apiRouter.use("/auth", authLimiter, authModule.routes);
 apiRouter.use("/invitations", invitationModule.routes);
 apiRouter.use("/admin/auth", authModule.admin.routes);
 apiRouter.use("/admin/dashboard", adminDashboardRoutes);
@@ -129,9 +131,13 @@ apiRouter.use("/bot", botModule.routes);
 apiRouter.use("/verify", verifyCertificateLimiter, certificatesModule.verifyRouter);
 apiRouter.use("/certificates", certificatesModule.publicRouter);
 apiRouter.use("/admin/certificates", certificatesModule.adminRouter);
-// Внутренний маршрут для Telegram-бота (авторизация по BOT_TOKEN)
-app.use("/api/bot/internal", botModule.internalRoutes);
-app.use("/api", apiRouter);
+// Основной API только v1.
+app.use("/api/v1/bot/internal", botModule.internalRoutes);
+app.use("/api/v1", apiRouter);
+app.get("/metrics", (req, res) => {
+  res.setHeader("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+  res.send(toPrometheusMetrics());
+});
 
 app.use(errorHandler);
 

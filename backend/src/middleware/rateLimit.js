@@ -9,6 +9,14 @@ const verifyCertificateLimiter = rateLimit({
   message: { error: "Слишком много запросов. Повторите позже." },
 });
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Слишком много запросов к auth API. Повторите позже." },
+});
+
 const adminGlobalLimiter = rateLimit({
   windowMs: adminRateLimitConfig.windowMs,
   max: adminRateLimitConfig.max,
@@ -19,5 +27,6 @@ const adminGlobalLimiter = rateLimit({
 
 module.exports = {
   verifyCertificateLimiter,
+  authLimiter,
   adminGlobalLimiter,
 };

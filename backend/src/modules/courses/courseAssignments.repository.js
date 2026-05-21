@@ -107,6 +107,44 @@ async function addAssignment(courseId, userId, assignedBy, deadlineAt = null) {
   }
 }
 
+async function addAssignmentsBulk(courseId, userIds, assignedBy, deadlineAt = null) {
+  if (!Array.isArray(userIds) || userIds.length === 0) {
+    return { assignedCount: 0 };
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    for (const rawUserId of userIds) {
+      const userId = Number(rawUserId);
+      if (!Number.isInteger(userId) || userId <= 0) {
+        continue;
+      }
+
+      await connection.execute(
+        `INSERT INTO course_user_assignments (course_id, user_id, assigned_by, assigned_at, status, deadline_at, closed_at, closed_by)
+         VALUES (?, ?, ?, UTC_TIMESTAMP(), 'active', ?, NULL, NULL)
+         ON DUPLICATE KEY UPDATE assigned_by = VALUES(assigned_by), assigned_at = UTC_TIMESTAMP(), status = 'active', deadline_at = VALUES(deadline_at), closed_at = NULL, closed_by = NULL`,
+        [courseId, userId, assignedBy, deadlineAt],
+      );
+    }
+
+    await connection.commit();
+    return { assignedCount: userIds.length };
+  } catch (error) {
+    await connection.rollback();
+    if (error.code === "ER_NO_REFERENCED_ROW_2") {
+      const err = new Error("Пользователь или курс не найден");
+      err.status = 404;
+      throw err;
+    }
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 async function removeAssignment(courseId, userId) {
   const [result] = await pool.execute("DELETE FROM course_user_assignments WHERE course_id = ? AND user_id = ?", [courseId, userId]);
   return result.affectedRows > 0;
@@ -184,6 +222,7 @@ module.exports = {
   getAssignments,
   replaceTargets,
   addAssignment,
+  addAssignmentsBulk,
   removeAssignment,
   closeAssignment,
   findUserAssignment,

@@ -7,7 +7,15 @@
     <p class="body-small text-secondary mb-8">
       {{ descriptionText }}
     </p>
-    <div class="reading-timer-notice__progress" role="progressbar" :aria-valuenow="progressPercent" aria-valuemin="0" aria-valuemax="100">
+    <div
+      class="reading-timer-notice__progress"
+      role="progressbar"
+      aria-label="Прогресс таймера чтения"
+      :aria-valuenow="progressPercent"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      :aria-valuetext="`${progressPercent}%`"
+    >
       <div class="reading-timer-notice__progress-fill" :style="{ width: `${progressPercent}%` }"></div>
     </div>
   </section>

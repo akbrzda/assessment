@@ -33,6 +33,7 @@ jobs:
         run: |
           cat << EOF > .env
           BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+          INTERNAL_API_SECRET=${{ secrets.BOT_INTERNAL_API_SECRET }}
           MINI_APP_URL=${{ secrets.BOT_MINI_APP_URL }}
           BACKEND_URL=${{ secrets.BOT_BACKEND_URL }}
           EOF

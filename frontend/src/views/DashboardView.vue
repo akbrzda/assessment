@@ -7,9 +7,6 @@
             <h1 class="welcome-title">{{ greetingText }}, {{ userStore.user?.firstName || "коллега" }}! 👋</h1>
             <p class="welcome-subtitle">Продолжайте обучение и достигайте новых целей</p>
           </div>
-          <button class="notification-btn" type="button" aria-label="Уведомления">
-            <Bell :size="26" />
-          </button>
         </div>
       </section>
 
@@ -27,7 +24,7 @@
       <div v-else-if="dashboardError" class="dashboard-error app-panel">
         <h2 class="section-title">Не удалось загрузить дашборд</h2>
         <p class="dashboard-error__text">{{ dashboardError }}</p>
-        <button class="continue-btn" type="button" @click="loadDashboardData">Повторить</button>
+        <BaseButton class="continue-btn" type="button" @click="loadDashboardData">Повторить</BaseButton>
       </div>
 
       <template v-else>
@@ -37,7 +34,7 @@
             <div class="continue-content">
               <h3 class="continue-title">{{ continueCourseTitle }}</h3>
               <p class="continue-meta">{{ continueCourseMeta }}</p>
-              <button class="continue-btn" type="button" @click="handleContinueAction">Продолжить</button>
+              <BaseButton class="continue-btn" type="button" @click="handleContinueAction">Продолжить</BaseButton>
             </div>
             <div class="continue-image" :class="{ 'continue-image--placeholder': !continueCourseImageUrl }" aria-hidden="true">
               <img
@@ -118,7 +115,7 @@
           <div v-else class="tasks-empty app-panel">
             <ShieldCheck :size="32" class="tasks-empty-icon" />
             <p class="tasks-empty-text">Все курсы завершены или ещё не начаты</p>
-            <button class="tasks-empty-link" type="button" @click="router.push({ name: 'assessments' })">Перейти к курсам</button>
+            <BaseButton class="tasks-empty-link" variant="ghost" size="sm" type="button" @click="router.push({ name: 'assessments' })">Перейти к курсам</BaseButton>
           </div>
         </section>
       </template>
@@ -129,10 +126,11 @@
 <script>
 import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
-import { Bell, BookOpen, ChevronRight, Clock3, MessageSquareText, ShieldCheck } from "lucide-vue-next";
+import { BookOpen, ChevronRight, Clock3, MessageSquareText, ShieldCheck } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 import { apiClient } from "../services/apiClient";
+import BaseButton from "../components/ui/BaseButton.vue";
 import { getCourseFallbackVisual } from "../utils/courseVisuals";
 import SkeletonBlock from "../components/skeleton/SkeletonBlock.vue";
 import SkeletonCard from "../components/skeleton/SkeletonCard.vue";
@@ -161,7 +159,6 @@ function normalizeCourse(item) {
 export default {
   name: "DashboardView",
   components: {
-    Bell,
     BookOpen,
     ChevronRight,
     Clock3,
@@ -171,6 +168,7 @@ export default {
     SkeletonCard,
     SkeletonList,
     SkeletonPageHeader,
+    BaseButton,
   },
   setup() {
     const router = useRouter();
@@ -269,23 +267,71 @@ export default {
       }));
     });
 
-    function openCourse(courseId) {
-      if (!courseId) {
-        return;
+    function resolveNextStep(courseDetails) {
+      const sections = courseDetails?.sections || [];
+      for (const section of sections) {
+        const topics = section?.topics || [];
+        const firstIncompleteTopic = topics.find((topic) => !topic?.progress?.locked && topic?.progress?.status !== "completed");
+        if (firstIncompleteTopic) {
+          return {
+            type: "topic",
+            sectionId: section.id,
+            topicId: firstIncompleteTopic.id,
+          };
+        }
+
+        if (!section?.progress?.locked && section?.progress?.status !== "passed") {
+          return {
+            type: "section",
+            sectionId: section.id,
+          };
+        }
       }
+
+      return null;
+    }
+
+    async function openContinueCourse(courseId) {
+      if (!courseId) return;
       telegramStore.hapticFeedback("impact", "light");
-      router.push({
-        name: "course-details",
-        params: { id: courseId },
-      });
+      try {
+        const courseResponse = await apiClient.getCourseById(courseId);
+        const nextStep = resolveNextStep(courseResponse?.course);
+        if (nextStep?.type === "topic") {
+          router.push({
+            name: "course-subtopic",
+            params: {
+              courseId,
+              sectionId: nextStep.sectionId,
+              topicId: nextStep.topicId,
+            },
+          });
+          return;
+        }
+
+        if (nextStep?.type === "section") {
+          router.push({
+            name: "course-topic",
+            params: {
+              courseId,
+              sectionId: nextStep.sectionId,
+            },
+          });
+          return;
+        }
+
+        router.push({ name: "course-details", params: { id: courseId } });
+      } catch (error) {
+        console.error("Не удалось определить следующую тему курса", error);
+        router.push({ name: "course-details", params: { id: courseId } });
+      }
     }
 
     function handleContinueAction() {
       if (continueCourse.value?.id) {
-        openCourse(continueCourse.value.id);
+        openContinueCourse(continueCourse.value.id);
         return;
       }
-
       router.push({ name: "assessments" });
     }
 

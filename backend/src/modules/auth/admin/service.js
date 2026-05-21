@@ -8,7 +8,7 @@ const { pool } = require("../../../config/database");
 const ACCESS_TOKEN_TTL = process.env.JWT_ACCESS_TTL || "30m";
 const REFRESH_TOKEN_TTL = process.env.JWT_REFRESH_TTL || "7d";
 const REFRESH_COOKIE_NAME = "admin_refresh_token";
-const REFRESH_COOKIE_PATH = "/api/admin/auth";
+const REFRESH_COOKIE_PATH = "/api/v1/admin/auth";
 
 const isProduction = process.env.NODE_ENV === "production";
 const cookieDomain = process.env.COOKIE_DOMAIN || (isProduction ? ".theorica.ru" : undefined);
@@ -91,6 +91,18 @@ function createRefreshToken(userId) {
   });
 }
 
+async function hashRefreshToken(refreshToken) {
+  return bcrypt.hash(refreshToken, 10);
+}
+
+async function verifyRefreshToken(storedRefreshTokenHash, refreshToken) {
+  if (!storedRefreshTokenHash || !refreshToken) {
+    return false;
+  }
+
+  return bcrypt.compare(refreshToken, storedRefreshTokenHash);
+}
+
 async function login(payload, req, res) {
   const { login, password } = payload;
 
@@ -149,8 +161,9 @@ async function login(payload, req, res) {
 
   const accessToken = createAccessToken(user);
   const refreshToken = createRefreshToken(user.id);
+  const refreshTokenHash = await hashRefreshToken(refreshToken);
 
-  await authRepository.updateRefreshToken(user.id, refreshToken);
+  await authRepository.updateRefreshToken(user.id, refreshTokenHash);
   await logAndSend({
     req,
     actor: { id: user.id, role: user.role_name, name: `${user.first_name} ${user.last_name}`.trim() },
@@ -182,15 +195,21 @@ async function refresh(payload, req, res) {
     throw buildError("Недействительный refresh token", 401);
   }
 
-  const user = await authRepository.findUserByRefreshToken(decoded.id, refreshToken);
+  const user = await authRepository.findUserById(decoded.id);
   if (!user) {
+    throw buildError("Недействительный refresh token", 401);
+  }
+
+  const isValidRefreshToken = await verifyRefreshToken(user.refresh_token, refreshToken);
+  if (!isValidRefreshToken) {
     throw buildError("Недействительный refresh token", 401);
   }
 
   const accessToken = createAccessToken(user);
   const newRefreshToken = createRefreshToken(user.id);
+  const newRefreshTokenHash = await hashRefreshToken(newRefreshToken);
 
-  await authRepository.updateRefreshToken(user.id, newRefreshToken);
+  await authRepository.updateRefreshToken(user.id, newRefreshTokenHash);
   setRefreshCookie(res, newRefreshToken);
 
   return {

@@ -1,7 +1,9 @@
 const { Server } = require("socket.io");
+const { createAdapter } = require("@socket.io/redis-adapter");
 const jwt = require("jsonwebtoken");
 const config = require("../config/env");
 const logger = require("../utils/logger");
+const { connectRedis } = require("./redisService");
 
 let io = null;
 
@@ -34,7 +36,7 @@ function authenticateSocket(socket, next) {
 }
 
 // Инициализация WebSocket сервера
-function initWebSocket(server) {
+async function initWebSocket(server) {
   const isProduction = config.nodeEnv === "production";
   if (isProduction && (!config.allowedOrigins || config.allowedOrigins.length === 0)) {
     throw new Error("ALLOWED_ORIGINS не задан: WebSocket не может быть запущен в production");
@@ -57,6 +59,7 @@ function initWebSocket(server) {
   });
 
   io.use(authenticateSocket);
+  await setupRedisAdapterIfAvailable();
 
   io.on("connection", (socket) => {
     logger.info(`WebSocket client connected: ${socket.id} (user: ${socket.userId})`);
@@ -83,6 +86,25 @@ function initWebSocket(server) {
 
   logger.info("✅ WebSocket server initialized");
   return io;
+}
+
+async function setupRedisAdapterIfAvailable() {
+  try {
+    const redisClient = await connectRedis();
+    if (!redisClient) {
+      logger.warn("Redis adapter Socket.IO отключен: Redis клиент недоступен");
+      return;
+    }
+
+    const pubClient = redisClient;
+    const subClient = redisClient.duplicate();
+    await subClient.connect();
+
+    io.adapter(createAdapter(pubClient, subClient));
+    logger.info("Socket.IO Redis adapter подключен (multi-process режим активен)");
+  } catch (error) {
+    logger.warn("Не удалось подключить Redis adapter для Socket.IO: %s", error.message);
+  }
 }
 
 // Получить экземпляр io

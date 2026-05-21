@@ -6,21 +6,44 @@ const fs = require("fs");
 const path = require("path");
 const notificationService = require("../../../services/notifications/notificationService");
 const logger = require("../../../utils/logger");
+const cacheService = require("../../../services/cacheService");
 
 // - урс -
 
 async function listCourses({ status, search } = {}) {
-  return coursesRepo.listCoursesForAdmin({ status, search });
+  const cacheKey = `courses:admin:list:${status || "all"}:${search || ""}`;
+  const cached = await cacheService.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const courses = await coursesRepo.listCoursesForAdmin({ status, search });
+  await cacheService.set(cacheKey, courses, 120);
+  return courses;
 }
 
 async function getCourse(courseId) {
+  const cacheKey = `courses:admin:details:${courseId}`;
+  const cached = await cacheService.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const course = await coursesRepo.getCourseByIdForAdmin(courseId);
   if (!course) {
     const error = new Error("урс не найден");
     error.status = 404;
     throw error;
   }
+  await cacheService.set(cacheKey, course, 120);
   return course;
+}
+
+async function invalidateCourseAdminCache(courseId) {
+  await cacheService.invalidate(/^courses:admin:list:/);
+  if (courseId) {
+    await cacheService.delete(`courses:admin:details:${courseId}`);
+  }
 }
 
 async function createCourse(payload, userId, req) {
@@ -40,6 +63,7 @@ async function createCourse(payload, userId, req) {
       entityId: course.id,
       metadata: { title: course.title, status: course.status },
     });
+    await invalidateCourseAdminCache(course.id);
     return course;
   } catch (error) {
     await connection.rollback();
@@ -78,6 +102,7 @@ async function updateCourse(courseId, payload, userId, req) {
       entityId: courseId,
       metadata: { title: course.title, status: course.status, previousStatus: existing.status },
     });
+    await invalidateCourseAdminCache(courseId);
     return course;
   } catch (error) {
     await connection.rollback();
@@ -130,6 +155,7 @@ async function uploadCourseCover(courseId, file, userId, req) {
       entityId: courseId,
       metadata: { title: course?.title || existing.title, coverUrl },
     });
+    await invalidateCourseAdminCache(courseId);
     return course;
   } catch (error) {
     await connection.rollback();
@@ -173,6 +199,7 @@ async function deleteCourse(courseId, req) {
       entityId: courseId,
       metadata: { title: existing.title },
     });
+    await invalidateCourseAdminCache(courseId);
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -207,6 +234,7 @@ async function publishCourse(courseId, userId, req) {
       entityId: courseId,
       metadata: { title: course.title, version: course.version },
     });
+    await invalidateCourseAdminCache(courseId);
 
     // Создаём уведомления для всех employee без прогресса по курсу
     setImmediate(() =>
@@ -297,6 +325,7 @@ async function archiveCourse(courseId, userId, req) {
       entityId: courseId,
       metadata: { title: existing.title },
     });
+    await invalidateCourseAdminCache(courseId);
     return course;
   } catch (error) {
     await connection.rollback();

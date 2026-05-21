@@ -270,7 +270,7 @@
     <div class="section-block">
       <div class="section-head">
         <h2 class="section-title">Сводка аналитики</h2>
-        <button class="help-btn" title="Справка"><Icon name="circle-help" :size="16" /></button>
+        <Button variant="ghost" size="sm" icon="circle-help" :icon-only="true" aria-label="Справка" />
       </div>
       <AnalyticsSummaryCards />
     </div>
@@ -314,9 +314,9 @@
           <TableBody>
             <TableRow v-for="row in funnel" :key="row.courseId">
               <TableCell>
-                <button type="button" class="funnel-course-link" @click="goToStatistics(row.courseId)">
+                <Button type="button" variant="link" size="sm" class="funnel-course-link" @click="goToStatistics(row.courseId)">
                   {{ row.courseTitle }}
-                </button>
+                </Button>
               </TableCell>
               <TableCell>{{ row.assignedCount }}</TableCell>
               <TableCell>{{ row.completedCount }}</TableCell>
@@ -1338,16 +1338,6 @@ const handleRemoveCategory = (categoryValue) => {
   margin: 4px 0 0;
   font-size: 13px;
   color: var(--text-secondary);
-}
-
-.help-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  padding: 0;
 }
 
 .period-select {

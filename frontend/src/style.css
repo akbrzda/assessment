@@ -39,7 +39,7 @@ html[data-theme="dark"] {
   --bg-primary: #111118;
   --bg-secondary: #1c1c26;
   --text-primary: #f0f0f5;
-  --text-secondary: #7a7a90;
+  --text-secondary: #c3cad9;
   --divider: #252530;
   --accent: #7b6fff;
   --accent-blue: #7b6fff;
@@ -82,6 +82,11 @@ body {
   transition:
     background-color 0.3s ease,
     color 0.3s ease;
+}
+
+:where(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 #app {
@@ -217,8 +222,8 @@ body {
 }
 
 .btn-icon {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   padding: 0;
   border: none;
@@ -689,6 +694,10 @@ button svg {
     margin-left: -4px;
     margin-right: -4px;
   }
+
+  :where(button, .btn, .btn-icon, .nav-item, a.btn, input[type="button"], input[type="submit"]) {
+    min-height: 44px;
+  }
 }
 
 /* === Редизайн 2026: базовый визуальный слой === */
@@ -712,7 +721,7 @@ html[data-theme="dark"] {
   --bg-primary: #111827;
   --bg-secondary: #1f2937;
   --text-primary: #f9fafb;
-  --text-secondary: #9ca3af;
+  --text-secondary: #c3cad9;
   --divider: #374151;
   --accent-blue: #7c6fff;
   --success: #4ade80;
@@ -756,7 +765,7 @@ body {
 
 .btn {
   border-radius: 10px;
-  min-height: 40px;
+  min-height: 44px;
   font-size: 14px;
   font-weight: 700;
 }

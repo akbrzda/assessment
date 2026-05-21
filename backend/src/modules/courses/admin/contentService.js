@@ -3,6 +3,7 @@ const coursesRepo = require("../courses.repository");
 const mutationsRepo = require("../coursesMutations.repository");
 const progressRepo = require("../courseProgress.repository");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
+const cacheService = require("../../../services/cacheService");
 
 function ensureCourseEditable(courseStatus) {
   if (courseStatus === "archived") {
@@ -17,6 +18,13 @@ async function recalculateProgressIfPublished(courseId, isPublished, connection)
     return;
   }
   await progressRepo.recalculateCourseProgressForAllUsers({ courseId, connection });
+}
+
+async function invalidateCourseAdminCache(courseId) {
+  await cacheService.invalidate(/^courses:admin:list:/);
+  if (courseId) {
+    await cacheService.delete(`courses:admin:details:${courseId}`);
+  }
 }
 
 // в”Ђв”Ђв”Ђ Р Р°Р·РґРµР»С‹ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
@@ -51,6 +59,7 @@ async function createSection(courseId, payload, userId, req) {
       entityId: sectionId,
       metadata: { courseId, title: section?.title },
     });
+    await invalidateCourseAdminCache(courseId);
     return { section, course: updatedCourse };
   } catch (error) {
     await connection.rollback();
@@ -96,6 +105,7 @@ async function updateSection(sectionId, payload, userId, req) {
       entityId: sectionId,
       metadata: { courseId: section.courseId, title: updatedSection?.title },
     });
+    await invalidateCourseAdminCache(section.courseId);
     return { section: updatedSection, course: updatedCourse };
   } catch (error) {
     await connection.rollback();
@@ -132,6 +142,7 @@ async function deleteSection(sectionId, userId, req) {
       entityId: sectionId,
       metadata: { courseId: section.courseId },
     });
+    await invalidateCourseAdminCache(section.courseId);
     return { course: updatedCourse };
   } catch (error) {
     await connection.rollback();
@@ -173,6 +184,7 @@ async function createTopic(sectionId, payload, userId, req) {
       entityId: topicId,
       metadata: { sectionId, courseId: section.courseId, title: topic?.title },
     });
+    await invalidateCourseAdminCache(section.courseId);
     return { topic, course: updatedCourse };
   } catch (error) {
     await connection.rollback();
@@ -217,6 +229,7 @@ async function reorderSections(courseId, sectionIds, userId, req) {
       entityId: courseId,
       metadata: { courseId },
     });
+    await invalidateCourseAdminCache(courseId);
     return { course: updatedCourse };
   } catch (error) {
     await connection.rollback();
@@ -261,6 +274,7 @@ async function reorderTopics(courseId, sectionId, topicIds, userId, req) {
       entityId: sectionId,
       metadata: { sectionId, courseId: section.courseId },
     });
+    await invalidateCourseAdminCache(section.courseId);
     return { course: updatedCourse };
   } catch (error) {
     await connection.rollback();
@@ -312,6 +326,7 @@ async function updateTopic(topicId, payload, userId, req) {
       entityId: topicId,
       metadata: { sectionId: topic.sectionId, courseId: topic.courseId, title: updatedTopic?.title },
     });
+    await invalidateCourseAdminCache(topic.courseId);
     return { topic: updatedTopic, course: updatedCourse };
   } catch (error) {
     await connection.rollback();
@@ -348,6 +363,7 @@ async function deleteTopic(topicId, userId, req) {
       entityId: topicId,
       metadata: { sectionId: topic.sectionId, courseId: topic.courseId },
     });
+    await invalidateCourseAdminCache(topic.courseId);
     return { course: updatedCourse };
   } catch (error) {
     await connection.rollback();

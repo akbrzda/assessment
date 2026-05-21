@@ -14,7 +14,7 @@
 
 <script>
 import { computed } from "vue";
-import { Home, ClipboardList, BarChart2, User } from "lucide-vue-next";
+import { BookOpenCheck, Home, Trophy, User } from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 
 export default {
@@ -33,13 +33,14 @@ export default {
         name: "assessments",
         to: "/assessments",
         label: "Курсы",
-        icon: ClipboardList,
+        icon: BookOpenCheck,
+        featured: true,
       },
       {
         name: "leaderboard",
         to: "/leaderboard",
         label: "Лидерборд",
-        icon: BarChart2,
+        icon: Trophy,
       },
       {
         name: "profile",
@@ -93,6 +94,21 @@ export default {
   transition: color 0.18s ease;
   padding: 6px 4px;
   gap: 3px;
+}
+
+.nav-item:nth-child(2) {
+  position: relative;
+}
+
+.nav-item:nth-child(2)::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  width: 28px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 70%, transparent 30%);
+  opacity: 0.7;
 }
 
 .nav-item.active {

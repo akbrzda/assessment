@@ -11,7 +11,12 @@ const logger = createLogger({
   ),
   transports: [
     new transports.Console(),
-    new transports.File({ filename: path.resolve(process.cwd(), 'logs', 'app.log') })
+    new transports.File({
+      filename: path.resolve(process.cwd(), 'logs', 'app.log'),
+      maxsize: 10 * 1024 * 1024,
+      maxFiles: 10,
+      tailable: true
+    })
   ]
 });
 

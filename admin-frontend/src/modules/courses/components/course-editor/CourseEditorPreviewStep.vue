@@ -3,9 +3,45 @@
     <div class="step-card-header">
       <h2>Шаг {{ previewStepId }}. Предпросмотр и публикация</h2>
       <p>Проверьте структуру курса, итоговую аттестацию и готовность к публикации.</p>
+      <div class="preview-mode-switch">
+        <Button size="sm" :variant="previewMode === 'editor' ? 'primary' : 'secondary'" @click="previewMode = 'editor'">Редактор</Button>
+        <Button size="sm" :variant="previewMode === 'student' ? 'primary' : 'secondary'" @click="previewMode = 'student'">Student-view</Button>
+      </div>
     </div>
 
-    <div class="preview-layout">
+    <div v-if="previewMode === 'student'" class="student-view-shell">
+      <div class="student-view-phone">
+        <div class="student-view-header">
+          <h3>{{ course.title }}</h3>
+          <p>Режим просмотра глазами ученика</p>
+        </div>
+        <div class="student-view-topics">
+          <button
+            v-for="section in previewSections"
+            :key="`student-${section.id}`"
+            type="button"
+            class="student-view-section"
+            @click="emit('update:active-preview-topic-id', section.topics?.[0]?.id || null)"
+          >
+            <span class="student-view-section-index">{{ section.orderIndex }}</span>
+            <span class="student-view-section-title">{{ section.title }}</span>
+          </button>
+        </div>
+        <div class="student-view-material">
+          <h4>
+            <template v-if="activePreviewTopicWithSection">
+              {{ activePreviewTopicWithSection.sectionOrderIndex }}.{{ activePreviewTopicWithSection.topic.orderIndex }}
+              {{ activePreviewTopicWithSection.topic.title }}
+            </template>
+            <template v-else>Материал темы</template>
+          </h4>
+          <div v-if="activePreviewTopicContent" class="student-view-material-text" v-html="activePreviewTopicContent"></div>
+          <div v-else class="student-view-empty">Материал пока не добавлен.</div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="preview-layout">
       <div class="preview-content-layout">
         <aside class="preview-structure-panel">
           <h3 class="preview-panel-title">Структура курса</h3>
@@ -81,6 +117,7 @@
 </template>
 
 <script setup>
+import { ref } from "vue";
 import { Button, Card } from "@/components/ui";
 
 defineProps({
@@ -102,6 +139,7 @@ defineProps({
 });
 
 const emit = defineEmits(["publish", "update:active-preview-topic-id"]);
+const previewMode = ref("editor");
 </script>
 
 <style scoped>
@@ -109,10 +147,101 @@ const emit = defineEmits(["publish", "update:active-preview-topic-id"]);
   margin-bottom: 20px;
 }
 
+.preview-mode-switch {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+}
+
 .preview-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 330px;
   gap: 14px;
+}
+
+.student-view-shell {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 10px;
+}
+
+.student-view-phone {
+  width: min(420px, 100%);
+  border: 1px solid var(--divider);
+  border-radius: 18px;
+  background: #f8fafc;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.student-view-header h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.student-view-header p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.student-view-topics {
+  display: grid;
+  gap: 8px;
+}
+
+.student-view-section {
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.student-view-section-index {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #6d28d9;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.student-view-section-title {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.student-view-material {
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.student-view-material h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.student-view-material-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.student-view-empty {
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 
 .preview-content-layout {

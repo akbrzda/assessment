@@ -40,16 +40,18 @@
           <Upload class="cover-dropzone-icon" :size="32" :stroke-width="1.5" />
           <p>
             Перетащите файл сюда или
-            <button type="button" class="cover-dropzone-link" @click.stop.prevent="emit('trigger-cover-file-input')">выберите файл</button>
+            <Button type="button" variant="link" size="sm" class="cover-dropzone-link" @click.stop.prevent="emit('trigger-cover-file-input')">
+              выберите файл
+            </Button>
           </p>
           <p class="cover-dropzone-hint">PNG, JPG или WEBP. Макс. размер 5 МБ</p>
         </label>
         <div v-if="form.coverUrl" class="cover-preview-box">
           <img :src="form.coverUrl" alt="Обложка курса" class="cover-preview-img" />
-          <button type="button" class="cover-preview-remove" @mousedown.stop.prevent @click.stop.prevent="emit('remove-cover')">
+          <Button type="button" variant="outline" size="sm" class="cover-preview-remove" @mousedown.stop.prevent @click.stop.prevent="emit('remove-cover')">
             <Trash2 :size="16" :stroke-width="2" />
             Удалить
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -107,7 +109,7 @@
 
 <script setup>
 import { Info, Trash2, Upload } from "lucide-vue-next";
-import { Input, Select, TagsInput, Textarea, WysiwygEditor } from "@/components/ui";
+import { Button, Input, Select, TagsInput, Textarea, WysiwygEditor } from "@/components/ui";
 
 const props = defineProps({
   form: { type: Object, required: true },

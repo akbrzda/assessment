@@ -14,13 +14,13 @@ async function findUserByLogin(login) {
   return users[0] || null;
 }
 
-async function findUserByRefreshToken(userId, refreshToken) {
+async function findUserById(userId) {
   const [users] = await pool.query(
     `SELECT u.*, r.name as role_name
      FROM users u
      LEFT JOIN roles r ON u.role_id = r.id
-     WHERE u.id = ? AND u.refresh_token = ?`,
-    [userId, refreshToken]
+     WHERE u.id = ?`,
+    [userId]
   );
 
   return users[0] || null;
@@ -36,7 +36,7 @@ async function clearRefreshToken(userId) {
 
 module.exports = {
   findUserByLogin,
-  findUserByRefreshToken,
+  findUserById,
   updateRefreshToken,
   clearRefreshToken,
 };

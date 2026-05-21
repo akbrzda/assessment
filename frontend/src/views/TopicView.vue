@@ -12,7 +12,7 @@
       <div v-else-if="errorText" class="card error-state">
         <h3 class="title-small mb-8">Не удалось загрузить тему</h3>
         <p class="body-small text-secondary mb-12">{{ errorText }}</p>
-        <button class="btn btn-primary btn-full" type="button" @click="loadSection">Повторить</button>
+        <BaseButton full-width type="button" @click="loadSection">Повторить</BaseButton>
       </div>
 
       <!-- Контент -->
@@ -27,9 +27,7 @@
             <span class="progress-label">Прогресс темы</span>
             <span class="topic-progress__percent">{{ sectionProgressPercent }}%</span>
           </div>
-          <div class="progress-bar mb-8">
-            <div class="progress-fill" :style="{ width: `${sectionProgressPercent}%` }"></div>
-          </div>
+          <ProgressBar class="mb-8" :value="sectionProgressPercent" />
           <p class="progress-count">{{ completedTopicsCount }} из {{ topics.length }} подтем</p>
         </section>
 
@@ -64,7 +62,9 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { apiClient } from "../services/apiClient";
+import BaseButton from "../components/ui/BaseButton.vue";
 import LockPopup from "../components/courses/LockPopup.vue";
+import ProgressBar from "../components/ui/ProgressBar.vue";
 import SubtopicItem from "../components/courses/SubtopicItem.vue";
 import { getVisibleTopics } from "../utils/courseVisibility";
 import SkeletonBlock from "../components/skeleton/SkeletonBlock.vue";
@@ -75,6 +75,8 @@ export default {
   name: "TopicView",
   components: {
     LockPopup,
+    BaseButton,
+    ProgressBar,
     SubtopicItem,
     SkeletonBlock,
     SkeletonList,
@@ -211,20 +213,6 @@ export default {
   font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
-}
-
-.progress-bar {
-  height: 6px;
-  background: color-mix(in srgb, var(--accent-blue) 20%, var(--bg-primary) 80%);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: var(--accent-blue);
-  border-radius: 999px;
-  transition: width 0.3s ease;
 }
 
 .progress-count {

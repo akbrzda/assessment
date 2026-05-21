@@ -24,9 +24,7 @@
             <span class="progress-label">Прогресс курса</span>
             <span class="progress-percent">{{ Math.round(course.progress.progressPercent || 0) }}%</span>
           </div>
-          <div class="progress-bar-wrap">
-            <div class="progress-bar-fill" :style="{ width: `${Math.min(Math.max(course.progress.progressPercent || 0, 0), 100)}%` }"></div>
-          </div>
+          <ProgressBar :value="course.progress.progressPercent || 0" />
           <p class="progress-hint">{{ course.progress.completedSectionsCount || 0 }} из {{ course.progress.totalSectionsCount || 0 }} тем</p>
         </section>
 
@@ -76,12 +74,12 @@
             <span v-if="isFinalAssessmentPassed" class="final-hint final-hint--passed"> Пройдена · {{ finalAssessmentBestScore }}% </span>
             <span v-else class="final-hint">Доступна после прохождения всех тем курса</span>
           </div>
-          <button v-if="isFinalAssessmentPassed" class="btn-final btn-final--result" @click="router.push(finalAssessmentResultLink)">
+          <BaseButton v-if="isFinalAssessmentPassed" class="btn-final btn-final--result" size="sm" @click="router.push(finalAssessmentResultLink)">
             Результат
-          </button>
-          <button v-else class="btn-final" :disabled="!course.finalAssessment.available || !course.finalAssessment.id" @click="openFinalAssessment">
+          </BaseButton>
+          <BaseButton v-else class="btn-final" size="sm" :disabled="!course.finalAssessment.available || !course.finalAssessment.id" @click="openFinalAssessment">
             Перейти
-          </button>
+          </BaseButton>
         </div>
       </template>
 
@@ -117,6 +115,8 @@ import { apiClient } from "../services/apiClient";
 import { useTelegramStore } from "../stores/telegram";
 import { useUserStore } from "../stores/user";
 import LockPopup from "../components/courses/LockPopup.vue";
+import BaseButton from "../components/ui/BaseButton.vue";
+import ProgressBar from "../components/ui/ProgressBar.vue";
 import { getVisibleTopics, sectionHasVisibleTopics } from "../utils/courseVisibility";
 import { getRichTextPreview } from "../utils/richText";
 import SkeletonBlock from "../components/skeleton/SkeletonBlock.vue";
@@ -129,6 +129,8 @@ export default {
   name: "CourseDetailsView",
   components: {
     LockPopup,
+    BaseButton,
+    ProgressBar,
     Check,
     GraduationCap,
     Lock,
@@ -731,22 +733,6 @@ export default {
   font-size: 17px;
   font-weight: 700;
   color: var(--text-primary);
-}
-
-.progress-bar-wrap {
-  width: 100%;
-  height: 8px;
-  background-color: var(--divider);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-
-.progress-bar-fill {
-  height: 100%;
-  background-color: var(--accent);
-  border-radius: 4px;
-  transition: width 0.3s ease;
 }
 
 .progress-hint {

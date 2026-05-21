@@ -1,5 +1,6 @@
 <template>
   <div id="app" :data-theme="theme" :class="platformClass">
+    <div v-if="isOffline" class="offline-banner">Нет соединения с интернетом. Показываем сохраненные данные, часть функций временно недоступна.</div>
     <router-view />
     <BottomNavigation v-if="showBottomNav" />
     <div v-if="showMiniAppOnboarding" class="miniapp-onboarding-overlay">
@@ -11,9 +12,9 @@
           <li>Изучайте материалы и проходите тесты по шагам.</li>
           <li>Следите за прогрессом, баллами и достижениями в профиле.</li>
         </ul>
-        <button class="btn btn-primary btn-full" :disabled="onboardingSubmitting" @click="finishMiniAppOnboarding">
+        <BaseButton full-width :disabled="onboardingSubmitting" :loading="onboardingSubmitting" @click="finishMiniAppOnboarding">
           {{ onboardingSubmitting ? "Сохраняем..." : "Понятно, начать" }}
-        </button>
+        </BaseButton>
       </div>
     </div>
     <Preloader v-if="isLoading" />
@@ -21,7 +22,7 @@
 </template>
 
 <script>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { useRoute } from "vue-router";
 import { useTelegramStore } from "./stores/telegram";
@@ -29,6 +30,7 @@ import { useThemeStore } from "./stores/theme";
 import { useUserStore } from "./stores/user";
 import { useBackButton } from "./composables/useBackButton";
 import { useTimezone } from "./composables/useTimezone";
+import BaseButton from "./components/ui/BaseButton.vue";
 import BottomNavigation from "./components/BottomNavigation.vue";
 import Preloader from "./components/Preloader.vue";
 
@@ -36,6 +38,7 @@ export default {
   name: "App",
   components: {
     BottomNavigation,
+    BaseButton,
     Preloader,
   },
   setup() {
@@ -53,6 +56,13 @@ export default {
     const theme = computed(() => themeStore.theme);
     const isLoading = computed(() => userStore.isLoading);
     const onboardingSubmitting = ref(false);
+    const isOffline = ref(typeof navigator !== "undefined" ? !navigator.onLine : false);
+    const handleOnline = () => {
+      isOffline.value = false;
+    };
+    const handleOffline = () => {
+      isOffline.value = true;
+    };
 
     const platformClass = computed(() => {
       const value = (platform.value || "").toLowerCase();
@@ -88,6 +98,9 @@ export default {
     }
 
     onMounted(async () => {
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+
       telegramStore.initTelegram();
       themeStore.initTheme();
       if (!telegramStore.hasValidInitData) {
@@ -106,6 +119,11 @@ export default {
       }
     });
 
+    onBeforeUnmount(() => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    });
+
     return {
       theme,
       isLoading,
@@ -114,12 +132,25 @@ export default {
       showMiniAppOnboarding,
       onboardingSubmitting,
       finishMiniAppOnboarding,
+      isOffline,
     };
   },
 };
 </script>
 
 <style scoped>
+.offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 1100;
+  padding: 10px 14px;
+  background: #8a2d2d;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: center;
+}
+
 .miniapp-onboarding-overlay {
   position: fixed;
   inset: 0;

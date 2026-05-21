@@ -49,7 +49,19 @@ async function getCourseByIdForAdmin(courseId) {
   if (!course) return null;
 
   const sections = await listSectionsByCourseId(courseId);
-  const sectionsWithTopics = await Promise.all(sections.map(async (section) => ({ ...section, topics: await listTopicsBySectionId(section.id) })));
+  const topics = await listTopicsByCourseId(courseId);
+  const topicsBySectionId = topics.reduce((accumulator, topic) => {
+    const sectionId = Number(topic.sectionId);
+    if (!accumulator[sectionId]) {
+      accumulator[sectionId] = [];
+    }
+    accumulator[sectionId].push(topic);
+    return accumulator;
+  }, {});
+  const sectionsWithTopics = sections.map((section) => ({
+    ...section,
+    topics: topicsBySectionId[Number(section.id)] || [],
+  }));
 
   const integrity = await validatePublicationIntegrity(courseId);
   return { ...course, sections: sectionsWithTopics, publication: { valid: integrity.valid, errors: integrity.errors } };

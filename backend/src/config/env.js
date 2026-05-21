@@ -13,7 +13,7 @@ for (const filename of envFiles) {
   }
 }
 
-const requiredVars = ["PORT", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "BOT_TOKEN", "JWT_SECRET", "JWT_REFRESH_SECRET"];
+const requiredVars = ["PORT", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "BOT_TOKEN", "JWT_SECRET", "JWT_REFRESH_SECRET", "INTERNAL_API_SECRET"];
 
 const missingVars = requiredVars.filter((key) => !process.env[key]);
 
@@ -39,7 +39,6 @@ function parseList(value) {
 
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
-  legacyCrudAuthEnabled: (process.env.LEGACY_CRUD_AUTH || "true").toLowerCase() === "true",
   port: Number(process.env.PORT || 3001),
   db: {
     host: process.env.DB_HOST,
@@ -50,6 +49,7 @@ module.exports = {
     connectTimeoutMs: Number(process.env.DB_CONNECT_TIMEOUT_MS || 10000),
   },
   botToken: process.env.BOT_TOKEN,
+  internalApiSecret: process.env.INTERNAL_API_SECRET || "",
   maxBotToken: process.env.MAX_BOT_TOKEN || process.env.BOT_TOKEN,
   maxBotName: process.env.MAX_BOT_NAME || "",
   jwtSecret: process.env.JWT_SECRET,
@@ -68,4 +68,8 @@ module.exports = {
 
 if (module.exports.nodeEnv === "production" && module.exports.allowedOrigins.length === 0) {
   throw new Error("[env] В production переменная ALLOWED_ORIGINS обязательна и не может быть пустой");
+}
+
+if (module.exports.nodeEnv === "production" && !module.exports.internalApiSecret) {
+  throw new Error("[env] В production переменная INTERNAL_API_SECRET обязательна");
 }

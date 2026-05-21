@@ -72,6 +72,7 @@ router.put("/:id/targets", ensureCourseWriteAccess, controller.updateTargets);
 // Назначения: ручные назначения пользователей
 router.get("/:id/assignments", controller.getAssignments);
 router.post("/:id/assignments", ensureCourseWriteAccess, controller.addAssignment);
+router.post("/:id/assignments/bulk", ensureCourseWriteAccess, controller.addAssignmentsBulk);
 router.post("/:id/assignments/:userId/close", ensureCourseWriteAccess, controller.closeAssignment);
 router.delete("/:id/assignments/:userId", ensureCourseWriteAccess, controller.removeAssignment);
 

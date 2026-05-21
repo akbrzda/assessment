@@ -36,7 +36,7 @@
       <div v-else-if="coursesError" class="error-state">
         <h3 class="title-small mb-8">Не удалось загрузить курсы</h3>
         <p class="body-small text-secondary mb-12">{{ coursesError }}</p>
-        <button class="btn btn-primary btn-full" type="button" @click="retryCourses">Повторить</button>
+        <BaseButton full-width type="button" @click="retryCourses">Повторить</BaseButton>
       </div>
 
       <div v-else-if="filteredCourses.length" class="courses-list">
@@ -52,13 +52,7 @@
               <span class="course-completed-text">Курс завершён</span>
             </div>
             <div v-else class="course-progress">
-              <div class="progress-track">
-                <div
-                  class="progress-fill"
-                  :class="{ 'progress-fill--active': course.progress.progressPercent > 0 }"
-                  :style="{ width: `${Math.min(Math.max(course.progress.progressPercent || 0, 0), 100)}%` }"
-                ></div>
-              </div>
+              <ProgressBar :value="course.progress.progressPercent || 0" />
               <span class="course-percent">{{ Math.round(course.progress.progressPercent || 0) }}%</span>
             </div>
           </div>
@@ -79,6 +73,8 @@ import { useRouter } from "vue-router";
 import { BookOpen, Search } from "lucide-vue-next";
 import { useTelegramStore } from "../stores/telegram";
 import { apiClient } from "../services/apiClient";
+import BaseButton from "../components/ui/BaseButton.vue";
+import ProgressBar from "../components/ui/ProgressBar.vue";
 import { getCourseFallbackVisual } from "../utils/courseVisuals";
 import SkeletonCard from "../components/skeleton/SkeletonCard.vue";
 import SkeletonPageHeader from "../components/skeleton/SkeletonPageHeader.vue";
@@ -88,6 +84,8 @@ export default {
   components: {
     BookOpen,
     Search,
+    BaseButton,
+    ProgressBar,
     SkeletonCard,
     SkeletonPageHeader,
   },
@@ -395,24 +393,6 @@ export default {
   grid-template-columns: 1fr auto;
   gap: 8px;
   align-items: center;
-}
-
-.progress-track {
-  height: 4px;
-  background: var(--divider);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  border-radius: 4px;
-  background: var(--divider);
-  transition: width 0.3s ease;
-}
-
-.progress-fill--active {
-  background: #34c759;
 }
 
 .course-percent {

@@ -104,7 +104,7 @@
 
         <div v-if="!sectionTestsEnabled" class="step-disabled-state">
           <p>Тесты тем отключены для этого курса. Слушатели смогут проходить материалы без промежуточных тестов.</p>
-          <button type="button" class="step-disabled-enable-btn" @click="sectionTestsEnabled = true">Включить тесты тем</button>
+          <Button type="button" class="step-disabled-enable-btn" size="sm" @click="sectionTestsEnabled = true">Включить тесты тем</Button>
         </div>
         <CourseSectionTestsStep v-else ref="sectionTestsStepRef" :course="course" @course-updated="handleCourseUpdatedFromTestsStep" />
       </Card>
@@ -126,7 +126,7 @@
 
         <div v-if="!finalAssessmentEnabled" class="editor-card step-disabled-state">
           <p>Итоговая аттестация отключена для этого курса. Курс будет считаться завершённым после прохождения всех материалов.</p>
-          <button type="button" class="step-disabled-enable-btn" @click="finalAssessmentEnabled = true">Включить аттестацию</button>
+          <Button type="button" class="step-disabled-enable-btn" size="sm" @click="finalAssessmentEnabled = true">Включить аттестацию</Button>
         </div>
         <CourseFinalAssessmentStep
           v-else

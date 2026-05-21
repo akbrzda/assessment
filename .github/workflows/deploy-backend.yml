@@ -44,6 +44,7 @@ jobs:
           DB_PASSWORD=${{ secrets.BACKEND_DB_PASSWORD }}
 
           BOT_TOKEN=${{ secrets.BACKEND_BOT_TOKEN }}
+          INTERNAL_API_SECRET=${{ secrets.BACKEND_INTERNAL_API_SECRET }}
           MAX_BOT_TOKEN=${{ secrets.BACKEND_MAX_BOT_TOKEN }}
           BOT_USERNAME=${{ secrets.BACKEND_BOT_USERNAME }}
           MAX_BOT_NAME=${{ secrets.BACKEND_MAX_BOT_NAME }}
@@ -89,6 +90,7 @@ jobs:
             --exclude '.git' \
             --exclude 'logs' \
             --exclude 'uploads' \
+             --exclude 'bot' \
             backend/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/backend.theorica.ru/
 
       - name: Install dependencies on server
@@ -148,7 +150,7 @@ jobs:
             PORT=${PORT:-3001}
             echo "Ожидание запуска на порту $PORT..."
             for i in $(seq 1 20); do
-              if curl -sf "http://localhost:$PORT/api/health" > /dev/null 2>&1; then
+              if curl -sf "http://localhost:$PORT/api/v1/health" > /dev/null 2>&1; then
                 echo "✅ Backend доступен (попытка $i)"
                 exit 0
               fi
