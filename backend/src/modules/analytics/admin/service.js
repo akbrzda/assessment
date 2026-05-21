@@ -595,42 +595,21 @@ exports.getUserReport = async (req, res, next) => {
 
     // Получаем информацию о пользователе
     let users;
-    try {
-      [users] = await pool.query(
-        `
-        SELECT 
-          u.*,
-          b.name as branch_name,
-          p.name as position_name,
-          l.name as level_name
-        FROM users u
-        LEFT JOIN branches b ON u.branch_id = b.id
-        LEFT JOIN positions p ON u.position_id = p.id
-        LEFT JOIN levels l ON u.level_id = l.id
-        WHERE u.id = ?
-      `,
-        [targetUserId],
-      );
-    } catch (error) {
-      if (error.code === "ER_NO_SUCH_TABLE" && error.message.includes("levels")) {
-        [users] = await pool.query(
-          `
-          SELECT 
-            u.*,
-            b.name as branch_name,
-            p.name as position_name,
-            NULL as level_name
-          FROM users u
-          LEFT JOIN branches b ON u.branch_id = b.id
-          LEFT JOIN positions p ON u.position_id = p.id
-          WHERE u.id = ?
-        `,
-          [targetUserId],
-        );
-      } else {
-        throw error;
-      }
-    }
+    [users] = await pool.query(
+      `
+      SELECT
+        u.*,
+        b.name as branch_name,
+        p.name as position_name,
+        l.name as level_name
+      FROM users u
+      LEFT JOIN branches b ON u.branch_id = b.id
+      LEFT JOIN positions p ON u.position_id = p.id
+      LEFT JOIN gamification_levels l ON u.level = l.level_number
+      WHERE u.id = ?
+    `,
+      [targetUserId],
+    );
 
     if (users.length === 0) {
       return res.status(404).json({ error: "Пользователь не найден" });
