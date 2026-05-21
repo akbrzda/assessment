@@ -531,7 +531,7 @@
 /* ===== REBRAND: Sticky Bulk Actions Bar ===== */
 .bulk-actions-bar {
   position: sticky;
-  bottom: 24px;
+  bottom: max(24px, env(safe-area-inset-bottom));
   z-index: var(--z-sticky);
   display: flex;
   align-items: center;
@@ -576,4 +576,14 @@
 .activity-type-dot--purple {
   background: hsl(var(--accent-purple-soft));
   color: hsl(var(--accent-purple));
+}
+
+/* ===== Адаптивность: кнопки действий в модалах ===== */
+@media (max-width: 480px) {
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+  .modal-actions > * {
+    width: 100%;
+  }
 }

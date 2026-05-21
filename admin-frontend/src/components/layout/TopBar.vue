@@ -1,48 +1,116 @@
 <template>
-  <header
-    class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-border/60 bg-[hsl(var(--topbar-bg)/0.92)] px-3 backdrop-blur sm:px-4 lg:px-6"
-  >
-    <button
-      type="button"
-      class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-accent/40 hover:text-foreground"
-      aria-label="Открыть меню"
-      @click="$emit('toggle-sidebar')"
+  <div class="sticky top-0 z-30">
+    <header
+      class="flex h-16 shrink-0 items-center gap-3 border-b border-border/60 bg-[hsl(var(--topbar-bg)/0.92)] px-3 backdrop-blur sm:px-4 lg:px-6"
     >
-      <component :is="MenuIcon" :size="20" />
-    </button>
+      <button
+        type="button"
+        class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-accent/40 hover:text-foreground"
+        aria-label="Открыть меню"
+        @click="$emit('toggle-sidebar')"
+      >
+        <component :is="MenuIcon" :size="20" />
+      </button>
 
-    <nav class="flex flex-1 items-center gap-1.5 overflow-hidden text-sm" aria-label="Навигация">
-      <RouterLink to="/dashboard" class="text-muted-foreground transition hover:text-foreground shrink-0">
-        <component :is="HomeIcon" :size="15" />
-      </RouterLink>
-      <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
-        <span class="text-muted-foreground/60 shrink-0">›</span>
-        <RouterLink
-          :to="crumb.path"
-          :class="[
-            'truncate transition',
-            i === breadcrumbs.length - 1 ? 'font-semibold text-nav-active-text' : 'text-muted-foreground hover:text-foreground',
-          ]"
-          >{{ crumb.label }}</RouterLink
-        >
-      </template>
-    </nav>
+      <nav class="flex flex-1 items-center gap-1.5 overflow-hidden text-sm" aria-label="Навигация">
+        <RouterLink to="/dashboard" class="text-muted-foreground transition hover:text-foreground shrink-0">
+          <component :is="HomeIcon" :size="15" />
+        </RouterLink>
+        <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
+          <span class="text-muted-foreground/60 shrink-0">›</span>
+          <RouterLink
+            :to="crumb.path"
+            :class="[
+              'truncate transition',
+              i === breadcrumbs.length - 1 ? 'font-semibold text-nav-active-text' : 'text-muted-foreground hover:text-foreground',
+            ]"
+            >{{ crumb.label }}</RouterLink
+          >
+        </template>
+      </nav>
 
-    <div class="flex items-center gap-2">
-      <div class="relative hidden items-center md:flex">
-        <component :is="SearchIcon" :size="14" class="pointer-events-none absolute left-2.5 text-muted-foreground" />
-        <input
-          v-model="searchQuery"
-          type="search"
-          class="h-10 w-72 rounded-xl border border-input bg-background pl-8 pr-14 text-sm placeholder:text-muted-foreground transition-all duration-[var(--motion-fast)] focus:border-ring focus:outline-none focus-visible:shadow-[var(--focus-ring)]"
-          placeholder="Поиск..."
-          @input="handleSearchInput"
-          @blur="hideSearch"
-        />
-        <div
-          v-if="showSearchResults"
-          class="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-border bg-card shadow-md"
+      <div class="flex items-center gap-2">
+        <div class="relative hidden items-center md:flex">
+          <component :is="SearchIcon" :size="14" class="pointer-events-none absolute left-2.5 text-muted-foreground" />
+          <input
+            v-model="searchQuery"
+            type="search"
+            class="h-10 w-72 rounded-xl border border-input bg-background pl-8 pr-14 text-sm placeholder:text-muted-foreground transition-all duration-[var(--motion-fast)] focus:border-ring focus:outline-none focus-visible:shadow-[var(--focus-ring)]"
+            placeholder="Поиск..."
+            @input="handleSearchInput"
+            @blur="hideSearch"
+          />
+          <div
+            v-if="showSearchResults"
+            class="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-border bg-card shadow-md"
+          >
+            <div v-if="searchLoading" class="px-3 py-2.5 space-y-2">
+              <div v-for="row in 3" :key="row" class="skeleton-shimmer h-8 w-full rounded-lg"></div>
+            </div>
+            <template v-else>
+              <button
+                v-for="item in flattenedSearchResults"
+                :key="item.key"
+                class="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-accent/40 transition"
+                @mousedown.prevent
+                @click="openSearchResult(item)"
+              >
+                <span class="shrink-0 text-xs text-muted-foreground w-20">{{ item.type }}</span>
+                <span class="truncate text-foreground">{{ item.title }}</span>
+              </button>
+              <div v-if="!flattenedSearchResults.length" class="px-3 py-2.5 text-sm text-muted-foreground">Ничего не найдено</div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Поиск на мобильных: кнопка-триггер -->
+        <button
+          type="button"
+          class="inline-flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-accent/40 hover:text-foreground md:hidden"
+          aria-label="Открыть поиск"
+          @click="mobileSearchOpen = !mobileSearchOpen"
         >
+          <component :is="SearchIcon" :size="18" />
+        </button>
+
+        <button
+          type="button"
+          class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:bg-accent/40 hover:text-foreground"
+          @click="toggleTheme"
+        >
+          <component :is="themeMode === 'dark' ? SunIcon : MoonIcon" :size="16" />
+        </button>
+      </div>
+    </header>
+
+    <!-- Мобильная строка поиска -->
+    <Transition name="search-drop">
+      <div v-if="mobileSearchOpen" class="md:hidden border-b border-border/60 bg-[hsl(var(--topbar-bg)/0.98)] px-3 py-2 backdrop-blur">
+        <div class="relative flex items-center gap-2">
+          <component :is="SearchIcon" :size="15" class="pointer-events-none absolute left-3 text-muted-foreground" />
+          <input
+            ref="mobileSearchInput"
+            v-model="searchQuery"
+            type="search"
+            class="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-10 text-sm placeholder:text-muted-foreground transition focus:border-ring focus:outline-none focus-visible:shadow-[var(--focus-ring)]"
+            placeholder="Поиск..."
+            @input="handleSearchInput"
+            @blur="hideSearch"
+          />
+          <button
+            type="button"
+            class="absolute right-2 inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground"
+            aria-label="Закрыть поиск"
+            @click="
+              mobileSearchOpen = false;
+              searchQuery = '';
+              showSearchResults = false;
+            "
+          >
+            <XIcon :size="15" />
+          </button>
+        </div>
+        <div v-if="showSearchResults" class="mt-1.5 overflow-hidden rounded-xl border border-border bg-card shadow-md">
           <div v-if="searchLoading" class="px-3 py-2.5 space-y-2">
             <div v-for="row in 3" :key="row" class="skeleton-shimmer h-8 w-full rounded-lg"></div>
           </div>
@@ -52,7 +120,10 @@
               :key="item.key"
               class="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-accent/40 transition"
               @mousedown.prevent
-              @click="openSearchResult(item)"
+              @click="
+                openSearchResult(item);
+                mobileSearchOpen = false;
+              "
             >
               <span class="shrink-0 text-xs text-muted-foreground w-20">{{ item.type }}</span>
               <span class="truncate text-foreground">{{ item.title }}</span>
@@ -61,24 +132,16 @@
           </template>
         </div>
       </div>
-
-      <button
-        type="button"
-        class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:bg-accent/40 hover:text-foreground"
-        @click="toggleTheme"
-      >
-        <component :is="themeMode === 'dark' ? SunIcon : MoonIcon" :size="16" />
-      </button>
-    </div>
-  </header>
+    </Transition>
+  </div>
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { useThemeStore } from "../../stores/theme";
 import { globalSearch } from "../../api/users";
-import { Menu as MenuIcon, Home as HomeIcon, Search as SearchIcon, Sun as SunIcon, Moon as MoonIcon } from "lucide-vue-next";
+import { Menu as MenuIcon, Home as HomeIcon, Search as SearchIcon, Sun as SunIcon, Moon as MoonIcon, X as XIcon } from "lucide-vue-next";
 
 defineProps({ sidebarCollapsed: { type: Boolean, default: false } });
 defineEmits(["toggle-sidebar"]);
@@ -89,6 +152,8 @@ const themeStore = useThemeStore();
 const themeMode = computed(() => themeStore.themeMode);
 const toggleTheme = () => themeStore.setThemeMode(themeMode.value === "dark" ? "light" : "dark");
 
+const mobileSearchOpen = ref(false);
+const mobileSearchInput = ref(null);
 const searchQuery = ref("");
 const searchLoading = ref(false);
 const searchResults = ref({ users: [], assessments: [], questions: [], courses: [] });
@@ -169,4 +234,22 @@ const openSearchResult = (item) => {
   searchQuery.value = "";
   router.push(item.route);
 };
+
+watch(mobileSearchOpen, (val) => {
+  if (val) nextTick(() => mobileSearchInput.value?.focus());
+});
 </script>
+
+<style scoped>
+.search-drop-enter-active,
+.search-drop-leave-active {
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.search-drop-enter-from,
+.search-drop-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+</style>

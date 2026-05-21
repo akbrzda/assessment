@@ -2,13 +2,7 @@
   <div class="dashboard">
     <div class="dashboard-content">
       <div class="filters-section">
-        <FilterBar
-          v-model="filters"
-          search-key="search"
-          search-placeholder="Поиск..."
-          :filter-defs="filterDefs"
-          @change="handleFiltersChange"
-        />
+        <FilterBar v-model="filters" search-key="search" search-placeholder="Поиск..." :filter-defs="filterDefs" @change="handleFiltersChange" />
         <Card v-if="isCustomPeriod" class="filters-card">
           <div class="filters-grid">
             <DatePicker v-model="filters.dateFrom" label="Дата от" />
@@ -22,7 +16,7 @@
       </div>
 
       <template v-if="skeletonVisible">
-        <div class="grid grid-cols-4 gap-4 max-[768px]:grid-cols-2 max-[480px]:grid-cols-1">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SkeletonStatCard v-for="card in 4" :key="card" />
         </div>
         <div class="dashboard-row-three">
@@ -44,178 +38,178 @@
 
       <!-- Карточки основных метрик -->
       <template v-else>
-      <div class="grid grid-cols-4 gap-4 max-[768px]:grid-cols-2 max-[480px]:grid-cols-1">
-        <StatCard
-          label="Активные курсы"
-          :value="metrics.activeCourses"
-          icon="BookOpen"
-          color="blue"
-          :trend="kpiDeltas[0].percent"
-          trend-label="к прошлому периоду"
-          clickable
-          @click="navigateToCourses"
-        />
-        <StatCard
-          label="Всего сотрудников"
-          :value="metrics.totalUsers"
-          icon="Users"
-          color="green"
-          :trend="kpiDeltas[1].percent"
-          trend-label="к прошлому периоду"
-        />
-        <StatCard
-          label="Активные аттестации"
-          :value="metrics.activeAssessments"
-          icon="ClipboardList"
-          color="purple"
-          size="secondary"
-          :trend="kpiDeltas[2].percent"
-          trend-label="к прошлому периоду"
-          clickable
-          @click="navigateToAssessments"
-        />
-        <StatCard label="Филиалы" :value="metrics.totalBranches" icon="Building2" color="orange" size="secondary" />
-      </div>
-      <div class="dashboard-row-three">
-        <Card title="Причины провалов" icon="AlertTriangle" class="failure-reasons-card">
-          <div class="failure-reasons-grid admin-card-grid">
-            <div class="failure-reason-item admin-data-card">
-              <div class="failure-reason-head">
-                <p class="failure-reason-label">Таймаут</p>
-                <p class="failure-reason-value">{{ failureReasons.timeout.count }} ({{ failureReasons.timeout.percent.toFixed(1) }}%)</p>
-              </div>
-              <div class="failure-reason-bar">
-                <div class="failure-reason-fill timeout" :style="{ width: `${failureReasons.timeout.percent}%` }"></div>
-              </div>
-            </div>
-            <div class="failure-reason-item admin-data-card">
-              <div class="failure-reason-head">
-                <p class="failure-reason-label">Неверные ответы</p>
-                <p class="failure-reason-value">{{ failureReasons.wrongAnswers.count }} ({{ failureReasons.wrongAnswers.percent.toFixed(1) }}%)</p>
-              </div>
-              <div class="failure-reason-bar">
-                <div class="failure-reason-fill wrong" :style="{ width: `${failureReasons.wrongAnswers.percent}%` }"></div>
-              </div>
-            </div>
-          </div>
-          <p class="failure-reason-total">Всего провалов: {{ failureReasons.totalFailed }}</p>
-        </Card>
-        <!-- Топ-3 сотрудников -->
-        <Card title="Топ-3 сотрудников по очкам" icon="Trophy" class="top-users-card">
-          <div v-if="metrics.topUsers && metrics.topUsers.length > 0" class="top-users-list">
-            <div v-for="(user, index) in metrics.topUsers" :key="user.id" class="top-user-item">
-              <div class="top-user-info">
-                <span class="medal">{{ getMedalEmoji(index) }}</span>
-                <div class="user-details">
-                  <p class="user-name">{{ user.first_name }} {{ user.last_name }}</p>
-                  <p class="user-meta">{{ user.position_name }} • {{ user.branch_name }}</p>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Активные курсы"
+            :value="metrics.activeCourses"
+            icon="BookOpen"
+            color="blue"
+            :trend="kpiDeltas[0].percent"
+            trend-label="к прошлому периоду"
+            clickable
+            @click="navigateToCourses"
+          />
+          <StatCard
+            label="Всего сотрудников"
+            :value="metrics.totalUsers"
+            icon="Users"
+            color="green"
+            :trend="kpiDeltas[1].percent"
+            trend-label="к прошлому периоду"
+          />
+          <StatCard
+            label="Активные аттестации"
+            :value="metrics.activeAssessments"
+            icon="ClipboardList"
+            color="purple"
+            size="secondary"
+            :trend="kpiDeltas[2].percent"
+            trend-label="к прошлому периоду"
+            clickable
+            @click="navigateToAssessments"
+          />
+          <StatCard label="Филиалы" :value="metrics.totalBranches" icon="Building2" color="orange" size="secondary" />
+        </div>
+        <div class="dashboard-row-three">
+          <Card title="Причины провалов" icon="AlertTriangle" class="failure-reasons-card">
+            <div class="failure-reasons-grid admin-card-grid">
+              <div class="failure-reason-item admin-data-card">
+                <div class="failure-reason-head">
+                  <p class="failure-reason-label">Таймаут</p>
+                  <p class="failure-reason-value">{{ failureReasons.timeout.count }} ({{ failureReasons.timeout.percent.toFixed(1) }}%)</p>
+                </div>
+                <div class="failure-reason-bar">
+                  <div class="failure-reason-fill timeout" :style="{ width: `${failureReasons.timeout.percent}%` }"></div>
                 </div>
               </div>
-              <div class="user-stats">
-                <Badge variant="primary" size="lg">{{ user.points }} очков</Badge>
-                <span class="user-level">Уровень {{ user.level }}</span>
+              <div class="failure-reason-item admin-data-card">
+                <div class="failure-reason-head">
+                  <p class="failure-reason-label">Неверные ответы</p>
+                  <p class="failure-reason-value">{{ failureReasons.wrongAnswers.count }} ({{ failureReasons.wrongAnswers.percent.toFixed(1) }}%)</p>
+                </div>
+                <div class="failure-reason-bar">
+                  <div class="failure-reason-fill wrong" :style="{ width: `${failureReasons.wrongAnswers.percent}%` }"></div>
+                </div>
               </div>
             </div>
-          </div>
-          <EmptyState v-else type="custom" title="Нет данных о сотрудниках" />
-        </Card>
-      </div>
-      <!-- Первая строка: Успешность, Топ сотрудников, График активности -->
-      <div class="dashboard-row-three">
-        <!-- Средняя успешность -->
-        <Card title="Средний процент успешности" icon="ChartPie" class="success-rate-card">
-          <div class="success-rate-content">
-            <div class="success-rate-value">{{ formatScore(metrics.avgSuccessRate) }}%</div>
-            <p class="success-rate-label">Взвешенная средняя по всем филиалам</p>
-          </div>
-        </Card>
-        <!-- Динамика активности -->
-        <Card title="Динамика активности" icon="ChartLine" class="activity-chart-card">
-          <div v-if="activityData && activityData.length > 0" class="chart-container">
-            <LineChart :data="activityData" :datasets="activityDatasets" labelKey="date" :height="250" />
-          </div>
-          <div v-else class="chart-empty">
-            <p>Нет данных</p>
-          </div>
-        </Card>
-      </div>
+            <p class="failure-reason-total">Всего провалов: {{ failureReasons.totalFailed }}</p>
+          </Card>
+          <!-- Топ-3 сотрудников -->
+          <Card title="Топ-3 сотрудников по очкам" icon="Trophy" class="top-users-card">
+            <div v-if="metrics.topUsers && metrics.topUsers.length > 0" class="top-users-list">
+              <div v-for="(user, index) in metrics.topUsers" :key="user.id" class="top-user-item">
+                <div class="top-user-info">
+                  <span class="medal">{{ getMedalEmoji(index) }}</span>
+                  <div class="user-details">
+                    <p class="user-name">{{ user.first_name }} {{ user.last_name }}</p>
+                    <p class="user-meta">{{ user.position_name }} • {{ user.branch_name }}</p>
+                  </div>
+                </div>
+                <div class="user-stats">
+                  <Badge variant="primary" size="lg">{{ user.points }} очков</Badge>
+                  <span class="user-level">Уровень {{ user.level }}</span>
+                </div>
+              </div>
+            </div>
+            <EmptyState v-else type="custom" title="Нет данных о сотрудниках" />
+          </Card>
+        </div>
+        <!-- Первая строка: Успешность, Топ сотрудников, График активности -->
+        <div class="dashboard-row-three">
+          <!-- Средняя успешность -->
+          <Card title="Средний процент успешности" icon="ChartPie" class="success-rate-card">
+            <div class="success-rate-content">
+              <div class="success-rate-value">{{ formatScore(metrics.avgSuccessRate) }}%</div>
+              <p class="success-rate-label">Взвешенная средняя по всем филиалам</p>
+            </div>
+          </Card>
+          <!-- Динамика активности -->
+          <Card title="Динамика активности" icon="ChartLine" class="activity-chart-card">
+            <div v-if="activityData && activityData.length > 0" class="chart-container">
+              <LineChart :data="activityData" :datasets="activityDatasets" labelKey="date" :height="250" />
+            </div>
+            <div v-else class="chart-empty">
+              <p>Нет данных</p>
+            </div>
+          </Card>
+        </div>
 
-      <!-- Вторая строка: Статистика аттестаций -->
+        <!-- Вторая строка: Статистика аттестаций -->
 
-      <div class="dashboard-row-three">
-        <Card title="Статистика аттестаций" icon="ChartBar" class="stats-card">
-          <div class="stats-grid">
-            <div class="stat-item">
-              <p class="stat-label">Всего попыток</p>
-              <p class="stat-value">{{ metrics.assessmentStats?.total_attempts || 0 }}</p>
-            </div>
-            <div class="stat-item">
-              <p class="stat-label">Завершено</p>
-              <p class="stat-value">{{ metrics.assessmentStats?.completed_attempts || 0 }}</p>
-            </div>
-            <div class="stat-item">
-              <p class="stat-label">Средний балл</p>
-              <p class="stat-value">{{ formatScore(metrics.assessmentStats?.avg_score) }}%</p>
-            </div>
-            <div class="stat-item">
-              <p class="stat-label">Уникальных пользователей</p>
-              <p class="stat-value">{{ metrics.assessmentStats?.unique_users || 0 }}</p>
-            </div>
-          </div>
-        </Card>
-        <!-- Активность по аттестациям -->
-        <Card title="Активность по аттестациям" icon="Activity" class="activities-card">
-          <div v-if="latestActivities && latestActivities.length > 0" class="activities-list">
-            <div v-for="activity in latestActivities" :key="activity.id" class="activity-item">
-              <div :class="['activity-type-dot', getActivityDotClass(activity.activity_type)]">
-                <Icon :name="getActivityIcon(activity.activity_type)" size="14" />
+        <div class="dashboard-row-three">
+          <Card title="Статистика аттестаций" icon="ChartBar" class="stats-card">
+            <div class="stats-grid">
+              <div class="stat-item">
+                <p class="stat-label">Всего попыток</p>
+                <p class="stat-value">{{ metrics.assessmentStats?.total_attempts || 0 }}</p>
               </div>
-              <div class="activity-content">
-                <p class="activity-text">
-                  <strong>{{ activity.user_name }}</strong>
-                  {{ activity.activity_type }}
-                </p>
-                <p class="activity-meta">{{ activity.assessment_name }}</p>
+              <div class="stat-item">
+                <p class="stat-label">Завершено</p>
+                <p class="stat-value">{{ metrics.assessmentStats?.completed_attempts || 0 }}</p>
               </div>
-              <p class="activity-time">{{ formatTime(activity.created_at) }}</p>
+              <div class="stat-item">
+                <p class="stat-label">Средний балл</p>
+                <p class="stat-value">{{ formatScore(metrics.assessmentStats?.avg_score) }}%</p>
+              </div>
+              <div class="stat-item">
+                <p class="stat-label">Уникальных пользователей</p>
+                <p class="stat-value">{{ metrics.assessmentStats?.unique_users || 0 }}</p>
+              </div>
             </div>
-          </div>
-          <EmptyState v-else type="custom" title="Нет активности" />
-        </Card>
-      </div>
-      <!-- Третья строка: KPI филиалов -->
-      <div class="dashboard-row-full">
-        <!-- KPI филиалов -->
-        <Card title="KPI филиалов" icon="Building2" class="branch-kpi-card">
-          <div v-if="branchKPI && branchKPI.length > 0" class="branch-kpi-list">
-            <div v-for="branch in sortedBranchKPI" :key="branch.id" class="branch-kpi-item">
-              <div class="branch-header">
-                <div class="branch-info">
-                  <h4 class="branch-name">{{ branch.branch_name }}</h4>
-                  <p class="branch-city">{{ branch.city }}</p>
+          </Card>
+          <!-- Активность по аттестациям -->
+          <Card title="Активность по аттестациям" icon="Activity" class="activities-card">
+            <div v-if="latestActivities && latestActivities.length > 0" class="activities-list">
+              <div v-for="activity in latestActivities" :key="activity.id" class="activity-item">
+                <div :class="['activity-type-dot', getActivityDotClass(activity.activity_type)]">
+                  <Icon :name="getActivityIcon(activity.activity_type)" size="14" />
                 </div>
-                <div :class="['branch-score', getScoreClass(branch.success_rate)]">{{ formatScore(branch.success_rate) }}%</div>
+                <div class="activity-content">
+                  <p class="activity-text">
+                    <strong>{{ activity.user_name }}</strong>
+                    {{ activity.activity_type }}
+                  </p>
+                  <p class="activity-meta">{{ activity.assessment_name }}</p>
+                </div>
+                <p class="activity-time">{{ formatTime(activity.created_at) }}</p>
               </div>
+            </div>
+            <EmptyState v-else type="custom" title="Нет активности" />
+          </Card>
+        </div>
+        <!-- Третья строка: KPI филиалов -->
+        <div class="dashboard-row-full">
+          <!-- KPI филиалов -->
+          <Card title="KPI филиалов" icon="Building2" class="branch-kpi-card">
+            <div v-if="branchKPI && branchKPI.length > 0" class="branch-kpi-list">
+              <div v-for="branch in sortedBranchKPI" :key="branch.id" class="branch-kpi-item">
+                <div class="branch-header">
+                  <div class="branch-info">
+                    <h4 class="branch-name">{{ branch.branch_name }}</h4>
+                    <p class="branch-city">{{ branch.city }}</p>
+                  </div>
+                  <div :class="['branch-score', getScoreClass(branch.success_rate)]">{{ formatScore(branch.success_rate) }}%</div>
+                </div>
 
-              <div class="branch-stats">
-                <div class="branch-stat">
-                  <span class="stat-label">Попыток:</span>
-                  <span class="stat-value">{{ branch.completed_attempts || 0 }}</span>
-                </div>
-                <div class="branch-stat">
-                  <span class="stat-label">Отлично:</span>
-                  <span class="stat-value success">{{ branch.excellent_count || 0 }}</span>
-                </div>
-                <div class="branch-stat">
-                  <span class="stat-label">Удовл.:</span>
-                  <span class="stat-value warning">{{ branch.good_count || 0 }}</span>
+                <div class="branch-stats">
+                  <div class="branch-stat">
+                    <span class="stat-label">Попыток:</span>
+                    <span class="stat-value">{{ branch.completed_attempts || 0 }}</span>
+                  </div>
+                  <div class="branch-stat">
+                    <span class="stat-label">Отлично:</span>
+                    <span class="stat-value success">{{ branch.excellent_count || 0 }}</span>
+                  </div>
+                  <div class="branch-stat">
+                    <span class="stat-label">Удовл.:</span>
+                    <span class="stat-value warning">{{ branch.good_count || 0 }}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <EmptyState v-else type="custom" title="Нет данных по филиалам" />
-        </Card>
-      </div>
+            <EmptyState v-else type="custom" title="Нет данных по филиалам" />
+          </Card>
+        </div>
       </template>
 
       <!-- Четвертая строка: Активность по аттестациям -->
@@ -778,7 +772,7 @@ onBeforeUnmount(() => {
   padding: 12px 16px;
   border-radius: 12px;
   background: rgba(255, 189, 58, 0.12);
-  color: #b45309;
+  color: hsl(var(--accent-orange));
   font-size: 14px;
 }
 .offline-banner :deep(svg) {
@@ -913,14 +907,14 @@ onBeforeUnmount(() => {
 .dashboard-row-three {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 32px;
+  gap: 20px;
 }
 
 /* Dashboard Row Two (KPI и Активность) */
 .dashboard-row-two {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 32px;
+  gap: 20px;
 }
 
 /* Dashboard Row Full (Full Width) */
@@ -1227,7 +1221,7 @@ onBeforeUnmount(() => {
 }
 
 .activity-time {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
   margin: 0;
   white-space: nowrap;
@@ -1238,10 +1232,12 @@ onBeforeUnmount(() => {
 @media (max-width: 1024px) {
   .dashboard-row-three {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
 
   .dashboard-row-two {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
 
   .combined-activities-content {
@@ -1260,10 +1256,12 @@ onBeforeUnmount(() => {
 
   .dashboard-row-three {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .dashboard-row-two {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .top-user-item {

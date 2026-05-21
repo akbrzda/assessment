@@ -4,6 +4,21 @@
 
 ---
 
+## Адаптивность admin-frontend — исправления по аудиту
+
+- [x] Critical: мобильный поиск в TopBar (кнопка-триггер + overlay)
+- [x] High: modal-actions — вертикальная укладка кнопок на < 480px (style.css)
+- [x] High: Pagination — touch-таргеты h-10 на mobile
+- [x] Medium: offline-banner цвет → CSS-переменная
+- [x] Medium: Dashboard stat cards — mobile-first grid (1→2→4 колонки)
+- [x] Medium: Modal.vue — padding px-4/py-3 на mobile
+- [x] Medium: activity-time font-size 11px → 12px
+- [x] Medium: FilterBar inline selects h-10 на mobile
+- [x] Low: dashboard-row gap 32px → 20px/16px на mobile
+- [x] Low: bulk-actions-bar safe-area-inset
+
+---
+
 ## Спринт 5 — Улучшения и технический долг (MEDIUM/LOW)
 
 ### TASK-017 · QA-чеклист по «Курсам» ❓

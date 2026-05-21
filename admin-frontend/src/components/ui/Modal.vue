@@ -19,7 +19,10 @@
           @click.stop
         >
           <!-- Шапка -->
-          <div v-if="title || closable" class="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-muted/40 shrink-0">
+          <div
+            v-if="title || closable"
+            class="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-border/80 bg-muted/40 shrink-0"
+          >
             <div class="flex items-center gap-2.5 min-w-0">
               <Icon v-if="icon" :name="icon" :size="18" class="text-primary shrink-0" />
               <h2 v-if="title" class="text-lg font-semibold text-foreground m-0 truncate">{{ title }}</h2>
@@ -35,12 +38,12 @@
           </div>
 
           <!-- Контент -->
-          <div class="p-6 flex-1">
+          <div class="p-4 sm:p-6 flex-1">
             <slot />
           </div>
 
           <!-- Футер -->
-          <div v-if="$slots.footer" class="px-6 py-4 border-t border-border/80 bg-muted/40 shrink-0">
+          <div v-if="$slots.footer" class="px-4 py-3 sm:px-6 sm:py-4 border-t border-border/80 bg-muted/40 shrink-0">
             <slot name="footer" />
           </div>
         </div>

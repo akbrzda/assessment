@@ -3,7 +3,7 @@
     <div class="text-sm text-muted-foreground">Страница {{ page }} из {{ totalPages }} • Всего {{ total }}</div>
     <div class="flex flex-wrap items-center gap-2">
       <button
-        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-sm text-foreground transition hover:bg-accent disabled:pointer-events-none disabled:opacity-40"
+        class="inline-flex h-10 w-10 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border bg-card text-sm text-foreground transition hover:bg-accent disabled:pointer-events-none disabled:opacity-40"
         :disabled="page === 1"
         aria-label="Предыдущая страница"
         @click="updatePage(page - 1)"
@@ -12,7 +12,7 @@
       </button>
 
       <button
-        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-sm text-foreground transition hover:bg-accent disabled:pointer-events-none disabled:opacity-40"
+        class="inline-flex h-10 w-10 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border bg-card text-sm text-foreground transition hover:bg-accent disabled:pointer-events-none disabled:opacity-40"
         :disabled="page >= totalPages"
         aria-label="Следующая страница"
         @click="updatePage(page + 1)"

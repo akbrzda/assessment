@@ -167,7 +167,7 @@
 
       <template v-for="def in mobileInlineFilterDefs" :key="`${def.key}-mobile-inline`">
         <select
-          class="md:hidden h-8 max-w-[130px] px-2 py-1 text-xs border border-border rounded-lg bg-background text-foreground outline-none"
+          class="md:hidden h-10 max-w-[130px] px-2 py-1 text-sm border border-border rounded-lg bg-background text-foreground outline-none"
           :value="modelValue[def.key] || ''"
           :aria-label="def.label"
           @change="selectOption(def.key, $event.target.value)"
