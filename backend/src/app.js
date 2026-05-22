@@ -26,8 +26,6 @@ const adminBranchRoutes = require("./modules/admin/branches");
 const adminPositionRoutes = require("./modules/admin/positions");
 const adminSettingsRoutes = require("./modules/admin/settings");
 const adminProfileRoutes = require("./modules/admin/profile");
-const adminPermissionsRoutes = require("./modules/admin/permissions");
-const adminRolesRoutes = require("./modules/admin/roles");
 const adminSearchRoutes = require("./modules/admin/search/routes");
 const adminAuditLogsRoutes = require("./modules/admin/audit-logs/routes");
 const { metricsMiddleware, toPrometheusMetrics } = require("./services/metricsService");
@@ -116,8 +114,7 @@ apiRouter.use("/admin/settings", adminSettingsRoutes);
 apiRouter.use("/admin/gamification/rules", gamificationModule.admin.rules.routes);
 apiRouter.use("/admin/invitations", invitationModule.admin.routes);
 apiRouter.use("/admin/profile", adminProfileRoutes);
-apiRouter.use("/admin/permissions", adminPermissionsRoutes);
-apiRouter.use("/admin/roles", adminRolesRoutes);
+// Управление ролями и granular-доступами отключено: оставляем только захардкоженные правила.
 apiRouter.use("/admin/search", adminSearchRoutes);
 apiRouter.use("/admin/audit-logs", adminAuditLogsRoutes);
 apiRouter.use("/admin/courses", coursesModule.admin.routes);

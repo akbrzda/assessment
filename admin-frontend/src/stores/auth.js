@@ -1,7 +1,6 @@
 import { defineStore } from "pinia";
 import authApi from "../api/auth";
 import websocketService from "../services/websocket";
-import apiClient from "../utils/axios";
 import {
   clearSession,
   getAccessToken,
@@ -10,6 +9,11 @@ import {
   setUser,
 } from "../services/session/tokenStorage";
 import { onAccessTokenRefreshed, refreshAccessToken } from "../services/session/refreshCoordinator";
+
+const HARD_CODED_ROLE_MODULES = {
+  superadmin: ["*"],
+  manager: ["assessments", "analytics", "users", "questions", "courses", "invitations"],
+};
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
@@ -30,23 +34,9 @@ export const useAuthStore = defineStore("auth", {
     token: (state) => state.accessToken,
 
     hasModuleAccess: (state) => (moduleCode) => {
-      if (state.user?.role === "superadmin") {
-        return true;
-      }
-
-      const roleDefaults = state.defaultModulesByRole[state.user?.role] || [];
-      const hasRoleDefault = roleDefaults.includes("*") || roleDefaults.includes(moduleCode);
-
-      if (!state.permissionsLoaded || !state.userPermissions) {
-        return hasRoleDefault;
-      }
-
-      const permission = state.userPermissions.find((item) => item.moduleCode === moduleCode);
-      if (permission && permission.isCustom) {
-        return permission.hasAccess;
-      }
-
-      return hasRoleDefault;
+      const roleName = state.user?.role;
+      const roleDefaults = HARD_CODED_ROLE_MODULES[roleName] || [];
+      return roleDefaults.includes("*") || roleDefaults.includes(moduleCode);
     },
   },
 
@@ -94,40 +84,13 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async loadDefaultModules() {
-      try {
-        const { data } = await apiClient.get("/admin/permissions/default-modules", {
-          cacheMaxAge: 300000,
-        });
-
-        this.defaultModulesByRole = data.defaultModules || {};
-      } catch (error) {
-        console.error("Не удалось загрузить default-модули:", error);
-      }
+      this.defaultModulesByRole = { ...HARD_CODED_ROLE_MODULES };
     },
 
     async loadUserPermissions() {
-      if (!this.user?.id) {
-        this.permissionsLoaded = false;
-        return;
-      }
-
-      try {
-        const { data } = await apiClient.get(`/admin/permissions/users/${this.user.id}`);
-        this.userPermissions = data.permissions || [];
-        this.permissionsLoaded = true;
-
-        if (data.roleName && Array.isArray(data.defaultModules)) {
-          this.defaultModulesByRole = {
-            ...this.defaultModulesByRole,
-            [data.roleName]: data.defaultModules,
-          };
-        } else if (!Object.keys(this.defaultModulesByRole).length) {
-          await this.loadDefaultModules();
-        }
-      } catch (error) {
-        console.error("Не удалось загрузить права пользователя:", error);
-        this.permissionsLoaded = false;
-      }
+      this.userPermissions = null;
+      this.permissionsLoaded = true;
+      this.defaultModulesByRole = { ...HARD_CODED_ROLE_MODULES };
     },
 
     async tryRestoreSession() {

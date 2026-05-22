@@ -1,4 +1,3 @@
-const { pool } = require("../config/database");
 const { hasDefaultModuleAccess } = require("../config/roleModules");
 const { logAccessDenied } = require("../services/auditService");
 
@@ -9,43 +8,15 @@ const { logAccessDenied } = require("../services/auditService");
 const checkModuleAccess = (moduleCode) => {
   return async (req, res, next) => {
     try {
-      const userId = req.user?.id;
-      const userRole = req.user?.role;
+      const userId = Number(req.user?.id);
+      const userRole = String(req.user?.role || "").toLowerCase();
 
       if (!userId) {
         return res.status(401).json({ error: "Не авторизован" });
       }
 
-      // Суперадмин имеет доступ ко всему
-      if (userRole === "superadmin") {
-        return next();
-      }
-
-      // Получаем модуль
-      const [modules] = await pool.query("SELECT id FROM system_modules WHERE code = ? AND is_active = 1", [moduleCode]);
-
-      if (modules.length === 0) {
-        return res.status(404).json({ error: "Модуль не найден" });
-      }
-
-      const moduleId = modules[0].id;
-
-      // Проверяем кастомные права пользователя
-      const [permissions] = await pool.query("SELECT has_access FROM user_permissions WHERE user_id = ? AND module_id = ?", [userId, moduleId]);
-
-      // Если есть кастомная настройка, используем её
-      if (permissions.length > 0) {
-        if (permissions[0].has_access) {
-          return next();
-        }
-        logAccessDenied({ req, reason: "module_access_denied", metadata: { moduleCode } }).catch(() => {});
-        return res.status(403).json({ error: "Доступ запрещен" });
-      }
-
-      // Проверяем права по умолчанию для роли
-      const hasDefaultAccess = hasDefaultModuleAccess(userRole, moduleCode);
-
-      if (hasDefaultAccess) {
+      // Используем только захардкоженный доступ по ролям без персональных overrides.
+      if (hasDefaultModuleAccess(userRole, moduleCode)) {
         return next();
       }
 

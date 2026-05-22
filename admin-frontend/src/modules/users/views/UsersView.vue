@@ -131,7 +131,6 @@
 
       <div v-if="authStore.isSuperAdmin" class="divider"></div>
 
-      <UserPermissionsManager v-if="authStore.isSuperAdmin && selectedUser" :userId="selectedUser.id" />
 
       <div v-if="canManagePasswordInEditModal" class="divider"></div>
 
@@ -247,7 +246,6 @@ import { createInvitation } from "@/api/invitations";
 import { BOT_USERNAME, MAX_BOT_NAME } from "@/env";
 import { Badge, Button, FilterBar, Input, Modal, PageHeader, Select, Tabs } from "@/components/ui";
 import UserForm from "@/modules/users/components/UserForm.vue";
-import UserPermissionsManager from "@/modules/users/components/UserPermissionsManager.vue";
 import UserProfileModal from "@/modules/users/components/users-view/UserProfileModal.vue";
 import UsersTable from "@/modules/users/components/users-view/UsersTable.vue";
 import { useToast } from "@/composables/useToast";
