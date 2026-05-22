@@ -347,11 +347,26 @@ export default {
       isDataLoading.value = true;
       dashboardError.value = "";
       try {
-        const [, coursesResponse] = await Promise.all([userStore.loadOverview(), apiClient.listCourses()]);
+        const canUseGamification = userStore.hasModuleAccess("gamification");
+        const canUseCourses = userStore.hasModuleAccess("courses");
+
+        const tasks = [];
+        if (canUseGamification) {
+          tasks.push(userStore.loadOverview());
+        }
+        if (canUseCourses) {
+          tasks.push(apiClient.listCourses());
+        }
+
+        const responses = await Promise.all(tasks);
+        const coursesResponse = canUseCourses ? responses[responses.length - 1] : null;
 
         courses.value = (coursesResponse?.courses || []).map((item) => normalizeCourse(item)).filter(Boolean);
 
-        const certificatesCount = Array.isArray(userStore.overview?.badges) ? userStore.overview.badges.filter((badge) => badge.earned).length : 0;
+        const certificatesCount =
+          canUseGamification && Array.isArray(userStore.overview?.badges)
+            ? userStore.overview.badges.filter((badge) => badge.earned).length
+            : 0;
         const completedTopics = courses.value.reduce((acc, course) => acc + Number(course.progress.completedSectionsCount || 0), 0);
 
         dashboardStats.value = {

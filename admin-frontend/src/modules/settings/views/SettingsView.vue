@@ -56,22 +56,36 @@
           <div v-else class="feature-flags-list">
             <label class="feature-flag-row">
               <div class="feature-flag-main">
-                <strong>Админ-панель (связанные модули)</strong>
-                <span class="text-xs text-muted-foreground">{{ adminLinkedModulesHint }}</span>
+                <strong>Общие модули (админ + клиент)</strong>
+                <span class="text-xs text-muted-foreground">{{ sharedModulesHint }}</span>
               </div>
               <input
                 type="checkbox"
                 class="native-checkbox"
                 :disabled="featureFlagsSaving"
-                :checked="adminLinkedModulesEnabled"
-                @change="toggleAdminLinkedModules($event.target.checked)"
+                :checked="sharedModulesEnabled"
+                @change="toggleSharedModules($event.target.checked)"
               />
             </label>
 
-            <label v-for="moduleItem in clientModules" :key="moduleItem.code" class="feature-flag-row">
+            <label v-for="moduleItem in clientOnlyModules" :key="moduleItem.code" class="feature-flag-row">
               <div class="feature-flag-main">
                 <strong>{{ moduleItem.name }}</strong>
-                <span class="text-xs text-muted-foreground">{{ moduleItem.code }}</span>
+                <span class="text-xs text-muted-foreground">Только клиент: {{ moduleItem.code }}</span>
+              </div>
+              <input
+                type="checkbox"
+                class="native-checkbox"
+                :disabled="moduleItem.locked || featureFlagsSaving"
+                :checked="moduleItem.enabled"
+                @change="toggleFeatureModule(moduleItem.code, $event.target.checked)"
+              />
+            </label>
+
+            <label v-for="moduleItem in adminOnlyModules" :key="`admin-${moduleItem.code}`" class="feature-flag-row">
+              <div class="feature-flag-main">
+                <strong>{{ moduleItem.name }}</strong>
+                <span class="text-xs text-muted-foreground">Только админка: {{ moduleItem.code }}</span>
               </div>
               <input
                 type="checkbox"
@@ -355,7 +369,7 @@ const featureFlagsLoading = ref(false);
 const featureFlagsSaving = ref(false);
 const featureModules = ref([]);
 const savedDisabledModules = ref([]);
-const featureGroups = ref({ adminLinkedModuleCodes: [], clientModuleCodes: [] });
+const featureGroups = ref({ sharedModuleCodes: [], clientOnlyModuleCodes: [], adminOnlyModuleCodes: [] });
 const botSettings = ref({
   onboardingTitle: "👋 Привет{{name}}!",
   onboardingBody:
@@ -419,33 +433,39 @@ const featureFlagsDirty = computed(() => {
   return JSON.stringify(currentDisabled) !== JSON.stringify(saved);
 });
 
-const adminLinkedModules = computed(() => {
-  const targetCodes = featureGroups.value.adminLinkedModuleCodes || [];
+const sharedModules = computed(() => {
+  const targetCodes = featureGroups.value.sharedModuleCodes || [];
   const targetSet = new Set(targetCodes);
   return featureModules.value.filter((item) => targetSet.has(item.code));
 });
 
-const clientModules = computed(() => {
-  const targetCodes = featureGroups.value.clientModuleCodes || [];
+const clientOnlyModules = computed(() => {
+  const targetCodes = featureGroups.value.clientOnlyModuleCodes || [];
   const targetSet = new Set(targetCodes);
   return featureModules.value.filter((item) => targetSet.has(item.code));
 });
 
-const adminLinkedModulesEnabled = computed(() => {
-  if (!adminLinkedModules.value.length) {
+const adminOnlyModules = computed(() => {
+  const targetCodes = featureGroups.value.adminOnlyModuleCodes || [];
+  const targetSet = new Set(targetCodes);
+  return featureModules.value.filter((item) => targetSet.has(item.code));
+});
+
+const sharedModulesEnabled = computed(() => {
+  if (!sharedModules.value.length) {
     return true;
   }
-  return adminLinkedModules.value.every((item) => item.enabled);
+  return sharedModules.value.every((item) => item.enabled);
 });
 
-const adminLinkedModulesHint = computed(() => adminLinkedModules.value.map((item) => item.code).join(", "));
+const sharedModulesHint = computed(() => sharedModules.value.map((item) => item.code).join(", "));
 
 const loadFeatureFlags = async () => {
   try {
     featureFlagsLoading.value = true;
     const data = await settingsApi.getFeatureFlags();
     featureModules.value = Array.isArray(data?.modules) ? data.modules : [];
-    featureGroups.value = data?.groups || { adminLinkedModuleCodes: [], clientModuleCodes: [] };
+    featureGroups.value = data?.groups || { sharedModuleCodes: [], clientOnlyModuleCodes: [], adminOnlyModuleCodes: [] };
     savedDisabledModules.value = Array.isArray(data?.disabledModules) ? data.disabledModules : [];
     authStore.setDisabledModules(savedDisabledModules.value);
     if (!authStore.hasModuleAccess("gamification") && activeTab.value === "gamification") {
@@ -459,8 +479,8 @@ const loadFeatureFlags = async () => {
   }
 };
 
-const toggleAdminLinkedModules = (enabled) => {
-  const targetCodes = new Set(featureGroups.value.adminLinkedModuleCodes || []);
+const toggleSharedModules = (enabled) => {
+  const targetCodes = new Set(featureGroups.value.sharedModuleCodes || []);
   featureModules.value = featureModules.value.map((item) => {
     if (!targetCodes.has(item.code) || item.locked) {
       return item;

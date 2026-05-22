@@ -14,8 +14,9 @@ const FEATURE_MODULES = [
   { code: "settings", name: "Настройки", locked: true },
 ];
 
-const ADMIN_LINKED_MODULE_CODES = ["users", "questions", "analytics", "invitations", "branches", "positions"];
-const CLIENT_MODULE_CODES = ["courses", "assessments", "gamification", "certificates"];
+const SHARED_MODULE_CODES = ["courses", "assessments", "certificates"];
+const CLIENT_ONLY_MODULE_CODES = ["gamification"];
+const ADMIN_ONLY_MODULE_CODES = ["users", "questions", "analytics", "invitations", "branches", "positions"];
 
 const MODULE_ROUTE_PREFIXES = [
   { prefix: "/admin/dashboard", moduleCode: "analytics" },
@@ -52,8 +53,9 @@ function getModuleCodeByPath(pathname = "") {
 module.exports = {
   FEATURE_FLAGS_SETTING_KEY,
   FEATURE_MODULES,
-  ADMIN_LINKED_MODULE_CODES,
-  CLIENT_MODULE_CODES,
+  SHARED_MODULE_CODES,
+  CLIENT_ONLY_MODULE_CODES,
+  ADMIN_ONLY_MODULE_CODES,
   LOCKED_MODULE_CODES,
   getModuleCodeByPath,
 };

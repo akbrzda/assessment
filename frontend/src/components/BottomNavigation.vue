@@ -24,13 +24,13 @@ export default {
 
     const navigationItems = computed(() =>
       [
-        userStore.hasModuleAccess("courses") && {
+        {
           name: "dashboard",
           to: "/dashboard",
           label: "Главная",
           icon: Home,
         },
-        userStore.hasModuleAccess("courses") && {
+        userStore.hasModuleAccess("assessments") && {
           name: "assessments",
           to: "/assessments",
           label: "Курсы",

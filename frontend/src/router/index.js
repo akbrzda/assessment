@@ -27,7 +27,7 @@ const routes = [
     path: "/assessments",
     name: "assessments",
     component: () => import("../views/AssessmentsView.vue"),
-    meta: { requiresAuth: true, module: "courses" },
+    meta: { requiresAuth: true, module: "assessments" },
   },
   {
     path: "/courses/:id",

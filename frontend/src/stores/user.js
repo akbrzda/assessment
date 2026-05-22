@@ -102,6 +102,11 @@ export const useUserStore = defineStore("user", () => {
   }
 
   async function loadOverview({ force = false } = {}) {
+    if (!hasModuleAccess.value("gamification")) {
+      overview.value = null;
+      return null;
+    }
+
     if (overview.value && !force && !overviewLoading.value) {
       return overview.value;
     }
@@ -157,7 +162,7 @@ export const useUserStore = defineStore("user", () => {
         user.value = mapUserPayload(status.user, overview.value);
         invitation.value = null;
         invitationAccepted.value = true;
-        if (!overview.value || force) {
+        if ((force || !overview.value) && hasModuleAccess.value("gamification")) {
           loadOverview({ force: Boolean(force) }).catch((err) => {
             console.error("Не удалось обновить данные геймификации", err);
           });
@@ -210,7 +215,9 @@ export const useUserStore = defineStore("user", () => {
         lastName: telegramStore.user?.last_name || mapped.lastName || "",
         avatarUrl: telegramStore.user?.photo_url || null,
       };
-      await loadOverview({ force: true });
+      if (hasModuleAccess.value("gamification")) {
+        await loadOverview({ force: true });
+      }
       return { success: true };
     } catch (err) {
       console.error("Ошибка регистрации", err);
@@ -238,7 +245,9 @@ export const useUserStore = defineStore("user", () => {
       disabledModules.value = Array.isArray(response?.disabledModules) ? response.disabledModules : [];
       const mapped = mapUserPayload(response.user, overview.value);
       user.value = mapped;
-      await loadOverview({ force: true });
+      if (hasModuleAccess.value("gamification")) {
+        await loadOverview({ force: true });
+      }
       return { success: true };
     } catch (err) {
       console.error("Ошибка обновления профиля", err);
@@ -290,7 +299,9 @@ export const useUserStore = defineStore("user", () => {
         avatarUrl: telegramStore.user?.photo_url || null,
       };
 
-      await loadOverview({ force: true });
+      if (hasModuleAccess.value("gamification")) {
+        await loadOverview({ force: true });
+      }
       return { success: true };
     } catch (err) {
       console.error("Ошибка принятия приглашения", err);

@@ -4,8 +4,9 @@ const settingsService = require("../../../services/settingsService");
 const {
   FEATURE_FLAGS_SETTING_KEY,
   FEATURE_MODULES,
-  ADMIN_LINKED_MODULE_CODES,
-  CLIENT_MODULE_CODES,
+  SHARED_MODULE_CODES,
+  CLIENT_ONLY_MODULE_CODES,
+  ADMIN_ONLY_MODULE_CODES,
   LOCKED_MODULE_CODES,
 } = require("../../../config/featureFlags");
 const multer = require("multer");
@@ -42,8 +43,9 @@ function getFeatureModulesPayload(disabledModules) {
 
 function getFeatureGroupsPayload() {
   return {
-    adminLinkedModuleCodes: [...ADMIN_LINKED_MODULE_CODES],
-    clientModuleCodes: [...CLIENT_MODULE_CODES],
+    sharedModuleCodes: [...SHARED_MODULE_CODES],
+    clientOnlyModuleCodes: [...CLIENT_ONLY_MODULE_CODES],
+    adminOnlyModuleCodes: [...ADMIN_ONLY_MODULE_CODES],
   };
 }
 
