@@ -22,33 +22,35 @@ export default {
   setup() {
     const userStore = useUserStore();
 
-    const navigationItems = computed(() => [
-      {
-        name: "dashboard",
-        to: "/dashboard",
-        label: "Главная",
-        icon: Home,
-      },
-      {
-        name: "assessments",
-        to: "/assessments",
-        label: "Курсы",
-        icon: BookOpenCheck,
-        featured: true,
-      },
-      {
-        name: "leaderboard",
-        to: "/leaderboard",
-        label: "Лидерборд",
-        icon: Trophy,
-      },
-      {
-        name: "profile",
-        to: "/profile",
-        label: "Профиль",
-        icon: User,
-      },
-    ]);
+    const navigationItems = computed(() =>
+      [
+        userStore.hasModuleAccess("courses") && {
+          name: "dashboard",
+          to: "/dashboard",
+          label: "Главная",
+          icon: Home,
+        },
+        userStore.hasModuleAccess("courses") && {
+          name: "assessments",
+          to: "/assessments",
+          label: "Курсы",
+          icon: BookOpenCheck,
+          featured: true,
+        },
+        userStore.hasModuleAccess("gamification") && {
+          name: "leaderboard",
+          to: "/leaderboard",
+          label: "Лидерборд",
+          icon: Trophy,
+        },
+        {
+          name: "profile",
+          to: "/profile",
+          label: "Профиль",
+          icon: User,
+        },
+      ].filter(Boolean),
+    );
 
     return {
       navigationItems,

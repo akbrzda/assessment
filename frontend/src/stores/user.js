@@ -74,12 +74,19 @@ export const useUserStore = defineStore("user", () => {
   const invitationAccepted = ref(false);
   const overview = ref(null);
   const overviewLoading = ref(false);
+  const disabledModules = ref([]);
   let overviewPromise = null;
   const error = ref(null);
 
   const isAuthenticated = computed(() => Boolean(user.value));
   const fullName = computed(() => user.value?.fullName || "");
   const initials = computed(() => computeInitials(user.value));
+  const hasModuleAccess = computed(() => (moduleCode) => {
+    if (!moduleCode) {
+      return true;
+    }
+    return !disabledModules.value.includes(moduleCode);
+  });
 
   async function loadReferences() {
     try {
@@ -144,6 +151,7 @@ export const useUserStore = defineStore("user", () => {
       invitationAccepted.value = Boolean(accepted);
 
       const status = await apiClient.getStatus();
+      disabledModules.value = Array.isArray(status?.disabledModules) ? status.disabledModules : [];
 
       if (status.registered) {
         user.value = mapUserPayload(status.user, overview.value);
@@ -188,6 +196,7 @@ export const useUserStore = defineStore("user", () => {
     try {
       const telegramStore = useTelegramStore();
       const response = await apiClient.register(payload);
+      disabledModules.value = Array.isArray(response?.disabledModules) ? response.disabledModules : [];
       const mapped = mapUserPayload(response.user, overview.value);
       user.value = mapped;
 
@@ -226,6 +235,7 @@ export const useUserStore = defineStore("user", () => {
     error.value = null;
     try {
       const response = await apiClient.updateProfile(payload);
+      disabledModules.value = Array.isArray(response?.disabledModules) ? response.disabledModules : [];
       const mapped = mapUserPayload(response.user, overview.value);
       user.value = mapped;
       await loadOverview({ force: true });
@@ -265,6 +275,7 @@ export const useUserStore = defineStore("user", () => {
 
       // Выполняем регистрацию
       const response = await apiClient.register(payload);
+      disabledModules.value = Array.isArray(response?.disabledModules) ? response.disabledModules : [];
       const mapped = mapUserPayload(response.user, overview.value);
       user.value = mapped;
 
@@ -294,6 +305,7 @@ export const useUserStore = defineStore("user", () => {
     user.value = null;
     inviteFlow.value = { hasInviteCode: false, inviteCodeValid: false, registrationByInvitationOnly: true };
     overview.value = null;
+    disabledModules.value = [];
     isInitialized.value = false;
   }
 
@@ -304,6 +316,7 @@ export const useUserStore = defineStore("user", () => {
 
     try {
       const result = await apiClient.completeOnboarding();
+      disabledModules.value = Array.isArray(result?.disabledModules) ? result.disabledModules : disabledModules.value;
       user.value = {
         ...user.value,
         onboardingCompletedAt: result?.onboardingCompletedAt || new Date().toISOString(),
@@ -328,12 +341,14 @@ export const useUserStore = defineStore("user", () => {
     invitationAccepted,
     overview,
     overviewLoading,
+    disabledModules,
     error,
 
     // getters
     isAuthenticated,
     fullName,
     initials,
+    hasModuleAccess,
 
     // actions
     ensureStatus,

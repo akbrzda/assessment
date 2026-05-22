@@ -3,6 +3,8 @@ const { normalizePhoneToE164Ru } = require("../../../utils/phone");
 const logger = require("../../../utils/logger");
 const { buildAuditEntry, logAuditEvent } = require("../../../services/auditService");
 const authRepository = require("./repository");
+const settingsService = require("../../../services/settingsService");
+const { FEATURE_FLAGS_SETTING_KEY } = require("../../../config/featureFlags");
 
 const PHONE_MISMATCH_ERROR_MESSAGE = "Номер телефона не совпадает с приглашением";
 const PHONE_CONFLICT_ERROR_MESSAGE = "Обнаружен конфликт профилей по номеру телефона. Обратитесь к администратору";
@@ -100,6 +102,20 @@ function verifyInviteContact({ contact, platformUser, clientPlatform }) {
   };
 }
 
+async function getDisabledModules() {
+  const rawValue = await settingsService.getSetting(FEATURE_FLAGS_SETTING_KEY, "[]");
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean);
+  } catch (error) {
+    console.error("Некорректный JSON feature flags:", error);
+    return [];
+  }
+}
+
 async function getStatus(context) {
   const telegramUser = context.telegramUser;
   const inviteCode = resolveInviteCode(context);
@@ -118,9 +134,11 @@ async function getStatus(context) {
       userId: context.currentUser.id,
     });
     const user = await authRepository.getDashboardData(context.currentUser.id);
+    const disabledModules = await getDisabledModules();
     return {
       registered: true,
       user,
+      disabledModules,
     };
   }
 
@@ -129,6 +147,7 @@ async function getStatus(context) {
     invitation = await authRepository.findActiveInvitationByCode(inviteCode);
   }
 
+  const disabledModules = await getDisabledModules();
   return {
     registered: false,
     defaults: {
@@ -155,6 +174,7 @@ async function getStatus(context) {
           lastName: invitation.last_name,
         }
       : null,
+    disabledModules,
   };
 }
 
@@ -338,7 +358,8 @@ async function register(context, payload) {
         }),
       );
 
-      return { registered: true, user };
+      const disabledModules = await getDisabledModules();
+      return { registered: true, user, disabledModules };
     }
 
     // Если у приглашения есть заранее созданный pending-профиль — активируем его
@@ -418,7 +439,8 @@ async function register(context, payload) {
       });
       await logAuditEvent(auditEntry);
 
-      return { registered: true, user };
+      const disabledModules = await getDisabledModules();
+      return { registered: true, user, disabledModules };
     }
 
     throw buildError("Приглашение не готово к активации: отсутствует pending-профиль", 409);
@@ -528,7 +550,8 @@ async function register(context, payload) {
     }),
   );
 
-  return { registered: true, user };
+  const disabledModules = await getDisabledModules();
+  return { registered: true, user, disabledModules };
 }
 
 async function getProfile(currentUser) {
@@ -603,4 +626,5 @@ module.exports = {
   updateTimezone,
   completeOnboarding,
   getReferences,
+  getDisabledModules,
 };

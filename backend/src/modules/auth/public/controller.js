@@ -51,7 +51,8 @@ async function register(req, res, next) {
 async function getProfile(req, res, next) {
   try {
     const user = await authService.getProfile(req.currentUser);
-    res.json({ user });
+    const disabledModules = await authService.getDisabledModules();
+    res.json({ user, disabledModules });
   } catch (error) {
     handleKnownError(error, res, next);
   }
@@ -61,7 +62,8 @@ async function updateProfile(req, res, next) {
   try {
     const payload = validateProfilePayload(req.body);
     const user = await authService.updateProfile(req.currentUser, payload);
-    res.json({ user });
+    const disabledModules = await authService.getDisabledModules();
+    res.json({ user, disabledModules });
   } catch (error) {
     handleKnownError(error, res, next);
   }
@@ -80,7 +82,8 @@ async function updateTimezone(req, res, next) {
 async function completeOnboarding(req, res, next) {
   try {
     const result = await authService.completeOnboarding(req.currentUser);
-    res.json(result);
+    const disabledModules = await authService.getDisabledModules();
+    res.json({ ...result, disabledModules });
   } catch (error) {
     handleKnownError(error, res, next);
   }

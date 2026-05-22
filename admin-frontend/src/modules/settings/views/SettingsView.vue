@@ -308,13 +308,20 @@ const { showToast, showSuccess, showError } = useToast();
 const authStore = useAuthStore();
 
 // Табы
-const tabsConfig = [
-  { value: "general", label: "Общие" },
-  { value: "featureFlags", label: "Feature Flags" },
-  { value: "bot", label: "Бот и онбординг" },
-  { value: "gamification", label: "Геймификация" },
-  { value: "environment", label: "Переменные окружения" },
-];
+const tabsConfig = computed(() => {
+  const tabs = [
+    { value: "general", label: "Общие" },
+    { value: "featureFlags", label: "Feature Flags" },
+    { value: "bot", label: "Бот и онбординг" },
+    { value: "environment", label: "Переменные окружения" },
+  ];
+
+  if (authStore.hasModuleAccess("gamification")) {
+    tabs.splice(3, 0, { value: "gamification", label: "Геймификация" });
+  }
+
+  return tabs;
+});
 
 const activeTab = ref("general");
 const settingsLoading = ref(true);
@@ -404,6 +411,9 @@ const loadFeatureFlags = async () => {
     featureModules.value = Array.isArray(data?.modules) ? data.modules : [];
     savedDisabledModules.value = Array.isArray(data?.disabledModules) ? data.disabledModules : [];
     authStore.setDisabledModules(savedDisabledModules.value);
+    if (!authStore.hasModuleAccess("gamification") && activeTab.value === "gamification") {
+      activeTab.value = "general";
+    }
   } catch (error) {
     console.error("Ошибка загрузки feature flags:", error);
     showError("Не удалось загрузить feature flags");
@@ -433,6 +443,9 @@ const saveFeatureFlags = async () => {
     featureModules.value = Array.isArray(data?.modules) ? data.modules : featureModules.value;
     savedDisabledModules.value = Array.isArray(data?.disabledModules) ? data.disabledModules : disabledModules;
     authStore.setDisabledModules(savedDisabledModules.value);
+    if (!authStore.hasModuleAccess("gamification") && activeTab.value === "gamification") {
+      activeTab.value = "general";
+    }
     showSuccess("Feature flags сохранены");
   } catch (error) {
     console.error("Ошибка сохранения feature flags:", error);

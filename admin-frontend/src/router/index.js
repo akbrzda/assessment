@@ -23,7 +23,7 @@ const routes = [
         path: "dashboard",
         name: "Dashboard",
         component: () => import("../modules/dashboard/views/DashboardView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Панель управления" },
+        meta: { roles: ["superadmin", "manager"], module: "analytics", title: "Панель управления" },
       },
       {
         path: "users",
@@ -161,7 +161,7 @@ const routes = [
         path: "certificates",
         name: "Certificates",
         component: () => import("../modules/certificates/views/CertificatesView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Сертификаты" },
+        meta: { roles: ["superadmin", "manager"], module: "certificates", title: "Сертификаты" },
       },
       {
         path: "audit-logs",

@@ -314,7 +314,7 @@ const buildInviteLinks = (code) => {
 
 const hasInviteLinks = computed(() => Boolean(inviteLinks.value.telegramLink || inviteLinks.value.maxLink || inviteLinks.value.fallbackCode));
 
-const canOpenInvitations = computed(() => authStore.isSuperAdmin || authStore.hasModuleAccess("invitations"));
+const canOpenInvitations = computed(() => authStore.hasModuleAccess("invitations"));
 
 const inviteBranchOptions = computed(() =>
   references.value.branches.map((branch) => ({

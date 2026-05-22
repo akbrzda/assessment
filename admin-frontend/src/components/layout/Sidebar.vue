@@ -131,15 +131,14 @@ const initials = computed(() => {
 });
 
 const navSections = computed(() => {
-  const isSA = authStore.isSuperAdmin;
-  const has = (mod) => isSA || authStore.hasModuleAccess(mod);
+  const has = (mod) => authStore.hasModuleAccess(mod);
 
   const sections = [
     {
       id: "main",
       title: "Главное",
       items: [
-        { label: "Дашборд", to: "/dashboard", icon: LayoutDashboardIcon },
+        has("analytics") && { label: "Дашборд", to: "/dashboard", icon: LayoutDashboardIcon },
         has("users") && { label: "Пользователи", to: "/users", icon: UsersIcon },
       ].filter(Boolean),
     },
@@ -150,7 +149,7 @@ const navSections = computed(() => {
         has("assessments") && { label: "Аттестации", to: "/assessments", icon: ClipboardListIcon },
         has("courses") && { label: "Курсы", to: "/courses", icon: BookOpenCheckIcon },
         has("questions") && { label: "Банк вопросов", to: "/questions", icon: FileQuestionIcon },
-        { label: "Сертификаты", to: "/certificates", icon: AwardIcon },
+        has("certificates") && { label: "Сертификаты", to: "/certificates", icon: AwardIcon },
       ].filter(Boolean),
     },
     {

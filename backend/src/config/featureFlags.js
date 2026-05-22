@@ -15,7 +15,9 @@ const FEATURE_MODULES = [
 ];
 
 const MODULE_ROUTE_PREFIXES = [
+  { prefix: "/admin/dashboard", moduleCode: "analytics" },
   { prefix: "/admin/users", moduleCode: "users" },
+  { prefix: "/admin/search", moduleCode: "users" },
   { prefix: "/admin/assessments", moduleCode: "assessments" },
   { prefix: "/assessments", moduleCode: "assessments" },
   { prefix: "/admin/courses", moduleCode: "courses" },
@@ -34,6 +36,7 @@ const MODULE_ROUTE_PREFIXES = [
   { prefix: "/admin/levels", moduleCode: "gamification" },
   { prefix: "/admin/certificates", moduleCode: "certificates" },
   { prefix: "/certificates", moduleCode: "certificates" },
+  { prefix: "/verify", moduleCode: "certificates" },
 ];
 
 const LOCKED_MODULE_CODES = new Set(FEATURE_MODULES.filter((item) => item.locked).map((item) => item.code));
