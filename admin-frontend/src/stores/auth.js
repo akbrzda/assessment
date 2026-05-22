@@ -24,6 +24,7 @@ export const useAuthStore = defineStore("auth", {
     userPermissions: null,
     permissionsLoaded: false,
     defaultModulesByRole: {},
+    disabledModules: [],
     restorePromise: null,
   }),
 
@@ -34,6 +35,10 @@ export const useAuthStore = defineStore("auth", {
     token: (state) => state.accessToken,
 
     hasModuleAccess: (state) => (moduleCode) => {
+      if (state.disabledModules.includes(moduleCode)) {
+        return false;
+      }
+
       const roleName = state.user?.role;
       const roleDefaults = HARD_CODED_ROLE_MODULES[roleName] || [];
       return roleDefaults.includes("*") || roleDefaults.includes(moduleCode);
@@ -69,6 +74,7 @@ export const useAuthStore = defineStore("auth", {
         const { data } = await authApi.login(credentials);
 
         this.user = data.user;
+        this.disabledModules = Array.isArray(data.disabledModules) ? data.disabledModules : [];
         this.setToken(data.accessToken);
         setUser(data.user);
 
@@ -115,6 +121,7 @@ export const useAuthStore = defineStore("auth", {
             this.user = data.user;
             setUser(data.user);
           }
+          this.disabledModules = Array.isArray(data.disabledModules) ? data.disabledModules : [];
 
           this.startTokenRefresh();
           await this.loadUserPermissions();
@@ -166,6 +173,10 @@ export const useAuthStore = defineStore("auth", {
       setUser(this.user);
     },
 
+    setDisabledModules(disabledModules = []) {
+      this.disabledModules = Array.isArray(disabledModules) ? disabledModules : [];
+    },
+
     async logout() {
       try {
         await authApi.logout();
@@ -184,6 +195,7 @@ export const useAuthStore = defineStore("auth", {
         this.userPermissions = null;
         this.permissionsLoaded = false;
         this.defaultModulesByRole = {};
+        this.disabledModules = [];
         clearSession();
       }
     },

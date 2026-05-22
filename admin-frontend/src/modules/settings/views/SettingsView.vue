@@ -38,6 +38,45 @@
         </Card>
       </div>
 
+      <!-- Вкладка: Feature Flags -->
+      <div v-if="activeTab === 'featureFlags'" class="settings-section">
+        <h3 class="section-title">Feature Flags модулей</h3>
+
+        <Card title="Управление разделами и API-модулями" icon="ToggleLeft">
+          <p class="text-sm text-muted-foreground mb-4">
+            Отключение модуля скрывает его в UI и блокирует соответствующие API-эндпоинты на backend.
+          </p>
+
+          <div v-if="featureFlagsLoading" class="space-y-2">
+            <Skeleton class="h-12 w-full rounded-xl" />
+            <Skeleton class="h-12 w-full rounded-xl" />
+            <Skeleton class="h-12 w-full rounded-xl" />
+          </div>
+
+          <div v-else class="feature-flags-list">
+            <label v-for="moduleItem in featureModules" :key="moduleItem.code" class="feature-flag-row">
+              <div class="feature-flag-main">
+                <strong>{{ moduleItem.name }}</strong>
+                <span class="text-xs text-muted-foreground">{{ moduleItem.code }}</span>
+              </div>
+              <input
+                type="checkbox"
+                class="native-checkbox"
+                :disabled="moduleItem.locked || featureFlagsSaving"
+                :checked="moduleItem.enabled"
+                @change="toggleFeatureModule(moduleItem.code, $event.target.checked)"
+              />
+            </label>
+          </div>
+
+          <div class="mt-4">
+            <Button icon="Save" :loading="featureFlagsSaving" :disabled="featureFlagsLoading || !featureFlagsDirty" @click="saveFeatureFlags">
+              Сохранить feature flags
+            </Button>
+          </div>
+        </Card>
+      </div>
+
       <!-- Вкладка: Бот и онбординг -->
       <div v-if="activeTab === 'bot'" class="settings-section">
         <h3 class="section-title">Бот и онбординг</h3>
@@ -247,7 +286,7 @@
   </div>
 </template>
 <script setup>
-import { ref, onMounted } from "vue";
+import { computed, ref, onMounted } from "vue";
 import settingsApi from "@/api/settings";
 import BadgesManager from "@/modules/settings/components/BadgesManager.vue";
 import LevelsManager from "@/modules/settings/components/LevelsManager.vue";
@@ -263,12 +302,15 @@ import SkeletonForm from "@/components/ui/SkeletonForm.vue";
 import SkeletonPageHeader from "@/components/ui/SkeletonPageHeader.vue";
 import { useToast } from "@/composables/useToast";
 import { useSkeletonGate } from "@/composables/useSkeletonGate";
+import { useAuthStore } from "@/stores/auth";
 
 const { showToast, showSuccess, showError } = useToast();
+const authStore = useAuthStore();
 
 // Табы
 const tabsConfig = [
   { value: "general", label: "Общие" },
+  { value: "featureFlags", label: "Feature Flags" },
   { value: "bot", label: "Бот и онбординг" },
   { value: "gamification", label: "Геймификация" },
   { value: "environment", label: "Переменные окружения" },
@@ -288,6 +330,10 @@ const logoUploading = ref(false);
 const logoFileInput = ref(null);
 
 const botSaving = ref(false);
+const featureFlagsLoading = ref(false);
+const featureFlagsSaving = ref(false);
+const featureModules = ref([]);
+const savedDisabledModules = ref([]);
 const botSettings = ref({
   onboardingTitle: "👋 Привет{{name}}!",
   onboardingBody:
@@ -344,6 +390,57 @@ const BOT_SETTINGS_META = [
     description: "Сообщение пользователю без приглашения",
   },
 ];
+
+const featureFlagsDirty = computed(() => {
+  const currentDisabled = featureModules.value.filter((item) => !item.enabled).map((item) => item.code).sort();
+  const saved = [...savedDisabledModules.value].sort();
+  return JSON.stringify(currentDisabled) !== JSON.stringify(saved);
+});
+
+const loadFeatureFlags = async () => {
+  try {
+    featureFlagsLoading.value = true;
+    const data = await settingsApi.getFeatureFlags();
+    featureModules.value = Array.isArray(data?.modules) ? data.modules : [];
+    savedDisabledModules.value = Array.isArray(data?.disabledModules) ? data.disabledModules : [];
+    authStore.setDisabledModules(savedDisabledModules.value);
+  } catch (error) {
+    console.error("Ошибка загрузки feature flags:", error);
+    showError("Не удалось загрузить feature flags");
+  } finally {
+    featureFlagsLoading.value = false;
+  }
+};
+
+const toggleFeatureModule = (moduleCode, enabled) => {
+  featureModules.value = featureModules.value.map((item) => {
+    if (item.code !== moduleCode || item.locked) {
+      return item;
+    }
+
+    return {
+      ...item,
+      enabled: Boolean(enabled),
+    };
+  });
+};
+
+const saveFeatureFlags = async () => {
+  try {
+    featureFlagsSaving.value = true;
+    const disabledModules = featureModules.value.filter((item) => !item.enabled).map((item) => item.code);
+    const data = await settingsApi.updateFeatureFlags(disabledModules);
+    featureModules.value = Array.isArray(data?.modules) ? data.modules : featureModules.value;
+    savedDisabledModules.value = Array.isArray(data?.disabledModules) ? data.disabledModules : disabledModules;
+    authStore.setDisabledModules(savedDisabledModules.value);
+    showSuccess("Feature flags сохранены");
+  } catch (error) {
+    console.error("Ошибка сохранения feature flags:", error);
+    showError(error?.response?.data?.error || "Не удалось сохранить feature flags");
+  } finally {
+    featureFlagsSaving.value = false;
+  }
+};
 
 async function handleLogoUpload(event) {
   const file = event.target.files?.[0];
@@ -467,6 +564,7 @@ const toggleGamification = async () => {
 
 onMounted(() => {
   loadSettings();
+  loadFeatureFlags();
 });
 </script>
 
@@ -580,6 +678,29 @@ onMounted(() => {
 
 .bot-actions {
   margin-top: 16px;
+}
+
+.feature-flags-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.feature-flag-row {
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface-card);
+}
+
+.feature-flag-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* Gamification Rules */

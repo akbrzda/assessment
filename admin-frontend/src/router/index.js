@@ -196,6 +196,7 @@ router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some((record) => record.meta?.requiresAuth);
   const roleRestrictedRecord = [...to.matched].reverse().find((record) => Array.isArray(record.meta?.roles));
   const allowedRoles = roleRestrictedRecord?.meta?.roles;
+  const requiredModule = to.meta?.module;
 
   // Обновить title страницы
   const baseTitle = "Система аттестаций";
@@ -225,6 +226,10 @@ router.beforeEach(async (to, from, next) => {
   // Курс для manager работает в read-only: запрещаем маршруты редактирования.
   if (authStore.user?.role === "manager" && ["CreateCourse", "EditCourse"].includes(String(to.name || ""))) {
     return next({ name: "Courses" });
+  }
+
+  if (requiredModule && !authStore.hasModuleAccess(requiredModule)) {
+    return next({ name: "NotFound", query: { type: "forbidden" } });
   }
 
   if (allowedRoles && !allowedRoles.includes(authStore.user?.role)) {

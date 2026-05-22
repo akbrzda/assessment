@@ -6,6 +6,7 @@ const path = require("path");
 const config = require("./config/env");
 const { errorHandler, timezone: timezoneMiddleware } = require("./middleware");
 const correlationId = require("./middleware/correlationId");
+const featureFlagsGate = require("./middleware/featureFlagsGate");
 const verifyJWT = require("./middleware/verifyJWT");
 const { verifyCertificateLimiter, authLimiter, adminGlobalLimiter } = require("./middleware/rateLimit");
 
@@ -89,6 +90,7 @@ const apiRouter = express.Router();
 apiRouter.use(timezoneMiddleware);
 apiRouter.use(metricsMiddleware);
 apiRouter.use("/admin", adminGlobalLimiter);
+apiRouter.use(featureFlagsGate);
 
 apiRouter.get("/health", async (req, res, next) => {
   try {

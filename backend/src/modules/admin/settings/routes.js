@@ -10,6 +10,8 @@ router.use(checkModuleAccess("settings"));
 
 router.post("/upload-logo", settingsController.uploadLogo);
 router.get("/", settingsController.getSettings);
+router.get("/feature-flags", settingsController.getFeatureFlags);
+router.put("/feature-flags", settingsController.updateFeatureFlags);
 router.get("/:key", settingsController.getSettingByKey);
 router.post("/", settingsController.createSetting);
 router.put("/:key", settingsController.updateSetting);

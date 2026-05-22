@@ -154,6 +154,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
+import { useAuthStore } from "@/stores/auth";
 import PageHeader from "@/components/ui/PageHeader.vue";
 import Button from "@/components/ui/Button.vue";
 import Badge from "@/components/ui/Badge.vue";
@@ -167,6 +168,7 @@ import DatePicker from "@/components/ui/DatePicker.vue";
 import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "@/components/ui";
 import { getAuditLogs } from "@/api/auditLogs";
 
+const authStore = useAuthStore();
 const logs = ref([]);
 const isLoading = ref(false);
 const errorMessage = ref("");
@@ -284,6 +286,7 @@ const parsedMetadata = computed(() => {
 
 function formatDate(iso) {
   if (!iso) return "—";
+  const userTimeZone = authStore.user?.timezone || "UTC";
   return new Date(iso).toLocaleString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
@@ -291,6 +294,7 @@ function formatDate(iso) {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
+    timeZone: userTimeZone,
   });
 }
 
