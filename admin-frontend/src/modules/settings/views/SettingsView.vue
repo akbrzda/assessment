@@ -54,7 +54,21 @@
           </div>
 
           <div v-else class="feature-flags-list">
-            <label v-for="moduleItem in featureModules" :key="moduleItem.code" class="feature-flag-row">
+            <label class="feature-flag-row">
+              <div class="feature-flag-main">
+                <strong>Админ-панель (связанные модули)</strong>
+                <span class="text-xs text-muted-foreground">{{ adminLinkedModulesHint }}</span>
+              </div>
+              <input
+                type="checkbox"
+                class="native-checkbox"
+                :disabled="featureFlagsSaving"
+                :checked="adminLinkedModulesEnabled"
+                @change="toggleAdminLinkedModules($event.target.checked)"
+              />
+            </label>
+
+            <label v-for="moduleItem in clientModules" :key="moduleItem.code" class="feature-flag-row">
               <div class="feature-flag-main">
                 <strong>{{ moduleItem.name }}</strong>
                 <span class="text-xs text-muted-foreground">{{ moduleItem.code }}</span>
@@ -341,6 +355,7 @@ const featureFlagsLoading = ref(false);
 const featureFlagsSaving = ref(false);
 const featureModules = ref([]);
 const savedDisabledModules = ref([]);
+const featureGroups = ref({ adminLinkedModuleCodes: [], clientModuleCodes: [] });
 const botSettings = ref({
   onboardingTitle: "👋 Привет{{name}}!",
   onboardingBody:
@@ -404,11 +419,33 @@ const featureFlagsDirty = computed(() => {
   return JSON.stringify(currentDisabled) !== JSON.stringify(saved);
 });
 
+const adminLinkedModules = computed(() => {
+  const targetCodes = featureGroups.value.adminLinkedModuleCodes || [];
+  const targetSet = new Set(targetCodes);
+  return featureModules.value.filter((item) => targetSet.has(item.code));
+});
+
+const clientModules = computed(() => {
+  const targetCodes = featureGroups.value.clientModuleCodes || [];
+  const targetSet = new Set(targetCodes);
+  return featureModules.value.filter((item) => targetSet.has(item.code));
+});
+
+const adminLinkedModulesEnabled = computed(() => {
+  if (!adminLinkedModules.value.length) {
+    return true;
+  }
+  return adminLinkedModules.value.every((item) => item.enabled);
+});
+
+const adminLinkedModulesHint = computed(() => adminLinkedModules.value.map((item) => item.code).join(", "));
+
 const loadFeatureFlags = async () => {
   try {
     featureFlagsLoading.value = true;
     const data = await settingsApi.getFeatureFlags();
     featureModules.value = Array.isArray(data?.modules) ? data.modules : [];
+    featureGroups.value = data?.groups || { adminLinkedModuleCodes: [], clientModuleCodes: [] };
     savedDisabledModules.value = Array.isArray(data?.disabledModules) ? data.disabledModules : [];
     authStore.setDisabledModules(savedDisabledModules.value);
     if (!authStore.hasModuleAccess("gamification") && activeTab.value === "gamification") {
@@ -420,6 +457,16 @@ const loadFeatureFlags = async () => {
   } finally {
     featureFlagsLoading.value = false;
   }
+};
+
+const toggleAdminLinkedModules = (enabled) => {
+  const targetCodes = new Set(featureGroups.value.adminLinkedModuleCodes || []);
+  featureModules.value = featureModules.value.map((item) => {
+    if (!targetCodes.has(item.code) || item.locked) {
+      return item;
+    }
+    return { ...item, enabled: Boolean(enabled) };
+  });
 };
 
 const toggleFeatureModule = (moduleCode, enabled) => {
@@ -441,6 +488,7 @@ const saveFeatureFlags = async () => {
     const disabledModules = featureModules.value.filter((item) => !item.enabled).map((item) => item.code);
     const data = await settingsApi.updateFeatureFlags(disabledModules);
     featureModules.value = Array.isArray(data?.modules) ? data.modules : featureModules.value;
+    featureGroups.value = data?.groups || featureGroups.value;
     savedDisabledModules.value = Array.isArray(data?.disabledModules) ? data.disabledModules : disabledModules;
     authStore.setDisabledModules(savedDisabledModules.value);
     if (!authStore.hasModuleAccess("gamification") && activeTab.value === "gamification") {

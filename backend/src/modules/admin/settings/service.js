@@ -1,7 +1,13 @@
 const { pool } = require("../../../config/database");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
 const settingsService = require("../../../services/settingsService");
-const { FEATURE_FLAGS_SETTING_KEY, FEATURE_MODULES, LOCKED_MODULE_CODES } = require("../../../config/featureFlags");
+const {
+  FEATURE_FLAGS_SETTING_KEY,
+  FEATURE_MODULES,
+  ADMIN_LINKED_MODULE_CODES,
+  CLIENT_MODULE_CODES,
+  LOCKED_MODULE_CODES,
+} = require("../../../config/featureFlags");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
@@ -32,6 +38,13 @@ function getFeatureModulesPayload(disabledModules) {
     locked: Boolean(moduleItem.locked),
     enabled: !disabledSet.has(moduleItem.code),
   }));
+}
+
+function getFeatureGroupsPayload() {
+  return {
+    adminLinkedModuleCodes: [...ADMIN_LINKED_MODULE_CODES],
+    clientModuleCodes: [...CLIENT_MODULE_CODES],
+  };
 }
 
 // Хранилище логотипа
@@ -130,6 +143,7 @@ exports.getFeatureFlags = async (req, res, next) => {
     res.json({
       disabledModules,
       modules: getFeatureModulesPayload(disabledModules),
+      groups: getFeatureGroupsPayload(),
     });
   } catch (error) {
     console.error("Get feature flags error:", error);
@@ -260,6 +274,7 @@ exports.updateFeatureFlags = async (req, res, next) => {
       message: "Feature flags обновлены успешно",
       disabledModules: normalized,
       modules: getFeatureModulesPayload(normalized),
+      groups: getFeatureGroupsPayload(),
     });
   } catch (error) {
     console.error("Update feature flags error:", error);

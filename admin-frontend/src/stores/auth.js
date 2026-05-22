@@ -4,8 +4,10 @@ import websocketService from "../services/websocket";
 import {
   clearSession,
   getAccessToken,
+  getDisabledModules,
   getUser,
   setAccessToken,
+  setDisabledModules as persistDisabledModules,
   setUser,
 } from "../services/session/tokenStorage";
 import { onAccessTokenRefreshed, refreshAccessToken } from "../services/session/refreshCoordinator";
@@ -24,7 +26,7 @@ export const useAuthStore = defineStore("auth", {
     userPermissions: null,
     permissionsLoaded: false,
     defaultModulesByRole: {},
-    disabledModules: [],
+    disabledModules: getDisabledModules(),
     restorePromise: null,
   }),
 
@@ -75,6 +77,7 @@ export const useAuthStore = defineStore("auth", {
 
         this.user = data.user;
         this.disabledModules = Array.isArray(data.disabledModules) ? data.disabledModules : [];
+        persistDisabledModules(this.disabledModules);
         this.setToken(data.accessToken);
         setUser(data.user);
 
@@ -122,6 +125,7 @@ export const useAuthStore = defineStore("auth", {
             setUser(data.user);
           }
           this.disabledModules = Array.isArray(data.disabledModules) ? data.disabledModules : [];
+          persistDisabledModules(this.disabledModules);
 
           this.startTokenRefresh();
           await this.loadUserPermissions();
@@ -175,6 +179,7 @@ export const useAuthStore = defineStore("auth", {
 
     setDisabledModules(disabledModules = []) {
       this.disabledModules = Array.isArray(disabledModules) ? disabledModules : [];
+      persistDisabledModules(this.disabledModules);
     },
 
     async logout() {

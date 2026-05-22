@@ -14,6 +14,9 @@ const FEATURE_MODULES = [
   { code: "settings", name: "Настройки", locked: true },
 ];
 
+const ADMIN_LINKED_MODULE_CODES = ["users", "questions", "analytics", "invitations", "branches", "positions"];
+const CLIENT_MODULE_CODES = ["courses", "assessments", "gamification", "certificates"];
+
 const MODULE_ROUTE_PREFIXES = [
   { prefix: "/admin/dashboard", moduleCode: "analytics" },
   { prefix: "/admin/users", moduleCode: "users" },
@@ -49,6 +52,8 @@ function getModuleCodeByPath(pathname = "") {
 module.exports = {
   FEATURE_FLAGS_SETTING_KEY,
   FEATURE_MODULES,
+  ADMIN_LINKED_MODULE_CODES,
+  CLIENT_MODULE_CODES,
   LOCKED_MODULE_CODES,
   getModuleCodeByPath,
 };
