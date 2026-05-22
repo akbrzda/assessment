@@ -43,9 +43,7 @@
         <h3 class="section-title">Feature Flags модулей</h3>
 
         <Card title="Управление разделами и API-модулями" icon="ToggleLeft">
-          <p class="text-sm text-muted-foreground mb-4">
-            Отключение модуля скрывает его в UI и блокирует соответствующие API-эндпоинты на backend.
-          </p>
+          <p class="text-sm text-muted-foreground mb-4">Отключение модуля скрывает его в UI и блокирует соответствующие API-эндпоинты на backend.</p>
 
           <div v-if="featureFlagsLoading" class="space-y-2">
             <Skeleton class="h-12 w-full rounded-xl" />
@@ -54,17 +52,17 @@
           </div>
 
           <div v-else class="feature-flags-list">
-            <label class="feature-flag-row">
+            <label v-for="moduleItem in sharedModules" :key="`shared-${moduleItem.code}`" class="feature-flag-row">
               <div class="feature-flag-main">
-                <strong>Общие модули (админ + клиент)</strong>
-                <span class="text-xs text-muted-foreground">{{ sharedModulesHint }}</span>
+                <strong>{{ moduleItem.name }}</strong>
+                <span class="text-xs text-muted-foreground">Клиент + админ: {{ moduleItem.code }}</span>
               </div>
               <input
                 type="checkbox"
                 class="native-checkbox"
-                :disabled="featureFlagsSaving"
-                :checked="sharedModulesEnabled"
-                @change="toggleSharedModules($event.target.checked)"
+                :disabled="moduleItem.locked || featureFlagsSaving"
+                :checked="moduleItem.enabled"
+                @change="toggleFeatureModule(moduleItem.code, $event.target.checked)"
               />
             </label>
 
@@ -428,7 +426,10 @@ const BOT_SETTINGS_META = [
 ];
 
 const featureFlagsDirty = computed(() => {
-  const currentDisabled = featureModules.value.filter((item) => !item.enabled).map((item) => item.code).sort();
+  const currentDisabled = featureModules.value
+    .filter((item) => !item.enabled)
+    .map((item) => item.code)
+    .sort();
   const saved = [...savedDisabledModules.value].sort();
   return JSON.stringify(currentDisabled) !== JSON.stringify(saved);
 });
@@ -451,15 +452,6 @@ const adminOnlyModules = computed(() => {
   return featureModules.value.filter((item) => targetSet.has(item.code));
 });
 
-const sharedModulesEnabled = computed(() => {
-  if (!sharedModules.value.length) {
-    return true;
-  }
-  return sharedModules.value.every((item) => item.enabled);
-});
-
-const sharedModulesHint = computed(() => sharedModules.value.map((item) => item.code).join(", "));
-
 const loadFeatureFlags = async () => {
   try {
     featureFlagsLoading.value = true;
@@ -477,16 +469,6 @@ const loadFeatureFlags = async () => {
   } finally {
     featureFlagsLoading.value = false;
   }
-};
-
-const toggleSharedModules = (enabled) => {
-  const targetCodes = new Set(featureGroups.value.sharedModuleCodes || []);
-  featureModules.value = featureModules.value.map((item) => {
-    if (!targetCodes.has(item.code) || item.locked) {
-      return item;
-    }
-    return { ...item, enabled: Boolean(enabled) };
-  });
 };
 
 const toggleFeatureModule = (moduleCode, enabled) => {
