@@ -91,11 +91,12 @@ export default {
     const activeFilter = ref("all");
     const currentPage = ref(1);
 
-    const filterOptions = [
-      { value: "all", label: "Все" },
-      { value: "assessment", label: "Аттестации" },
-      { value: "course", label: "Курсы" },
-    ];
+    const filterOptions = computed(() => {
+      const options = [{ value: "all", label: "Все" }];
+      if (userStore.hasModuleAccess("assessments")) options.push({ value: "assessment", label: "Аттестации" });
+      if (userStore.hasModuleAccess("courses")) options.push({ value: "course", label: "Курсы" });
+      return options;
+    });
 
     function formatDate(value) {
       const parsed = parseDate(value);
@@ -218,10 +219,16 @@ export default {
           await userStore.ensureStatus();
         }
 
-        const [attempts, coursesResponse] = await Promise.all([loadAllAttempts(), apiClient.listCourses()]);
+        const canUseAssessments = userStore.hasModuleAccess("assessments");
+        const canUseCourses = userStore.hasModuleAccess("courses");
 
-        attemptItems.value = attempts.map(mapAttemptItem);
-        const courses = Array.isArray(coursesResponse?.courses) ? coursesResponse.courses : [];
+        const [attemptsResult, coursesResult] = await Promise.all([
+          canUseAssessments ? loadAllAttempts() : Promise.resolve([]),
+          canUseCourses ? apiClient.listCourses() : Promise.resolve({ courses: [] }),
+        ]);
+
+        attemptItems.value = attemptsResult.map(mapAttemptItem);
+        const courses = Array.isArray(coursesResult?.courses) ? coursesResult.courses : [];
         courseItems.value = courses.map(mapCourseItem);
       } catch (error) {
         attemptItems.value = [];

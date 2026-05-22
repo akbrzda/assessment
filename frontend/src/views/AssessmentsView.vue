@@ -63,6 +63,37 @@
         <BookOpen :size="48" color="var(--text-secondary)" />
         <p class="body-small text-secondary mt-12">Курсы пока недоступны</p>
       </div>
+
+      <!-- Аттестации -->
+      <template v-if="showAssessments">
+        <h2 class="assessments-section-title">Аттестации</h2>
+
+        <div v-if="isAssessmentsLoading" class="courses-skeleton">
+          <SkeletonCard v-for="index in 2" :key="index" />
+        </div>
+
+        <div v-else-if="userAssessments.length" class="courses-list">
+          <button v-for="item in userAssessments" :key="item.id" class="course-card" type="button" @click="openAssessment(item)">
+            <div class="course-icon assessment-icon">
+              <ClipboardCheck :size="24" class="course-icon-svg" stroke-width="2" />
+            </div>
+            <div class="course-body">
+              <h3 class="course-title">{{ item.title }}</h3>
+              <div v-if="item.lastAttemptStatus === 'completed'" class="course-completed-badge">
+                <span class="course-completed-text">
+                  {{ item.bestScorePercent != null ? `Результат: ${Math.round(item.bestScorePercent)}%` : "Аттестация пройдена" }}
+                </span>
+              </div>
+              <p v-else class="course-meta">{{ getAssessmentLabel(item) }}</p>
+            </div>
+          </button>
+        </div>
+
+        <div v-else class="empty-state">
+          <ClipboardCheck :size="48" color="var(--text-secondary)" />
+          <p class="body-small text-secondary mt-12">Аттестации пока не назначены</p>
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -70,8 +101,9 @@
 <script>
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { BookOpen, Search } from "lucide-vue-next";
+import { BookOpen, ClipboardCheck, Search } from "lucide-vue-next";
 import { useTelegramStore } from "../stores/telegram";
+import { useUserStore } from "../stores/user";
 import { apiClient } from "../services/apiClient";
 import BaseButton from "../components/ui/BaseButton.vue";
 import ProgressBar from "../components/ui/ProgressBar.vue";
@@ -83,6 +115,7 @@ export default {
   name: "AssessmentsView",
   components: {
     BookOpen,
+    ClipboardCheck,
     Search,
     BaseButton,
     ProgressBar,
@@ -92,12 +125,16 @@ export default {
   setup() {
     const router = useRouter();
     const telegramStore = useTelegramStore();
+    const userStore = useUserStore();
 
     const courses = ref([]);
     const courseSearch = ref("");
     const courseFilter = ref("all");
     const isCoursesLoading = ref(false);
     const coursesError = ref("");
+    const userAssessments = ref([]);
+    const isAssessmentsLoading = ref(false);
+    const showAssessments = computed(() => userStore.hasModuleAccess("assessments"));
     const searchInputRef = ref(null);
 
     const courseTabs = [
@@ -151,6 +188,22 @@ export default {
       });
     }
 
+    function getAssessmentLabel(item) {
+      if (item.status === "pending") return "Ещё не открыта";
+      if (item.status === "closed") return "Период истёк";
+      if (item.lastAttemptStatus === "in_progress") return "Начата, продолжить";
+      return "Доступна для прохождения";
+    }
+
+    function openAssessment(item) {
+      telegramStore.hapticFeedback("impact", "light");
+      if (item.lastAttemptStatus === "completed" && item.lastAttemptId) {
+        router.push({ name: "assessment-results", params: { id: item.id }, query: { attemptId: item.lastAttemptId } });
+        return;
+      }
+      router.push({ name: "assessment-process", params: { id: item.id } });
+    }
+
     function normalizeCourse(item) {
       if (!item) return null;
       return {
@@ -183,12 +236,27 @@ export default {
       }
     }
 
+    async function loadAssessments() {
+      if (!userStore.hasModuleAccess("assessments")) return;
+      isAssessmentsLoading.value = true;
+      try {
+        const { assessments } = await apiClient.listUserAssessments();
+        userAssessments.value = Array.isArray(assessments) ? assessments : [];
+      } catch (error) {
+        console.error("Не удалось загрузить аттестации", error);
+        userAssessments.value = [];
+      } finally {
+        isAssessmentsLoading.value = false;
+      }
+    }
+
     function retryCourses() {
       loadCourses();
     }
 
     onMounted(() => {
       loadCourses();
+      loadAssessments();
     });
 
     return {
@@ -199,12 +267,17 @@ export default {
       filteredCourses,
       isCoursesLoading,
       coursesError,
+      userAssessments,
+      isAssessmentsLoading,
+      showAssessments,
       searchInputRef,
       focusSearch,
       getCourseVisualStyle,
       getSectionsLabel,
       getCourseFallbackVisual,
       openCourse,
+      openAssessment,
+      getAssessmentLabel,
       retryCourses,
     };
   },
@@ -426,6 +499,18 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.assessments-section-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 24px 0 12px;
+}
+
+.assessment-icon {
+  background: #e8f0fe;
+  color: #4a6ee0;
 }
 
 .mt-12 {

@@ -30,7 +30,7 @@ export default {
           label: "Главная",
           icon: Home,
         },
-        userStore.hasModuleAccess("assessments") && {
+        userStore.hasModuleAccess("courses") && {
           name: "assessments",
           to: "/assessments",
           label: "Курсы",
