@@ -439,7 +439,11 @@ const { showToast } = useToast();
 const IMAGE_MAX_SIZE_BYTES = 50 * 1024 * 1024;
 const VIDEO_MAX_SIZE_BYTES = 1024 * 1024 * 1024;
 
-const API_ORIGIN = (API_BASE_URL || "http://localhost:3001/api").replace(/\/api\/?$/, "");
+const API_ORIGIN = (() => {
+  const rawBaseUrl = (API_BASE_URL || "http://localhost:3001/api").trim();
+  const withoutApiPath = rawBaseUrl.replace(/\/api(?:\/v\d+)?\/?$/, "");
+  return withoutApiPath.replace(/\/+$/, "");
+})();
 const imageInputRef = ref(null);
 const videoInputRef = ref(null);
 const sourceMode = ref(false);
@@ -987,6 +991,13 @@ const handleVideoFileChange = async (event) => {
     duration: Infinity,
     position: "top-right",
   });
+  let isToastFinalized = false;
+  const toastAutoDismissTimer = setTimeout(() => {
+    if (!isToastFinalized) {
+      sonnerToast.dismiss(toastId);
+      isToastFinalized = true;
+    }
+  }, 120000);
   let lastProgressPercent = -1;
 
   try {
@@ -1012,7 +1023,12 @@ const handleVideoFileChange = async (event) => {
       },
     });
     const mediaUrl = resolveMediaUrl(response?.mediaUrl || "");
-    if (!mediaUrl) return;
+    if (!mediaUrl) {
+      sonnerToast.dismiss(toastId);
+      isToastFinalized = true;
+      showToast("Не удалось подготовить ссылку на загруженное видео", "error");
+      return;
+    }
     putMediaItemToLibrary({
       ...response,
       size: file.size,
@@ -1040,6 +1056,7 @@ const handleVideoFileChange = async (event) => {
       duration: 3500,
       position: "top-right",
     });
+    isToastFinalized = true;
   } catch (error) {
     console.error("Не удалось загрузить видео:", error);
     sonnerToast.error("Ошибка загрузки видео", {
@@ -1048,7 +1065,12 @@ const handleVideoFileChange = async (event) => {
       duration: 6000,
       position: "top-right",
     });
+    isToastFinalized = true;
   } finally {
+    clearTimeout(toastAutoDismissTimer);
+    if (!isToastFinalized) {
+      sonnerToast.dismiss(toastId);
+    }
     if (event?.target) event.target.value = "";
   }
 };
