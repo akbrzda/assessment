@@ -1,6 +1,6 @@
 const path = require("path");
 
-const UPLOADS_ROOT = path.resolve(__dirname, "../../../uploads");
+const UPLOADS_ROOT = path.resolve(__dirname, "../../uploads");
 
 function normalizeSegment(value) {
   return String(value || "")
