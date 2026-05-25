@@ -7,28 +7,7 @@ const path = require("path");
 const notificationService = require("../../../services/notifications/notificationService");
 const logger = require("../../../utils/logger");
 const cacheService = require("../../../services/cacheService");
-
-function buildUploadsUrl(subfolder, fileName) {
-  const normalizedSubfolder = String(subfolder || "").trim().replace(/^\/+|\/+$/g, "");
-  const normalizedFileName = String(fileName || "").trim().replace(/^\/+|\/+$/g, "");
-  if (!normalizedSubfolder || !normalizedFileName) {
-    return "";
-  }
-  return `/uploads/${normalizedSubfolder}/${normalizedFileName}`;
-}
-
-function extractFileNameFromUploadsUrl(fileUrl, subfolder) {
-  const normalizedSubfolder = String(subfolder || "").trim().replace(/^\/+|\/+$/g, "");
-  const normalizedUrl = String(fileUrl || "").trim();
-  if (!normalizedSubfolder || !normalizedUrl) {
-    return "";
-  }
-  const prefix = `/uploads/${normalizedSubfolder}/`;
-  if (!normalizedUrl.startsWith(prefix)) {
-    return "";
-  }
-  return normalizedUrl.slice(prefix.length).replace(/^\/+|\/+$/g, "");
-}
+const { resolveUploadsPath, resolveUploadsUrl, extractFileNameFromUploadsUrl } = require("../../../utils/uploads");
 
 // - урс -
 
@@ -153,7 +132,7 @@ async function uploadCourseCover(courseId, file, userId, req) {
     throw error;
   }
 
-  const coverUrl = buildUploadsUrl("courses", file.filename);
+  const coverUrl = resolveUploadsUrl("courses", file.filename);
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -162,7 +141,7 @@ async function uploadCourseCover(courseId, file, userId, req) {
 
     const previousFileName = extractFileNameFromUploadsUrl(existing.coverUrl, "courses");
     if (previousFileName) {
-      const previousFilePath = path.join(__dirname, "../../../../../uploads/courses", path.basename(previousFileName));
+      const previousFilePath = resolveUploadsPath("courses", path.basename(previousFileName));
       if (fs.existsSync(previousFilePath)) {
         fs.unlinkSync(previousFilePath);
       }

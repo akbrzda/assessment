@@ -17,34 +17,13 @@ const {
   reorderSectionsSchema,
   reorderTopicsSchema,
 } = require("./validators");
+const { resolveUploadsPath, resolveUploadsUrl, extractFileNameFromUploadsUrl } = require("../../../utils/uploads");
 
-const COURSE_COVERS_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/courses");
-const COURSE_MEDIA_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/course-media");
+const COURSE_COVERS_UPLOAD_DIR = resolveUploadsPath("courses");
+const COURSE_MEDIA_UPLOAD_DIR = resolveUploadsPath("course-media");
 const COURSE_MEDIA_IMAGE_MAX_SIZE = 50 * 1024 * 1024;
 const COURSE_MEDIA_VIDEO_MAX_SIZE = 1024 * 1024 * 1024;
 const COURSE_MEDIA_ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".webm", ".ogg", ".mov"];
-
-function buildUploadsUrl(subfolder, fileName) {
-  const normalizedSubfolder = String(subfolder || "").trim().replace(/^\/+|\/+$/g, "");
-  const normalizedFileName = String(fileName || "").trim().replace(/^\/+|\/+$/g, "");
-  if (!normalizedSubfolder || !normalizedFileName) {
-    return "";
-  }
-  return `/uploads/${normalizedSubfolder}/${normalizedFileName}`;
-}
-
-function extractFileNameFromUploadsUrl(fileUrl, subfolder) {
-  const normalizedSubfolder = String(subfolder || "").trim().replace(/^\/+|\/+$/g, "");
-  const normalizedUrl = String(fileUrl || "").trim();
-  if (!normalizedSubfolder || !normalizedUrl) {
-    return "";
-  }
-  const prefix = `/uploads/${normalizedSubfolder}/`;
-  if (!normalizedUrl.startsWith(prefix)) {
-    return "";
-  }
-  return normalizedUrl.slice(prefix.length).replace(/^\/+|\/+$/g, "");
-}
 
 function resolveMediaMimeType(extension) {
   const mimeTypesByExtension = {
@@ -214,7 +193,7 @@ async function listCourseMedia(req, res, next) {
 
         return {
           fileName: entry.name,
-          mediaUrl: buildUploadsUrl("course-media", entry.name),
+          mediaUrl: resolveUploadsUrl("course-media", entry.name),
           mediaType: resolveMediaTypeByExtension(extension),
           mimeType,
           size: Number(stats.size || 0),
@@ -376,7 +355,7 @@ async function uploadCourseMedia(req, res, next) {
       const finalMimeType = mimeType;
 
       const mediaType = isVideo ? "video" : "image";
-      const mediaUrl = buildUploadsUrl("course-media", fileName);
+      const mediaUrl = resolveUploadsUrl("course-media", fileName);
 
       res.json({
         mediaUrl,

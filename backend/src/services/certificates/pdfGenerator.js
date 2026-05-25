@@ -3,12 +3,9 @@ const fs = require("fs");
 const path = require("path");
 const logger = require("../../utils/logger");
 const settingsService = require("../settingsService");
+const { resolveUploadsPath, extractFileNameFromUploadsUrl } = require("../../utils/uploads");
 
-const UPLOAD_DIR = process.env.CERTIFICATES_UPLOAD_DIR
-  ? path.resolve(process.env.CERTIFICATES_UPLOAD_DIR)
-  : path.join(__dirname, "../../../uploads/certificates");
-
-const UPLOADS_ROOT = path.join(__dirname, "../../../uploads");
+const UPLOAD_DIR = process.env.CERTIFICATES_UPLOAD_DIR ? path.resolve(process.env.CERTIFICATES_UPLOAD_DIR) : resolveUploadsPath("certificates");
 
 const WIDTH = 1240;
 const HEIGHT = 1754;
@@ -22,8 +19,8 @@ async function resolveLogoDataUrl() {
     const logoUrl = await settingsService.getSetting("COMPANY_LOGO_URL");
     if (!logoUrl) return null;
 
-    const relativeLogoPath = logoUrl.replace(/^\/?uploads\/?/, "").replace(/^\/+/, "");
-    const resolvedPath = path.join(UPLOADS_ROOT, relativeLogoPath);
+    const relativeLogoPath = extractFileNameFromUploadsUrl(logoUrl, "logo") || logoUrl.replace(/^\/?uploads\/?/, "").replace(/^\/+/, "");
+    const resolvedPath = resolveUploadsPath("logo", relativeLogoPath);
     if (!fs.existsSync(resolvedPath)) return null;
 
     const ext = path.extname(resolvedPath).toLowerCase();

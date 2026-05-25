@@ -12,6 +12,7 @@ const {
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const { resolveUploadsPath, resolveUploadsUrl } = require("../../../utils/uploads");
 
 function parseDisabledModules(rawValue) {
   if (!rawValue) {
@@ -24,7 +25,13 @@ function parseDisabledModules(rawValue) {
       return [];
     }
 
-    return parsed.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean);
+    return parsed
+      .map((item) =>
+        String(item || "")
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean);
   } catch (error) {
     console.error("Некорректный JSON feature flags:", error);
     return [];
@@ -52,7 +59,7 @@ function getFeatureGroupsPayload() {
 // Хранилище логотипа
 const logoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const dir = path.join(__dirname, "../../../../../uploads/logo");
+    const dir = resolveUploadsPath("logo");
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
@@ -87,7 +94,7 @@ exports.uploadLogo = (req, res, next) => {
       return res.status(400).json({ error: "Файл не передан" });
     }
 
-    const logoUrl = `/uploads/logo/${req.file.filename}`;
+    const logoUrl = resolveUploadsUrl("logo", req.file.filename);
 
     try {
       // Создаём или обновляем настройку
@@ -233,7 +240,17 @@ exports.updateFeatureFlags = async (req, res, next) => {
     }
 
     const knownCodes = new Set(FEATURE_MODULES.map((item) => item.code));
-    const normalized = Array.from(new Set(input.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean)));
+    const normalized = Array.from(
+      new Set(
+        input
+          .map((item) =>
+            String(item || "")
+              .trim()
+              .toLowerCase(),
+          )
+          .filter(Boolean),
+      ),
+    );
 
     const invalidCodes = normalized.filter((code) => !knownCodes.has(code));
     if (invalidCodes.length > 0) {
@@ -249,7 +266,10 @@ exports.updateFeatureFlags = async (req, res, next) => {
     const [existing] = await pool.query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key = ?", [FEATURE_FLAGS_SETTING_KEY]);
 
     if (existing.length > 0) {
-      await pool.query("UPDATE system_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = ?", [serialized, FEATURE_FLAGS_SETTING_KEY]);
+      await pool.query("UPDATE system_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = ?", [
+        serialized,
+        FEATURE_FLAGS_SETTING_KEY,
+      ]);
     } else {
       await pool.query("INSERT INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)", [
         FEATURE_FLAGS_SETTING_KEY,

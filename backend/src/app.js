@@ -2,13 +2,13 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
-const path = require("path");
 const config = require("./config/env");
 const { errorHandler, timezone: timezoneMiddleware } = require("./middleware");
 const correlationId = require("./middleware/correlationId");
 const featureFlagsGate = require("./middleware/featureFlagsGate");
 const verifyJWT = require("./middleware/verifyJWT");
 const { verifyCertificateLimiter, authLimiter, adminGlobalLimiter } = require("./middleware/rateLimit");
+const { UPLOADS_ROOT, resolveUploadsPath } = require("./utils/uploads");
 
 const authModule = require("./modules/auth");
 const invitationModule = require("./modules/invitations");
@@ -77,12 +77,12 @@ app.use((req, res, next) => {
 });
 
 // Restrict certificate and course media access to authorized users
-app.use("/uploads/certificates", verifyJWT, express.static(path.join(__dirname, "../../uploads/certificates")));
-app.use("/uploads/courses", verifyJWT, express.static(path.join(__dirname, "../../uploads/courses")));
-app.use("/uploads/course-media", verifyJWT, express.static(path.join(__dirname, "../../uploads/course-media")));
+app.use("/uploads/certificates", verifyJWT, express.static(resolveUploadsPath("certificates")));
+app.use("/uploads/courses", verifyJWT, express.static(resolveUploadsPath("courses")));
+app.use("/uploads/course-media", verifyJWT, express.static(resolveUploadsPath("course-media")));
 
 // Public static files (icons, covers, media)
-app.use("/uploads", express.static(path.join(__dirname, "../../uploads")));
+app.use("/uploads", express.static(UPLOADS_ROOT));
 
 const apiRouter = express.Router();
 

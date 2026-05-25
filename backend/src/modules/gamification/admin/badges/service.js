@@ -3,33 +3,12 @@ const { createLog } = require("../../../../services/adminLogService");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-
-function buildUploadsUrl(subfolder, fileName) {
-  const normalizedSubfolder = String(subfolder || "").trim().replace(/^\/+|\/+$/g, "");
-  const normalizedFileName = String(fileName || "").trim().replace(/^\/+|\/+$/g, "");
-  if (!normalizedSubfolder || !normalizedFileName) {
-    return "";
-  }
-  return `/uploads/${normalizedSubfolder}/${normalizedFileName}`;
-}
-
-function extractFileNameFromUploadsUrl(fileUrl, subfolder) {
-  const normalizedSubfolder = String(subfolder || "").trim().replace(/^\/+|\/+$/g, "");
-  const normalizedUrl = String(fileUrl || "").trim();
-  if (!normalizedSubfolder || !normalizedUrl) {
-    return "";
-  }
-  const prefix = `/uploads/${normalizedSubfolder}/`;
-  if (!normalizedUrl.startsWith(prefix)) {
-    return "";
-  }
-  return normalizedUrl.slice(prefix.length).replace(/^\/+|\/+$/g, "");
-}
+const { resolveUploadsPath, resolveUploadsUrl, extractFileNameFromUploadsUrl } = require("../../../../utils/uploads");
 
 // Настройка загрузки файлов
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, "../../../../../uploads/badges");
+    const uploadDir = resolveUploadsPath("badges");
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -66,7 +45,7 @@ exports.getBadges = async (req, res, next) => {
               condition_type, condition_data, points_reward, is_active, 
               sort_order, created_at, updated_at 
        FROM badges 
-       ORDER BY sort_order ASC, id ASC`
+       ORDER BY sort_order ASC, id ASC`,
     );
 
     res.json({ badges });
@@ -89,7 +68,7 @@ exports.getBadgeById = async (req, res, next) => {
               sort_order, created_at, updated_at 
        FROM badges 
        WHERE id = ?`,
-      [id]
+      [id],
     );
 
     if (badges.length === 0) {
@@ -135,7 +114,7 @@ exports.createBadge = async (req, res, next) => {
         points_reward || 0,
         is_active !== undefined ? is_active : 1,
         sort_order || 0,
-      ]
+      ],
     );
 
     // Логирование
@@ -179,7 +158,7 @@ exports.updateBadge = async (req, res, next) => {
         is_active !== undefined ? is_active : 1,
         sort_order || 0,
         id,
-      ]
+      ],
     );
 
     // Логирование
@@ -220,14 +199,14 @@ exports.uploadBadgeIcon = async (req, res, next) => {
       if (badges[0].icon_url) {
         const oldFileName = extractFileNameFromUploadsUrl(badges[0].icon_url, "badges");
         if (oldFileName) {
-          const oldPath = path.join(__dirname, "../../../../../uploads/badges", path.basename(oldFileName));
+          const oldPath = resolveUploadsPath("badges", path.basename(oldFileName));
           if (fs.existsSync(oldPath)) {
             fs.unlinkSync(oldPath);
           }
         }
       }
 
-      const iconUrl = buildUploadsUrl("badges", req.file.filename);
+      const iconUrl = resolveUploadsUrl("badges", req.file.filename);
 
       // Обновить URL иконки
       await pool.query("UPDATE badges SET icon_url = ? WHERE id = ?", [iconUrl, id]);
@@ -266,7 +245,7 @@ exports.deleteBadge = async (req, res, next) => {
     if (badge.icon_url) {
       const iconFileName = extractFileNameFromUploadsUrl(badge.icon_url, "badges");
       if (iconFileName) {
-        const iconPath = path.join(__dirname, "../../../../../uploads/badges", path.basename(iconFileName));
+        const iconPath = resolveUploadsPath("badges", path.basename(iconFileName));
         if (fs.existsSync(iconPath)) {
           fs.unlinkSync(iconPath);
         }
