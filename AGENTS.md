@@ -360,6 +360,7 @@ If the user asks for a commit:
 
 General principles:
 
+- Comments always write in Russian.
 - Prefer self-documenting code over excessive comments.
 - Comments MUST explain:
   - why something exists

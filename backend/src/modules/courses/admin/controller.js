@@ -7,11 +7,7 @@ const { pool } = require("../../../config/database");
 const fs = require("fs");
 const multer = require("multer");
 const path = require("path");
-const { execFile } = require("child_process");
-const { promisify } = require("util");
-const ffmpegPath = require("ffmpeg-static");
 const { buildMediaUrl, extractFileNameFromMediaUrl } = require("../../../utils/mediaUrl");
-const execFileAsync = promisify(execFile);
 const {
   createCourseSchema,
   updateCourseSchema,
@@ -27,7 +23,7 @@ const COURSE_COVERS_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/co
 const COURSE_MEDIA_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/course-media");
 const COURSE_MEDIA_IMAGE_MAX_SIZE = 50 * 1024 * 1024;
 const COURSE_MEDIA_VIDEO_MAX_SIZE = 1024 * 1024 * 1024;
-const COURSE_MEDIA_ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".webm"];
+const COURSE_MEDIA_ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".webm", ".ogg", ".mov"];
 
 function resolveMediaMimeType(extension) {
   const mimeTypesByExtension = {
@@ -47,59 +43,6 @@ function resolveMediaMimeType(extension) {
 
 function resolveMediaTypeByExtension(extension) {
   return [".mp4", ".webm", ".ogg", ".mov"].includes(extension) ? "video" : "image";
-}
-
-// Транскодирует видео в H.264/AAC mp4, ограничивая высоту до 1080p.
-// Если результат больше оригинала — оставляет оригинал без изменений.
-async function transcodeVideoTo1080p(inputPath) {
-  const dir = path.dirname(inputPath);
-  const baseName = path.basename(inputPath, path.extname(inputPath));
-  const tempOutputPath = path.join(dir, `${baseName}_opt.mp4`);
-  const finalOutputPath = path.join(dir, `${baseName}.mp4`);
-
-  try {
-    await execFileAsync(ffmpegPath, [
-      "-i",
-      inputPath,
-      "-vf",
-      "scale=-2:min(1080\\,ih)",
-      "-c:v",
-      "libx264",
-      "-crf",
-      "23",
-      "-preset",
-      "fast",
-      "-c:a",
-      "aac",
-      "-b:a",
-      "128k",
-      "-movflags",
-      "+faststart",
-      "-y",
-      tempOutputPath,
-    ]);
-
-    const originalSize = fs.statSync(inputPath).size;
-    const optimizedSize = fs.statSync(tempOutputPath).size;
-
-    if (optimizedSize >= originalSize) {
-      // Транскодирование не дало выигрыша — оставляем оригинал
-      fs.unlinkSync(tempOutputPath);
-      return { filePath: inputPath, fileName: path.basename(inputPath), size: originalSize };
-    }
-
-    // Заменяем оригинал оптимизированной версией
-    fs.unlinkSync(inputPath);
-    fs.renameSync(tempOutputPath, finalOutputPath);
-    return { filePath: finalOutputPath, fileName: `${baseName}.mp4`, size: optimizedSize };
-  } catch (err) {
-    if (fs.existsSync(tempOutputPath)) {
-      try {
-        fs.unlinkSync(tempOutputPath);
-      } catch {}
-    }
-    throw err;
-  }
 }
 
 const courseCoverStorage = multer.diskStorage({
@@ -151,7 +94,7 @@ const uploadCourseMediaFile = multer({
     const extension = path.extname(file.originalname || "").toLowerCase();
     const mimeType = String(file.mimetype || "").toLowerCase();
     const imageTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
-    const videoTypes = ["video/mp4", "video/webm"];
+    const videoTypes = ["video/mp4", "video/webm", "video/ogg", "video/quicktime"];
     const allowedExtensions = new Set(COURSE_MEDIA_ALLOWED_EXTENSIONS);
 
     if (!allowedExtensions.has(extension)) {
@@ -408,14 +351,8 @@ async function uploadCourseMedia(req, res, next) {
         });
       }
 
-      let fileName = req.file.filename;
-      let finalMimeType = mimeType;
-
-      if (isVideo) {
-        const transcoded = await transcodeVideoTo1080p(req.file.path);
-        fileName = transcoded.fileName;
-        finalMimeType = "video/mp4";
-      }
+      const fileName = req.file.filename;
+      const finalMimeType = mimeType;
 
       const mediaType = isVideo ? "video" : "image";
       const mediaUrl = buildMediaUrl("course-media", fileName);

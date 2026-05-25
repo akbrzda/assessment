@@ -1,11 +1,11 @@
 import { toast as sonnerToast } from "vue-sonner";
 
-// Длительность авто-скрытия по типу (мс)
+// Auto-hide duration by toast type (ms).
 const DURATIONS = {
   success: 3000,
   info: 4000,
   warning: 6000,
-  error: Infinity, // не закрывается автоматически
+  error: 6000,
 };
 
 export function useToast() {
@@ -17,7 +17,7 @@ export function useToast() {
     const duration = DURATIONS[type] ?? 4000;
     const opts = { duration };
 
-    // Поддержка объекта { title, description }
+    // Support object payload: { title, description }.
     if (typeof message === "object" && message !== null) {
       const { title, description } = message;
       if (type === "success") sonnerToast.success(title, { description, ...opts });
