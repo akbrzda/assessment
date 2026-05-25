@@ -623,7 +623,12 @@ export default {
 
         const [courseResponse, assessmentsResponse] = await Promise.all([
           apiClient.getCourseById(id),
-          userStore.hasModuleAccess("assessments") ? apiClient.listUserAssessments() : Promise.resolve({ assessments: [] }),
+          // Assessments are supplementary data for the course details view.
+          // If the module is disabled on the server, fall back to an empty list
+          // rather than failing the entire course load.
+          userStore.hasModuleAccess("assessments")
+            ? apiClient.listUserAssessments().catch(() => ({ assessments: [] }))
+            : Promise.resolve({ assessments: [] }),
         ]);
         course.value = normalizeCoursePayload(courseResponse?.course || null);
 
