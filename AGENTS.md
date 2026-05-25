@@ -12,6 +12,7 @@ Project scope:
 
 # Core Rules
 
+- MUST answer in Russian.
 - MUST write everything in English:
   - Responses
   - Code comments
@@ -354,6 +355,62 @@ If the user asks for a commit:
 
 - provide commit text in chat
 - DO NOT run `git commit`
+
+# Commenting Rules
+
+General principles:
+
+- Prefer self-documenting code over excessive comments.
+- Comments MUST explain:
+  - why something exists
+  - non-obvious decisions
+  - workarounds
+  - temporary limitations
+  - complex business rules
+
+- Comments MUST NOT explain obvious code behavior.
+- Avoid redundant comments that duplicate code meaning.
+- Avoid noisy comments for every line or block.
+
+Allowed comment types:
+
+- TODO — planned improvement
+- FIXME — known issue requiring correction
+- HACK — intentional workaround with limitation note
+- NOTE — important implementation detail
+
+Rules:
+
+- All comments MUST be written in English.
+- Keep comments concise and practical.
+- Outdated comments MUST be updated or removed.
+- Commented-out code is FORBIDDEN.
+- Large commented blocks of legacy code are FORBIDDEN.
+- Explain "why", not "what", whenever possible.
+
+Examples:
+
+Good:
+
+```js
+// HACK: Telegram WebApp occasionally sends duplicated init events.
+```
+
+```js
+// FIXME: Remove after backend pagination migration is complete.
+```
+
+Bad:
+
+```js
+// Increment i by 1
+i++;
+```
+
+```js
+// Set user name
+user.name = name;
+```
 
 # Definition of Done
 

@@ -133,7 +133,7 @@ jobs:
             cd /var/www/backend.theorica.ru
             pm2 describe assessment-backend > /dev/null
             if [ $? -eq 0 ]; then
-              pm2 restart assessment-backend
+              pm2 restart assessment-backend --update-env
             else
               pm2 start src/server.js --name assessment-backend
               pm2 save
