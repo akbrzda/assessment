@@ -1,0 +1,22 @@
+# Нормализация переносов строк для всего репозитория
+* text=auto eol=lf
+
+# Windows-специфичные файлы — CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Бинарные файлы — не трогаем
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.mp4 binary
+*.webm binary

@@ -1,97 +1,123 @@
-# Role
+# AGENTS.md
 
-You are the AI agent for the **Assessment** project. Work pragmatically: preserve task intent, minimize risk, and avoid overengineering.
+> Этот файл читают LLM-агенты перед началом любой работы в репозитории.
+> Правила обязательны. Не игнорируй их.
 
-Project scope:
+---
 
-- Employee assessment platform
-- Telegram MiniApp
-- Admin Panel
-- Backend
-- Telegram Bot
+## ГЛАВНОЕ ПРАВИЛО
 
-# Core Rules
+ТЫ РАБОТАЕШЬ В ПРОДАКШЕН-РЕПОЗИТОРИИ. ЛЮБОЕ ИЗМЕНЕНИЕ ДОЛЖНО БЫТЬ МИНИМАЛЬНЫМ,
+ПРОВЕРЯЕМЫМ И СООТВЕТСТВОВАТЬ АРХИТЕКТУРЕ ПРОЕКТА.
 
-- MUST answer in Russian.
-- MUST write everything in English:
-  - Responses
-  - Code comments
-  - Documentation
-  - Commit texts
+---
 
-- MUST understand the task context and the target module before making changes.
-- DO use simple, predictable solutions.
-- AVOID assumptions:
-  - If risk is high, ask.
-  - Otherwise choose the safest minimal option.
-- PRESERVE existing architecture, layering, and project patterns.
-- Prefer editing existing files over creating new ones.
-- Prefer consistency over cleverness.
+## ПЕРЕД НАЧАЛОМ РАБОТЫ
 
-# Project Context
+1. ПРОЧИТАЙ `AGENTS.md` полностью.
+2. ПРОЧИТАЙ `TASKS.md` — пойми контекст текущей задачи.
+3. ПРОЧИТАЙ `ARCHITECTURE.md` — если меняешь структуру, модули, импорты или бизнес-логику.
+4. ПРОЧИТАЙ `DESIGN_SYSTEM.md` — если меняешь UI.
+5. ПРОЧИТАЙ `docs/engineering/api-guidelines.md` и `docs/openapi.yaml` — если меняешь API.
+6. ПРОВЕРЬ существующие компоненты, composables, сервисы, репозитории перед созданием новых.
+7. НЕ СОЗДАВАЙ новый файл, если можно изменить существующий.
+8. ОПРЕДЕЛИ затронутый модуль и слой до начала изменений.
+9. ПЕРЕД ЗАПУСКОМ сервиса убедись, что аналогичный процесс не запущен.
 
-Monorepo structure:
+---
+
+## РОЛЬ
+
+Ты — AI-агент для проекта **Assessment** (платформа аттестации сотрудников).
+
+Структура монорепозитория:
 
 - `backend/` — Node.js/Express + MySQL
 - `frontend/` — Telegram MiniApp (Vue 3)
 - `admin-frontend/` — Admin Panel (Vue 3)
 - `bot/` — Telegram bot (Telegraf)
-- `docs/` — standards, contracts, requirements
+- `docs/` — стандарты, контракты, требования
 
-Primary source-of-truth documents:
+Основные источники правды:
 
-- `docs/engineering/architecture.md`
+- `ARCHITECTURE.md`
+- `DESIGN_SYSTEM.md`
 - `docs/engineering/code-standards.md`
 - `docs/engineering/api-guidelines.md`
-- `docs/engineering/components.md`
 - `docs/openapi.yaml`
 - `TASKS.md`
 
-# Workflow
+---
 
-1. Before starting, MUST read relevant sections in:
-   - `docs/`
-   - `docs/engineering/`
-   - `TASKS.md`
+## ЯЗЫК КОММУНИКАЦИИ
 
-2. Identify:
-   - affected module
-   - affected layer
+- Отвечай пользователю на **русском языке**.
+- Код пиши на **английском** (имена переменных, функций, классов, файлов).
+- Комментарии в коде пиши на **русском языке**.
+- Commit messages пиши на **русском языке** (формат ниже).
 
-3. Check whether existing:
-   - components
-   - services
-   - composables
-   - repositories
-     can be reused before creating new ones.
+---
 
-4. Make only necessary changes:
-   - no extra files
-   - no speculative abstractions
-   - no unnecessary refactoring
+## ENV-ПЕРЕМЕННЫЕ
 
-5. Before starting a service, verify that no equivalent process is already running.
-   Never start duplicate services/processes.
+Единый config/env-модуль находится в `backend/src/config/env.js`.
 
-6. Before finishing:
-   - run the quality checklist
-   - update `TASKS.md` if needed
+Если добавляешь новую ENV-переменную, ОБЯЗАТЕЛЬНО обнови:
 
-# Architecture Rules
+1. `backend/src/config/env.js` — добавь переменную в единый модуль.
+2. `.env.example` соответствующего пакета (`backend/.env.example`, `admin-frontend/.env.example`, `bot/.env.example`).
+3. `.github/workflows/ci.yml` — если переменная нужна в pipeline.
+4. `docs/` — документацию деплоя, если переменная нужна на сервере.
+5. Тестовые моки или тестовую конфигурацию, если переменная влияет на тесты.
 
-Backend MUST follow MVC + Layered architecture:
+ЗАПРЕЩЕНО:
+
+- Читать `process.env.SOMETHING` напрямую вне `backend/src/config/env.js` в backend-коде.
+- Добавлять переменную только в код без обновления `.env.example`.
+- Хардкодить секреты, токены, ключи, пароли.
+- Добавлять реальные значения в `.env.example` — только placeholder-значения.
+
+Пример placeholder-значений в `.env.example`:
+
+```env
+DATABASE_URL=postgres://user:password@localhost:5432/app
+JWT_SECRET=change-me
+BOT_TOKEN=your_telegram_bot_token
+```
+
+---
+
+## КОДИРОВКА И WINDOWS
+
+1. ВСЕ текстовые файлы MUST быть в UTF-8.
+2. НЕ создавай файлы в Windows-1251, CP866, ANSI, CP1252 или другой legacy-кодировке.
+3. НЕ добавляй BOM без необходимости.
+4. Соблюдай `.editorconfig` и `.gitattributes`.
+5. В PowerShell явно указывай UTF-8:
+
+```powershell
+[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))
+```
+
+6. Используй `-Encoding UTF8` при чтении/записи через Get-Content / Set-Content.
+
+---
+
+## АРХИТЕКТУРА BACKEND
+
+Backend MUST следовать MVC + Layered architecture:
 
 ```text
 Routes -> Controller -> Service -> Repository -> Database
 ```
 
-Reverse dependencies are FORBIDDEN.
+Обратные зависимости FORBIDDEN.
 
-Preferred backend module structure:
+Структура модуля:
 
 ```text
-module/
-├── index.js
+modules/<domain>/
+├── index.js        # публичный API модуля (обязательно)
 ├── routes.js
 ├── controller.js
 ├── service.js
@@ -100,26 +126,28 @@ module/
 └── mapper.js
 ```
 
-Rules:
+Правила:
 
-- Cross-module imports MUST go through public `index.js`.
-- Direct imports of internal module files are FORBIDDEN.
-- SQL access MUST exist only in Repository layer.
-- Business logic MUST exist only in Service layer.
-- Validation MUST happen before Service execution.
-- Controllers SHOULD remain thin.
-- Repository layer MUST NOT contain business rules.
-- Services MUST NOT depend on HTTP framework objects directly.
+- Кросс-модульные импорты MUST идти через `index.js`.
+- Прямые импорты внутренних файлов модуля FORBIDDEN.
+- SQL-запросы MUST находиться только в Repository.
+- Бизнес-логика MUST находиться только в Service.
+- Валидация MUST выполняться до вызова Service.
+- Controllers SHOULD оставаться тонкими.
+- Repository MUST NOT содержать бизнес-правила.
+- Services MUST NOT зависеть от HTTP-объектов напрямую.
 
-# Frontend Architecture Rules
+---
 
-Frontend and Admin Frontend MUST use:
+## АРХИТЕКТУРА FRONTEND
+
+Frontend и Admin Frontend MUST использовать:
 
 - Vue 3 Composition API (`<script setup>`)
 - Pinia
 - composables
 
-Preferred frontend structure:
+Структура:
 
 ```text
 src/
@@ -132,335 +160,269 @@ src/
 └── constants/
 ```
 
-Rules:
+Правила:
 
-- Avoid placing business logic directly inside components.
-- Composables SHOULD encapsulate reusable stateful logic.
-- API calls SHOULD be centralized and reusable.
-- Reuse existing UI patterns before introducing new components.
-- Prefer existing components before creating new ones.
-- For new UI work, align with:
-  - existing admin-frontend components
-  - `docs/engineering/components.md`
+- Бизнес-логику НЕЛЬЗЯ помещать напрямую в компоненты.
+- Composables SHOULD инкапсулировать переиспользуемую stateful-логику.
+- API-вызовы SHOULD быть централизованными.
+- Проверяй существующие компоненты перед созданием новых.
+- Для нового UI — выравнивайся с `docs/engineering/components.md`.
 
-# Code Standards
+---
 
-- MUST use UTF-8 for all files.
-- MUST preserve current line endings and file encoding.
-- NEVER write files in:
-  - ANSI
-  - ASCII
-  - CP1251
-  - CP1252
+## UI-ПРАВИЛА
 
-PowerShell rules:
+Перед изменением UI прочитай `docs/engineering/components.md`.
 
-- MUST explicitly use UTF-8 (`-Encoding UTF8`)
-- On Windows save as UTF-8 without BOM
+Соответствия (admin-frontend):
 
-Use:
+| Нативный элемент | Проектный компонент |
+| ---------------- | ------------------- |
+| `<button>`       | `Button.vue`        |
+| `<input>`        | `Input.vue`         |
+| `<select>`       | `Select.vue`        |
+| `<textarea>`     | аналог проекта      |
+| самописный modal | `Modal.vue`         |
+| самописный badge | `Badge.vue`         |
 
-```powershell
-[System.IO.File]::WriteAllText(..., [System.Text.UTF8Encoding]::new($false))
-```
+Для экранов и компонентов используй единые состояния:
 
-Additional rules:
+1. Loading
+2. Error
+3. Empty
+4. Disabled
+5. Success
 
-- Files over 500 lines SHOULD be split by responsibility.
-- Components — PascalCase
-- Variables/functions — camelCase
-- Constants — UPPER_SNAKE_CASE
+ЗАПРЕЩЕНО:
 
-Comments are allowed only for:
+1. НЕ создавай новый UI-компонент без проверки существующих.
+2. НЕ смешивай нативные элементы и проектные компоненты без причины.
+3. НЕ дублируй компоненты с одинаковой ответственностью.
+4. НЕ используй inline-стили, если в проекте принят другой подход.
 
-- complex logic
-- workarounds
-- TODO/FIXME/HACK notes
+---
 
-Avoid:
+## КОММЕНТАРИИ И КОММИТЫ
 
-- redundant comments
-- obvious comments
-- commented-out code
+### Комментарии
 
-# Error Handling Rules
+- Пиши на **русском языке**.
+- Объясняй «почему», а не «что».
+- Разрешённые типы: `TODO`, `FIXME`, `HACK`, `NOTE`.
+- FORBIDDEN: очевидные комментарии, закомментированный код, дублирование кода словами.
 
-- Async errors MUST be handled explicitly using `try/catch`.
-- Errors returned to users MUST be user-friendly.
-- Internal logs MAY contain technical details.
-- Never expose:
-  - passwords
-  - tokens
-  - keys
-  - secrets
-  - sensitive personal data
-
-Validation rules:
-
-- Input validation is mandatory.
-- Never trust client input.
-- Validate:
-  - body
-  - params
-  - query
-  - headers where applicable
-
-# API & Data Rules
-
-- Validate HTTP contracts against:
-  - `docs/openapi.yaml`
-  - `docs/engineering/api-guidelines.md`
-
-- Avoid:
-  - N+1 queries
-  - redundant loading
-  - overfetching
-
-Use:
-
-- batching
-- pagination
-- caching where appropriate
-
-Database rules:
-
-- Prefer explicit column selection over `SELECT *`.
-- Large queries MUST consider indexing and execution cost.
-- Pagination is required for potentially large datasets.
-
-# Database & Migration Rules
-
-- NEVER modify old migrations already applied in shared environments.
-- Every schema change MUST use a new migration.
-- Avoid destructive migrations unless explicitly required.
-- Database changes MUST preserve backward compatibility when practical.
-- Migration files MUST remain deterministic and repeatable.
-
-# Testing Rules
-
-- Reuse existing testing patterns before introducing new ones.
-- Unit tests SHOULD cover critical business logic.
-- Integration tests SHOULD be added for complex API flows.
-- Avoid excessive mocking when real behavior can be tested safely.
-- Do not create brittle snapshot-heavy tests.
-- Frontend components with complex interaction SHOULD have test coverage.
-- Bug fixes SHOULD include regression protection when practical.
-- If tests are intentionally skipped, explain why.
-
-# Performance Rules
-
-- Avoid unnecessary re-renders.
-- Avoid duplicate requests.
-- Avoid unnecessary database queries.
-- Prefer predictable performance over premature optimization.
-- Lazy load heavy frontend modules when practical.
-- Use memoization/caching only when justified.
-
-# Logging & Monitoring Rules
-
-- Logs MUST be meaningful and actionable.
-- Use error-level logging only for real failures.
-- Avoid noisy logs in production.
-- Include contextual identifiers where useful.
-- NEVER log:
-  - secrets
-  - passwords
-  - tokens
-  - authentication headers
-
-# Refactoring Rules
-
-- Refactoring MUST preserve existing behavior unless explicitly requested.
-- Avoid large rewrites during unrelated tasks.
-- Prefer incremental improvements.
-- Do not introduce abstractions without repeated usage or clear benefit.
-- Reduce complexity carefully without causing architecture churn.
-
-# Environment & Secrets Safety
-
-- NEVER commit `.env` files.
-- NEVER expose secrets in logs or responses.
-- NEVER overwrite existing environment configuration without explicit instruction.
-- Production configuration MUST remain isolated from development configuration.
-- Secrets MUST be loaded from environment configuration only.
-
-# API Versioning Rules
-
-- Avoid breaking existing API contracts.
-- Breaking changes MUST be documented explicitly.
-- Response formats SHOULD remain backward compatible whenever possible.
-- Validate API changes against `docs/openapi.yaml`.
-
-# TASKS.md Rules
-
-- Keep only active work in `TASKS.md`.
-- Use checklist format:
-  - `[ ]`
-  - `[x]`
-
-- Remove:
-  - completed items
-  - completed sections
-
-- If no tasks remain, clear the file.
-- Keep task descriptions short and actionable.
-
-# Dependency Rules
-
-Before installing any library, MUST:
-
-1. Ask user permission.
-2. Explain briefly why it is needed.
-3. Verify that no existing project alternative already covers the need.
-
-Rules:
-
-- NEVER install dependencies "just in case".
-- Prefer existing project dependencies.
-- Avoid introducing overlapping libraries.
-- Prefer lightweight dependencies.
-
-# Git & Branch Safety
-
-- NEVER rewrite shared branch history.
-- NEVER force-push without explicit instruction.
-- Keep changes focused on task scope.
-- Avoid unrelated formatting-only changes.
-- Avoid mixing refactoring with feature implementation unless necessary.
-
-# Commit Rules
-
-- Commit text MUST be in English.
-- Conventional Commits are FORBIDDEN:
-  - `feat:`
-  - `fix:`
-  - etc.
-
-Commit messages MUST:
-
-- describe the result
-- be concise
-- reflect business outcome
-
-Commit messages MUST NEVER include:
-
-- file paths
-- endpoints
-- entity names
-- table names
-- migrations
-- low-level technical details
-
-If the user asks for a commit:
-
-- provide commit text in chat
-- DO NOT run `git commit`
-
-# Commenting Rules
-
-General principles:
-
-- Comments always write in Russian.
-- Prefer self-documenting code over excessive comments.
-- Comments MUST explain:
-  - why something exists
-  - non-obvious decisions
-  - workarounds
-  - temporary limitations
-  - complex business rules
-
-- Comments MUST NOT explain obvious code behavior.
-- Avoid redundant comments that duplicate code meaning.
-- Avoid noisy comments for every line or block.
-
-Allowed comment types:
-
-- TODO — planned improvement
-- FIXME — known issue requiring correction
-- HACK — intentional workaround with limitation note
-- NOTE — important implementation detail
-
-Rules:
-
-- All comments MUST be written in English.
-- Keep comments concise and practical.
-- Outdated comments MUST be updated or removed.
-- Commented-out code is FORBIDDEN.
-- Large commented blocks of legacy code are FORBIDDEN.
-- Explain "why", not "what", whenever possible.
-
-Examples:
-
-Good:
+Хорошо:
 
 ```js
-// HACK: Telegram WebApp occasionally sends duplicated init events.
+// HACK: Telegram WebApp иногда дублирует init-события — фильтруем повторы.
+// FIXME: убрать после завершения миграции пагинации на backend.
 ```
 
-```js
-// FIXME: Remove after backend pagination migration is complete.
-```
-
-Bad:
+Плохо:
 
 ```js
-// Increment i by 1
+// Увеличиваем i на 1
 i++;
-```
-
-```js
-// Set user name
+// Устанавливаем имя пользователя
 user.name = name;
 ```
 
-# Definition of Done
+### Commit messages
 
-A task is considered complete only if:
+Commit messages пишутся на **русском языке** в формате:
 
-- The implementation matches task intent.
-- Existing functionality is preserved.
-- Layer boundaries are preserved.
-- Validation and error handling are implemented.
-- No debug logs remain.
-- No duplicated logic was introduced.
-- Documentation is updated if behavior changed.
-- TASKS.md is updated accordingly.
-- The solution follows existing project conventions.
+```text
+<type>(<scope>): описание на русском
+```
 
-# AI Agent Behavioral Constraints
+Примеры:
 
-- Prefer editing existing files over creating new ones.
-- Prefer existing project utilities over new helpers.
-- Do not introduce new architecture patterns without explicit need.
-- Do not rename files, folders, or interfaces unnecessarily.
-- Avoid speculative improvements outside task scope.
-- When uncertain, choose the safest minimal implementation.
-- Do not overengineer.
-- Do not optimize prematurely.
-- Do not introduce "future-proof" abstractions without evidence.
+```text
+fix(auth): исправлена проверка refresh-токена
+feat(ui): добавлен компонент пустого состояния
+refactor(config): вынесена валидация env-переменных
+```
 
-# Pre-Commit Checklist
+Commit messages MUST:
 
-- No debug `console.log`
-- No unused imports
-- No unused code
-- No duplicated logic
-- Errors are handled
-- Input validation exists
-- Layer boundaries are preserved
-- Documentation updated if required
-- No secrets exposed
-- No unrelated changes included
+- описывать бизнес-результат
+- быть краткими и конкретными
 
-# Do Not
+Commit messages MUST NOT содержать:
 
-- NEVER auto-commit without explicit request.
-- NEVER install dependencies without approval.
-- NEVER create unnecessary files or abstractions.
-- NEVER break architecture without strong justification.
-- NEVER run duplicate services/processes.
-- NEVER bypass validation layers.
-- NEVER place SQL outside repositories.
-- NEVER place business logic inside controllers.
-- NEVER expose internal implementation details to users.
-- NEVER silently change API contracts.
+- пути к файлам
+- имена таблиц, эндпоинтов, сущностей
+- низкоуровневые технические детали
+
+НЕ запускай `git commit` автоматически. Предоставляй только текст коммита.
+
+---
+
+## ВРЕМЕННЫЕ ФАЙЛЫ И СКРИПТЫ
+
+1. НЕ создавай временные файлы в репозитории (`.tmp`, `.bak`, `.orig`, `tmp-*.js`, `debug-*.json`).
+2. НЕ оставляй debug-файлы, scratch-файлы, временные SQL и shell-скрипты.
+3. ПЕРЕД финалом проверь список изменённых файлов — `git status --short`.
+4. УДАЛИ всё, что было создано только для временной диагностики.
+
+---
+
+## ПРАВИЛА API И ДАННЫХ
+
+- Validate HTTP-контракты против `docs/openapi.yaml` и `docs/engineering/api-guidelines.md`.
+- Избегай N+1 запросов, redundant loading, overfetching.
+- Используй batching, pagination, caching там, где уместно.
+- Предпочитай явный выбор колонок вместо `SELECT *`.
+- Pagination обязательна для потенциально больших датасетов.
+
+---
+
+## ПРАВИЛА БД И МИГРАЦИЙ
+
+- NEVER изменяй старые миграции, уже применённые в shared-окружениях.
+- Каждое изменение схемы MUST использовать новую миграцию.
+- Избегай деструктивных миграций без явного требования.
+- Миграции MUST быть детерминированными и повторяемыми.
+
+---
+
+## ОБРАБОТКА ОШИБОК
+
+- Async-ошибки MUST обрабатываться через `try/catch`.
+- Ошибки для пользователей MUST быть user-friendly.
+- Никогда не раскрывай: пароли, токены, ключи, секреты, персональные данные.
+- Input validation обязательна. Никогда не доверяй клиентским данным.
+- Валидируй: body, params, query, headers где применимо.
+
+---
+
+## ЗАВИСИМОСТИ
+
+Перед установкой любой библиотеки MUST:
+
+1. Запросить разрешение у пользователя.
+2. Кратко объяснить, зачем она нужна.
+3. Убедиться, что существующие зависимости не покрывают потребность.
+
+NEVER устанавливай зависимости «на будущее».
+
+---
+
+## ТЕСТИРОВАНИЕ
+
+- Переиспользуй существующие тестовые паттерны.
+- Unit-тесты SHOULD покрывать критическую бизнес-логику.
+- Integration-тесты SHOULD добавляться для сложных API-флоу.
+- Bug-фиксы SHOULD включать регрессионную защиту.
+
+---
+
+## GIT И БЕЗОПАСНОСТЬ
+
+- NEVER переписывай историю shared-ветки.
+- NEVER force-push без явного указания.
+- Держи изменения сфокусированными на задаче.
+- NEVER коммить `.env` файлы.
+- NEVER раскрывай секреты в логах или ответах.
+
+---
+
+## ПРОВЕРКИ ПЕРЕД ФИНАЛОМ
+
+Выполни из корня репозитория:
+
+```bash
+node scripts/check-env-sync.mjs
+node scripts/check-no-temp-files.mjs
+git status --short
+```
+
+---
+
+## ФИНАЛЬНЫЙ ОТЧЁТ АГЕНТА
+
+В конце работы ВСЕГДА укажи:
+
+1. Какие файлы изменены.
+2. Какие новые файлы созданы.
+3. Какие файлы удалены.
+4. Добавлялись ли ENV-переменные; обновлены ли `.env.example` и CI.
+5. Какие проверки выполнены.
+6. Остались ли риски или ручные действия.
+
+---
+
+## WHAT NOT TO DO
+
+1. NEVER игнорируй `AGENTS.md`.
+2. NEVER добавляй ENV-переменную только в код.
+3. NEVER создавай лишние файлы, временные скрипты и debug-артефакты.
+4. NEVER используй нативный UI-элемент, если в проекте есть готовый компонент.
+5. NEVER пиши новые комментарии на английском.
+6. NEVER пиши commit messages на английском.
+7. NEVER меняй архитектуру без обновления `ARCHITECTURE.md`.
+8. NEVER оставляй неиспользуемый код, мёртвые импорты, временные файлы.
+9. NEVER говори «готово», не выполнив `git status --short`.
+10. NEVER запускай `git commit` автоматически.
+11. NEVER устанавливай зависимости без разрешения пользователя.
+12. NEVER делай массовый рефакторинг вне задачи.
+13. NEVER помещай SQL вне Repository.
+14. NEVER помещай бизнес-логику в Controller.
+15. NEVER раскрывай внутренние детали реализации пользователям.
+16. NEVER молча меняй API-контракты.
+
+---
+
+## ПРИМЕРЫ
+
+### ENV-переменная
+
+Плохо:
+
+```js
+const apiKey = process.env.PAYMENT_API_KEY; // только в коде
+```
+
+Хорошо:
+
+```js
+// backend/src/config/env.js
+module.exports = {
+  paymentApiKey: process.env.PAYMENT_API_KEY,
+};
+// + обновлён backend/.env.example
+// + обновлён .github/workflows/ci.yml
+```
+
+### UI-компонент
+
+Плохо:
+
+```html
+<button @click="onSave">Сохранить</button>
+<!-- если в проекте есть Button.vue -->
+```
+
+Хорошо:
+
+```html
+<button @click="onSave">Сохранить</button>
+```
+
+### Временный скрипт
+
+Плохо: `tmp-fix.js` оставлен в корне проекта.
+
+Хорошо: временный скрипт не добавлялся в репозиторий или удалён до финального отчёта.
+
+### Commit message
+
+Плохо: `fix auth bug`
+
+Хорошо: `fix(auth): исправлена проверка refresh-токена`
+
+### Кодировка
+
+Плохо: файл сохранён в Windows-1251, кракозябры в русских комментариях.
+
+Хорошо: файл в UTF-8, `.editorconfig` и `.gitattributes` задают единые правила.

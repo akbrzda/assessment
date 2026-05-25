@@ -1,0 +1,15 @@
+{
+  "name": "assessment-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Assessment platform monorepo — root-level scripts",
+  "scripts": {
+    "check:env": "node scripts/check-env-sync.mjs",
+    "check:no-temp-files": "node scripts/check-no-temp-files.mjs",
+    "check": "node scripts/check-env-sync.mjs && node scripts/check-no-temp-files.mjs",
+    "hooks:install": "node scripts/install-hooks.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
