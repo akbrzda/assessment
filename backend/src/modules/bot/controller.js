@@ -55,6 +55,13 @@ async function getUserStatus(req, res, next) {
 async function getOnboardingConfig(req, res, next) {
   try {
     const config = await botService.getOnboardingConfig();
+    console.log(
+      "[bot/onboarding-config] titleLength=%d, bodyLength=%d, step2Length=%d, step3Length=%d",
+      String(config?.onboardingTitle || "").length,
+      String(config?.onboardingBody || "").length,
+      String(config?.onboardingStep2 || "").length,
+      String(config?.onboardingStep3 || "").length,
+    );
     res.json(config);
   } catch (err) {
     next(err);

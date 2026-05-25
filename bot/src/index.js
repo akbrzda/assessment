@@ -154,15 +154,21 @@ async function getUserStatus(telegramId) {
 
 async function getOnboardingConfig() {
   if (!backendUrl) {
+    console.error("[bot] BACKEND_URL is empty. Cannot load onboarding config.");
     return null;
   }
   try {
     const { status, body } = await backendGet("/api/v1/bot/onboarding-config");
     if (status === 200 && body) {
+      const titleLength = String(body.onboardingTitle || "").length;
+      const bodyLength = String(body.onboardingBody || "").length;
+      console.log("[bot] onboarding-config loaded: titleLength=%d, bodyLength=%d", titleLength, bodyLength);
       return body;
     }
+    console.error("[bot] onboarding-config request failed: status=%s", status);
     return null;
-  } catch {
+  } catch (error) {
+    console.error("[bot] onboarding-config request error: %s", error.message);
     return null;
   }
 }
@@ -196,7 +202,7 @@ async function setNotificationsEnabled(telegramId, enabled) {
 
 function applyNameTemplate(template, firstName) {
   const normalizedName = firstName ? `, ${firstName}` : "";
-  return String(template || "").replaceAll("{{name}}", normalizedName);
+  return String(template || "").replace(/\{\{\s*name\s*\}\}/g, normalizedName);
 }
 
 function buildOnboardingMessage(firstName, config) {

@@ -13,31 +13,6 @@
 
     <!-- Content -->
     <div v-else class="settings-content">
-      <!-- Вкладка: Общие -->
-      <div v-if="activeTab === 'general'" class="settings-section">
-        <h3 class="section-title">Общие настройки</h3>
-
-        <Card title="Логотип компании" icon="Image">
-          <p class="text-sm text-muted-foreground mb-4">
-            Логотип отображается в PNG-сертификатах. Рекомендуемый формат: PNG с прозрачным фоном, до 2 МБ.
-          </p>
-
-          <div class="flex flex-col gap-4">
-            <div v-if="logoPreview" class="logo-preview-wrap">
-              <img :src="logoPreview" alt="Логотип компании" class="logo-preview-img" />
-            </div>
-
-            <div class="flex items-center gap-3">
-              <input ref="logoFileInput" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="handleLogoUpload" />
-              <Button icon="Upload" :loading="logoUploading" @click="logoFileInput?.click()">
-                {{ logoPreview ? "Заменить логотип" : "Загрузить логотип" }}
-              </Button>
-              <span v-if="logoPreview" class="text-sm text-muted-foreground">Текущий путь: {{ logoPreview }}</span>
-            </div>
-          </div>
-        </Card>
-      </div>
-
       <!-- Вкладка: Feature Flags -->
       <div v-if="activeTab === 'featureFlags'" class="settings-section">
         <h3 class="section-title">Feature Flags модулей</h3>
@@ -235,79 +210,6 @@
         </Card>
       </div>
 
-      <!-- Вкладка: Переменные окружения -->
-      <div v-if="activeTab === 'environment'" class="settings-section">
-        <h3 class="section-title">Переменные окружения</h3>
-
-        <Card title="Конфигурация (.env)" icon="Lock">
-          <div class="env-description-block">
-            <p>Эти переменные задаются в файлах <code>.env</code> и не изменяются из админ-панели.</p>
-          </div>
-
-          <div class="env-columns">
-            <div class="env-column">
-              <h4 class="env-column-title">Backend (общий <code>.env</code>)</h4>
-              <div class="env-list">
-                <div class="env-item">
-                  <div class="env-key">BOT_TOKEN</div>
-                  <div class="env-value">Токен основного Telegram-бота</div>
-                </div>
-                <div class="env-item">
-                  <div class="env-key">LOG_BOT_TOKEN</div>
-                  <div class="env-value">Токен бота для отправки логов</div>
-                </div>
-                <div class="env-item">
-                  <div class="env-key">LOG_CHAT_ID</div>
-                  <div class="env-value">ID чата/группы для логов</div>
-                </div>
-                <div class="env-item">
-                  <div class="env-key">INVITE_EXPIRATION_DAYS</div>
-                  <div class="env-value">Срок действия ссылок-приглашений (дни)</div>
-                </div>
-                <div class="env-item">
-                  <div class="env-key">SUPERADMIN_IDS</div>
-                  <div class="env-value">Telegram ID суперадминов (через запятую)</div>
-                </div>
-                <div class="env-item">
-                  <div class="env-key">ALLOWED_ORIGINS</div>
-                  <div class="env-value">Разрешённые домены для CORS</div>
-                </div>
-                <div class="env-item">
-                  <div class="env-key">JWT_SECRET</div>
-                  <div class="env-value">Секретный ключ для access-токенов</div>
-                </div>
-                <div class="env-item">
-                  <div class="env-key">JWT_REFRESH_SECRET</div>
-                  <div class="env-value">Секретный ключ для refresh-токенов</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="env-column">
-              <h4 class="env-column-title">Frontend (общий <code>.env</code>)</h4>
-              <div class="env-list">
-                <div class="env-item">
-                  <div class="env-key">API_BASE_URL</div>
-                  <div class="env-value">Базовый URL API (для клиентских запросов)</div>
-                </div>
-                <div class="env-item">
-                  <div class="env-key">INVITE_EXPIRATION_DAYS</div>
-                  <div class="env-value">Срок действия приглашений, отображаемый в интерфейсе</div>
-                </div>
-                <div class="env-item">
-                  <div class="env-key">BOT_USERNAME</div>
-                  <div class="env-value">Username Telegram-бота (для ссылок без @)</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="env-note">
-            <Icon name="Info" class="env-note-icon" />
-            <span>После изменения переменных окружения необходимо обновить файл <code>.env</code> и перезагрузить соответствующий сервис.</span>
-          </div>
-        </Card>
-      </div>
     </div>
   </div>
 </template>
@@ -321,7 +223,6 @@ import GamificationDryRun from "@/modules/gamification/components/GamificationDr
 import Button from "@/components/ui/Button.vue";
 import Card from "@/components/ui/Card.vue";
 import Tabs from "@/components/ui/Tabs.vue";
-import Icon from "@/components/ui/Icon.vue";
 import PageHeader from "@/components/ui/PageHeader.vue";
 import Skeleton from "@/components/ui/Skeleton.vue";
 import SkeletonForm from "@/components/ui/SkeletonForm.vue";
@@ -336,31 +237,23 @@ const authStore = useAuthStore();
 // Табы
 const tabsConfig = computed(() => {
   const tabs = [
-    { value: "general", label: "Общие" },
     { value: "featureFlags", label: "Feature Flags" },
     { value: "bot", label: "Бот и онбординг" },
-    { value: "environment", label: "Переменные окружения" },
   ];
 
   if (authStore.hasModuleAccess("gamification")) {
-    tabs.splice(3, 0, { value: "gamification", label: "Геймификация" });
+    tabs.push({ value: "gamification", label: "Геймификация" });
   }
 
   return tabs;
 });
 
-const activeTab = ref("general");
+const activeTab = ref("featureFlags");
 const settingsLoading = ref(true);
 const { skeletonVisible } = useSkeletonGate(settingsLoading, { minDuration: 320, delay: 80 });
 
 const gamificationEnabled = ref(true);
 const rulesEnabled = ref(false);
-
-// Общие настройки
-const logoUrl = ref("");
-const logoPreview = ref("");
-const logoUploading = ref(false);
-const logoFileInput = ref(null);
 
 const botSaving = ref(false);
 const featureFlagsLoading = ref(false);
@@ -505,24 +398,6 @@ const saveFeatureFlags = async () => {
   }
 };
 
-async function handleLogoUpload(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  logoUploading.value = true;
-  try {
-    const result = await settingsApi.uploadLogo(file);
-    logoUrl.value = result.url;
-    logoPreview.value = result.url;
-    showSuccess("Логотип загружен");
-  } catch (err) {
-    console.error("Ошибка загрузки логотипа:", err);
-    showError("Не удалось загрузить логотип");
-  } finally {
-    logoUploading.value = false;
-    if (logoFileInput.value) logoFileInput.value.value = "";
-  }
-}
-
 // Загрузка настроек
 const loadSettings = async () => {
   try {
@@ -533,11 +408,6 @@ const loadSettings = async () => {
     // Парсим настройки
     settings.forEach((setting) => {
       const value = parseValue(setting.setting_value);
-
-      if (setting.setting_key === "COMPANY_LOGO_URL") {
-        logoUrl.value = setting.setting_value || "";
-        logoPreview.value = setting.setting_value || "";
-      }
 
       // Флаг движка правил
       if (setting.setting_key === "GAMIFICATION_ENABLED") {
@@ -636,22 +506,6 @@ onMounted(() => {
   width: 100%;
 }
 
-.logo-preview-wrap {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px;
-  width: fit-content;
-}
-
-.logo-preview-img {
-  max-height: 64px;
-  max-width: 200px;
-  object-fit: contain;
-}
 
 .page-header {
   display: flex;
@@ -849,69 +703,6 @@ onMounted(() => {
   margin-top: 24px;
 }
 
-/* Environment Variables */
-.env-description-block {
-  margin-bottom: 24px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--divider);
-}
-
-.env-description-block p {
-  font-size: 15px;
-  color: var(--text-secondary);
-  margin: 0;
-  line-height: 1.6;
-}
-
-.env-description-block code {
-  background: var(--bg-secondary);
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 14px;
-  color: var(--accent-blue);
-}
-
-.env-columns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
-.env-column {
-  display: flex;
-  flex-direction: column;
-}
-
-.env-column-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 12px 0;
-}
-
-.env-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.env-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 16px;
-  background: var(--surface-card);
-  border-radius: 12px;
-  border: 1px solid var(--divider);
-}
-
-.env-key {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--accent-blue);
-}
 
 /* Responsive */
 @media (max-width: 768px) {
@@ -930,23 +721,8 @@ onMounted(() => {
   .settings-section {
     gap: 16px;
   }
-
-  .env-columns {
-    grid-template-columns: 1fr;
-  }
 }
 
-.env-note span {
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.env-note code {
-  background: #ffffff33;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 13px;
-}
 
 /* Responsive */
 @media (max-width: 768px) {
