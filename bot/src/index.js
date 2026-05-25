@@ -16,17 +16,11 @@ for (const filename of envFiles) {
   }
 }
 
-const { BOT_TOKEN, MINI_APP_URL, BACKEND_URL, INTERNAL_API_SECRET, BOT_WEBHOOK_DOMAIN, BOT_WEBHOOK_PATH, BOT_WEBHOOK_PORT } = process.env;
+const { BOT_TOKEN, MINI_APP_URL, BACKEND_URL, BOT_WEBHOOK_DOMAIN, BOT_WEBHOOK_PATH, BOT_WEBHOOK_PORT } = process.env;
 const botUsername = (process.env.BOT_USERNAME || "").trim();
-const internalApiSecret = String(INTERNAL_API_SECRET || "").trim();
 
 if (!BOT_TOKEN) {
   console.error("[bot] BOT_TOKEN is not set. Check bot/.env.");
-  process.exit(1);
-}
-
-if (!internalApiSecret) {
-  console.error("[bot] INTERNAL_API_SECRET is not set. Check bot/.env.");
   process.exit(1);
 }
 
@@ -36,7 +30,7 @@ const miniAppUrl = (MINI_APP_URL || "").trim();
 const backendUrl = (BACKEND_URL || "").trim();
 
 /**
- * Выполняет GET-запрос к backend API с авторизацией по INTERNAL_API_SECRET.
+ * Выполняет GET-запрос к backend API.
  */
 function backendGet(urlPath) {
   return new Promise((resolve, reject) => {
@@ -49,9 +43,7 @@ function backendGet(urlPath) {
       port: url.port || (fullUrl.startsWith("https") ? 443 : 80),
       path: url.pathname + url.search,
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${internalApiSecret}`,
-      },
+      headers: {},
     };
 
     const req = lib.request(options, (res) => {
@@ -73,7 +65,7 @@ function backendGet(urlPath) {
 }
 
 /**
- * Выполняет PATCH-запрос к backend API с авторизацией по INTERNAL_API_SECRET.
+ * Выполняет PATCH-запрос к backend API.
  */
 function backendPatch(urlPath, payload) {
   return new Promise((resolve, reject) => {
@@ -88,7 +80,6 @@ function backendPatch(urlPath, payload) {
       path: url.pathname + url.search,
       method: "PATCH",
       headers: {
-        Authorization: `Bearer ${internalApiSecret}`,
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(data),
       },
@@ -140,7 +131,7 @@ async function getUserStatus(telegramId) {
   }
 
   try {
-    const { status, body } = await backendGet(`/api/v1/bot/internal/user-status?telegramId=${telegramId}`);
+    const { status, body } = await backendGet(`/api/v1/bot/user-status?telegramId=${telegramId}`);
     if (status === 200 && body) {
       return {
         found: true,
@@ -166,7 +157,7 @@ async function getOnboardingConfig() {
     return null;
   }
   try {
-    const { status, body } = await backendGet("/api/v1/bot/internal/onboarding-config");
+    const { status, body } = await backendGet("/api/v1/bot/onboarding-config");
     if (status === 200 && body) {
       return body;
     }
@@ -182,7 +173,7 @@ async function getOnboardingConfig() {
 async function fetchCertificates(telegramId) {
   if (!backendUrl) return [];
   try {
-    const { status, body } = await backendGet(`/api/v1/bot/internal/certificates?telegramId=${telegramId}`);
+    const { status, body } = await backendGet(`/api/v1/bot/certificates?telegramId=${telegramId}`);
     if (status === 200 && body) return body.certificates || [];
     return [];
   } catch {
@@ -196,7 +187,7 @@ async function fetchCertificates(telegramId) {
 async function setNotificationsEnabled(telegramId, enabled) {
   if (!backendUrl) return false;
   try {
-    const { status } = await backendPatch(`/api/v1/bot/internal/notifications/settings?telegramId=${telegramId}`, { notificationsEnabled: enabled });
+    const { status } = await backendPatch(`/api/v1/bot/notifications/settings/by-telegram-id?telegramId=${telegramId}`, { notificationsEnabled: enabled });
     return status === 200;
   } catch {
     return false;
@@ -532,7 +523,7 @@ bot.hears("🔔 Уведомления", async (ctx) => {
   // Получаем текущий статус через user-status
   let enabled = true;
   try {
-    const { status, body } = await backendGet(`/api/v1/bot/internal/user-status?telegramId=${telegramId}`);
+    const { status, body } = await backendGet(`/api/v1/bot/user-status?telegramId=${telegramId}`);
     if (status === 200 && body) {
       enabled = body.notificationsEnabled !== false;
     }

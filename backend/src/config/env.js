@@ -23,7 +23,6 @@ const requiredVars = [
   "BOT_TOKEN",
   "JWT_SECRET",
   "JWT_REFRESH_SECRET",
-  "INTERNAL_API_SECRET",
 ];
 
 const missingVars = requiredVars.filter((key) => !process.env[key]);
@@ -70,7 +69,6 @@ module.exports = {
       }
     : null,
   botToken: process.env.BOT_TOKEN,
-  internalApiSecret: process.env.INTERNAL_API_SECRET || "",
   maxBotToken: process.env.MAX_BOT_TOKEN || process.env.BOT_TOKEN,
   maxBotName: process.env.MAX_BOT_NAME || "",
   jwtSecret: process.env.JWT_SECRET,
@@ -91,6 +89,3 @@ if (module.exports.nodeEnv === "production" && module.exports.allowedOrigins.len
   throw new Error("[env] В production переменная ALLOWED_ORIGINS обязательна и не может быть пустой");
 }
 
-if (module.exports.nodeEnv === "production" && !module.exports.internalApiSecret) {
-  throw new Error("[env] В production переменная INTERNAL_API_SECRET обязательна");
-}

@@ -28,7 +28,6 @@ const COURSE_MEDIA_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/cou
 const COURSE_MEDIA_IMAGE_MAX_SIZE = 50 * 1024 * 1024;
 const COURSE_MEDIA_VIDEO_MAX_SIZE = 1024 * 1024 * 1024;
 const COURSE_MEDIA_ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".webm"];
-const COURSE_MEDIA_TRANSCODE_ENABLED = String(process.env.COURSE_MEDIA_TRANSCODE_ENABLED || "false").toLowerCase() === "true";
 
 function resolveMediaMimeType(extension) {
   const mimeTypesByExtension = {
@@ -412,7 +411,7 @@ async function uploadCourseMedia(req, res, next) {
       let fileName = req.file.filename;
       let finalMimeType = mimeType;
 
-      if (isVideo && COURSE_MEDIA_TRANSCODE_ENABLED) {
+      if (isVideo) {
         const transcoded = await transcodeVideoTo1080p(req.file.path);
         fileName = transcoded.fileName;
         finalMimeType = "video/mp4";

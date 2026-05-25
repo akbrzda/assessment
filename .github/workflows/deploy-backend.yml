@@ -36,8 +36,6 @@ jobs:
           PORT=${{ secrets.BACKEND_PORT }}
           ALLOWED_ORIGINS=${{ secrets.BACKEND_ALLOWED_ORIGINS }}
           BACKEND_URL=${{ secrets.BACKEND_URL }}
-          MEDIA_BASE_URL=${{ secrets.MEDIA_BASE_URL }}
-          MEDIA_ROOT_PREFIX=${{ secrets.MEDIA_ROOT_PREFIX }}
 
           DB_HOST=${{ secrets.BACKEND_DB_HOST }}
           DB_PORT=${{ secrets.BACKEND_DB_PORT }}
@@ -46,7 +44,6 @@ jobs:
           DB_PASSWORD=${{ secrets.BACKEND_DB_PASSWORD }}
 
           BOT_TOKEN=${{ secrets.BACKEND_BOT_TOKEN }}
-          INTERNAL_API_SECRET=${{ secrets.BACKEND_INTERNAL_API_SECRET }}
           MAX_BOT_TOKEN=${{ secrets.BACKEND_MAX_BOT_TOKEN }}
           BOT_USERNAME=${{ secrets.BACKEND_BOT_USERNAME }}
           MAX_BOT_NAME=${{ secrets.BACKEND_MAX_BOT_NAME }}
@@ -91,8 +88,9 @@ jobs:
             --exclude 'node_modules' \
             --exclude '.git' \
             --exclude 'logs' \
-            --exclude 'uploads' \
-             --exclude 'bot' \
+            --exclude 'uploads/' \
+            --exclude 'uploads/***' \
+            --exclude 'bot' \
             backend/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/backend.theorica.ru/
 
       - name: Install dependencies on server

@@ -139,7 +139,6 @@ apiRouter.use("/verify", verifyCertificateLimiter, certificatesModule.verifyRout
 apiRouter.use("/certificates", certificatesModule.publicRouter);
 apiRouter.use("/admin/certificates", certificatesModule.adminRouter);
 // Основной API только v1.
-app.use("/api/v1/bot/internal", botModule.internalRoutes);
 app.use("/api/v1", apiRouter);
 app.get("/metrics", (req, res) => {
   res.setHeader("Content-Type", "text/plain; version=0.0.4; charset=utf-8");

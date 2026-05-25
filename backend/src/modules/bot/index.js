@@ -1,3 +1,3 @@
-const { publicRouter, internalRouter } = require("./routes");
+const { publicRouter } = require("./routes");
 
-module.exports = { routes: publicRouter, internalRoutes: internalRouter };
+module.exports = { routes: publicRouter };

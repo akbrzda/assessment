@@ -33,21 +33,21 @@ async function updateNotificationSettings(req, res, next) {
 async function getUserStatus(req, res, next) {
   try {
     const telegramId = String(req.query.telegramId || "");
-    console.log("[bot/internal/user-status] incoming telegramId=%s", telegramId);
+    console.log("[bot/user-status] incoming telegramId=%s", telegramId);
     if (!telegramId) {
-      console.log("[bot/internal/user-status] telegramId is empty");
+      console.log("[bot/user-status] telegramId is empty");
       return res.status(400).json({ error: "telegramId обязателен" });
     }
     const status = await botService.getUserStatusByTelegramId(telegramId);
-    console.log("[bot/internal/user-status] status result=%O", status);
+    console.log("[bot/user-status] status result=%O", status);
     if (!status) {
-      console.log("[bot/internal/user-status] user NOT found for telegramId=%s", telegramId);
+      console.log("[bot/user-status] user NOT found for telegramId=%s", telegramId);
       return res.status(404).json({ error: "Пользователь не найден" });
     }
-    console.log("[bot/internal/user-status] user found: firstName=%s, onboardingCompleted=%s", status.firstName, status.onboardingCompleted);
+    console.log("[bot/user-status] user found: firstName=%s, onboardingCompleted=%s", status.firstName, status.onboardingCompleted);
     res.json(status);
   } catch (err) {
-    console.error("[bot/internal/user-status] error:", err.message);
+    console.error("[bot/user-status] error:", err.message);
     next(err);
   }
 }
@@ -62,31 +62,31 @@ async function getOnboardingConfig(req, res, next) {
 }
 
 /**
- * GET /api/bot/internal/certificates?telegramId=X
+ * GET /api/bot/certificates?telegramId=X
  * Список issued сертификатов пользователя для Telegram-бота.
  */
 async function getCertificatesByTelegramId(req, res, next) {
   try {
     const telegramId = String(req.query.telegramId || "");
-    console.log("[bot/internal/certificates] incoming telegramId=%s", telegramId);
+    console.log("[bot/certificates] incoming telegramId=%s", telegramId);
     if (!telegramId) {
-      console.log("[bot/internal/certificates] telegramId is empty");
+      console.log("[bot/certificates] telegramId is empty");
       return res.status(400).json({ error: "telegramId обязателен" });
     }
     const certs = await certRepository.findAllByTelegramId(telegramId);
-    console.log("[bot/internal/certificates] found %d certificates", certs.length);
+    console.log("[bot/certificates] found %d certificates", certs.length);
     certs.forEach((c, i) => {
-      console.log("[bot/internal/certificates] cert[%d]: uuid=%s, course=%s, issued=%s", i, c.uuid, c.course_title, c.issued_at);
+      console.log("[bot/certificates] cert[%d]: uuid=%s, course=%s, issued=%s", i, c.uuid, c.course_title, c.issued_at);
     });
     res.json({ certificates: certs });
   } catch (err) {
-    console.error("[bot/internal/certificates] error:", err.message);
+    console.error("[bot/certificates] error:", err.message);
     next(err);
   }
 }
 
 /**
- * PATCH /api/bot/internal/notifications/settings?telegramId=X
+ * PATCH /api/bot/notifications/settings/by-telegram-id?telegramId=X
  * Обновление настроек уведомлений пользователя из бота.
  */
 async function patchNotificationsByTelegramId(req, res, next) {
