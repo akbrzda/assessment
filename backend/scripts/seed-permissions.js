@@ -28,6 +28,22 @@ async function seedPermissions() {
       inserted += Number(result.affectedRows || 0);
     }
 
+    const invitationCrudPermissions = [
+      { actionCode: "read", description: "Просмотр приглашений" },
+      { actionCode: "create", description: "Создание приглашений" },
+      { actionCode: "update", description: "Редактирование приглашений" },
+      { actionCode: "delete", description: "Удаление приглашений" },
+    ];
+
+    for (const permission of invitationCrudPermissions) {
+      const [result] = await connection.query(
+        `INSERT IGNORE INTO permissions (module_code, entity_code, action_code, description, is_active)
+         VALUES ('invitations', 'invitation', ?, ?, 1)`,
+        [permission.actionCode, permission.description],
+      );
+      inserted += Number(result.affectedRows || 0);
+    }
+
     console.log(`[seed-permissions] Готово. Добавлено записей: ${inserted}`);
   } finally {
     await connection.end();

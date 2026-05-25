@@ -24,6 +24,14 @@ async function getSettingByKey(req, res, next) {
   }
 }
 
+async function getFeatureFlags(req, res, next) {
+  try {
+    return await settingsService.getFeatureFlags(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function createSetting(req, res, next) {
   try {
     return await settingsService.createSetting(req, res, next);
@@ -35,6 +43,14 @@ async function createSetting(req, res, next) {
 async function updateSetting(req, res, next) {
   try {
     return await settingsService.updateSetting(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function updateFeatureFlags(req, res, next) {
+  try {
+    return await settingsService.updateFeatureFlags(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -52,7 +68,9 @@ module.exports = {
   uploadLogo,
   getSettings,
   getSettingByKey,
+  getFeatureFlags,
   createSetting,
   updateSetting,
+  updateFeatureFlags,
   deleteSetting,
 };

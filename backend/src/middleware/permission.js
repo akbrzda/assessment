@@ -1,28 +1,26 @@
-const permissionService = require("../services/PermissionService");
 const { logAccessDenied } = require("../services/auditService");
 
-function requirePermission(moduleCode, entityCode, actionCode, options = {}) {
+function requirePermission(moduleCode, entityCode, actionCode) {
   return async (req, res, next) => {
     try {
-      const context = options.contextBuilder ? options.contextBuilder(req) : {};
-      const decision = await permissionService.can(req.user, moduleCode, entityCode, actionCode, context);
+      const userId = Number(req.user?.id);
+      const roleName = String(req.user?.role || "").toLowerCase();
+      const isAdminRole = roleName === "superadmin" || roleName === "manager";
 
-      if (!decision.allowed) {
-        const status = req.user?.id ? 403 : 401;
+      if (!userId) {
+        return res.status(401).json({ error: "Не авторизован" });
+      }
+
+      // Отключаем новую granular RBAC-логику и возвращаем старое поведение:
+      // допуск только по захардкоженным ролям админ-панели.
+      if (!isAdminRole) {
         logAccessDenied({
           req,
-          reason: decision.reason || "permission_denied",
-          metadata: { moduleCode, entityCode, actionCode, source: decision.source },
+          reason: "permission_denied_hardcoded",
+          metadata: { moduleCode, entityCode, actionCode, source: "role_hardcoded" },
         }).catch(() => {});
-        return res.status(status).json({
+        return res.status(403).json({
           error: "Доступ запрещен",
-          code: decision.reason,
-          details: {
-            moduleCode,
-            entityCode,
-            actionCode,
-            source: decision.source,
-          },
         });
       }
 

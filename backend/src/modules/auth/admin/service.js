@@ -4,6 +4,8 @@ const config = require("../../../config/env");
 const authRepository = require("./repository");
 const { logAndSend } = require("../../../services/auditService");
 const { pool } = require("../../../config/database");
+const settingsService = require("../../../services/settingsService");
+const { FEATURE_FLAGS_SETTING_KEY } = require("../../../config/featureFlags");
 
 const ACCESS_TOKEN_TTL = process.env.JWT_ACCESS_TTL || "30m";
 const REFRESH_TOKEN_TTL = process.env.JWT_REFRESH_TTL || "7d";
@@ -73,6 +75,7 @@ function toUserResponse(user) {
     lastName: user.last_name,
     avatarUrl: user.avatar_url,
     role: user.role_name,
+    timezone: user.timezone || "UTC",
     branchId: user.branch_id,
     branchName: user.branch_name,
     positionName: user.position_name,
@@ -89,6 +92,20 @@ function createRefreshToken(userId) {
   return jwt.sign({ id: userId }, config.jwtRefreshSecret, {
     expiresIn: REFRESH_TOKEN_TTL,
   });
+}
+
+async function getDisabledModules() {
+  const rawValue = await settingsService.getSetting(FEATURE_FLAGS_SETTING_KEY, "[]");
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean);
+  } catch (error) {
+    console.error("Некорректный JSON feature flags:", error);
+    return [];
+  }
 }
 
 async function hashRefreshToken(refreshToken) {
@@ -175,10 +192,12 @@ async function login(payload, req, res) {
   await recordLoginHistory({ userId: user.id, req });
 
   setRefreshCookie(res, refreshToken);
+  const disabledModules = await getDisabledModules();
 
   return {
     accessToken,
     user: toUserResponse(user),
+    disabledModules,
   };
 }
 
@@ -211,10 +230,12 @@ async function refresh(payload, req, res) {
 
   await authRepository.updateRefreshToken(user.id, newRefreshTokenHash);
   setRefreshCookie(res, newRefreshToken);
+  const disabledModules = await getDisabledModules();
 
   return {
     accessToken,
     user: toUserResponse(user),
+    disabledModules,
   };
 }
 

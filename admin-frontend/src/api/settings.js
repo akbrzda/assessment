@@ -13,6 +13,18 @@ export default {
     return response.data;
   },
 
+  // Получить feature flags модулей
+  async getFeatureFlags() {
+    const response = await apiClient.get("/admin/settings/feature-flags");
+    return response.data;
+  },
+
+  // Обновить feature flags модулей
+  async updateFeatureFlags(disabledModules) {
+    const response = await apiClient.put("/admin/settings/feature-flags", { disabledModules });
+    return response.data;
+  },
+
   // Создать новую настройку
   async createSetting(data) {
     const response = await apiClient.post("/admin/settings", data);

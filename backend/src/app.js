@@ -6,6 +6,7 @@ const path = require("path");
 const config = require("./config/env");
 const { errorHandler, timezone: timezoneMiddleware } = require("./middleware");
 const correlationId = require("./middleware/correlationId");
+const featureFlagsGate = require("./middleware/featureFlagsGate");
 const verifyJWT = require("./middleware/verifyJWT");
 const { verifyCertificateLimiter, authLimiter, adminGlobalLimiter } = require("./middleware/rateLimit");
 
@@ -26,8 +27,6 @@ const adminBranchRoutes = require("./modules/admin/branches");
 const adminPositionRoutes = require("./modules/admin/positions");
 const adminSettingsRoutes = require("./modules/admin/settings");
 const adminProfileRoutes = require("./modules/admin/profile");
-const adminPermissionsRoutes = require("./modules/admin/permissions");
-const adminRolesRoutes = require("./modules/admin/roles");
 const adminSearchRoutes = require("./modules/admin/search/routes");
 const adminAuditLogsRoutes = require("./modules/admin/audit-logs/routes");
 const { metricsMiddleware, toPrometheusMetrics } = require("./services/metricsService");
@@ -97,6 +96,7 @@ const apiRouter = express.Router();
 apiRouter.use(timezoneMiddleware);
 apiRouter.use(metricsMiddleware);
 apiRouter.use("/admin", adminGlobalLimiter);
+apiRouter.use(featureFlagsGate);
 
 apiRouter.get("/health", async (req, res, next) => {
   try {
@@ -122,8 +122,7 @@ apiRouter.use("/admin/settings", adminSettingsRoutes);
 apiRouter.use("/admin/gamification/rules", gamificationModule.admin.rules.routes);
 apiRouter.use("/admin/invitations", invitationModule.admin.routes);
 apiRouter.use("/admin/profile", adminProfileRoutes);
-apiRouter.use("/admin/permissions", adminPermissionsRoutes);
-apiRouter.use("/admin/roles", adminRolesRoutes);
+// Управление ролями и granular-доступами отключено: оставляем только захардкоженные правила.
 apiRouter.use("/admin/search", adminSearchRoutes);
 apiRouter.use("/admin/audit-logs", adminAuditLogsRoutes);
 apiRouter.use("/admin/courses", coursesModule.admin.routes);

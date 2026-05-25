@@ -362,7 +362,7 @@ const rolesSaving = ref(false);
 const overridesSaving = ref(false);
 const newRoleForm = ref({ roleId: "", expiresAt: "" });
 const newOverrideForm = ref({ permissionId: "", effect: "allow", reason: "", expiresAt: "" });
-const canManageRolesAndPermissions = computed(() => authStore.user?.role !== "manager");
+const canManageRolesAndPermissions = computed(() => false);
 const grantingAccess = ref(false);
 const grantedLinks = ref(null);
 

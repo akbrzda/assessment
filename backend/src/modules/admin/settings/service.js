@@ -1,10 +1,54 @@
 const { pool } = require("../../../config/database");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
 const settingsService = require("../../../services/settingsService");
+const {
+  FEATURE_FLAGS_SETTING_KEY,
+  FEATURE_MODULES,
+  SHARED_MODULE_CODES,
+  CLIENT_ONLY_MODULE_CODES,
+  ADMIN_ONLY_MODULE_CODES,
+  LOCKED_MODULE_CODES,
+} = require("../../../config/featureFlags");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { buildMediaUrl } = require("../../../utils/mediaUrl");
+
+function parseDisabledModules(rawValue) {
+  if (!rawValue) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean);
+  } catch (error) {
+    console.error("Некорректный JSON feature flags:", error);
+    return [];
+  }
+}
+
+function getFeatureModulesPayload(disabledModules) {
+  const disabledSet = new Set(disabledModules);
+  return FEATURE_MODULES.map((moduleItem) => ({
+    code: moduleItem.code,
+    name: moduleItem.name,
+    locked: Boolean(moduleItem.locked),
+    enabled: !disabledSet.has(moduleItem.code),
+  }));
+}
+
+function getFeatureGroupsPayload() {
+  return {
+    sharedModuleCodes: [...SHARED_MODULE_CODES],
+    clientOnlyModuleCodes: [...CLIENT_ONLY_MODULE_CODES],
+    adminOnlyModuleCodes: [...ADMIN_ONLY_MODULE_CODES],
+  };
+}
 
 // Хранилище логотипа
 const logoStorage = multer.diskStorage({
@@ -92,6 +136,25 @@ exports.getSettings = async (req, res, next) => {
 };
 
 /**
+ * Получить feature flags модулей
+ */
+exports.getFeatureFlags = async (req, res, next) => {
+  try {
+    const rawValue = await settingsService.getSetting(FEATURE_FLAGS_SETTING_KEY, "[]");
+    const disabledModules = parseDisabledModules(rawValue);
+
+    res.json({
+      disabledModules,
+      modules: getFeatureModulesPayload(disabledModules),
+      groups: getFeatureGroupsPayload(),
+    });
+  } catch (error) {
+    console.error("Get feature flags error:", error);
+    next(error);
+  }
+};
+
+/**
  * Получить конкретную настройку
  */
 exports.getSettingByKey = async (req, res, next) => {
@@ -156,6 +219,68 @@ exports.updateSetting = async (req, res, next) => {
     res.json({ message: "Настройка обновлена успешно" });
   } catch (error) {
     console.error("Update setting error:", error);
+    next(error);
+  }
+};
+
+/**
+ * Обновить feature flags модулей
+ */
+exports.updateFeatureFlags = async (req, res, next) => {
+  try {
+    const input = Array.isArray(req.body?.disabledModules) ? req.body.disabledModules : null;
+    if (!input) {
+      return res.status(400).json({ error: "Поле disabledModules должно быть массивом" });
+    }
+
+    const knownCodes = new Set(FEATURE_MODULES.map((item) => item.code));
+    const normalized = Array.from(new Set(input.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean)));
+
+    const invalidCodes = normalized.filter((code) => !knownCodes.has(code));
+    if (invalidCodes.length > 0) {
+      return res.status(400).json({ error: "Переданы неизвестные модули", details: { invalidCodes } });
+    }
+
+    const lockedInPayload = normalized.filter((code) => LOCKED_MODULE_CODES.has(code));
+    if (lockedInPayload.length > 0) {
+      return res.status(400).json({ error: "Нельзя отключать защищённые модули", details: { lockedInPayload } });
+    }
+
+    const serialized = JSON.stringify(normalized);
+    const [existing] = await pool.query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key = ?", [FEATURE_FLAGS_SETTING_KEY]);
+
+    if (existing.length > 0) {
+      await pool.query("UPDATE system_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = ?", [serialized, FEATURE_FLAGS_SETTING_KEY]);
+    } else {
+      await pool.query("INSERT INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)", [
+        FEATURE_FLAGS_SETTING_KEY,
+        serialized,
+        "Отключённые модули проекта для feature flags",
+      ]);
+    }
+
+    settingsService.clearCache();
+
+    await logAndSend({
+      req,
+      actor: buildActorFromRequest(req),
+      action: "feature_flags.updated",
+      entity: "setting",
+      entityId: null,
+      metadata: {
+        key: FEATURE_FLAGS_SETTING_KEY,
+        disabledModules: normalized,
+      },
+    });
+
+    res.json({
+      message: "Feature flags обновлены успешно",
+      disabledModules: normalized,
+      modules: getFeatureModulesPayload(normalized),
+      groups: getFeatureGroupsPayload(),
+    });
+  } catch (error) {
+    console.error("Update feature flags error:", error);
     next(error);
   }
 };

@@ -27,55 +27,55 @@ const routes = [
     path: "/assessments",
     name: "assessments",
     component: () => import("../views/AssessmentsView.vue"),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, module: "courses" },
   },
   {
     path: "/courses/:id",
     name: "course-details",
     component: () => import("../views/CourseDetailsView.vue"),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, module: "courses" },
   },
   {
     path: "/courses/:courseId/topics/:sectionId",
     name: "course-topic",
     component: () => import("../views/TopicView.vue"),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, module: "courses" },
   },
   {
     path: "/courses/:courseId/topics/:sectionId/subtopics/:topicId",
     name: "course-subtopic",
     component: () => import("../views/SubtopicView.vue"),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, module: "courses" },
   },
   {
     path: "/courses/:courseId/status/:statusType",
     name: "course-status-page",
     component: () => import("../views/CourseStatusPageView.vue"),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, module: "courses" },
   },
   {
     path: "/assessment/:id",
     name: "assessment-process",
     component: () => import("../views/AssessmentProcessView.vue"),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, module: "assessments" },
   },
   {
     path: "/assessment/:id/theory",
     name: "assessment-theory",
     component: () => import("../views/AssessmentTheoryView.vue"),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, module: "assessments" },
   },
   {
     path: "/assessment-results/:id",
     name: "assessment-results",
     component: () => import("../views/AssessmentResultsView.vue"),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, module: "assessments" },
   },
   {
     path: "/leaderboard",
     name: "leaderboard",
     component: () => import("../views/LeaderboardView.vue"),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, module: "gamification" },
   },
   {
     path: "/profile",
@@ -87,7 +87,7 @@ const routes = [
     path: "/profile/achievements",
     name: "achievements",
     component: () => import("../views/AchievementsView.vue"),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, module: "gamification" },
   },
   {
     path: "/profile/history",
@@ -99,6 +99,12 @@ const routes = [
     path: "/certificates",
     name: "certificates",
     component: () => import("../views/CertificatesView.vue"),
+    meta: { requiresAuth: true, module: "certificates" },
+  },
+  {
+    path: "/module-disabled",
+    name: "module-disabled",
+    component: () => import("../views/ModuleDisabledView.vue"),
     meta: { requiresAuth: true },
   },
   {
@@ -118,6 +124,12 @@ router.beforeEach(async (to, from, next) => {
   if (navigationTarget) {
     return next(navigationTarget);
   }
+
+  const requiredModule = to.meta?.module;
+  if (requiredModule && !userStore.hasModuleAccess(requiredModule)) {
+    return next({ name: "module-disabled", query: { module: String(requiredModule) } });
+  }
+
   return next();
 });
 

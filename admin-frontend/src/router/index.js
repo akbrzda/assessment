@@ -23,7 +23,7 @@ const routes = [
         path: "dashboard",
         name: "Dashboard",
         component: () => import("../modules/dashboard/views/DashboardView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Панель управления" },
+        meta: { roles: ["superadmin", "manager"], module: "analytics", title: "Панель управления" },
       },
       {
         path: "users",
@@ -42,18 +42,6 @@ const routes = [
         name: "Invitations",
         component: () => import("../modules/invitations/views/InvitationsView.vue"),
         meta: { roles: ["superadmin", "manager"], module: "invitations", title: "Приглашения" },
-      },
-      {
-        path: "roles",
-        name: "Roles",
-        component: () => import("../modules/admin/roles/views/RolesListView.vue"),
-        meta: { roles: ["superadmin"], module: "users", title: "Роли и права" },
-      },
-      {
-        path: "roles/:id",
-        name: "RoleDetails",
-        component: () => import("../modules/admin/roles/views/RoleDetailView.vue"),
-        meta: { roles: ["superadmin"], module: "users", title: "Редактирование роли" },
       },
       {
         path: "assessments",
@@ -173,7 +161,7 @@ const routes = [
         path: "certificates",
         name: "Certificates",
         component: () => import("../modules/certificates/views/CertificatesView.vue"),
-        meta: { roles: ["superadmin", "manager"], title: "Сертификаты" },
+        meta: { roles: ["superadmin", "manager"], module: "certificates", title: "Сертификаты" },
       },
       {
         path: "audit-logs",
@@ -208,7 +196,7 @@ router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some((record) => record.meta?.requiresAuth);
   const roleRestrictedRecord = [...to.matched].reverse().find((record) => Array.isArray(record.meta?.roles));
   const allowedRoles = roleRestrictedRecord?.meta?.roles;
-  const requiredModule = to.meta?.module; // Код модуля, например "branches", "settings"
+  const requiredModule = to.meta?.module;
 
   // Обновить title страницы
   const baseTitle = "Система аттестаций";
@@ -235,26 +223,17 @@ router.beforeEach(async (to, from, next) => {
     return next("/dashboard");
   }
 
-  // Загружаем права пользователя если они еще не загружены
-  if (authStore.isAuthenticated && !authStore.permissionsLoaded) {
-    await authStore.loadUserPermissions();
-  }
-
   // Курс для manager работает в read-only: запрещаем маршруты редактирования.
   if (authStore.user?.role === "manager" && ["CreateCourse", "EditCourse"].includes(String(to.name || ""))) {
     return next({ name: "Courses" });
   }
 
-  // Если указан модуль, проверяем права на модуль (приоритет над ролями)
-  if (requiredModule) {
-    if (!authStore.hasModuleAccess(requiredModule)) {
-      return next({ name: "NotFound", query: { type: "forbidden" } });
-    }
-  } else if (allowedRoles) {
-    // Проверка ролей только если нет модуля
-    if (!allowedRoles.includes(authStore.user?.role)) {
-      return next({ name: "NotFound", query: { type: "forbidden" } });
-    }
+  if (requiredModule && !authStore.hasModuleAccess(requiredModule)) {
+    return next({ name: "NotFound", query: { type: "forbidden" } });
+  }
+
+  if (allowedRoles && !allowedRoles.includes(authStore.user?.role)) {
+    return next({ name: "NotFound", query: { type: "forbidden" } });
   }
 
   next();

@@ -37,7 +37,7 @@
     </div>
 
     <div v-else class="menu-card">
-      <button class="menu-item" @click="handleAchievements">
+      <button v-if="canOpenAchievements" class="menu-item" @click="handleAchievements">
         <span class="menu-icon-wrap">
           <Star :size="20" class="menu-icon" />
         </span>
@@ -45,7 +45,7 @@
         <ChevronRight :size="18" class="menu-chevron" />
       </button>
 
-      <div class="menu-divider"></div>
+      <div v-if="canOpenAchievements" class="menu-divider"></div>
 
       <button class="menu-item" @click="handleHistory">
         <span class="menu-icon-wrap">
@@ -57,7 +57,7 @@
 
       <div class="menu-divider"></div>
 
-      <button class="menu-item" @click="handleCertificates">
+      <button v-if="canOpenCertificates" class="menu-item" @click="handleCertificates">
         <span class="menu-icon-wrap">
           <Award :size="20" class="menu-icon" />
         </span>
@@ -65,7 +65,7 @@
         <ChevronRight :size="18" class="menu-chevron" />
       </button>
 
-      <div class="menu-divider"></div>
+      <div v-if="canOpenCertificates" class="menu-divider"></div>
 
       <button class="menu-item" @click="toggleNotificationSettings">
         <span class="menu-icon-wrap">
@@ -146,6 +146,8 @@ export default {
       const userPoints = Number(user.value?.points);
       return Number.isFinite(userPoints) ? userPoints : 0;
     });
+    const canOpenAchievements = computed(() => userStore.hasModuleAccess("gamification"));
+    const canOpenCertificates = computed(() => userStore.hasModuleAccess("certificates"));
 
     async function loadStats() {
       isStatsLoading.value = true;
@@ -155,23 +157,25 @@ export default {
         }
 
         let completedCourses = 0;
-        try {
-          const coursesResponse = await apiClient.listCourses();
-          const coursesList = coursesResponse?.courses || [];
-          completedCourses = coursesList.filter((course) => course.progress?.status === "completed").length;
-        } catch (error) {
-          console.warn("Не удалось получить список курсов для статистики профиля", error);
+        if (userStore.hasModuleAccess("courses")) {
+          try {
+            const coursesResponse = await apiClient.listCourses();
+            const coursesList = coursesResponse?.courses || [];
+            completedCourses = coursesList.filter((course) => course.progress?.status === "completed").length;
+          } catch (error) {
+            console.warn("Не удалось получить список курсов для статистики профиля", error);
+          }
         }
 
         let earnedBadgesCount = 0;
-        try {
-          const overview = await userStore.loadOverview();
-          const badges = Array.isArray(overview?.badges) ? overview.badges : [];
-          earnedBadgesCount = badges.filter((badge) => badge.earned).length;
-        } catch (error) {
-          console.warn("Не удалось получить бейджи для статистики профиля", error);
-          const fallbackBadges = Array.isArray(userStore.overview?.badges) ? userStore.overview.badges : [];
-          earnedBadgesCount = fallbackBadges.filter((badge) => badge.earned).length;
+        if (userStore.hasModuleAccess("gamification")) {
+          try {
+            const overview = await userStore.loadOverview();
+            const badges = Array.isArray(overview?.badges) ? overview.badges : [];
+            earnedBadgesCount = badges.filter((badge) => badge.earned).length;
+          } catch (error) {
+            console.warn("Не удалось получить бейджи для статистики профиля", error);
+          }
         }
 
         statsData.value = {
@@ -258,6 +262,8 @@ export default {
       user,
       statsData,
       profilePoints,
+      canOpenAchievements,
+      canOpenCertificates,
       isStatsLoading,
       handleAchievements,
       handleHistory,

@@ -33,6 +33,7 @@
           <article v-if="continueCourse" class="continue-card app-panel">
             <div class="continue-content">
               <h3 class="continue-title">{{ continueCourseTitle }}</h3>
+              <p v-if="nextTopicLabel" class="continue-next-topic">{{ nextTopicLabel }}</p>
               <p class="continue-meta">{{ continueCourseMeta }}</p>
               <BaseButton class="continue-btn" type="button" @click="handleContinueAction">Продолжить</BaseButton>
             </div>
@@ -115,7 +116,9 @@
           <div v-else class="tasks-empty app-panel">
             <ShieldCheck :size="32" class="tasks-empty-icon" />
             <p class="tasks-empty-text">Все курсы завершены или ещё не начаты</p>
-            <BaseButton class="tasks-empty-link" variant="ghost" size="sm" type="button" @click="router.push({ name: 'assessments' })">Перейти к курсам</BaseButton>
+            <BaseButton class="tasks-empty-link" variant="ghost" size="sm" type="button" @click="router.push({ name: 'assessments' })"
+              >Перейти к курсам</BaseButton
+            >
           </div>
         </section>
       </template>
@@ -231,6 +234,22 @@ export default {
 
     const isContinueDisabled = computed(() => !continueCourse.value);
 
+    const nextTopicLabel = ref("");
+    watch(
+      continueCourse,
+      async (course) => {
+        nextTopicLabel.value = "";
+        if (!course?.id) return;
+        try {
+          const courseResponse = await apiClient.getCourseById(course.id);
+          nextTopicLabel.value = resolveNextStepLabel(courseResponse?.course);
+        } catch {
+          // Не критично — просто не показываем подсказку
+        }
+      },
+      { immediate: true },
+    );
+
     const continueCourseImageUrl = computed(() => {
       if (!continueCourse.value?.coverUrl || isContinueImageBroken.value) {
         return "";
@@ -266,6 +285,21 @@ export default {
         subtitle: activity.result ? `Прогресс: ${activity.result.score}%` : "Продолжить обучение",
       }));
     });
+
+    function resolveNextStepLabel(courseDetails) {
+      const sections = courseDetails?.sections || [];
+      for (const section of sections) {
+        const topics = section?.topics || [];
+        const firstIncompleteTopic = topics.find((topic) => !topic?.progress?.locked && topic?.progress?.status !== "completed");
+        if (firstIncompleteTopic) {
+          return firstIncompleteTopic.title || section.title || "";
+        }
+        if (!section?.progress?.locked && section?.progress?.status !== "passed") {
+          return section.title || "";
+        }
+      }
+      return "";
+    }
 
     function resolveNextStep(courseDetails) {
       const sections = courseDetails?.sections || [];
@@ -347,11 +381,24 @@ export default {
       isDataLoading.value = true;
       dashboardError.value = "";
       try {
-        const [, coursesResponse] = await Promise.all([userStore.loadOverview(), apiClient.listCourses()]);
+        const canUseGamification = userStore.hasModuleAccess("gamification");
+        const canUseCourses = userStore.hasModuleAccess("courses");
+
+        const tasks = [];
+        if (canUseGamification) {
+          tasks.push(userStore.loadOverview());
+        }
+        if (canUseCourses) {
+          tasks.push(apiClient.listCourses());
+        }
+
+        const responses = await Promise.all(tasks);
+        const coursesResponse = canUseCourses ? responses[responses.length - 1] : null;
 
         courses.value = (coursesResponse?.courses || []).map((item) => normalizeCourse(item)).filter(Boolean);
 
-        const certificatesCount = Array.isArray(userStore.overview?.badges) ? userStore.overview.badges.filter((badge) => badge.earned).length : 0;
+        const certificatesCount =
+          canUseGamification && Array.isArray(userStore.overview?.badges) ? userStore.overview.badges.filter((badge) => badge.earned).length : 0;
         const completedTopics = courses.value.reduce((acc, course) => acc + Number(course.progress.completedSectionsCount || 0), 0);
 
         dashboardStats.value = {
@@ -407,6 +454,7 @@ export default {
       continueCourse,
       continueCourseTitle,
       continueCourseMeta,
+      nextTopicLabel,
       continueCourseImageUrl,
       continueCourseFallbackIcon,
       displayTasks,
@@ -562,8 +610,18 @@ export default {
   line-height: 1.3;
 }
 
+.continue-next-topic {
+  margin: 4px 0 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .continue-meta {
-  margin: 6px 0 12px;
+  margin: 4px 0 12px;
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 400;
@@ -718,6 +776,10 @@ export default {
 
   .continue-title {
     font-size: 15px;
+  }
+
+  .continue-next-topic {
+    font-size: 13px;
   }
 
   .continue-meta {

@@ -52,6 +52,27 @@ async function seedRolePermissions() {
       }
     }
 
+    const managerRole = roles.find((role) => role.name === "manager");
+    if (managerRole) {
+      const [invitationCrudPermissions] = await connection.query(
+        `SELECT id
+         FROM permissions
+         WHERE module_code = 'invitations'
+           AND entity_code = 'invitation'
+           AND action_code IN ('read', 'create', 'update', 'delete')
+           AND is_active = 1`,
+      );
+
+      for (const permission of invitationCrudPermissions) {
+        const [result] = await connection.query(
+          `INSERT IGNORE INTO role_permissions (role_id, permission_id, effect)
+           VALUES (?, ?, 'allow')`,
+          [managerRole.id, permission.id],
+        );
+        inserted += Number(result.affectedRows || 0);
+      }
+    }
+
     console.log(`[seed-role-permissions] Готово. Добавлено записей: ${inserted}`);
   } finally {
     await connection.end();
