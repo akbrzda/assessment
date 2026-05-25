@@ -30,21 +30,19 @@ const adminProfileRoutes = require("./modules/admin/profile");
 const adminSearchRoutes = require("./modules/admin/search/routes");
 const adminAuditLogsRoutes = require("./modules/admin/audit-logs/routes");
 const { metricsMiddleware, toPrometheusMetrics } = require("./services/metricsService");
-const { resolveMediaRootPrefix } = require("./utils/mediaUrl");
 const botModule = require("./modules/bot");
 const certificatesModule = require("./modules/certificates");
 const { registerAssessmentEvents } = require("./events/assessmentEvents");
 
-// Регистрируем обработчики доменных событий
+// Register domain event handlers
 registerAssessmentEvents();
 
 const app = express();
 app.set("trust proxy", 1);
-const mediaRootPrefix = `/${resolveMediaRootPrefix()}`;
 
 const isProduction = config.nodeEnv === "production";
 if (isProduction && config.allowedOrigins.length === 0) {
-  throw new Error("ALLOWED_ORIGINS не задан: запуск в production остановлен");
+  throw new Error("ALLOWED_ORIGINS is not configured: production startup aborted");
 }
 
 const corsOptions = {
@@ -72,27 +70,23 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(correlationId);
 
-// Защита от индексации поисковыми системами
+// Block search engine indexing
 app.use((req, res, next) => {
   res.setHeader("X-Robots-Tag", "noindex, nofollow");
   next();
 });
 
-// Доступ к сертификатам только для авторизованных пользователей
+// Restrict certificate and course media access to authorized users
 app.use("/uploads/certificates", verifyJWT, express.static(path.join(__dirname, "../../uploads/certificates")));
 app.use("/uploads/courses", verifyJWT, express.static(path.join(__dirname, "../../uploads/courses")));
 app.use("/uploads/course-media", verifyJWT, express.static(path.join(__dirname, "../../uploads/course-media")));
-app.use(`${mediaRootPrefix}/certificates`, verifyJWT, express.static(path.join(__dirname, "../../uploads/certificates")));
-app.use(`${mediaRootPrefix}/courses`, verifyJWT, express.static(path.join(__dirname, "../../uploads/courses")));
-app.use(`${mediaRootPrefix}/course-media`, verifyJWT, express.static(path.join(__dirname, "../../uploads/course-media")));
 
-// Статические файлы (иконки, обложки, медиа)
+// Public static files (icons, covers, media)
 app.use("/uploads", express.static(path.join(__dirname, "../../uploads")));
-app.use(mediaRootPrefix, express.static(path.join(__dirname, "../../uploads")));
 
 const apiRouter = express.Router();
 
-// Middleware для конвертации дат в часовой пояс пользователя
+// Middleware for converting dates to the user timezone
 apiRouter.use(timezoneMiddleware);
 apiRouter.use(metricsMiddleware);
 apiRouter.use("/admin", adminGlobalLimiter);
@@ -122,7 +116,7 @@ apiRouter.use("/admin/settings", adminSettingsRoutes);
 apiRouter.use("/admin/gamification/rules", gamificationModule.admin.rules.routes);
 apiRouter.use("/admin/invitations", invitationModule.admin.routes);
 apiRouter.use("/admin/profile", adminProfileRoutes);
-// Управление ролями и granular-доступами отключено: оставляем только захардкоженные правила.
+// Role and granular permissions management is intentionally disabled here.
 apiRouter.use("/admin/search", adminSearchRoutes);
 apiRouter.use("/admin/audit-logs", adminAuditLogsRoutes);
 apiRouter.use("/admin/courses", coursesModule.admin.routes);
@@ -138,7 +132,7 @@ apiRouter.use("/bot", botModule.routes);
 apiRouter.use("/verify", verifyCertificateLimiter, certificatesModule.verifyRouter);
 apiRouter.use("/certificates", certificatesModule.publicRouter);
 apiRouter.use("/admin/certificates", certificatesModule.adminRouter);
-// Основной API только v1.
+// Main API is exposed only as v1.
 app.use("/api/v1", apiRouter);
 app.get("/metrics", (req, res) => {
   res.setHeader("Content-Type", "text/plain; version=0.0.4; charset=utf-8");

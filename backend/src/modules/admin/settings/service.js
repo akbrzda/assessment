@@ -12,7 +12,6 @@ const {
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-const { buildMediaUrl } = require("../../../utils/mediaUrl");
 
 function parseDisabledModules(rawValue) {
   if (!rawValue) {
@@ -88,7 +87,7 @@ exports.uploadLogo = (req, res, next) => {
       return res.status(400).json({ error: "Файл не передан" });
     }
 
-    const logoUrl = buildMediaUrl("logo", req.file.filename);
+    const logoUrl = `/uploads/logo/${req.file.filename}`;
 
     try {
       // Создаём или обновляем настройку

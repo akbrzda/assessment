@@ -3,7 +3,28 @@ const { createLog } = require("../../../../services/adminLogService");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-const { buildMediaUrl, extractFileNameFromMediaUrl } = require("../../../../utils/mediaUrl");
+
+function buildUploadsUrl(subfolder, fileName) {
+  const normalizedSubfolder = String(subfolder || "").trim().replace(/^\/+|\/+$/g, "");
+  const normalizedFileName = String(fileName || "").trim().replace(/^\/+|\/+$/g, "");
+  if (!normalizedSubfolder || !normalizedFileName) {
+    return "";
+  }
+  return `/uploads/${normalizedSubfolder}/${normalizedFileName}`;
+}
+
+function extractFileNameFromUploadsUrl(fileUrl, subfolder) {
+  const normalizedSubfolder = String(subfolder || "").trim().replace(/^\/+|\/+$/g, "");
+  const normalizedUrl = String(fileUrl || "").trim();
+  if (!normalizedSubfolder || !normalizedUrl) {
+    return "";
+  }
+  const prefix = `/uploads/${normalizedSubfolder}/`;
+  if (!normalizedUrl.startsWith(prefix)) {
+    return "";
+  }
+  return normalizedUrl.slice(prefix.length).replace(/^\/+|\/+$/g, "");
+}
 
 // Настройка загрузки файлов
 const storage = multer.diskStorage({
@@ -197,7 +218,7 @@ exports.uploadBadgeIcon = async (req, res, next) => {
 
       // Удалить старую иконку если есть
       if (badges[0].icon_url) {
-        const oldFileName = extractFileNameFromMediaUrl(badges[0].icon_url, "badges");
+        const oldFileName = extractFileNameFromUploadsUrl(badges[0].icon_url, "badges");
         if (oldFileName) {
           const oldPath = path.join(__dirname, "../../../../../uploads/badges", path.basename(oldFileName));
           if (fs.existsSync(oldPath)) {
@@ -206,7 +227,7 @@ exports.uploadBadgeIcon = async (req, res, next) => {
         }
       }
 
-      const iconUrl = buildMediaUrl("badges", req.file.filename);
+      const iconUrl = buildUploadsUrl("badges", req.file.filename);
 
       // Обновить URL иконки
       await pool.query("UPDATE badges SET icon_url = ? WHERE id = ?", [iconUrl, id]);
@@ -243,7 +264,7 @@ exports.deleteBadge = async (req, res, next) => {
 
     // Удалить иконку если есть
     if (badge.icon_url) {
-      const iconFileName = extractFileNameFromMediaUrl(badge.icon_url, "badges");
+      const iconFileName = extractFileNameFromUploadsUrl(badge.icon_url, "badges");
       if (iconFileName) {
         const iconPath = path.join(__dirname, "../../../../../uploads/badges", path.basename(iconFileName));
         if (fs.existsSync(iconPath)) {

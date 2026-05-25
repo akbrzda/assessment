@@ -3,7 +3,6 @@ const logger = require("../../utils/logger");
 const repository = require("../../modules/certificates/repository");
 const pngGenerator = require("./pdfGenerator");
 const settingsService = require("../settingsService");
-const { buildMediaUrl } = require("../../utils/mediaUrl");
 
 /**
  * Основной сервис выдачи сертификатов.
@@ -46,7 +45,7 @@ async function _doGenerate(record, { firstName, lastName, courseTitle, scorePerc
       scorePercent,
     });
 
-    const fileUrl = buildMediaUrl("certificates", fileName);
+    const fileUrl = `/uploads/certificates/${fileName}`;
     const snapshotData = { fullName, courseTitle, issuedAt: issuedAt.toISOString(), scorePercent };
 
     await repository.saveSnapshot(id, snapshotData);
