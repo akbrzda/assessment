@@ -27,7 +27,8 @@ const COURSE_COVERS_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/co
 const COURSE_MEDIA_UPLOAD_DIR = path.join(__dirname, "../../../../../uploads/course-media");
 const COURSE_MEDIA_IMAGE_MAX_SIZE = 50 * 1024 * 1024;
 const COURSE_MEDIA_VIDEO_MAX_SIZE = 1024 * 1024 * 1024;
-const COURSE_MEDIA_ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".mp4", ".webm"];
+const COURSE_MEDIA_ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".webm"];
+const COURSE_MEDIA_TRANSCODE_ENABLED = String(process.env.COURSE_MEDIA_TRANSCODE_ENABLED || "false").toLowerCase() === "true";
 
 function resolveMediaMimeType(extension) {
   const mimeTypesByExtension = {
@@ -150,17 +151,17 @@ const uploadCourseMediaFile = multer({
   fileFilter: (req, file, cb) => {
     const extension = path.extname(file.originalname || "").toLowerCase();
     const mimeType = String(file.mimetype || "").toLowerCase();
-    const imageTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif"];
+    const imageTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
     const videoTypes = ["video/mp4", "video/webm"];
     const allowedExtensions = new Set(COURSE_MEDIA_ALLOWED_EXTENSIONS);
 
     if (!allowedExtensions.has(extension)) {
-      cb(new Error("Разрешены только файлы: jpg, jpeg, png, gif, mp4, webm"));
+      cb(new Error("Разрешены только файлы: jpg, jpeg, png, webp, gif, mp4, webm"));
       return;
     }
 
     if (!imageTypes.includes(mimeType) && !videoTypes.includes(mimeType)) {
-      cb(new Error("Разрешены только изображения (jpg, jpeg, png, gif) и видео (mp4, webm)"));
+      cb(new Error("Разрешены только изображения (jpg, jpeg, png, webp, gif) и видео (mp4, webm)"));
       return;
     }
 
@@ -411,7 +412,7 @@ async function uploadCourseMedia(req, res, next) {
       let fileName = req.file.filename;
       let finalMimeType = mimeType;
 
-      if (isVideo) {
+      if (isVideo && COURSE_MEDIA_TRANSCODE_ENABLED) {
         const transcoded = await transcodeVideoTo1080p(req.file.path);
         fileName = transcoded.fileName;
         finalMimeType = "video/mp4";

@@ -804,6 +804,11 @@ const loadAssessments = async () => {
 
     assessmentOptions.value = [{ value: "", label: "Не выбрано" }, ...options];
   } catch (error) {
+    const isAssessmentsModuleDisabled = error?.response?.data?.code === "module_disabled" && error?.response?.data?.moduleCode === "assessments";
+    if (isAssessmentsModuleDisabled) {
+      assessmentOptions.value = [{ value: "", label: "Не выбрано" }];
+      return;
+    }
     showToast(getErrorMessage(error, "Не удалось загрузить список аттестаций"), "error");
   }
 };
