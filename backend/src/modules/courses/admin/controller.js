@@ -10,6 +10,7 @@ const path = require("path");
 const { execFile } = require("child_process");
 const { promisify } = require("util");
 const ffmpegPath = require("ffmpeg-static");
+const { buildMediaUrl, extractFileNameFromMediaUrl } = require("../../../utils/mediaUrl");
 const execFileAsync = promisify(execFile);
 const {
   createCourseSchema,
@@ -249,7 +250,7 @@ async function listCourseMedia(req, res, next) {
 
         return {
           fileName: entry.name,
-          mediaUrl: `/uploads/course-media/${entry.name}`,
+          mediaUrl: buildMediaUrl("course-media", entry.name),
           mediaType: resolveMediaTypeByExtension(extension),
           mimeType,
           size: Number(stats.size || 0),
@@ -281,12 +282,7 @@ async function deleteCourseMedia(req, res, next) {
 
     for (const mediaUrlRaw of mediaUrls) {
       const mediaUrl = String(mediaUrlRaw || "").trim();
-      if (!mediaUrl.startsWith("/uploads/course-media/")) {
-        skipped += 1;
-        continue;
-      }
-
-      const fileName = path.basename(mediaUrl);
+      const fileName = extractFileNameFromMediaUrl(mediaUrl, "course-media");
       const extension = path.extname(fileName || "").toLowerCase();
       if (!fileName || !COURSE_MEDIA_ALLOWED_EXTENSIONS.includes(extension)) {
         skipped += 1;
@@ -422,7 +418,7 @@ async function uploadCourseMedia(req, res, next) {
       }
 
       const mediaType = isVideo ? "video" : "image";
-      const mediaUrl = `/uploads/course-media/${fileName}`;
+      const mediaUrl = buildMediaUrl("course-media", fileName);
 
       res.json({
         mediaUrl,

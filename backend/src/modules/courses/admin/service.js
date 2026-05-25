@@ -7,6 +7,7 @@ const path = require("path");
 const notificationService = require("../../../services/notifications/notificationService");
 const logger = require("../../../utils/logger");
 const cacheService = require("../../../services/cacheService");
+const { buildMediaUrl, extractFileNameFromMediaUrl } = require("../../../utils/mediaUrl");
 
 // - урс -
 
@@ -131,15 +132,16 @@ async function uploadCourseCover(courseId, file, userId, req) {
     throw error;
   }
 
-  const coverUrl = `/uploads/courses/${file.filename}`;
+  const coverUrl = buildMediaUrl("courses", file.filename);
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
     await mutationsRepo.updateCourseFields(courseId, { coverUrl }, userId, connection);
     await connection.commit();
 
-    if (typeof existing.coverUrl === "string" && existing.coverUrl.startsWith("/uploads/courses/")) {
-      const previousFilePath = path.join(__dirname, "../../../../../uploads/courses", path.basename(existing.coverUrl));
+    const previousFileName = extractFileNameFromMediaUrl(existing.coverUrl, "courses");
+    if (previousFileName) {
+      const previousFilePath = path.join(__dirname, "../../../../../uploads/courses", path.basename(previousFileName));
       if (fs.existsSync(previousFilePath)) {
         fs.unlinkSync(previousFilePath);
       }

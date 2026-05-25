@@ -4,6 +4,7 @@ const settingsService = require("../../../services/settingsService");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const { buildMediaUrl } = require("../../../utils/mediaUrl");
 
 // Хранилище логотипа
 const logoStorage = multer.diskStorage({
@@ -43,7 +44,7 @@ exports.uploadLogo = (req, res, next) => {
       return res.status(400).json({ error: "Файл не передан" });
     }
 
-    const logoUrl = `/uploads/logo/${req.file.filename}`;
+    const logoUrl = buildMediaUrl("logo", req.file.filename);
 
     try {
       // Создаём или обновляем настройку

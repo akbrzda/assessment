@@ -931,15 +931,21 @@ const handleDelete = async () => {
     const deletedUserId = Number(selectedUser.value.id);
     await deleteUser(deletedUserId);
 
-    // Моментально обновляем локальный список, чтобы пользователь сразу исчезал из UI.
+    // Моментально обновляем локальный список, чтобы пользователь сразу исчезал из UI,
+    // и не зависим от возможной задержки консистентности на бэкенде.
     users.value = users.value.filter((user) => Number(user.id) !== deletedUserId);
     totalUsers.value = Math.max(0, totalUsers.value - 1);
     selectedUserIds.value = selectedUserIds.value.filter((id) => Number(id) !== deletedUserId);
+
+    let shouldReloadUsers = false;
     if (users.value.length === 0 && pagination.value.page > 1) {
       pagination.value.page -= 1;
+      shouldReloadUsers = true;
     }
 
-    await loadUsers({ forceFresh: true });
+    if (shouldReloadUsers) {
+      await loadUsers({ forceFresh: true });
+    }
     closeModals();
     showToast("Пользователь удален", "success");
   } catch (error) {

@@ -31,6 +31,7 @@ const adminRolesRoutes = require("./modules/admin/roles");
 const adminSearchRoutes = require("./modules/admin/search/routes");
 const adminAuditLogsRoutes = require("./modules/admin/audit-logs/routes");
 const { metricsMiddleware, toPrometheusMetrics } = require("./services/metricsService");
+const { resolveMediaRootPrefix } = require("./utils/mediaUrl");
 const botModule = require("./modules/bot");
 const certificatesModule = require("./modules/certificates");
 const { registerAssessmentEvents } = require("./events/assessmentEvents");
@@ -40,6 +41,7 @@ registerAssessmentEvents();
 
 const app = express();
 app.set("trust proxy", 1);
+const mediaRootPrefix = `/${resolveMediaRootPrefix()}`;
 
 const isProduction = config.nodeEnv === "production";
 if (isProduction && config.allowedOrigins.length === 0) {
@@ -81,9 +83,13 @@ app.use((req, res, next) => {
 app.use("/uploads/certificates", verifyJWT, express.static(path.join(__dirname, "../../uploads/certificates")));
 app.use("/uploads/courses", verifyJWT, express.static(path.join(__dirname, "../../uploads/courses")));
 app.use("/uploads/course-media", verifyJWT, express.static(path.join(__dirname, "../../uploads/course-media")));
+app.use(`${mediaRootPrefix}/certificates`, verifyJWT, express.static(path.join(__dirname, "../../uploads/certificates")));
+app.use(`${mediaRootPrefix}/courses`, verifyJWT, express.static(path.join(__dirname, "../../uploads/courses")));
+app.use(`${mediaRootPrefix}/course-media`, verifyJWT, express.static(path.join(__dirname, "../../uploads/course-media")));
 
 // Статические файлы (иконки, обложки, медиа)
 app.use("/uploads", express.static(path.join(__dirname, "../../uploads")));
+app.use(mediaRootPrefix, express.static(path.join(__dirname, "../../uploads")));
 
 const apiRouter = express.Router();
 

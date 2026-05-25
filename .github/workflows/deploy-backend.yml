@@ -36,6 +36,8 @@ jobs:
           PORT=${{ secrets.BACKEND_PORT }}
           ALLOWED_ORIGINS=${{ secrets.BACKEND_ALLOWED_ORIGINS }}
           BACKEND_URL=${{ secrets.BACKEND_URL }}
+          MEDIA_BASE_URL=${{ secrets.MEDIA_BASE_URL }}
+          MEDIA_ROOT_PREFIX=${{ secrets.MEDIA_ROOT_PREFIX }}
 
           DB_HOST=${{ secrets.BACKEND_DB_HOST }}
           DB_PORT=${{ secrets.BACKEND_DB_PORT }}

@@ -3,6 +3,7 @@ const { createLog } = require("../../../../services/adminLogService");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const { buildMediaUrl, extractFileNameFromMediaUrl } = require("../../../../utils/mediaUrl");
 
 // Настройка загрузки файлов
 const storage = multer.diskStorage({
@@ -196,13 +197,16 @@ exports.uploadBadgeIcon = async (req, res, next) => {
 
       // Удалить старую иконку если есть
       if (badges[0].icon_url) {
-        const oldPath = path.join(__dirname, "../../../../../uploads/badges", path.basename(badges[0].icon_url));
-        if (fs.existsSync(oldPath)) {
-          fs.unlinkSync(oldPath);
+        const oldFileName = extractFileNameFromMediaUrl(badges[0].icon_url, "badges");
+        if (oldFileName) {
+          const oldPath = path.join(__dirname, "../../../../../uploads/badges", path.basename(oldFileName));
+          if (fs.existsSync(oldPath)) {
+            fs.unlinkSync(oldPath);
+          }
         }
       }
 
-      const iconUrl = `/uploads/badges/${req.file.filename}`;
+      const iconUrl = buildMediaUrl("badges", req.file.filename);
 
       // Обновить URL иконки
       await pool.query("UPDATE badges SET icon_url = ? WHERE id = ?", [iconUrl, id]);
@@ -239,9 +243,12 @@ exports.deleteBadge = async (req, res, next) => {
 
     // Удалить иконку если есть
     if (badge.icon_url) {
-      const iconPath = path.join(__dirname, "../../../../../uploads/badges", path.basename(badge.icon_url));
-      if (fs.existsSync(iconPath)) {
-        fs.unlinkSync(iconPath);
+      const iconFileName = extractFileNameFromMediaUrl(badge.icon_url, "badges");
+      if (iconFileName) {
+        const iconPath = path.join(__dirname, "../../../../../uploads/badges", path.basename(iconFileName));
+        if (fs.existsSync(iconPath)) {
+          fs.unlinkSync(iconPath);
+        }
       }
     }
 
