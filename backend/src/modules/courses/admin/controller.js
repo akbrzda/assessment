@@ -1,11 +1,12 @@
 const coursesService = require("./service");
 const contentService = require("./contentService");
+const adminRepo = require("./repository");
+const fileService = require("./fileService");
 const assignmentsRepo = require("../courseAssignments.repository");
 const progressRepo = require("../courseProgress.repository");
 const analyticsRepo = require("../courseAnalytics.repository");
 const { pool } = require("../../../config/database");
 const { randomUUID } = require("crypto");
-const fs = require("fs");
 const multer = require("multer");
 const path = require("path");
 const {
@@ -48,9 +49,6 @@ function resolveMediaTypeByExtension(extension) {
 
 const courseCoverStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    if (!fs.existsSync(COURSE_COVERS_UPLOAD_DIR)) {
-      fs.mkdirSync(COURSE_COVERS_UPLOAD_DIR, { recursive: true });
-    }
     cb(null, COURSE_COVERS_UPLOAD_DIR);
   },
   filename: (req, file, cb) => {
@@ -75,9 +73,6 @@ const uploadCourseCoverFile = multer({
 
 const courseMediaStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    if (!fs.existsSync(COURSE_MEDIA_UPLOAD_DIR)) {
-      fs.mkdirSync(COURSE_MEDIA_UPLOAD_DIR, { recursive: true });
-    }
     cb(null, COURSE_MEDIA_UPLOAD_DIR);
   },
   filename: (req, file, cb) => {
@@ -124,15 +119,9 @@ async function resolveManagerBranchIds(currentUser = {}) {
   const branchIds = [];
 
   if (userId > 0) {
-    const [rows] = await pool.query(
-      `SELECT DISTINCT branch_id AS branchId
-       FROM branch_managers
-       WHERE user_id = ?`,
-      [userId],
-    );
-
+    const rows = await adminRepo.getManagerBranchIds(userId);
     for (const item of rows) {
-      const branchId = Number(item.branchId || 0);
+      const branchId = Number(item || 0);
       if (branchId > 0) {
         branchIds.push(branchId);
       }
@@ -152,7 +141,13 @@ async function resolveManagerBranchIds(currentUser = {}) {
 function validate(schema, body, res) {
   const { error, value } = schema.validate(body, { abortEarly: false });
   if (error) {
-    res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
+    res.status(422).json({
+      error: "Validation failed",
+      validationErrors: error.details.map((detail) => ({
+        field: detail.path.join("."),
+        message: detail.message,
+      })),
+    });
     return null;
   }
   return value;
@@ -173,32 +168,35 @@ async function listCourses(req, res, next) {
 
 async function listCourseMedia(req, res, next) {
   try {
-    if (!fs.existsSync(COURSE_MEDIA_UPLOAD_DIR)) {
+    const hasMediaDirectory = await fileService.fileExists(COURSE_MEDIA_UPLOAD_DIR);
+    if (!hasMediaDirectory) {
       return res.json({ items: [] });
     }
 
-    const entries = fs.readdirSync(COURSE_MEDIA_UPLOAD_DIR, { withFileTypes: true });
-    const items = entries
-      .filter((entry) => entry.isFile())
-      .map((entry) => {
-        const extension = path.extname(entry.name || "").toLowerCase();
+    const fileNames = await fileService.listFiles(COURSE_MEDIA_UPLOAD_DIR);
+    const resolvedItems = await Promise.all(
+      fileNames.map(async (fileName) => {
+        const extension = path.extname(fileName || "").toLowerCase();
         if (!COURSE_MEDIA_ALLOWED_EXTENSIONS.includes(extension)) {
           return null;
         }
 
-        const fullPath = path.join(COURSE_MEDIA_UPLOAD_DIR, entry.name);
-        const stats = fs.statSync(fullPath);
+        const fullPath = fileService.resolveSafePath(COURSE_MEDIA_UPLOAD_DIR, fileName);
+        const stats = await fileService.getFileStats(fullPath);
         const mimeType = resolveMediaMimeType(extension);
 
         return {
-          fileName: entry.name,
-          mediaUrl: resolveUploadsUrl("course-media", entry.name),
+          fileName,
+          mediaUrl: resolveUploadsUrl("course-media", fileName),
           mediaType: resolveMediaTypeByExtension(extension),
           mimeType,
           size: Number(stats.size || 0),
           updatedAt: stats.mtime ? stats.mtime.toISOString() : null,
         };
-      })
+      }),
+    );
+
+    const items = resolvedItems
       .filter(Boolean)
       .sort((a, b) => {
         const left = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
@@ -232,12 +230,12 @@ async function deleteCourseMedia(req, res, next) {
       }
 
       const filePath = path.join(COURSE_MEDIA_UPLOAD_DIR, fileName);
-      if (!fs.existsSync(filePath)) {
+      if (!(await fileService.fileExists(filePath))) {
         skipped += 1;
         continue;
       }
 
-      fs.unlinkSync(filePath);
+      await fileService.removeFile(filePath);
       deleted += 1;
     }
 
@@ -294,6 +292,12 @@ async function getCoursePreview(req, res, next) {
 }
 
 async function uploadCourseCover(req, res, next) {
+  try {
+    await fileService.ensureDirectory(COURSE_COVERS_UPLOAD_DIR);
+  } catch (error) {
+    next(error);
+    return;
+  }
   uploadCourseCoverFile(req, res, async (uploadError) => {
     if (uploadError) {
       return res.status(400).json({ error: uploadError.message });
@@ -301,8 +305,8 @@ async function uploadCourseCover(req, res, next) {
 
     const courseId = parseId(req.params.id);
     if (!courseId) {
-      if (req.file?.path && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
+      if (req.file?.path) {
+        await fileService.removeFile(req.file.path);
       }
       return res.status(400).json({ error: "Некорректный идентификатор курса" });
     }
@@ -314,15 +318,15 @@ async function uploadCourseCover(req, res, next) {
     try {
       const detectedType = await checkFileMagicBytes(req.file.path);
       if (detectedType !== null && detectedType !== "image") {
-        fs.unlinkSync(req.file.path);
+        await fileService.removeFile(req.file.path);
         return res.status(400).json({ error: "Содержимое файла не является изображением." });
       }
 
       const course = await coursesService.uploadCourseCover(courseId, req.file, req.user.id, req);
       res.json({ course, coverUrl: course.coverUrl });
     } catch (error) {
-      if (req.file?.path && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
+      if (req.file?.path) {
+        await fileService.removeFile(req.file.path);
       }
       next(error);
     }
@@ -330,6 +334,12 @@ async function uploadCourseCover(req, res, next) {
 }
 
 async function uploadCourseMedia(req, res, next) {
+  try {
+    await fileService.ensureDirectory(COURSE_MEDIA_UPLOAD_DIR);
+  } catch (error) {
+    next(error);
+    return;
+  }
   uploadCourseMediaFile(req, res, async (uploadError) => {
     if (uploadError) {
       if (uploadError.code === "LIMIT_FILE_SIZE") {
@@ -348,8 +358,8 @@ async function uploadCourseMedia(req, res, next) {
       const maxAllowedSize = isVideo ? COURSE_MEDIA_VIDEO_MAX_SIZE : COURSE_MEDIA_IMAGE_MAX_SIZE;
 
       if (Number(req.file.size || 0) > maxAllowedSize) {
-        if (req.file?.path && fs.existsSync(req.file.path)) {
-          fs.unlinkSync(req.file.path);
+        if (req.file?.path) {
+          await fileService.removeFile(req.file.path);
         }
         return res.status(400).json({
           error: isVideo ? "Превышен лимит видео. Максимальный размер — 1024 МБ." : "Превышен лимит изображения. Максимальный размер — 50 МБ.",
@@ -359,7 +369,7 @@ async function uploadCourseMedia(req, res, next) {
       const detectedType = await checkFileMagicBytes(req.file.path);
       const expectedType = isVideo ? "video" : "image";
       if (detectedType !== null && detectedType !== expectedType) {
-        fs.unlinkSync(req.file.path);
+        await fileService.removeFile(req.file.path);
         return res.status(400).json({ error: "Содержимое файла не соответствует заявленному типу." });
       }
 
@@ -377,8 +387,8 @@ async function uploadCourseMedia(req, res, next) {
         originalName: req.file.originalname,
       });
     } catch (error) {
-      if (req.file?.path && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
+      if (req.file?.path) {
+        await fileService.removeFile(req.file.path);
       }
       next(error);
     }
@@ -624,28 +634,7 @@ async function closeAssignment(req, res, next) {
       return res.status(404).json({ error: "Назначение пользователя не найдено" });
     }
 
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
-      await connection.execute(
-        `INSERT INTO course_user_progress
-          (course_id, user_id, status, progress_percent, completed_modules_count, total_modules_count, assigned_at, deadline_at, closed_at, closed_by, created_at, updated_at)
-         VALUES (?, ?, 'closed', 0, 0, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP(), ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
-         ON DUPLICATE KEY UPDATE
-           status = 'closed',
-           closed_at = UTC_TIMESTAMP(),
-           closed_by = VALUES(closed_by),
-           deadline_at = IFNULL(deadline_at, UTC_TIMESTAMP()),
-           updated_at = UTC_TIMESTAMP()`,
-        [courseId, userId, req.user.id],
-      );
-      await connection.commit();
-    } catch (err) {
-      await connection.rollback();
-      throw err;
-    } finally {
-      connection.release();
-    }
+    await assignmentsRepo.upsertClosedCourseProgress(courseId, userId, req.user.id);
 
     const assignments = await assignmentsRepo.getAssignments(courseId);
     res.json({ assignments });
@@ -692,11 +681,10 @@ async function getCourseUserProgress(req, res, next) {
 
     if (req.user?.role === "manager") {
       const managerBranchIds = await resolveManagerBranchIds(req.user);
-      const [users] = await pool.query("SELECT branch_id FROM users WHERE id = ? LIMIT 1", [userId]);
-      if (!users.length) {
+      const targetBranchId = await adminRepo.getUserBranchId(userId);
+      if (targetBranchId === null) {
         return res.status(404).json({ error: "Пользователь не найден" });
       }
-      const targetBranchId = Number(users[0].branch_id || 0);
       if (!managerBranchIds.length || !managerBranchIds.includes(targetBranchId)) {
         return res.status(403).json({ error: "Нет доступа к прогрессу пользователя из другого филиала" });
       }
@@ -787,28 +775,11 @@ async function getCourseChangelog(req, res, next) {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
     const offset = (page - 1) * limit;
 
-    const [[countRow]] = await pool.query(
-      `SELECT COUNT(*) AS total FROM audit_logs
-        WHERE (entity_type = 'course' AND entity_id = ?)
-           OR (entity_type IN ('course_section', 'course_topic')
-               AND JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.courseId')) = ?)`,
-      [courseId, String(courseId)],
-    );
-
-    const [rows] = await pool.query(
-      `SELECT id, actor_user_id, actor_name, actor_role, action, entity_type,
-              entity_id, before_json, after_json, metadata_json, status, created_at
-         FROM audit_logs
-        WHERE (entity_type = 'course' AND entity_id = ?)
-           OR (entity_type IN ('course_section', 'course_topic')
-               AND JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.courseId')) = ?)
-        ORDER BY id DESC
-        LIMIT ? OFFSET ?`,
-      [courseId, String(courseId), limit, offset],
-    );
+    const total = await adminRepo.getCourseChangelogTotal(courseId);
+    const rows = await adminRepo.listCourseChangelog(courseId, limit, offset);
 
     return res.json({
-      total: Number(countRow.total),
+      total,
       page,
       limit,
       items: rows.map((r) => ({

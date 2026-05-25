@@ -134,12 +134,10 @@ async function issueCertificate(req, res, next) {
       return res.status(400).json({ error: "userId и courseId обязательны" });
     }
 
-    // Получаем данные пользователя и курса
-    const { pool } = require("../../config/database");
-    const [[userRow]] = await pool.execute(`SELECT id, first_name, last_name FROM users WHERE id = ? LIMIT 1`, [userId]);
+    const userRow = await repository.findUserById(userId);
     if (!userRow) return res.status(404).json({ error: "Пользователь не найден" });
 
-    const [[courseRow]] = await pool.execute(`SELECT id, title FROM courses WHERE id = ? LIMIT 1`, [courseId]);
+    const courseRow = await repository.findCourseById(courseId);
     if (!courseRow) return res.status(404).json({ error: "Курс не найден" });
 
     const cert = await certificateService.generateCertificate(userId, courseId, null, {

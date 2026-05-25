@@ -49,6 +49,12 @@ function parseList(value) {
 
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
+  jwtAccessTtl: process.env.JWT_ACCESS_TTL || "30m",
+  jwtRefreshTtl: process.env.JWT_REFRESH_TTL || "7d",
+  cookieDomain: process.env.COOKIE_DOMAIN || "",
+  cookieSameSite: process.env.COOKIE_SAMESITE || "",
+  certificatesUploadDir: process.env.CERTIFICATES_UPLOAD_DIR || "",
+  botUsername: process.env.BOT_USERNAME || "",
   port: Number(process.env.PORT || 3001),
   db: {
     host: process.env.DB_HOST,

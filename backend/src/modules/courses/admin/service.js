@@ -2,8 +2,8 @@ const { pool } = require("../../../config/database");
 const coursesRepo = require("../courses.repository");
 const mutationsRepo = require("../coursesMutations.repository");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
-const fs = require("fs");
 const path = require("path");
+const fileService = require("./fileService");
 const notificationService = require("../../../services/notifications/notificationService");
 const logger = require("../../../utils/logger");
 const cacheService = require("../../../services/cacheService");
@@ -142,9 +142,7 @@ async function uploadCourseCover(courseId, file, userId, req) {
     const previousFileName = extractFileNameFromUploadsUrl(existing.coverUrl, "courses");
     if (previousFileName) {
       const previousFilePath = resolveUploadsPath("courses", path.basename(previousFileName));
-      if (fs.existsSync(previousFilePath)) {
-        fs.unlinkSync(previousFilePath);
-      }
+      await fileService.removeFile(previousFilePath);
     }
 
     const course = await coursesRepo.findById(courseId);

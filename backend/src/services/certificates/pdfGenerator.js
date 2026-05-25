@@ -1,11 +1,12 @@
 const sharp = require("sharp");
 const fs = require("fs");
 const path = require("path");
+const config = require("../../config/env");
 const logger = require("../../utils/logger");
 const settingsService = require("../settingsService");
 const { resolveUploadsPath, extractFileNameFromUploadsUrl } = require("../../utils/uploads");
 
-const UPLOAD_DIR = process.env.CERTIFICATES_UPLOAD_DIR ? path.resolve(process.env.CERTIFICATES_UPLOAD_DIR) : resolveUploadsPath("certificates");
+const UPLOAD_DIR = config.certificatesUploadDir ? path.resolve(config.certificatesUploadDir) : resolveUploadsPath("certificates");
 
 const WIDTH = 1240;
 const HEIGHT = 1754;

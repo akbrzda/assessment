@@ -6,6 +6,12 @@ const completionSchema = Joi.object({
   timeSpentSeconds: Joi.number().integer().min(0).optional(),
   clientPayload: Joi.object().unknown(true).optional(),
 });
+function formatValidationErrors(details = []) {
+  return details.map((detail) => ({
+    field: Array.isArray(detail.path) ? detail.path.join(".") : "",
+    message: detail.message,
+  }));
+}
 
 async function getTheory(req, res, next) {
   try {
@@ -34,7 +40,7 @@ async function completeTheory(req, res, next) {
 
     const { error, value } = completionSchema.validate(req.body, { abortEarly: false });
     if (error) {
-      return res.status(422).json({ error: error.details.map((detail) => detail.message).join(", ") });
+      return res.status(422).json({ error: "Validation failed", validationErrors: formatValidationErrors(error.details) });
     }
 
     try {

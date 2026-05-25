@@ -7,14 +7,14 @@ const { pool } = require("../../../config/database");
 const settingsService = require("../../../services/settingsService");
 const { FEATURE_FLAGS_SETTING_KEY } = require("../../../config/featureFlags");
 
-const ACCESS_TOKEN_TTL = process.env.JWT_ACCESS_TTL || "30m";
-const REFRESH_TOKEN_TTL = process.env.JWT_REFRESH_TTL || "7d";
+const ACCESS_TOKEN_TTL = config.jwtAccessTtl || "30m";
+const REFRESH_TOKEN_TTL = config.jwtRefreshTtl || "7d";
 const REFRESH_COOKIE_NAME = "admin_refresh_token";
 const REFRESH_COOKIE_PATH = "/api/v1/admin/auth";
 
-const isProduction = process.env.NODE_ENV === "production";
-const cookieDomain = process.env.COOKIE_DOMAIN || (isProduction ? ".theorica.ru" : undefined);
-const cookieSameSite = process.env.COOKIE_SAMESITE || (isProduction ? "none" : "lax");
+const isProduction = config.nodeEnv === "production";
+const cookieDomain = config.cookieDomain || (isProduction ? ".theorica.ru" : undefined);
+const cookieSameSite = config.cookieSameSite || (isProduction ? "none" : "lax");
 const refreshCookieOptions = {
   httpOnly: true,
   secure: isProduction,

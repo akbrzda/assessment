@@ -160,6 +160,21 @@ async function closeAssignment(courseId, userId, closedBy) {
   return result.affectedRows > 0;
 }
 
+async function upsertClosedCourseProgress(courseId, userId, closedBy) {
+  await pool.execute(
+    `INSERT INTO course_user_progress
+      (course_id, user_id, status, progress_percent, completed_modules_count, total_modules_count, assigned_at, deadline_at, closed_at, closed_by, created_at, updated_at)
+     VALUES (?, ?, 'closed', 0, 0, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP(), ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+     ON DUPLICATE KEY UPDATE
+       status = 'closed',
+       closed_at = UTC_TIMESTAMP(),
+       closed_by = VALUES(closed_by),
+       deadline_at = IFNULL(deadline_at, UTC_TIMESTAMP()),
+       updated_at = UTC_TIMESTAMP()`,
+    [courseId, userId, closedBy],
+  );
+}
+
 async function findUserAssignment(courseId, userId) {
   const [rows] = await pool.execute(
     `SELECT assigned_at, status, deadline_at, closed_at
@@ -225,6 +240,7 @@ module.exports = {
   addAssignmentsBulk,
   removeAssignment,
   closeAssignment,
+  upsertClosedCourseProgress,
   findUserAssignment,
   listAssignedCourseIds,
 };

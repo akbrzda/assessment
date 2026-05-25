@@ -3,7 +3,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const config = require("./config/env");
-const { errorHandler, timezone: timezoneMiddleware } = require("./middleware");
+const { errorHandler, errorResponseNormalizer, timezone: timezoneMiddleware } = require("./middleware");
 const correlationId = require("./middleware/correlationId");
 const featureFlagsGate = require("./middleware/featureFlagsGate");
 const verifyJWT = require("./middleware/verifyJWT");
@@ -59,6 +59,10 @@ app.use(
         baseUri: ["'self'"],
         frameAncestors: ["'none'"],
         objectSrc: ["'none'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        mediaSrc: ["'self'", "blob:", "https:"],
       },
     },
     xContentTypeOptions: true,
@@ -69,6 +73,7 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 app.use(correlationId);
+app.use(errorResponseNormalizer);
 
 // Block search engine indexing
 app.use((req, res, next) => {

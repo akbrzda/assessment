@@ -197,6 +197,16 @@ async function findAllByTelegramId(telegramId) {
   return rows;
 }
 
+async function findUserById(userId) {
+  const [rows] = await pool.execute("SELECT id, first_name, last_name FROM users WHERE id = ? LIMIT 1", [userId]);
+  return rows[0] ?? null;
+}
+
+async function findCourseById(courseId) {
+  const [rows] = await pool.execute("SELECT id, title FROM courses WHERE id = ? LIMIT 1", [courseId]);
+  return rows[0] ?? null;
+}
+
 module.exports = {
   create,
   updateStatus,
@@ -208,6 +218,8 @@ module.exports = {
   findFailed,
   findLastByTelegramId,
   findAllByTelegramId,
+  findUserById,
+  findCourseById,
   resolveDisplayStatus,
   resetCourseProgressByCertificateId,
 };

@@ -2169,6 +2169,34 @@ async function cancelExpiredAttempts(assessmentId = null) {
   return completeExpiredAttempts(assessmentId);
 }
 
+async function listUserAttemptHistory(userId, { limit, offset }) {
+  const [rows] = await pool.query(
+    `SELECT
+      aa.id AS attempt_id,
+      aa.attempt_number,
+      aa.status,
+      aa.score_percent,
+      aa.started_at,
+      aa.completed_at,
+      a.id AS assessment_id,
+      a.title AS assessment_title,
+      a.pass_score_percent
+     FROM assessment_attempts aa
+     JOIN assessments a ON a.id = aa.assessment_id
+     WHERE aa.user_id = ?
+     ORDER BY aa.started_at DESC
+     LIMIT ? OFFSET ?`,
+    [userId, limit, offset],
+  );
+
+  const [countRows] = await pool.query("SELECT COUNT(*) AS total FROM assessment_attempts WHERE user_id = ?", [userId]);
+
+  return {
+    rows,
+    total: Number(countRows[0]?.total || 0),
+  };
+}
+
 module.exports = {
   createAssessment,
   updateAssessment,
@@ -2194,6 +2222,7 @@ module.exports = {
   getUsersWithIncompleteAttempts,
   completeExpiredAttempts,
   cancelExpiredAttempts,
+  listUserAttemptHistory,
   __test: {
     scoreAnswer,
     normalizeTextAnswer,

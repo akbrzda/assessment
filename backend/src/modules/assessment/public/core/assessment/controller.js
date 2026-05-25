@@ -8,6 +8,12 @@ const gamificationService = require("../../../../../services/gamificationService
 const gamificationQueueService = require("../../../../../services/gamificationQueueService");
 const metricsService = require("../../../../../services/metricsService");
 const { logAndSend, buildActorFromRequest } = require("../../../../../services/auditService");
+function formatValidationErrors(details = []) {
+  return details.map((detail) => ({
+    field: Array.isArray(detail.path) ? detail.path.join(".") : "",
+    message: detail.message,
+  }));
+}
 
 const optionSchema = Joi.object({
   text: Joi.string().trim().min(1).max(512).required(),
@@ -301,7 +307,7 @@ async function create(req, res, next) {
 
     const { error, value } = baseSchema.validate(payload, { abortEarly: false });
     if (error) {
-      return res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
+      return res.status(422).json({ error: "Validation failed", validationErrors: formatValidationErrors(error.details) });
     }
 
     const targets = value.internalCourseSectionId ? { branchIds: [], userIds: [], positionIds: [] } : await prepareTargets(value, req.currentUser);
@@ -436,7 +442,7 @@ async function submitAnswer(req, res, next) {
 
     const { error, value } = answerSchema.validate(req.body, { abortEarly: false });
     if (error) {
-      return res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
+      return res.status(422).json({ error: "Validation failed", validationErrors: formatValidationErrors(error.details) });
     }
 
     const result = await assessmentModel.saveAnswer({
@@ -475,7 +481,7 @@ async function submitAnswersBatch(req, res, next) {
 
     const { error, value } = answerBatchSchema.validate(req.body, { abortEarly: false });
     if (error) {
-      return res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
+      return res.status(422).json({ error: "Validation failed", validationErrors: formatValidationErrors(error.details) });
     }
 
     const results = await assessmentModel.saveAnswersBatch({
@@ -616,7 +622,7 @@ async function update(req, res, next) {
 
     const { error, value } = baseSchema.validate(payload, { abortEarly: false });
     if (error) {
-      return res.status(422).json({ error: error.details.map((d) => d.message).join(", ") });
+      return res.status(422).json({ error: "Validation failed", validationErrors: formatValidationErrors(error.details) });
     }
 
     const targets = value.internalCourseSectionId ? { branchIds: [], userIds: [], positionIds: [] } : await prepareTargets(value, req.currentUser);
@@ -738,30 +744,10 @@ async function getUserAttemptHistory(req, res, next) {
     const limit = Math.min(Number(req.query.limit) || 20, 50);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
 
-    const { pool } = require("../../../../../config/database");
-    const [rows] = await pool.query(
-      `SELECT
-        aa.id AS attempt_id,
-        aa.attempt_number,
-        aa.status,
-        aa.score_percent,
-        aa.started_at,
-        aa.completed_at,
-        a.id AS assessment_id,
-        a.title AS assessment_title,
-        a.pass_score_percent
-       FROM assessment_attempts aa
-       JOIN assessments a ON a.id = aa.assessment_id
-       WHERE aa.user_id = ?
-       ORDER BY aa.started_at DESC
-       LIMIT ? OFFSET ?`,
-      [userId, limit, offset],
-    );
-
-    const [countRows] = await pool.query(`SELECT COUNT(*) AS total FROM assessment_attempts WHERE user_id = ?`, [userId]);
+    const history = await assessmentModel.listUserAttemptHistory(userId, { limit, offset });
 
     res.json({
-      attempts: rows.map((row) => ({
+      attempts: history.rows.map((row) => ({
         attemptId: row.attempt_id,
         attemptNumber: row.attempt_number,
         status: row.status,
@@ -773,7 +759,7 @@ async function getUserAttemptHistory(req, res, next) {
         assessmentTitle: row.assessment_title,
         passScorePercent: row.pass_score_percent,
       })),
-      total: Number(countRows[0]?.total || 0),
+      total: history.total,
       limit,
       offset,
     });

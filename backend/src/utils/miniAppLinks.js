@@ -13,7 +13,7 @@ function buildMiniAppLinks(payload) {
     };
   }
 
-  const telegramBot = normalizeBotUsername(process.env.BOT_USERNAME);
+  const telegramBot = normalizeBotUsername(config.botUsername);
   const maxBot = normalizeBotUsername(config.maxBotName);
 
   return {
@@ -41,4 +41,3 @@ module.exports = {
   buildMiniAppLinks,
   buildMiniAppButtons,
 };
-
