@@ -24,10 +24,26 @@ if (!BOT_TOKEN) {
   process.exit(1);
 }
 
+// Basic format check: <numeric_id>:<hash>
+const BOT_TOKEN_PATTERN = /^\d{5,}:[A-Za-z0-9_-]{35,}$/;
+if (!BOT_TOKEN_PATTERN.test(BOT_TOKEN)) {
+  console.error("[bot] BOT_TOKEN has invalid format. Expected: <id>:<hash>. Check bot/.env.");
+  process.exit(1);
+}
+
 const bot = new Telegraf(BOT_TOKEN);
 
 const miniAppUrl = (MINI_APP_URL || "").trim();
 const backendUrl = (BACKEND_URL || "").trim();
+
+if (!backendUrl) {
+  console.error("[bot] BACKEND_URL is not set. Bot cannot communicate with backend. Check bot/.env.");
+  process.exit(1);
+}
+
+if (!miniAppUrl) {
+  console.warn("[bot] MINI_APP_URL is not set. Mini App buttons will be unavailable.");
+}
 
 /**
  * Выполняет GET-запрос к backend API.
@@ -44,6 +60,7 @@ function backendGet(urlPath) {
       path: url.pathname + url.search,
       method: "GET",
       headers: {},
+      timeout: 5000,
     };
 
     const req = lib.request(options, (res) => {
@@ -59,6 +76,7 @@ function backendGet(urlPath) {
         }
       });
     });
+    req.on("timeout", () => req.destroy(new Error("Request timed out")));
     req.on("error", reject);
     req.end();
   });
@@ -83,6 +101,7 @@ function backendPatch(urlPath, payload) {
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(data),
       },
+      timeout: 5000,
     };
 
     const req = lib.request(options, (res) => {
@@ -98,6 +117,7 @@ function backendPatch(urlPath, payload) {
         }
       });
     });
+    req.on("timeout", () => req.destroy(new Error("Request timed out")));
     req.on("error", reject);
     req.write(data);
     req.end();
@@ -193,7 +213,9 @@ async function fetchCertificates(telegramId) {
 async function setNotificationsEnabled(telegramId, enabled) {
   if (!backendUrl) return false;
   try {
-    const { status } = await backendPatch(`/api/v1/bot/notifications/settings/by-telegram-id?telegramId=${telegramId}`, { notificationsEnabled: enabled });
+    const { status } = await backendPatch(`/api/v1/bot/notifications/settings/by-telegram-id?telegramId=${telegramId}`, {
+      notificationsEnabled: enabled,
+    });
     return status === 200;
   } catch {
     return false;
@@ -341,70 +363,85 @@ function resolveOnboardingState(rawState) {
 }
 
 bot.start(async (ctx) => {
-  const telegramFirstName = ctx.from?.first_name || "";
-  const telegramId = String(ctx.from?.id || "");
-  const startPayload = ctx.startPayload;
+  try {
+    const telegramFirstName = ctx.from?.first_name || "";
+    const telegramId = String(ctx.from?.id || "");
+    const rawPayload = ctx.startPayload;
 
-  const webAppUrl = miniAppUrl;
-  const onboardingConfig = await getOnboardingConfig();
-  const hasInvitePayload = Boolean(startPayload && startPayload.startsWith("invite_"));
+    // Validate startPayload: only allow safe alphanumeric characters to prevent injection
+    const SAFE_PAYLOAD_PATTERN = /^[A-Za-z0-9_-]{0,64}$/;
+    const startPayload = SAFE_PAYLOAD_PATTERN.test(String(rawPayload || "")) ? rawPayload : "";
 
-  if (startPayload && startPayload.startsWith("invite_")) {
-    console.log("[bot] Приглашение обнаружено:", startPayload);
-  }
+    const webAppUrl = miniAppUrl;
+    const onboardingConfig = await getOnboardingConfig();
+    const hasInvitePayload = Boolean(startPayload && startPayload.startsWith("invite_"));
 
-  console.log("[bot /start] telegramId=%s, hasInvite=%s", telegramId, hasInvitePayload);
-  const userStatus = await getUserStatus(telegramId);
-  console.log("[bot /start] userStatus=%O", userStatus);
-  const userName = userStatus?.found ? userStatus.firstName || telegramFirstName : telegramFirstName;
-  const onboardingCompleted = userStatus?.found ? Boolean(userStatus.onboardingCompleted) : false;
+    if (startPayload && startPayload.startsWith("invite_")) {
+      console.log("[bot] Приглашение обнаружено:", startPayload);
+    }
 
-  console.log(
-    "[bot /start] found=%s, notFound=%s, unavailable=%s, onboardingCompleted=%s",
-    userStatus?.found,
-    userStatus?.notFound,
-    userStatus?.unavailable,
-    onboardingCompleted,
-  );
+    console.log("[bot /start] telegramId=%s, hasInvite=%s", telegramId, hasInvitePayload);
+    const userStatus = await getUserStatus(telegramId);
+    console.log("[bot /start] userStatus=%O", userStatus);
+    const userName = userStatus?.found ? userStatus.firstName || telegramFirstName : telegramFirstName;
+    const onboardingCompleted = userStatus?.found ? Boolean(userStatus.onboardingCompleted) : false;
 
-  // Показываем сообщение про приглашение только если точно знаем, что пользователя нет в системе.
-  if (userStatus?.notFound && hasInvitePayload) {
-    // Новый пользователь пришёл по ссылке-приглашению — направляем в мини-приложение.
-    // Telegram передаёт startPayload как start_param в initDataUnsafe, поэтому
-    // мини-приложение автоматически получит код инвайта при открытии через web_app кнопку.
-    console.log("[bot /start] BRANCH: notFound с invite — отправляем кнопку активации");
-    await ctx.reply(buildInviteWelcomeMessage(userName, onboardingConfig), {
-      reply_markup: buildInviteKeyboard(webAppUrl, onboardingConfig),
+    console.log(
+      "[bot /start] found=%s, notFound=%s, unavailable=%s, onboardingCompleted=%s",
+      userStatus?.found,
+      userStatus?.notFound,
+      userStatus?.unavailable,
+      onboardingCompleted,
+    );
+
+    // Показываем сообщение про приглашение только если точно знаем, что пользователя нет в системе.
+    if (userStatus?.notFound && hasInvitePayload) {
+      // Новый пользователь пришёл по ссылке-приглашению — направляем в мини-приложение.
+      // Telegram передаёт startPayload как start_param в initDataUnsafe, поэтому
+      // мини-приложение автоматически получит код инвайта при открытии через web_app кнопку.
+      console.log("[bot /start] BRANCH: notFound с invite — отправляем кнопку активации");
+      await ctx.reply(buildInviteWelcomeMessage(userName, onboardingConfig), {
+        reply_markup: buildInviteKeyboard(webAppUrl, onboardingConfig),
+        parse_mode: "HTML",
+      });
+      return;
+    }
+
+    if (userStatus?.notFound && !hasInvitePayload) {
+      console.log("[bot /start] BRANCH: notFound без invite — отправляем сообщение про приглашение");
+      await ctx.reply(buildGuestNoInviteMessage(userName, onboardingConfig), {
+        parse_mode: "HTML",
+      });
+      return;
+    }
+
+    if (!onboardingCompleted) {
+      await ctx.reply(buildOnboardingMessage(userName, onboardingConfig), {
+        reply_markup: buildOnboardingKeyboard(webAppUrl, onboardingConfig),
+        parse_mode: "HTML",
+      });
+      return;
+    }
+
+    await ctx.reply(buildMainMenuMessage(userName, onboardingConfig), {
+      reply_markup: buildMainMenuKeyboard(webAppUrl, onboardingConfig),
       parse_mode: "HTML",
     });
-    return;
+  } catch (error) {
+    console.error("[bot] Error in /start handler:", error.message);
+    try {
+      await ctx.reply("Произошла ошибка. Попробуйте позже.");
+    } catch {}
   }
-
-  if (userStatus?.notFound && !hasInvitePayload) {
-    console.log("[bot /start] BRANCH: notFound без invite — отправляем сообщение про приглашение");
-    await ctx.reply(buildGuestNoInviteMessage(userName, onboardingConfig), {
-      parse_mode: "HTML",
-    });
-    return;
-  }
-
-  if (!onboardingCompleted) {
-    await ctx.reply(buildOnboardingMessage(userName, onboardingConfig), {
-      reply_markup: buildOnboardingKeyboard(webAppUrl, onboardingConfig),
-      parse_mode: "HTML",
-    });
-    return;
-  }
-
-  await ctx.reply(buildMainMenuMessage(userName, onboardingConfig), {
-    reply_markup: buildMainMenuKeyboard(webAppUrl, onboardingConfig),
-    parse_mode: "HTML",
-  });
 });
 
 bot.command("help", async (ctx) => {
-  const onboardingConfig = await getOnboardingConfig();
-  await ctx.reply(buildHelpMessage(onboardingConfig), { parse_mode: "HTML" });
+  try {
+    const onboardingConfig = await getOnboardingConfig();
+    await ctx.reply(buildHelpMessage(onboardingConfig), { parse_mode: "HTML" });
+  } catch (error) {
+    console.error("[bot] Error in /help handler:", error.message);
+  }
 });
 
 bot.action(/^onboarding:(step1|step2|step3)$/, async (ctx) => {
@@ -449,138 +486,165 @@ bot.action(/^onboarding:(step1|step2|step3)$/, async (ctx) => {
 
 // Команда /certificate — последний сертификат
 bot.command("certificate", async (ctx) => {
-  const telegramId = String(ctx.from?.id || "");
-  const certs = await fetchCertificates(telegramId);
-
-  if (!certs.length) {
-    await ctx.reply("У вас пока нет выданных сертификатов. Пройдите курс и сдайте итоговую аттестацию! 📚");
-    return;
-  }
-
-  const last = certs[0];
   try {
-    const fileBuffer = await downloadFile(`${backendUrl}/uploads/certificates/${last.uuid}.pdf`);
-    const dateStr = new Date(last.issued_at).toLocaleDateString("ru-RU");
-    await ctx.replyWithDocument(
-      { source: fileBuffer, filename: `certificate-${last.uuid}.pdf` },
-      { caption: `🏆 Сертификат: ${last.course_title}\nДата: ${dateStr}`, parse_mode: "HTML" },
-    );
-  } catch (err) {
-    console.error("[bot] Ошибка отправки сертификата:", err.message);
-    await ctx.reply("Не удалось загрузить файл сертификата. Попробуйте позже.");
+    const telegramId = String(ctx.from?.id || "");
+    const certs = await fetchCertificates(telegramId);
+
+    if (!certs.length) {
+      await ctx.reply("У вас пока нет выданных сертификатов. Пройдите курс и сдайте итоговую аттестацию! 📚");
+      return;
+    }
+
+    const last = certs[0];
+    try {
+      const fileBuffer = await downloadFile(`${backendUrl}/uploads/certificates/${last.uuid}.pdf`);
+      const dateStr = new Date(last.issued_at).toLocaleDateString("ru-RU");
+      await ctx.replyWithDocument(
+        { source: fileBuffer, filename: `certificate-${last.uuid}.pdf` },
+        { caption: `🏆 Сертификат: ${last.course_title}\nДата: ${dateStr}`, parse_mode: "HTML" },
+      );
+    } catch (err) {
+      console.error("[bot] Ошибка отправки сертификата:", err.message);
+      await ctx.reply("Не удалось загрузить файл сертификата. Попробуйте позже.");
+    }
+  } catch (error) {
+    console.error("[bot] Error in /certificate handler:", error.message);
   }
 });
 
 // Команда /certificates — список всех сертификатов
 bot.command("certificates", async (ctx) => {
-  const telegramId = String(ctx.from?.id || "");
-  const certs = await fetchCertificates(telegramId);
+  try {
+    const telegramId = String(ctx.from?.id || "");
+    const certs = await fetchCertificates(telegramId);
 
-  if (!certs.length) {
-    await ctx.reply("У вас пока нет выданных сертификатов. Пройдите курс и сдайте итоговую аттестацию! 📚");
-    return;
-  }
-
-  // Отправляем каждый как отдельный файл с inline-кнопкой «Скачать»
-  for (const cert of certs) {
-    const dateStr = new Date(cert.issued_at).toLocaleDateString("ru-RU");
-    try {
-      const fileBuffer = await downloadFile(`${backendUrl}/uploads/certificates/${cert.uuid}.pdf`);
-      await ctx.replyWithDocument(
-        { source: fileBuffer, filename: `certificate-${cert.uuid}.pdf` },
-        { caption: `🏆 <b>${cert.course_title}</b>\nДата: ${dateStr}`, parse_mode: "HTML" },
-      );
-    } catch (err) {
-      console.error("[bot] Ошибка отправки сертификата uuid=%s: %s", cert.uuid, err.message);
-      await ctx.reply(`📄 ${cert.course_title} (${dateStr}) — файл временно недоступен`);
+    if (!certs.length) {
+      await ctx.reply("У вас пока нет выданных сертификатов. Пройдите курс и сдайте итоговую аттестацию! 📚");
+      return;
     }
+
+    // Отправляем каждый как отдельный файл с inline-кнопкой «Скачать»
+    for (const cert of certs) {
+      const dateStr = new Date(cert.issued_at).toLocaleDateString("ru-RU");
+      try {
+        const fileBuffer = await downloadFile(`${backendUrl}/uploads/certificates/${cert.uuid}.pdf`);
+        await ctx.replyWithDocument(
+          { source: fileBuffer, filename: `certificate-${cert.uuid}.pdf` },
+          { caption: `🏆 <b>${cert.course_title}</b>\nДата: ${dateStr}`, parse_mode: "HTML" },
+        );
+      } catch (err) {
+        console.error("[bot] Ошибка отправки сертификата uuid=%s: %s", cert.uuid, err.message);
+        await ctx.reply(`📄 ${cert.course_title} (${dateStr}) — файл временно недоступен`);
+      }
+    }
+  } catch (error) {
+    console.error("[bot] Error in /certificates handler:", error.message);
   }
 });
 
 // Кнопка меню «Мои сертификаты»
 bot.hears("📄 Мои сертификаты", async (ctx) => {
-  const telegramId = String(ctx.from?.id || "");
-  const certs = await fetchCertificates(telegramId);
+  try {
+    const telegramId = String(ctx.from?.id || "");
+    const certs = await fetchCertificates(telegramId);
 
-  if (!certs.length) {
-    await ctx.reply("У вас пока нет выданных сертификатов. Пройдите курс и сдайте итоговую аттестацию! 📚");
-    return;
-  }
-
-  for (const cert of certs) {
-    const dateStr = new Date(cert.issued_at).toLocaleDateString("ru-RU");
-    try {
-      const fileBuffer = await downloadFile(`${backendUrl}/uploads/certificates/${cert.uuid}.pdf`);
-      await ctx.replyWithDocument(
-        { source: fileBuffer, filename: `certificate-${cert.uuid}.pdf` },
-        { caption: `🏆 <b>${cert.course_title}</b>\nДата: ${dateStr}`, parse_mode: "HTML" },
-      );
-    } catch (err) {
-      console.error("[bot] Ошибка отправки сертификата uuid=%s: %s", cert.uuid, err.message);
-      await ctx.reply(`📄 ${cert.course_title} (${dateStr}) — файл временно недоступен`);
+    if (!certs.length) {
+      await ctx.reply("У вас пока нет выданных сертификатов. Пройдите курс и сдайте итоговую аттестацию! 📚");
+      return;
     }
+
+    for (const cert of certs) {
+      const dateStr = new Date(cert.issued_at).toLocaleDateString("ru-RU");
+      try {
+        const fileBuffer = await downloadFile(`${backendUrl}/uploads/certificates/${cert.uuid}.pdf`);
+        await ctx.replyWithDocument(
+          { source: fileBuffer, filename: `certificate-${cert.uuid}.pdf` },
+          { caption: `🏆 <b>${cert.course_title}</b>\nДата: ${dateStr}`, parse_mode: "HTML" },
+        );
+      } catch (err) {
+        console.error("[bot] Ошибка отправки сертификата uuid=%s: %s", cert.uuid, err.message);
+        await ctx.reply(`📄 ${cert.course_title} (${dateStr}) — файл временно недоступен`);
+      }
+    }
+  } catch (error) {
+    console.error("[bot] Error in '📄 Мои сертификаты' handler:", error.message);
   }
 });
 
 // Кнопка меню «Уведомления» — показываем статус и кнопки вкл/выкл
 bot.hears("🔔 Уведомления", async (ctx) => {
-  const telegramId = String(ctx.from?.id || "");
-
-  // Получаем текущий статус через user-status
-  let enabled = true;
   try {
-    const { status, body } = await backendGet(`/api/v1/bot/user-status?telegramId=${telegramId}`);
-    if (status === 200 && body) {
-      enabled = body.notificationsEnabled !== false;
+    const telegramId = String(ctx.from?.id || "");
+
+    // Получаем текущий статус через user-status
+    let enabled = true;
+    try {
+      const { status, body } = await backendGet(`/api/v1/bot/user-status?telegramId=${telegramId}`);
+      if (status === 200 && body) {
+        enabled = body.notificationsEnabled !== false;
+      }
+    } catch {
+      // игнорируем
     }
-  } catch {
-    // игнорируем
+
+    const statusText = enabled ? "✅ Включены" : "❌ Выключены";
+    const toggleLabel = enabled ? "🔕 Выключить уведомления" : "🔔 Включить уведомления";
+    const toggleData = enabled ? "notifications:disable" : "notifications:enable";
+
+    await ctx.reply(`🔔 <b>Уведомления</b>\n\nТекущий статус: ${statusText}`, {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [[{ text: toggleLabel, callback_data: toggleData }]],
+      },
+    });
+  } catch (error) {
+    console.error("[bot] Error in '🔔 Уведомления' handler:", error.message);
   }
-
-  const statusText = enabled ? "✅ Включены" : "❌ Выключены";
-  const toggleLabel = enabled ? "🔕 Выключить уведомления" : "🔔 Включить уведомления";
-  const toggleData = enabled ? "notifications:disable" : "notifications:enable";
-
-  await ctx.reply(`🔔 <b>Уведомления</b>\n\nТекущий статус: ${statusText}`, {
-    parse_mode: "HTML",
-    reply_markup: {
-      inline_keyboard: [[{ text: toggleLabel, callback_data: toggleData }]],
-    },
-  });
 });
 
 bot.hears("ℹ️ Помощь", async (ctx) => {
-  const onboardingConfig = await getOnboardingConfig();
-  await ctx.reply(buildHelpMessage(onboardingConfig), { parse_mode: "HTML" });
+  try {
+    const onboardingConfig = await getOnboardingConfig();
+    await ctx.reply(buildHelpMessage(onboardingConfig), { parse_mode: "HTML" });
+  } catch (error) {
+    console.error("[bot] Error in 'ℹ️ Помощь' handler:", error.message);
+  }
 });
 
 // Обработчик callback-кнопок вкл/выкл уведомлений
 bot.action(/^notifications:(enable|disable)$/, async (ctx) => {
-  const telegramId = String(ctx.from?.id || "");
-  const enable = ctx.match[1] === "enable";
+  try {
+    const telegramId = String(ctx.from?.id || "");
+    const enable = ctx.match[1] === "enable";
 
-  const ok = await setNotificationsEnabled(telegramId, enable);
+    const ok = await setNotificationsEnabled(telegramId, enable);
 
-  if (!ok) {
-    await ctx.answerCbQuery("Ошибка. Попробуйте позже.", { show_alert: true });
-    return;
-  }
+    if (!ok) {
+      await ctx.answerCbQuery("Ошибка. Попробуйте позже.", { show_alert: true });
+      return;
+    }
 
-  const statusText = enable ? "✅ Уведомления включены" : "❌ Уведомления выключены";
-  await ctx.answerCbQuery(statusText);
-  await ctx.editMessageText(`🔔 <b>Уведомления</b>\n\nТекущий статус: ${enable ? "✅ Включены" : "❌ Выключены"}`, {
-    parse_mode: "HTML",
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: enable ? "🔕 Выключить уведомления" : "🔔 Включить уведомления",
-            callback_data: enable ? "notifications:disable" : "notifications:enable",
-          },
+    const statusText = enable ? "✅ Уведомления включены" : "❌ Уведомления выключены";
+    await ctx.answerCbQuery(statusText);
+    await ctx.editMessageText(`🔔 <b>Уведомления</b>\n\nТекущий статус: ${enable ? "✅ Включены" : "❌ Выключены"}`, {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: enable ? "🔕 Выключить уведомления" : "🔔 Включить уведомления",
+              callback_data: enable ? "notifications:disable" : "notifications:enable",
+            },
+          ],
         ],
-      ],
-    },
-  });
+      },
+    });
+  } catch (error) {
+    console.error("[bot] Error in notifications action handler:", error.message);
+    try {
+      await ctx.answerCbQuery("Ошибка. Попробуйте позже.", { show_alert: true });
+    } catch {}
+  }
 });
 
 bot.catch((err, ctx) => {

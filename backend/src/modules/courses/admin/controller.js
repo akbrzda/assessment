@@ -4,6 +4,7 @@ const assignmentsRepo = require("../courseAssignments.repository");
 const progressRepo = require("../courseProgress.repository");
 const analyticsRepo = require("../courseAnalytics.repository");
 const { pool } = require("../../../config/database");
+const { randomUUID } = require("crypto");
 const fs = require("fs");
 const multer = require("multer");
 const path = require("path");
@@ -17,7 +18,7 @@ const {
   reorderSectionsSchema,
   reorderTopicsSchema,
 } = require("./validators");
-const { resolveUploadsPath, resolveUploadsUrl, extractFileNameFromUploadsUrl } = require("../../../utils/uploads");
+const { resolveUploadsPath, resolveUploadsUrl, extractFileNameFromUploadsUrl, checkFileMagicBytes } = require("../../../utils/uploads");
 
 const COURSE_COVERS_UPLOAD_DIR = resolveUploadsPath("courses");
 const COURSE_MEDIA_UPLOAD_DIR = resolveUploadsPath("course-media");
@@ -54,8 +55,7 @@ const courseCoverStorage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const extension = path.extname(file.originalname || "").toLowerCase();
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `course-cover-${uniqueSuffix}${extension}`);
+    cb(null, `course-cover-${randomUUID()}${extension}`);
   },
 });
 
@@ -82,8 +82,7 @@ const courseMediaStorage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const extension = path.extname(file.originalname || "").toLowerCase();
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `course-media-${uniqueSuffix}${extension}`);
+    cb(null, `course-media-${randomUUID()}${extension}`);
   },
 });
 
@@ -251,7 +250,7 @@ async function deleteCourseMedia(req, res, next) {
 async function getCourse(req, res, next) {
   try {
     const courseId = parseId(req.params.id);
-    if (!courseId) return res.status(400).json({ error: "екорректный идентификатор курса" });
+    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
     const course = await coursesService.getCourse(courseId);
     res.json({ course });
   } catch (error) {
@@ -273,7 +272,7 @@ async function createCourse(req, res, next) {
 async function updateCourse(req, res, next) {
   try {
     const courseId = parseId(req.params.id);
-    if (!courseId) return res.status(400).json({ error: "екорректный идентификатор курса" });
+    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
     const value = validate(updateCourseSchema, req.body, res);
     if (!value) return;
     const course = await coursesService.updateCourse(courseId, value, req.user.id, req);
@@ -313,6 +312,12 @@ async function uploadCourseCover(req, res, next) {
     }
 
     try {
+      const detectedType = await checkFileMagicBytes(req.file.path);
+      if (detectedType !== null && detectedType !== "image") {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ error: "Содержимое файла не является изображением." });
+      }
+
       const course = await coursesService.uploadCourseCover(courseId, req.file, req.user.id, req);
       res.json({ course, coverUrl: course.coverUrl });
     } catch (error) {
@@ -351,6 +356,13 @@ async function uploadCourseMedia(req, res, next) {
         });
       }
 
+      const detectedType = await checkFileMagicBytes(req.file.path);
+      const expectedType = isVideo ? "video" : "image";
+      if (detectedType !== null && detectedType !== expectedType) {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ error: "Содержимое файла не соответствует заявленному типу." });
+      }
+
       const fileName = req.file.filename;
       const finalMimeType = mimeType;
 
@@ -376,7 +388,7 @@ async function uploadCourseMedia(req, res, next) {
 async function deleteCourse(req, res, next) {
   try {
     const courseId = parseId(req.params.id);
-    if (!courseId) return res.status(400).json({ error: "екорректный идентификатор курса" });
+    if (!courseId) return res.status(400).json({ error: "Некорректный идентификатор курса" });
     await coursesService.deleteCourse(courseId, req);
     res.status(204).send();
   } catch (error) {

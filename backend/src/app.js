@@ -76,12 +76,20 @@ app.use((req, res, next) => {
   next();
 });
 
-// Restrict certificate and course media access to authorized users
+// Allow cross-origin loading of media files (Telegram MiniApp runs on a different origin)
+app.use("/uploads", (req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
+
+// Restrict certificate and course covers to authorized users
 app.use("/uploads/certificates", verifyJWT, express.static(resolveUploadsPath("certificates")));
 app.use("/uploads/courses", verifyJWT, express.static(resolveUploadsPath("courses")));
-app.use("/uploads/course-media", verifyJWT, express.static(resolveUploadsPath("course-media")));
 
-// Public static files (icons, covers, media)
+// Course media (videos, images) must be public — browsers cannot send Authorization for <video>/<img>
+app.use("/uploads/course-media", express.static(resolveUploadsPath("course-media")));
+
+// Public static files (icons, badges, logos)
 app.use("/uploads", express.static(UPLOADS_ROOT));
 
 const apiRouter = express.Router();

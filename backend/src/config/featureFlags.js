@@ -23,7 +23,9 @@ const MODULE_ROUTE_PREFIXES = [
   { prefix: "/admin/users", moduleCode: "users" },
   { prefix: "/admin/search", moduleCode: "users" },
   { prefix: "/admin/assessments", moduleCode: "assessments" },
-  { prefix: "/assessments", moduleCode: "assessments" },
+  // Only the user-facing assessment list is gated; attempt routes (/assessments/:id/attempts/...)
+  // must remain accessible so course final assessments continue to work when the module is disabled.
+  { prefix: "/assessments/user", moduleCode: "assessments" },
   { prefix: "/admin/courses", moduleCode: "courses" },
   { prefix: "/courses", moduleCode: "courses" },
   { prefix: "/admin/question-bank", moduleCode: "questions" },

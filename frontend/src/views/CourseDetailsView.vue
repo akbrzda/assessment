@@ -1,7 +1,6 @@
 <template>
   <div class="page-container">
     <div class="container">
-
       <template v-if="isLoading">
         <div class="course-skeleton">
           <SkeletonPageHeader />
@@ -77,7 +76,13 @@
           <BaseButton v-if="isFinalAssessmentPassed" class="btn-final btn-final--result" size="sm" @click="router.push(finalAssessmentResultLink)">
             Результат
           </BaseButton>
-          <BaseButton v-else class="btn-final" size="sm" :disabled="!course.finalAssessment.available || !course.finalAssessment.id" @click="openFinalAssessment">
+          <BaseButton
+            v-else
+            class="btn-final"
+            size="sm"
+            :disabled="!course.finalAssessment.available || !course.finalAssessment.id"
+            @click="openFinalAssessment"
+          >
             Перейти
           </BaseButton>
         </div>
@@ -182,7 +187,9 @@ export default {
         return null;
       }
 
-      const visibleSections = (rawCourse.sections || []).filter((section) => sectionHasVisibleTopics(section)).map((section) => normalizeSectionTopics(section));
+      const visibleSections = (rawCourse.sections || [])
+        .filter((section) => sectionHasVisibleTopics(section))
+        .map((section) => normalizeSectionTopics(section));
 
       return {
         ...rawCourse,
@@ -614,7 +621,10 @@ export default {
           await userStore.ensureStatus();
         }
 
-        const [courseResponse, assessmentsResponse] = await Promise.all([apiClient.getCourseById(id), apiClient.listUserAssessments()]);
+        const [courseResponse, assessmentsResponse] = await Promise.all([
+          apiClient.getCourseById(id),
+          userStore.hasModuleAccess("assessments") ? apiClient.listUserAssessments() : Promise.resolve({ assessments: [] }),
+        ]);
         course.value = normalizeCoursePayload(courseResponse?.course || null);
 
         const nextMap = new Map();
