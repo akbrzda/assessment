@@ -35,6 +35,9 @@ jobs:
           BOT_TOKEN=${{ secrets.BOT_TOKEN }}
           MINI_APP_URL=${{ secrets.BOT_MINI_APP_URL }}
           BACKEND_URL=${{ secrets.BOT_BACKEND_URL }}
+          BOT_WEBHOOK_DOMAIN=${{ secrets.BOT_WEBHOOK_DOMAIN }}
+          BOT_WEBHOOK_PATH=${{ secrets.BOT_WEBHOOK_PATH }}
+          BOT_WEBHOOK_PORT=${{ secrets.BOT_WEBHOOK_PORT }}
           EOF
 
       - name: Setup SSH
