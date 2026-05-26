@@ -1,6 +1,9 @@
 <template>
   <div id="app" :data-theme="theme" :class="platformClass">
-    <div v-if="isOffline" class="offline-banner">Нет соединения с интернетом. Показываем сохраненные данные, часть функций временно недоступна.</div>
+    <div v-if="isOffline && !isBannerDismissed" class="offline-banner">
+      <span>Нет соединения с интернетом. Показываем сохраненные данные, часть функций временно недоступна.</span>
+      <button type="button" class="offline-banner-close" aria-label="Закрыть уведомление" @click="dismissOfflineBanner">×</button>
+    </div>
     <router-view />
     <BottomNavigation v-if="showBottomNav" />
     <div v-if="showMiniAppOnboarding" class="miniapp-onboarding-overlay">
@@ -22,13 +25,15 @@
 </template>
 
 <script>
-import { computed, onMounted, onBeforeUnmount, ref } from "vue";
+import { computed, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { useRoute } from "vue-router";
 import { useTelegramStore } from "./stores/telegram";
 import { useThemeStore } from "./stores/theme";
 import { useUserStore } from "./stores/user";
 import { useBackButton } from "./composables/useBackButton";
+import { useNetworkStatus } from "./composables/useNetworkStatus";
+import { useTelegramInit } from "./composables/useTelegramInit";
 import { useTimezone } from "./composables/useTimezone";
 import BaseButton from "./components/ui/BaseButton.vue";
 import BottomNavigation from "./components/BottomNavigation.vue";
@@ -56,13 +61,7 @@ export default {
     const theme = computed(() => themeStore.theme);
     const isLoading = computed(() => userStore.isLoading);
     const onboardingSubmitting = ref(false);
-    const isOffline = ref(typeof navigator !== "undefined" ? !navigator.onLine : false);
-    const handleOnline = () => {
-      isOffline.value = false;
-    };
-    const handleOffline = () => {
-      isOffline.value = true;
-    };
+    const { isOffline, isBannerDismissed, dismissOfflineBanner } = useNetworkStatus();
 
     const platformClass = computed(() => {
       const value = (platform.value || "").toLowerCase();
@@ -97,31 +96,13 @@ export default {
       onboardingSubmitting.value = false;
     }
 
-    onMounted(async () => {
-      window.addEventListener("online", handleOnline);
-      window.addEventListener("offline", handleOffline);
-
-      telegramStore.initTelegram();
-      themeStore.initTheme();
-      if (!telegramStore.hasValidInitData) {
-        telegramStore.showAlert("Не удалось получить данные Mini App. Откройте приложение из бота Telegram или MAX.");
-        return;
-      }
-      try {
-        await userStore.ensureStatus();
-
-        // Инициализируем timezone после успешной аутентификации
-        if (userStore.isAuthenticated) {
-          initTimezone();
-        }
-      } catch (error) {
-        console.error("Не удалось инициализировать пользователя", error);
-      }
-    });
-
-    onBeforeUnmount(() => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+    useTelegramInit({
+      telegramStore,
+      themeStore,
+      userStore,
+      onAuthenticated: () => {
+        initTimezone();
+      },
     });
 
     return {
@@ -133,6 +114,8 @@ export default {
       onboardingSubmitting,
       finishMiniAppOnboarding,
       isOffline,
+      isBannerDismissed,
+      dismissOfflineBanner,
     };
   },
 };
@@ -141,6 +124,10 @@ export default {
 <style scoped>
 .offline-banner {
   position: sticky;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   top: 0;
   z-index: 1100;
   padding: 10px 14px;
@@ -149,6 +136,16 @@ export default {
   font-size: 13px;
   line-height: 1.35;
   text-align: center;
+}
+
+.offline-banner-close {
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
 }
 
 .miniapp-onboarding-overlay {

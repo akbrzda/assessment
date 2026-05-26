@@ -166,7 +166,7 @@ export default {
   margin-bottom: 32px;
 }
 .lb-title {
-  font-size: 28px;
+  font-size: clamp(22px, 6vw, 28px);
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.2;
@@ -201,9 +201,9 @@ export default {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 16px;
+  gap: 8px;
   margin-bottom: 32px;
-  padding: 0 8px;
+  padding: 0 4px;
 }
 .podium-item {
   display: flex;
@@ -211,14 +211,15 @@ export default {
   align-items: center;
   gap: 6px;
   flex: 1;
+  min-width: 0;
   max-width: 110px;
 }
 .podium-first {
   margin-bottom: 20px;
 }
 .podium-avatar {
-  width: 72px;
-  height: 72px;
+  width: clamp(52px, 18vw, 72px);
+  height: clamp(52px, 18vw, 72px);
   border-radius: 50%;
   overflow: hidden;
   background-color: #d0d0d0;
@@ -228,8 +229,8 @@ export default {
   flex-shrink: 0;
 }
 .podium-avatar--large {
-  width: 84px;
-  height: 84px;
+  width: clamp(64px, 22vw, 84px);
+  height: clamp(64px, 22vw, 84px);
 }
 .podium-avatar img {
   width: 100%;
@@ -237,21 +238,21 @@ export default {
   object-fit: cover;
 }
 .podium-initials {
-  font-size: 22px;
+  font-size: clamp(16px, 5vw, 22px);
   font-weight: 700;
   color: #fff;
 }
 .podium-avatar--large .podium-initials {
-  font-size: 26px;
+  font-size: clamp(20px, 6vw, 26px);
 }
 .podium-badge {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   color: #fff;
   flex-shrink: 0;
@@ -269,15 +270,23 @@ export default {
   box-shadow: 0 2px 6px rgba(176, 106, 34, 0.4);
 }
 .podium-name {
-  font-size: 15px;
+  font-size: clamp(12px, 3.5vw, 15px);
   font-weight: 600;
   color: var(--text-primary);
   text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .podium-points {
-  font-size: 12px;
+  font-size: clamp(10px, 2.8vw, 12px);
   color: var(--text-secondary);
   text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .lb-list {
   display: flex;
@@ -333,9 +342,10 @@ export default {
   margin-left: 4px;
 }
 .lb-pts {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-secondary);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .leaderboard-skeleton {
   display: flex;

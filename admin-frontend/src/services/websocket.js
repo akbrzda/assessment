@@ -119,6 +119,10 @@ class WebSocketService {
     this.socket.on("assessment:update", (data) => {
       this.emit("assessment:update", data);
     });
+
+    this.socket.on("feature_flags_updated", (data) => {
+      this.emit("feature_flags_updated", data);
+    });
   }
 
   disconnect() {

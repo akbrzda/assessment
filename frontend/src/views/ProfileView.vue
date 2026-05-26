@@ -6,7 +6,12 @@
 
     <div class="profile-header">
       <div class="avatar-wrap">
-        <img v-if="user?.avatar" :src="user.avatar" :alt="user?.firstName" class="avatar-img" />
+        <img
+          v-if="user?.avatar"
+          :src="user.avatar"
+          :alt="user?.firstName"
+          class="avatar-img"
+        />
         <span v-else class="avatar-initials">{{ userStore.initials }}</span>
       </div>
 
@@ -37,7 +42,11 @@
     </div>
 
     <div v-else class="menu-card">
-      <button v-if="canOpenAchievements" class="menu-item" @click="handleAchievements">
+      <button
+        v-if="canOpenAchievements"
+        class="menu-item"
+        @click="handleAchievements"
+      >
         <span class="menu-icon-wrap">
           <Star :size="20" class="menu-icon" />
         </span>
@@ -57,7 +66,11 @@
 
       <div class="menu-divider"></div>
 
-      <button v-if="canOpenCertificates" class="menu-item" @click="handleCertificates">
+      <button
+        v-if="canOpenCertificates"
+        class="menu-item"
+        @click="handleCertificates"
+      >
         <span class="menu-icon-wrap">
           <Award :size="20" class="menu-icon" />
         </span>
@@ -81,8 +94,16 @@
         <label v-else class="notif-toggle-row">
           <span class="notif-toggle-label">Получать уведомления от бота</span>
           <span class="notif-toggle-wrap">
-            <input type="checkbox" class="notif-checkbox" :checked="notificationsEnabled" :disabled="isNotifSaving" @change="handleNotifToggle" />
-            <span class="notif-toggle-track"><span class="notif-toggle-thumb"></span></span>
+            <input
+              type="checkbox"
+              class="notif-checkbox"
+              :checked="notificationsEnabled"
+              :disabled="isNotifSaving"
+              @change="handleNotifToggle"
+            />
+            <span class="notif-toggle-track"
+              ><span class="notif-toggle-thumb"></span
+            ></span>
           </span>
         </label>
         <p v-if="notifError" class="notif-error">{{ notifError }}</p>
@@ -103,7 +124,16 @@
 
 <script>
 import { ref, computed, onMounted } from "vue";
-import { Settings, Star, Clock, Award, LogOut, ChevronRight, Bell, ChevronDown } from "lucide-vue-next";
+import {
+  Settings,
+  Star,
+  Clock,
+  Award,
+  LogOut,
+  ChevronRight,
+  Bell,
+  ChevronDown,
+} from "lucide-vue-next";
 import { useUserStore } from "../stores/user";
 import { useTelegramStore } from "../stores/telegram";
 import { useRouter } from "vue-router";
@@ -146,8 +176,12 @@ export default {
       const userPoints = Number(user.value?.points);
       return Number.isFinite(userPoints) ? userPoints : 0;
     });
-    const canOpenAchievements = computed(() => userStore.hasModuleAccess("gamification"));
-    const canOpenCertificates = computed(() => userStore.hasModuleAccess("certificates"));
+    const canOpenAchievements = computed(() =>
+      userStore.hasModuleAccess("gamification"),
+    );
+    const canOpenCertificates = computed(() =>
+      userStore.hasModuleAccess("certificates"),
+    );
 
     async function loadStats() {
       isStatsLoading.value = true;
@@ -161,9 +195,14 @@ export default {
           try {
             const coursesResponse = await apiClient.listCourses();
             const coursesList = coursesResponse?.courses || [];
-            completedCourses = coursesList.filter((course) => course.progress?.status === "completed").length;
+            completedCourses = coursesList.filter(
+              (course) => course.progress?.status === "completed",
+            ).length;
           } catch (error) {
-            console.warn("Не удалось получить список курсов для статистики профиля", error);
+            console.warn(
+              "Не удалось получить список курсов для статистики профиля",
+              error,
+            );
           }
         }
 
@@ -171,10 +210,15 @@ export default {
         if (userStore.hasModuleAccess("gamification")) {
           try {
             const overview = await userStore.loadOverview();
-            const badges = Array.isArray(overview?.badges) ? overview.badges : [];
+            const badges = Array.isArray(overview?.badges)
+              ? overview.badges
+              : [];
             earnedBadgesCount = badges.filter((badge) => badge.earned).length;
           } catch (error) {
-            console.warn("Не удалось получить бейджи для статистики профиля", error);
+            console.warn(
+              "Не удалось получить бейджи для статистики профиля",
+              error,
+            );
           }
         }
 
@@ -215,7 +259,10 @@ export default {
         const data = await apiClient.getNotificationSettings();
         notificationsEnabled.value = data.notificationsEnabled !== false;
       } catch (err) {
-        console.error("[ProfileView] ошибка загрузки настроек уведомлений:", err);
+        console.error(
+          "[ProfileView] ошибка загрузки настроек уведомлений:",
+          err,
+        );
         notifError.value = "Не удалось загрузить настройки";
       } finally {
         isNotifLoading.value = false;
@@ -235,11 +282,16 @@ export default {
       isNotifSaving.value = true;
       notifError.value = "";
       try {
-        await apiClient.updateNotificationSettings({ notificationsEnabled: enabled });
+        await apiClient.updateNotificationSettings({
+          notificationsEnabled: enabled,
+        });
         notificationsEnabled.value = enabled;
         telegramStore.hapticFeedback("notification", "success");
       } catch (err) {
-        console.error("[ProfileView] ошибка сохранения настроек уведомлений:", err);
+        console.error(
+          "[ProfileView] ошибка сохранения настроек уведомлений:",
+          err,
+        );
         notifError.value = "Не удалось сохранить";
         notificationsEnabled.value = !enabled;
       } finally {
@@ -285,7 +337,7 @@ export default {
 .profile-page {
   min-height: 100vh;
   background-color: var(--bg-secondary);
-  padding-bottom: 80px;
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
   position: relative;
 }
 

@@ -362,15 +362,16 @@ function resolveOnboardingState(rawState) {
   return "step1";
 }
 
+function sanitizeStartPayload(rawPayload) {
+  const SAFE_PAYLOAD_PATTERN = /^[A-Za-z0-9_-]{0,64}$/;
+  return SAFE_PAYLOAD_PATTERN.test(String(rawPayload || "")) ? String(rawPayload || "") : "";
+}
+
 bot.start(async (ctx) => {
   try {
     const telegramFirstName = ctx.from?.first_name || "";
     const telegramId = String(ctx.from?.id || "");
-    const rawPayload = ctx.startPayload;
-
-    // Validate startPayload: only allow safe alphanumeric characters to prevent injection
-    const SAFE_PAYLOAD_PATTERN = /^[A-Za-z0-9_-]{0,64}$/;
-    const startPayload = SAFE_PAYLOAD_PATTERN.test(String(rawPayload || "")) ? rawPayload : "";
+    const startPayload = sanitizeStartPayload(ctx.startPayload);
 
     const webAppUrl = miniAppUrl;
     const onboardingConfig = await getOnboardingConfig();
@@ -676,7 +677,12 @@ async function launchBot() {
   }
 }
 
-launchBot();
+if (require.main === module) {
+  launchBot();
+  process.once("SIGINT", () => bot.stop("SIGINT"));
+  process.once("SIGTERM", () => bot.stop("SIGTERM"));
+}
 
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
+module.exports = {
+  sanitizeStartPayload,
+};

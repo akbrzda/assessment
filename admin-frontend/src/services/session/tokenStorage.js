@@ -1,6 +1,7 @@
 const USER_KEY = "user";
 const ACCESS_TOKEN_KEY = "access_token";
 const DISABLED_MODULES_KEY = "disabled_modules";
+const AVAILABLE_MODULES_KEY = "available_modules";
 let accessTokenMemory = null;
 
 const parseUser = (value) => {
@@ -16,6 +17,23 @@ const parseUser = (value) => {
 };
 
 const parseDisabledModules = (value) => {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean);
+  } catch {
+    return [];
+  }
+};
+
+const parseAvailableModules = (value) => {
   if (!value) {
     return [];
   }
@@ -101,8 +119,22 @@ export const clearDisabledModules = () => {
   localStorage.removeItem(DISABLED_MODULES_KEY);
 };
 
+export const getAvailableModules = () => parseAvailableModules(localStorage.getItem(AVAILABLE_MODULES_KEY));
+
+export const setAvailableModules = (availableModules = []) => {
+  const normalized = Array.isArray(availableModules)
+    ? availableModules.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean)
+    : [];
+  localStorage.setItem(AVAILABLE_MODULES_KEY, JSON.stringify(normalized));
+};
+
+export const clearAvailableModules = () => {
+  localStorage.removeItem(AVAILABLE_MODULES_KEY);
+};
+
 export const clearSession = () => {
   clearAccessToken();
   clearUser();
   clearDisabledModules();
+  clearAvailableModules();
 };

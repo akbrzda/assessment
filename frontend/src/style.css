@@ -78,7 +78,7 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  padding-bottom: 76px; /* Space for bottom navigation */
+  padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); /* Space for bottom navigation + iOS home indicator */
   transition:
     background-color 0.3s ease,
     color 0.3s ease;

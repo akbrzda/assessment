@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 
 const settingsService = require("../src/services/settingsService");
 const featureFlagsGate = require("../src/middleware/featureFlagsGate");
-const { getModuleCodeByPath } = require("../src/config/featureFlags");
+const { getModuleCodeByPath, parseDisabledModules } = require("../src/config/featureFlags");
 
 function createRes() {
   const payload = { statusCode: null, body: null };
@@ -26,6 +26,17 @@ test("feature route mapping покрывает критичные префикс
   assert.equal(getModuleCodeByPath("/verify/abc"), "certificates");
   assert.equal(getModuleCodeByPath("/admin/dashboard/summary"), "analytics");
   assert.equal(getModuleCodeByPath("/admin/search/users"), "users");
+  assert.equal(getModuleCodeByPath("/unknown-route"), null);
+});
+
+test("parseDisabledModules возвращает пустой Set для строки null", () => {
+  const disabledModules = parseDisabledModules("null");
+  assert.equal(disabledModules.size, 0);
+});
+
+test("parseDisabledModules фильтрует пустые значения и null из массива", () => {
+  const disabledModules = parseDisabledModules(JSON.stringify(["courses", "", null, "   ", "  assessments  "]));
+  assert.deepEqual(Array.from(disabledModules), ["courses", "assessments"]);
 });
 
 test("featureFlagsGate блокирует отключенный модуль", async () => {
@@ -63,5 +74,44 @@ test("featureFlagsGate пропускает модуль, если он вклю
   settingsService.getSetting = original;
 
   assert.equal(nextCalled, true);
+  assert.equal(res.payload.statusCode, null);
+});
+
+test("featureFlagsGate вызывает next, если disabledModules пустой массив", async () => {
+  const original = settingsService.getSetting;
+  settingsService.getSetting = async () => JSON.stringify([]);
+
+  const req = { path: "/admin/question-bank" };
+  const res = createRes();
+  let nextCalled = false;
+
+  await featureFlagsGate(req, res, () => {
+    nextCalled = true;
+  });
+
+  settingsService.getSetting = original;
+
+  assert.equal(nextCalled, true);
+  assert.equal(res.payload.statusCode, null);
+});
+
+test("featureFlagsGate передает ошибку в next при reject settingsService.getSetting", async () => {
+  const original = settingsService.getSetting;
+  const expectedError = new Error("settings unavailable");
+  settingsService.getSetting = async () => {
+    throw expectedError;
+  };
+
+  const req = { path: "/admin/question-bank" };
+  const res = createRes();
+  let receivedError = null;
+
+  await featureFlagsGate(req, res, (error) => {
+    receivedError = error;
+  });
+
+  settingsService.getSetting = original;
+
+  assert.equal(receivedError, expectedError);
   assert.equal(res.payload.statusCode, null);
 });

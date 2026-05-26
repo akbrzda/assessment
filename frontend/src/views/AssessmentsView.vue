@@ -3,7 +3,12 @@
     <div class="container">
       <div class="page-header">
         <h1 class="courses-page-title">Курсы</h1>
-        <button class="header-search-btn" type="button" @click="focusSearch" aria-label="Поиск">
+        <button
+          class="header-search-btn"
+          type="button"
+          @click="focusSearch"
+          aria-label="Поиск"
+        >
           <Search :size="22" />
         </button>
       </div>
@@ -11,7 +16,13 @@
       <div class="search-row mb-12">
         <div class="search-wrapper">
           <Search class="search-icon-inner" :size="15" />
-          <input ref="searchInputRef" v-model="courseSearch" type="text" class="search-input" placeholder="Поиск курсов" />
+          <input
+            ref="searchInputRef"
+            v-model="courseSearch"
+            type="text"
+            class="search-input"
+            placeholder="Поиск курсов"
+          />
         </div>
       </div>
 
@@ -36,24 +47,52 @@
       <div v-else-if="coursesError" class="error-state">
         <h3 class="title-small mb-8">Не удалось загрузить курсы</h3>
         <p class="body-small text-secondary mb-12">{{ coursesError }}</p>
-        <BaseButton full-width type="button" @click="retryCourses">Повторить</BaseButton>
+        <BaseButton full-width type="button" @click="retryCourses"
+          >Повторить</BaseButton
+        >
       </div>
 
       <div v-else-if="filteredCourses.length" class="courses-list">
-        <button v-for="course in filteredCourses" :key="course.id" class="course-card" type="button" @click="openCourse(course.id)">
+        <button
+          v-for="course in filteredCourses"
+          :key="course.id"
+          class="course-card"
+          type="button"
+          @click="openCourse(course.id)"
+        >
           <div class="course-icon" :style="getCourseVisualStyle(course)">
-            <img v-if="course.coverUrl" :src="course.coverUrl" :alt="course.title" class="course-cover" loading="lazy" />
-            <component v-else :is="getCourseFallbackVisual(course.id).icon" class="course-icon-svg" :size="24" stroke-width="2" />
+            <img
+              v-if="course.coverUrl"
+              :src="course.coverUrl"
+              :alt="course.title"
+              class="course-cover"
+              loading="lazy"
+            />
+            <component
+              v-else
+              :is="getCourseFallbackVisual(course.id).icon"
+              class="course-icon-svg"
+              :size="24"
+              stroke-width="2"
+            />
           </div>
           <div class="course-body">
             <h3 class="course-title">{{ course.title }}</h3>
-            <p class="course-meta">{{ course.sectionsCount }} {{ getSectionsLabel(course.sectionsCount) }}</p>
-            <div v-if="course.progress.status === 'completed'" class="course-completed-badge">
+            <p class="course-meta">
+              {{ course.sectionsCount }}
+              {{ getSectionsLabel(course.sectionsCount) }}
+            </p>
+            <div
+              v-if="course.progress.status === 'completed'"
+              class="course-completed-badge"
+            >
               <span class="course-completed-text">Курс завершён</span>
             </div>
             <div v-else class="course-progress">
               <ProgressBar :value="course.progress.progressPercent || 0" />
-              <span class="course-percent">{{ Math.round(course.progress.progressPercent || 0) }}%</span>
+              <span class="course-percent"
+                >{{ Math.round(course.progress.progressPercent || 0) }}%</span
+              >
             </div>
           </div>
         </button>
@@ -73,15 +112,32 @@
         </div>
 
         <div v-else-if="userAssessments.length" class="courses-list">
-          <button v-for="item in userAssessments" :key="item.id" class="course-card" type="button" @click="openAssessment(item)">
+          <button
+            v-for="item in userAssessments"
+            :key="item.id"
+            class="course-card"
+            type="button"
+            @click="openAssessment(item)"
+          >
             <div class="course-icon assessment-icon">
-              <ClipboardCheck :size="24" class="course-icon-svg" stroke-width="2" />
+              <ClipboardCheck
+                :size="24"
+                class="course-icon-svg"
+                stroke-width="2"
+              />
             </div>
             <div class="course-body">
               <h3 class="course-title">{{ item.title }}</h3>
-              <div v-if="item.lastAttemptStatus === 'completed'" class="course-completed-badge">
+              <div
+                v-if="item.lastAttemptStatus === 'completed'"
+                class="course-completed-badge"
+              >
                 <span class="course-completed-text">
-                  {{ item.bestScorePercent != null ? `Результат: ${Math.round(item.bestScorePercent)}%` : "Аттестация пройдена" }}
+                  {{
+                    item.bestScorePercent != null
+                      ? `Результат: ${Math.round(item.bestScorePercent)}%`
+                      : "Аттестация пройдена"
+                  }}
                 </span>
               </div>
               <p v-else class="course-meta">{{ getAssessmentLabel(item) }}</p>
@@ -91,7 +147,9 @@
 
         <div v-else class="empty-state">
           <ClipboardCheck :size="48" color="var(--text-secondary)" />
-          <p class="body-small text-secondary mt-12">Аттестации пока не назначены</p>
+          <p class="body-small text-secondary mt-12">
+            Аттестации пока не назначены
+          </p>
         </div>
       </template>
     </div>
@@ -134,7 +192,9 @@ export default {
     const coursesError = ref("");
     const userAssessments = ref([]);
     const isAssessmentsLoading = ref(false);
-    const showAssessments = computed(() => userStore.hasModuleAccess("assessments"));
+    const showAssessments = computed(() =>
+      userStore.hasModuleAccess("assessments"),
+    );
     const searchInputRef = ref(null);
 
     const courseTabs = [
@@ -158,7 +218,9 @@ export default {
         })
         .filter((course) => {
           if (!query) return true;
-          return `${course.title} ${course.description}`.toLowerCase().includes(query);
+          return `${course.title} ${course.description}`
+            .toLowerCase()
+            .includes(query);
         });
     });
 
@@ -198,7 +260,11 @@ export default {
     function openAssessment(item) {
       telegramStore.hapticFeedback("impact", "light");
       if (item.lastAttemptStatus === "completed" && item.lastAttemptId) {
-        router.push({ name: "assessment-results", params: { id: item.id }, query: { attemptId: item.lastAttemptId } });
+        router.push({
+          name: "assessment-results",
+          params: { id: item.id },
+          query: { attemptId: item.lastAttemptId },
+        });
         return;
       }
       router.push({ name: "assessment-process", params: { id: item.id } });
@@ -210,12 +276,19 @@ export default {
         id: Number(item.id),
         title: item.title || "Курс",
         description: item.description || "",
-        coverUrl: item.coverUrl || item.cover_url || item.imageUrl || item.image || null,
+        coverUrl:
+          item.coverUrl ||
+          item.cover_url ||
+          item.imageUrl ||
+          item.image ||
+          null,
         sectionsCount: Number(item.sectionsCount || 0),
         progress: {
           status: item.progress?.status || "not_started",
           progressPercent: Number(item.progress?.progressPercent || 0),
-          completedSectionsCount: Number(item.progress?.completedSectionsCount || 0),
+          completedSectionsCount: Number(
+            item.progress?.completedSectionsCount || 0,
+          ),
           totalSectionsCount: Number(item.progress?.totalSectionsCount || 0),
         },
       };
@@ -226,7 +299,9 @@ export default {
       coursesError.value = "";
       try {
         const { courses: response } = await apiClient.listCourses();
-        courses.value = (response || []).map((item) => normalizeCourse(item)).filter(Boolean);
+        courses.value = (response || [])
+          .map((item) => normalizeCourse(item))
+          .filter(Boolean);
       } catch (error) {
         console.error("Не удалось загрузить список курсов", error);
         courses.value = [];
@@ -298,7 +373,7 @@ export default {
 }
 
 .courses-page-title {
-  font-size: 28px;
+  font-size: clamp(22px, 6vw, 28px);
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -311,7 +386,10 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: 10px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 10px;
 }
 
 /* Поиск */

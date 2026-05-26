@@ -1,6 +1,7 @@
 const { pool } = require("../../../config/database");
 const { logAndSend, buildActorFromRequest } = require("../../../services/auditService");
 const settingsService = require("../../../services/settingsService");
+const { emitToAll } = require("../../../services/websocketService");
 const {
   FEATURE_FLAGS_SETTING_KEY,
   FEATURE_MODULES,
@@ -8,35 +9,12 @@ const {
   CLIENT_ONLY_MODULE_CODES,
   ADMIN_ONLY_MODULE_CODES,
   LOCKED_MODULE_CODES,
+  getDisabledModulesList,
 } = require("../../../config/featureFlags");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { resolveUploadsPath, resolveUploadsUrl } = require("../../../utils/uploads");
-
-function parseDisabledModules(rawValue) {
-  if (!rawValue) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(rawValue);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .map((item) =>
-        String(item || "")
-          .trim()
-          .toLowerCase(),
-      )
-      .filter(Boolean);
-  } catch (error) {
-    console.error("Некорректный JSON feature flags:", error);
-    return [];
-  }
-}
 
 function getFeatureModulesPayload(disabledModules) {
   const disabledSet = new Set(disabledModules);
@@ -147,7 +125,7 @@ exports.getSettings = async (req, res, next) => {
 exports.getFeatureFlags = async (req, res, next) => {
   try {
     const rawValue = await settingsService.getSetting(FEATURE_FLAGS_SETTING_KEY, "[]");
-    const disabledModules = parseDisabledModules(rawValue);
+    const disabledModules = getDisabledModulesList(rawValue);
 
     res.json({
       disabledModules,
@@ -290,6 +268,11 @@ exports.updateFeatureFlags = async (req, res, next) => {
         key: FEATURE_FLAGS_SETTING_KEY,
         disabledModules: normalized,
       },
+    });
+
+    emitToAll("feature_flags_updated", {
+      disabledModules: normalized,
+      updatedAt: new Date().toISOString(),
     });
 
     res.json({

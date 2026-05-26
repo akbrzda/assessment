@@ -165,18 +165,6 @@
         Очистить
       </button>
 
-      <template v-for="def in mobileInlineFilterDefs" :key="`${def.key}-mobile-inline`">
-        <select
-          class="md:hidden h-10 max-w-[130px] px-2 py-1 text-sm border border-border rounded-lg bg-background text-foreground outline-none"
-          :value="modelValue[def.key] || ''"
-          :aria-label="def.label"
-          @change="selectOption(def.key, $event.target.value)"
-        >
-          <option value="">{{ def.placeholder || def.label || "Все" }}</option>
-          <option v-for="opt in def.options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-        </select>
-      </template>
-
       <!-- Разворачивание (мобильное) -->
       <button
         class="flex md:hidden items-center gap-1.5 px-2.5 py-1.5 border-none bg-transparent cursor-pointer text-muted-foreground text-sm rounded-xl shrink-0 ml-auto"
@@ -483,10 +471,8 @@ const activeChips = computed(() => {
 });
 
 const activeCount = computed(() => activeChips.value.length);
-const mobileInlineFilterDefs = computed(() => props.filterDefs.filter((def) => def.type === "select" || !def.type).slice(0, 2));
-const mobileDrawerFilterDefs = computed(() =>
-  props.filterDefs.filter((def) => !mobileInlineFilterDefs.value.some((inlineDef) => inlineDef.key === def.key)),
-);
+// На мобильных все фильтры показываются в drawer — избегаем overflow в главной строке
+const mobileDrawerFilterDefs = computed(() => props.filterDefs);
 
 const hasActiveFilters = computed(() => {
   if (props.modelValue[props.searchKey]) return true;

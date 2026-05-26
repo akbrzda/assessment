@@ -2,7 +2,7 @@
   <TabsRoot v-model="model" :class="rootClass">
     <TabsList
       :class="[
-        'flex items-center gap-1',
+        'tabs-list flex items-center gap-1 overflow-x-auto',
         variant === 'underline'
           ? 'border-b border-border/80 bg-transparent'
           : 'rounded-[var(--radius-md)] border border-border/70 bg-muted/70 p-1 shadow-[var(--elevation-soft)]',
@@ -14,7 +14,7 @@
         :value="tab.value"
         :disabled="tab.disabled"
         :class="[
-          'inline-flex items-center gap-1.5 text-sm font-medium transition-all duration-150 focus:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed',
+          'inline-flex shrink-0 items-center gap-1.5 text-sm font-medium whitespace-nowrap transition-all duration-150 focus:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed',
           variant === 'underline'
             ? [
                 'px-3 py-2.5 border-b-2 -mb-px rounded-none',
@@ -76,3 +76,14 @@ const model = computed({
 
 const rootClass = computed(() => (props.fullWidth ? "w-full" : ""));
 </script>
+
+<style scoped>
+/* Скрываем scrollbar, сохраняя возможность горизонтального скролла на мобильных */
+.tabs-list {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.tabs-list::-webkit-scrollbar {
+  display: none;
+}
+</style>

@@ -25,17 +25,27 @@
     <div v-else-if="errorMessage" class="achievements-error app-panel">
       <p class="error-title">Не удалось загрузить достижения</p>
       <p class="error-text">{{ errorMessage }}</p>
-      <button class="retry-btn" type="button" @click="loadAchievements">Повторить</button>
+      <button class="retry-btn" type="button" @click="loadAchievements">
+        Повторить
+      </button>
     </div>
 
     <div v-else-if="earnedBadges.length" class="badge-list">
-      <article v-for="badge in earnedBadges" :key="badge.id || badge.code || badge.name" class="badge-card app-panel">
+      <article
+        v-for="badge in earnedBadges"
+        :key="badge.id || badge.code || badge.name"
+        class="badge-card app-panel"
+      >
         <div class="badge-card__top">
           <h2 class="badge-card__title">{{ badge.name || "Бейдж" }}</h2>
-          <span v-if="formatReward(badge)" class="badge-card__reward">+{{ formatReward(badge) }} очков</span>
+          <span v-if="formatReward(badge)" class="badge-card__reward"
+            >+{{ formatReward(badge) }} очков</span
+          >
         </div>
 
-        <p v-if="badge.description" class="badge-card__description">{{ badge.description }}</p>
+        <p v-if="badge.description" class="badge-card__description">
+          {{ badge.description }}
+        </p>
 
         <div class="badge-card__meta">
           <p v-if="formatReason(badge)" class="badge-card__meta-item">
@@ -44,7 +54,9 @@
           </p>
           <p class="badge-card__meta-item">
             <span class="meta-label">Получено:</span>
-            <span class="meta-value">{{ formatDate(badge.earnedAt || badge.awardedAt || badge.obtainedAt) }}</span>
+            <span class="meta-value">{{
+              formatDate(badge.earnedAt || badge.awardedAt || badge.obtainedAt)
+            }}</span>
           </p>
         </div>
       </article>
@@ -52,7 +64,9 @@
 
     <div v-else class="achievements-empty app-panel">
       <p class="empty-title">Пока нет полученных достижений</p>
-      <p class="empty-subtitle">Пройдите курсы и аттестации, чтобы открыть первые бейджи</p>
+      <p class="empty-subtitle">
+        Пройдите курсы и аттестации, чтобы открыть первые бейджи
+      </p>
     </div>
   </div>
 </template>
@@ -89,7 +103,9 @@ export default {
       return toNumber(userStore.user?.points);
     });
 
-    const earnedBadges = computed(() => badges.value.filter((badge) => badge.earned));
+    const earnedBadges = computed(() =>
+      badges.value.filter((badge) => badge.earned),
+    );
 
     function formatDate(value) {
       if (!value) {
@@ -139,7 +155,9 @@ export default {
         let overviewBadges = [];
         try {
           const overview = await userStore.loadOverview();
-          overviewBadges = Array.isArray(overview?.badges) ? overview.badges : [];
+          overviewBadges = Array.isArray(overview?.badges)
+            ? overview.badges
+            : [];
         } catch (error) {
           console.warn("Не удалось загрузить overview для достижений", error);
         }
@@ -147,7 +165,9 @@ export default {
         let allBadges = [];
         try {
           const badgesResponse = await apiClient.getGamificationBadges();
-          allBadges = Array.isArray(badgesResponse?.badges) ? badgesResponse.badges : [];
+          allBadges = Array.isArray(badgesResponse?.badges)
+            ? badgesResponse.badges
+            : [];
         } catch (error) {
           console.warn("Не удалось загрузить каталог бейджей", error);
         }
@@ -185,9 +205,10 @@ export default {
 
 <style scoped>
 .achievements-page {
+  /* NOTE: нижний отступ учитывает высоту нижней навигации + безопасную зону iOS */
   min-height: 100vh;
   background: var(--bg-primary);
-  padding: 18px 16px 96px;
+  padding: 18px 16px calc(96px + env(safe-area-inset-bottom, 0px));
 }
 
 .achievements-header {

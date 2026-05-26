@@ -4,7 +4,7 @@ const logger = require("../../../utils/logger");
 const { buildAuditEntry, logAuditEvent } = require("../../../services/auditService");
 const authRepository = require("./repository");
 const settingsService = require("../../../services/settingsService");
-const { FEATURE_FLAGS_SETTING_KEY } = require("../../../config/featureFlags");
+const { FEATURE_FLAGS_SETTING_KEY, getDisabledModulesList } = require("../../../config/featureFlags");
 
 const PHONE_MISMATCH_ERROR_MESSAGE = "Номер телефона не совпадает с приглашением";
 const PHONE_CONFLICT_ERROR_MESSAGE = "Обнаружен конфликт профилей по номеру телефона. Обратитесь к администратору";
@@ -104,16 +104,7 @@ function verifyInviteContact({ contact, platformUser, clientPlatform }) {
 
 async function getDisabledModules() {
   const rawValue = await settingsService.getSetting(FEATURE_FLAGS_SETTING_KEY, "[]");
-  try {
-    const parsed = JSON.parse(rawValue);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean);
-  } catch (error) {
-    logger.warn("Некорректный JSON feature flags:", { error: error.message });
-    return [];
-  }
+  return getDisabledModulesList(rawValue);
 }
 
 async function getStatus(context) {

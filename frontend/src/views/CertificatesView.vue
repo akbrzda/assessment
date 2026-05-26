@@ -13,11 +13,17 @@
     <div v-else-if="errorMessage" class="certificates-error app-panel">
       <p class="error-title">Не удалось загрузить сертификаты</p>
       <p class="error-text">{{ errorMessage }}</p>
-      <button class="retry-btn" type="button" @click="loadCertificates">Повторить</button>
+      <button class="retry-btn" type="button" @click="loadCertificates">
+        Повторить
+      </button>
     </div>
 
     <div v-else-if="certificates.length" class="cert-list">
-      <article v-for="cert in certificates" :key="cert.uuid" class="cert-card app-panel">
+      <article
+        v-for="cert in certificates"
+        :key="cert.uuid"
+        class="cert-card app-panel"
+      >
         <div class="cert-card__top">
           <span class="cert-icon"><Trophy :size="16" /></span>
           <div class="cert-card__info">
@@ -26,48 +32,87 @@
             <p class="cert-card__expires">
               Действует до: {{ formatDate(cert.expires_at) }}
             </p>
-            <p v-if="(cert.display_status || cert.status) === 'expired'" class="cert-card__expired">
+            <p
+              v-if="(cert.display_status || cert.status) === 'expired'"
+              class="cert-card__expired"
+            >
               Просрочен
             </p>
           </div>
         </div>
         <div v-if="cert.score_percent != null" class="cert-card__score">
-          Результат: <strong>{{ Number(cert.score_percent).toFixed(0) }}%</strong>
+          Результат:
+          <strong>{{ Number(cert.score_percent).toFixed(0) }}%</strong>
         </div>
         <button
           class="cert-download-btn"
           type="button"
-          :disabled="downloading[cert.uuid] || (cert.display_status || cert.status) === 'expired'"
+          :disabled="
+            downloading[cert.uuid] ||
+            (cert.display_status || cert.status) === 'expired'
+          "
           @click="openPreview(cert)"
         >
-          {{ (cert.display_status || cert.status) === "expired" ? "Скачивание недоступно" : downloading[cert.uuid] ? "Загрузка..." : "Предпросмотр и скачать файл" }}
+          {{
+            (cert.display_status || cert.status) === "expired"
+              ? "Скачивание недоступно"
+              : downloading[cert.uuid]
+                ? "Загрузка..."
+                : "Предпросмотр и скачать файл"
+          }}
         </button>
       </article>
     </div>
 
     <div v-else class="certificates-empty app-panel">
       <p class="empty-title">Пока нет выданных сертификатов</p>
-      <p class="empty-subtitle">Завершите курс и сдайте итоговую аттестацию, чтобы получить сертификат</p>
+      <p class="empty-subtitle">
+        Завершите курс и сдайте итоговую аттестацию, чтобы получить сертификат
+      </p>
     </div>
 
-    <div v-if="previewVisible" class="preview-overlay" @click.self="closePreview">
+    <div
+      v-if="previewVisible"
+      class="preview-overlay"
+      @click.self="closePreview"
+    >
       <div class="preview-modal app-panel">
         <div class="preview-header">
           <div class="preview-title-wrap">
-            <h2 class="preview-title">{{ previewCertificate?.course_title || "Сертификат" }}</h2>
+            <h2 class="preview-title">
+              {{ previewCertificate?.course_title || "Сертификат" }}
+            </h2>
             <p class="preview-subtitle">Предпросмотр сертификата</p>
           </div>
-          <button class="preview-close-btn" type="button" @click="closePreview">Закрыть</button>
+          <button class="preview-close-btn" type="button" @click="closePreview">
+            Закрыть
+          </button>
         </div>
 
         <div class="preview-body">
-          <div v-if="previewLoading" class="preview-loading">Загружаем файл...</div>
-          <div v-else-if="previewError" class="preview-error">{{ previewError }}</div>
-          <iframe v-else-if="previewFrameSrc" class="preview-frame" :src="previewFrameSrc" title="Предпросмотр сертификата" />
+          <div v-if="previewLoading" class="preview-loading">
+            Загружаем файл...
+          </div>
+          <div v-else-if="previewError" class="preview-error">
+            {{ previewError }}
+          </div>
+          <iframe
+            v-else-if="previewFrameSrc"
+            class="preview-frame"
+            :src="previewFrameSrc"
+            title="Предпросмотр сертификата"
+          />
         </div>
 
         <div class="preview-footer">
-          <button class="preview-download-btn" type="button" :disabled="!previewBlob" @click="downloadCurrentPdf">Скачать файл</button>
+          <button
+            class="preview-download-btn"
+            type="button"
+            :disabled="!previewBlob"
+            @click="downloadCurrentPdf"
+          >
+            Скачать файл
+          </button>
         </div>
       </div>
     </div>
@@ -214,7 +259,7 @@ export default {
 <style scoped>
 .certificates-page {
   padding: 16px;
-  padding-bottom: 80px;
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
 }
 
 .certificates-header {
@@ -229,7 +274,7 @@ export default {
 
 .certificates-subtitle {
   font-size: 14px;
-  color: var(--color-text-secondary, #888);
+  color: var(--text-secondary, #888);
   margin: 0;
 }
 
@@ -268,13 +313,13 @@ export default {
 
 .cert-card__date {
   font-size: 13px;
-  color: var(--color-text-secondary, #888);
+  color: var(--text-secondary, #888);
   margin: 0;
 }
 
 .cert-card__expires {
   font-size: 12px;
-  color: var(--color-text-secondary, #888);
+  color: var(--text-secondary, #888);
   margin: 4px 0 0;
 }
 
@@ -286,20 +331,21 @@ export default {
 
 .cert-card__score {
   font-size: 13px;
-  color: var(--color-text-secondary, #888);
+  color: var(--text-secondary, #888);
   margin-bottom: 12px;
 }
 
 .cert-download-btn {
   width: 100%;
   padding: 10px 16px;
-  background: var(--color-primary, #4f46e5);
+  background: var(--accent, #4f46e5);
   color: #fff;
   border: none;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  min-height: 44px;
 }
 
 .cert-download-btn:disabled {
@@ -329,13 +375,13 @@ export default {
 .error-text,
 .empty-subtitle {
   font-size: 14px;
-  color: var(--color-text-secondary, #888);
+  color: var(--text-secondary, #888);
   margin: 0 0 16px;
 }
 
 .retry-btn {
   padding: 8px 20px;
-  background: var(--color-primary, #4f46e5);
+  background: var(--accent, #4f46e5);
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -390,7 +436,7 @@ export default {
 .preview-subtitle {
   margin: 2px 0 0;
   font-size: 12px;
-  color: var(--color-text-secondary, #888);
+  color: var(--text-secondary, #888);
 }
 
 .preview-close-btn {
@@ -427,7 +473,7 @@ export default {
   padding: 16px;
   text-align: center;
   font-size: 14px;
-  color: var(--color-text-secondary, #666);
+  color: var(--text-secondary, #666);
 }
 
 .preview-footer {

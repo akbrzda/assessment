@@ -2,7 +2,7 @@
   <div
     :class="[
       'rounded-xl border border-border/90 bg-card shadow-[var(--elevation-soft)] transition-all duration-[var(--motion-base)]',
-      size === 'secondary' ? 'p-4' : 'p-5',
+      size === 'secondary' ? 'p-3 sm:p-4' : 'p-4 sm:p-5',
       clickable && 'cursor-pointer hover:-translate-y-0.5 hover:border-ring/45 hover:shadow-[var(--elevation-float)]',
     ]"
     v-bind="clickable ? { role: 'button', tabindex: 0 } : {}"
@@ -15,7 +15,7 @@
       </div>
       <div class="flex-1 min-w-0">
         <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">{{ label }}</p>
-        <p :class="['font-bold tabular-nums leading-none', size === 'secondary' ? 'text-2xl' : 'text-[2.25rem]']">
+        <p :class="['font-bold tabular-nums leading-none', size === 'secondary' ? 'text-2xl' : 'text-3xl sm:text-[2.25rem]']">
           {{ value }}
         </p>
         <div v-if="trend !== undefined" class="mt-2">

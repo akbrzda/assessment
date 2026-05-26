@@ -45,6 +45,32 @@
           </TableCell>
         </TableRow>
       </template>
+      <template #mobile>
+        <div v-for="role in roles" :key="role.id" class="flex flex-col gap-3 p-4 border-b border-border last:border-0">
+          <div class="flex items-start justify-between gap-2">
+            <span class="font-medium text-sm leading-tight">{{ role.name }}</span>
+            <Badge :variant="role.is_active ? 'success' : 'secondary'" size="sm" class="shrink-0">
+              {{ role.is_active ? "Активна" : "Отключена" }}
+            </Badge>
+          </div>
+          <p v-if="role.description" class="text-sm text-muted-foreground">{{ role.description }}</p>
+          <dl class="grid gap-1.5 text-sm border-t border-border pt-2">
+            <div class="flex justify-between">
+              <dt class="text-muted-foreground">Приоритет</dt>
+              <dd class="font-medium">{{ role.priority ?? 0 }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-muted-foreground">Права</dt>
+              <dd class="font-medium">{{ role.permissions_count ?? 0 }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-muted-foreground">Пользователи</dt>
+              <dd class="font-medium">{{ role.users_count ?? 0 }}</dd>
+            </div>
+          </dl>
+          <Button size="sm" variant="secondary" icon="Pencil" class="w-full" @click="openRole(role.id)">Редактировать</Button>
+        </div>
+      </template>
     </DataTable>
   </div>
 </template>

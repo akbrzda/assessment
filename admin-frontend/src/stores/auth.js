@@ -4,18 +4,15 @@ import websocketService from "../services/websocket";
 import {
   clearSession,
   getAccessToken,
+  getAvailableModules,
   getDisabledModules,
   getUser,
   setAccessToken,
+  setAvailableModules as persistAvailableModules,
   setDisabledModules as persistDisabledModules,
   setUser,
 } from "../services/session/tokenStorage";
 import { onAccessTokenRefreshed, refreshAccessToken } from "../services/session/refreshCoordinator";
-
-const HARD_CODED_ROLE_MODULES = {
-  superadmin: ["*"],
-  manager: ["assessments", "analytics", "users", "questions", "courses", "invitations"],
-};
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
@@ -27,7 +24,9 @@ export const useAuthStore = defineStore("auth", {
     permissionsLoaded: false,
     defaultModulesByRole: {},
     disabledModules: getDisabledModules(),
+    availableModules: getAvailableModules(),
     restorePromise: null,
+    featureFlagsUnsubscribe: null,
   }),
 
   getters: {
@@ -41,9 +40,11 @@ export const useAuthStore = defineStore("auth", {
         return false;
       }
 
-      const roleName = state.user?.role;
-      const roleDefaults = HARD_CODED_ROLE_MODULES[roleName] || [];
-      return roleDefaults.includes("*") || roleDefaults.includes(moduleCode);
+      if (!moduleCode) {
+        return true;
+      }
+
+      return state.availableModules.includes("*") || state.availableModules.includes(moduleCode);
     },
   },
 
@@ -60,6 +61,12 @@ export const useAuthStore = defineStore("auth", {
           websocketService.reconnectWithNewToken(newAccessToken);
         }
       });
+
+      if (!this.featureFlagsUnsubscribe) {
+        this.featureFlagsUnsubscribe = websocketService.on("feature_flags_updated", (payload) => {
+          this.setDisabledModules(payload?.disabledModules || []);
+        });
+      }
     },
 
     stopSessionSync() {
@@ -69,6 +76,11 @@ export const useAuthStore = defineStore("auth", {
 
       this.sessionSyncUnsubscribe();
       this.sessionSyncUnsubscribe = null;
+
+      if (this.featureFlagsUnsubscribe) {
+        this.featureFlagsUnsubscribe();
+        this.featureFlagsUnsubscribe = null;
+      }
     },
 
     async login(credentials) {
@@ -77,7 +89,9 @@ export const useAuthStore = defineStore("auth", {
 
         this.user = data.user;
         this.disabledModules = Array.isArray(data.disabledModules) ? data.disabledModules : [];
+        this.availableModules = Array.isArray(data.availableModules) ? data.availableModules : [];
         persistDisabledModules(this.disabledModules);
+        persistAvailableModules(this.availableModules);
         this.setToken(data.accessToken);
         setUser(data.user);
 
@@ -93,13 +107,13 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async loadDefaultModules() {
-      this.defaultModulesByRole = { ...HARD_CODED_ROLE_MODULES };
+      this.defaultModulesByRole = {};
     },
 
     async loadUserPermissions() {
       this.userPermissions = null;
       this.permissionsLoaded = true;
-      this.defaultModulesByRole = { ...HARD_CODED_ROLE_MODULES };
+      this.defaultModulesByRole = {};
     },
 
     async tryRestoreSession() {
@@ -125,7 +139,9 @@ export const useAuthStore = defineStore("auth", {
             setUser(data.user);
           }
           this.disabledModules = Array.isArray(data.disabledModules) ? data.disabledModules : [];
+          this.availableModules = Array.isArray(data.availableModules) ? data.availableModules : [];
           persistDisabledModules(this.disabledModules);
+          persistAvailableModules(this.availableModules);
 
           this.startTokenRefresh();
           await this.loadUserPermissions();
@@ -182,6 +198,11 @@ export const useAuthStore = defineStore("auth", {
       persistDisabledModules(this.disabledModules);
     },
 
+    setAvailableModules(availableModules = []) {
+      this.availableModules = Array.isArray(availableModules) ? availableModules : [];
+      persistAvailableModules(this.availableModules);
+    },
+
     async logout() {
       try {
         await authApi.logout();
@@ -201,6 +222,7 @@ export const useAuthStore = defineStore("auth", {
         this.permissionsLoaded = false;
         this.defaultModulesByRole = {};
         this.disabledModules = [];
+        this.availableModules = [];
         clearSession();
       }
     },

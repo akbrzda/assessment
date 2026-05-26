@@ -5,7 +5,8 @@ const authRepository = require("./repository");
 const { logAndSend } = require("../../../services/auditService");
 const { pool } = require("../../../config/database");
 const settingsService = require("../../../services/settingsService");
-const { FEATURE_FLAGS_SETTING_KEY } = require("../../../config/featureFlags");
+const { FEATURE_FLAGS_SETTING_KEY, getDisabledModulesList } = require("../../../config/featureFlags");
+const { getDefaultModulesForRole } = require("../../../config/roleModules");
 
 const ACCESS_TOKEN_TTL = config.jwtAccessTtl || "30m";
 const REFRESH_TOKEN_TTL = config.jwtRefreshTtl || "7d";
@@ -82,6 +83,10 @@ function toUserResponse(user) {
   };
 }
 
+function getAvailableModulesForUser(user) {
+  return getDefaultModulesForRole(user?.role_name || "");
+}
+
 function createAccessToken(user) {
   return jwt.sign({ id: user.id, role: user.role_name, branch_id: user.branch_id || null }, config.jwtSecret, {
     expiresIn: ACCESS_TOKEN_TTL,
@@ -96,16 +101,7 @@ function createRefreshToken(userId) {
 
 async function getDisabledModules() {
   const rawValue = await settingsService.getSetting(FEATURE_FLAGS_SETTING_KEY, "[]");
-  try {
-    const parsed = JSON.parse(rawValue);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean);
-  } catch (error) {
-    console.error("Некорректный JSON feature flags:", error);
-    return [];
-  }
+  return getDisabledModulesList(rawValue);
 }
 
 async function hashRefreshToken(refreshToken) {
@@ -198,6 +194,7 @@ async function login(payload, req, res) {
     accessToken,
     user: toUserResponse(user),
     disabledModules,
+    availableModules: getAvailableModulesForUser(user),
   };
 }
 
@@ -236,6 +233,7 @@ async function refresh(payload, req, res) {
     accessToken,
     user: toUserResponse(user),
     disabledModules,
+    availableModules: getAvailableModulesForUser(user),
   };
 }
 

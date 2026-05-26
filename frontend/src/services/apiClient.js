@@ -6,6 +6,34 @@ const envBaseUrl = (API_BASE_URL || "").trim();
 const runtimeBaseUrl = typeof window !== "undefined" && window.location ? window.location.origin : "";
 const BASE_URL = (envBaseUrl || runtimeBaseUrl || "").replace(/\/$/, "");
 
+function normalizeErrorMessage(errorPayload) {
+  if (typeof errorPayload === "string") {
+    return errorPayload;
+  }
+
+  if (Array.isArray(errorPayload)) {
+    const messages = errorPayload
+      .map((item) => {
+        if (!item || typeof item !== "object") {
+          return "";
+        }
+        const field = typeof item.field === "string" ? item.field.trim() : "";
+        const message = typeof item.message === "string" ? item.message.trim() : "";
+        if (!message) {
+          return "";
+        }
+        return field ? `${field}: ${message}` : message;
+      })
+      .filter(Boolean);
+
+    if (messages.length > 0) {
+      return messages.join(", ");
+    }
+  }
+
+  return "Произошла ошибка";
+}
+
 async function request(path, options = {}) {
   const headers = new Headers(options.headers || {});
   const isBlob = options.responseType === "blob";
@@ -40,7 +68,7 @@ async function request(path, options = {}) {
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    const message = errorBody.error || "Произошла ошибка";
+    const message = normalizeErrorMessage(errorBody.error);
     const error = new Error(message);
     error.status = response.status;
     if (errorBody.code) {

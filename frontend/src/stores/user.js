@@ -88,6 +88,20 @@ export const useUserStore = defineStore("user", () => {
     return !disabledModules.value.includes(moduleCode);
   });
 
+  function applyFeatureFlagsUpdate(nextDisabledModules = []) {
+    disabledModules.value = Array.isArray(nextDisabledModules) ? nextDisabledModules : [];
+
+    if (!hasModuleAccess.value("gamification")) {
+      overview.value = null;
+    }
+  }
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("feature_flags_updated", (event) => {
+      applyFeatureFlagsUpdate(event?.detail?.disabledModules || []);
+    });
+  }
+
   async function loadReferences() {
     try {
       const data = await apiClient.getReferences();
@@ -156,7 +170,7 @@ export const useUserStore = defineStore("user", () => {
       invitationAccepted.value = Boolean(accepted);
 
       const status = await apiClient.getStatus();
-      disabledModules.value = Array.isArray(status?.disabledModules) ? status.disabledModules : [];
+      applyFeatureFlagsUpdate(status?.disabledModules || []);
 
       if (status.registered) {
         user.value = mapUserPayload(status.user, overview.value);
@@ -201,7 +215,7 @@ export const useUserStore = defineStore("user", () => {
     try {
       const telegramStore = useTelegramStore();
       const response = await apiClient.register(payload);
-      disabledModules.value = Array.isArray(response?.disabledModules) ? response.disabledModules : [];
+      applyFeatureFlagsUpdate(response?.disabledModules || []);
       const mapped = mapUserPayload(response.user, overview.value);
       user.value = mapped;
 
@@ -242,7 +256,7 @@ export const useUserStore = defineStore("user", () => {
     error.value = null;
     try {
       const response = await apiClient.updateProfile(payload);
-      disabledModules.value = Array.isArray(response?.disabledModules) ? response.disabledModules : [];
+      applyFeatureFlagsUpdate(response?.disabledModules || []);
       const mapped = mapUserPayload(response.user, overview.value);
       user.value = mapped;
       if (hasModuleAccess.value("gamification")) {
@@ -284,7 +298,7 @@ export const useUserStore = defineStore("user", () => {
 
       // Выполняем регистрацию
       const response = await apiClient.register(payload);
-      disabledModules.value = Array.isArray(response?.disabledModules) ? response.disabledModules : [];
+      applyFeatureFlagsUpdate(response?.disabledModules || []);
       const mapped = mapUserPayload(response.user, overview.value);
       user.value = mapped;
 
@@ -316,7 +330,7 @@ export const useUserStore = defineStore("user", () => {
     user.value = null;
     inviteFlow.value = { hasInviteCode: false, inviteCodeValid: false, registrationByInvitationOnly: true };
     overview.value = null;
-    disabledModules.value = [];
+    applyFeatureFlagsUpdate([]);
     isInitialized.value = false;
   }
 
@@ -327,7 +341,7 @@ export const useUserStore = defineStore("user", () => {
 
     try {
       const result = await apiClient.completeOnboarding();
-      disabledModules.value = Array.isArray(result?.disabledModules) ? result.disabledModules : disabledModules.value;
+      applyFeatureFlagsUpdate(Array.isArray(result?.disabledModules) ? result.disabledModules : disabledModules.value);
       user.value = {
         ...user.value,
         onboardingCompletedAt: result?.onboardingCompletedAt || new Date().toISOString(),
@@ -360,6 +374,7 @@ export const useUserStore = defineStore("user", () => {
     fullName,
     initials,
     hasModuleAccess,
+    applyFeatureFlagsUpdate,
 
     // actions
     ensureStatus,

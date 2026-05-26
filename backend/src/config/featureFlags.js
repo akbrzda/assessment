@@ -47,6 +47,35 @@ const MODULE_ROUTE_PREFIXES = [
 
 const LOCKED_MODULE_CODES = new Set(FEATURE_MODULES.filter((item) => item.locked).map((item) => item.code));
 
+function parseDisabledModules(rawValue) {
+  if (!rawValue) {
+    return new Set();
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (!Array.isArray(parsed)) {
+      return new Set();
+    }
+
+    return new Set(
+      parsed
+        .map((item) => String(item || "").trim().toLowerCase())
+        .filter(Boolean),
+    );
+  } catch (error) {
+    return new Set();
+  }
+}
+
+function getDisabledModulesSet(rawValue) {
+  return parseDisabledModules(rawValue);
+}
+
+function getDisabledModulesList(rawValue) {
+  return Array.from(getDisabledModulesSet(rawValue));
+}
+
 function getModuleCodeByPath(pathname = "") {
   const matched = MODULE_ROUTE_PREFIXES.find((item) => pathname.startsWith(item.prefix));
   return matched ? matched.moduleCode : null;
@@ -59,5 +88,8 @@ module.exports = {
   CLIENT_ONLY_MODULE_CODES,
   ADMIN_ONLY_MODULE_CODES,
   LOCKED_MODULE_CODES,
+  parseDisabledModules,
+  getDisabledModulesSet,
+  getDisabledModulesList,
   getModuleCodeByPath,
 };
