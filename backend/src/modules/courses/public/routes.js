@@ -17,6 +17,7 @@ router.post("/sections/:sectionId/attempts/:attemptId/complete", coursesControll
 router.post("/modules/:moduleId/attempts/:attemptId/complete", coursesController.completeModuleAttempt);
 router.get("/:courseId/final-assessment/access", coursesController.getFinalAssessmentAccess);
 router.post("/:courseId/final-assessment/attempts/:attemptId/complete", requireCourseFinalAssessmentAccess, coursesController.completeFinalAttempt);
+router.post("/:courseId/certificate", coursesController.issueCourseCertificate);
 
 router.get("/", coursesController.listCourses);
 router.get("/:courseId/sections/:sectionId", coursesController.getCourseSection);

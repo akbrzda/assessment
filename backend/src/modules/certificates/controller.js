@@ -37,6 +37,10 @@ async function getCertificateByUuid(req, res, next) {
     if (!cert || cert.status === "revoked") {
       return res.status(404).json({ error: "Сертификат не найден" });
     }
+    if (String(req.query.download || "").toLowerCase() === "true") {
+      return streamCertificateFile(res, cert, graceDays);
+    }
+
     // Не возвращаем внутренние пути
     const { file_path, ...safeFields } = cert;
     res.json({ ...safeFields, display_status: repository.resolveDisplayStatus(cert, graceDays) });
@@ -45,29 +49,35 @@ async function getCertificateByUuid(req, res, next) {
   }
 }
 
+function streamCertificateFile(res, cert, graceDays) {
+  if (!cert || cert.status !== "issued") {
+    return res.status(404).json({ error: "Сертификат не найден или не готов" });
+  }
+  if (repository.resolveDisplayStatus(cert, graceDays) === "expired") {
+    return res.status(409).json({ error: "Срок действия сертификата истек, скачивание недоступно" });
+  }
+  if (!cert.file_path || !fs.existsSync(cert.file_path)) {
+    return res.status(404).json({ error: "Файл сертификата не найден" });
+  }
+
+  const extension = path.extname(cert.file_path || "").toLowerCase();
+  const mimeType = extension === ".pdf" ? "application/pdf" : extension === ".png" ? "image/png" : "application/octet-stream";
+  res.setHeader("Content-Type", mimeType);
+  res.setHeader("Content-Disposition", `attachment; filename="certificate-${cert.uuid}${extension || ".pdf"}"`);
+  fs.createReadStream(cert.file_path).pipe(res);
+  return null;
+}
+
 /**
  * GET /api/certificates/:uuid/download
- * Скачивание PNG файла.
+ * Скачивание файла сертификата.
  */
 async function downloadCertificate(req, res, next) {
   try {
     const { uuid } = req.params;
     const graceDays = Math.max(0, Number(await settingsService.getSetting("CERTIFICATE_GRACE_DAYS", "0")) || 0);
     const cert = await repository.findByUuid(uuid);
-    if (!cert || cert.status !== "issued") {
-      return res.status(404).json({ error: "Сертификат не найден или не готов" });
-    }
-    if (repository.resolveDisplayStatus(cert, graceDays) === "expired") {
-      return res.status(409).json({ error: "Срок действия сертификата истек, скачивание недоступно" });
-    }
-    if (!cert.file_path || !fs.existsSync(cert.file_path)) {
-      return res.status(404).json({ error: "Файл сертификата не найден" });
-    }
-    const extension = path.extname(cert.file_path || "").toLowerCase();
-    const mimeType = extension === ".png" ? "image/png" : "application/octet-stream";
-    res.setHeader("Content-Type", mimeType);
-    res.setHeader("Content-Disposition", `attachment; filename="certificate-${uuid}${extension || ".png"}"`);
-    fs.createReadStream(cert.file_path).pipe(res);
+    return streamCertificateFile(res, cert, graceDays);
   } catch (err) {
     next(err);
   }

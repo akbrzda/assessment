@@ -102,6 +102,12 @@ const routes = [
     meta: { requiresAuth: true, module: "certificates" },
   },
   {
+    path: "/certificates/:uuid",
+    name: "certificate-details",
+    component: () => import("../views/CertificatesView.vue"),
+    meta: { requiresAuth: true, module: "certificates" },
+  },
+  {
     path: "/module-disabled",
     name: "module-disabled",
     component: () => import("../views/ModuleDisabledView.vue"),

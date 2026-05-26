@@ -229,8 +229,15 @@ export const apiClient = {
   getMyCertificates() {
     return request("/certificates/my");
   },
+  getCertificateByUuid(uuid, options = {}) {
+    const query = options.download ? "?download=true" : "";
+    return request(`/certificates/${uuid}${query}`);
+  },
   downloadCertificate(uuid) {
     return request(`/certificates/${uuid}/download`, { responseType: "blob" });
+  },
+  issueCourseCertificate(courseId) {
+    return request(`/courses/${courseId}/certificate`, { method: "POST" });
   },
   getNotificationSettings() {
     return request("/bot/notifications/settings");

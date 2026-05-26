@@ -40,7 +40,7 @@
           :disabled="downloading[cert.uuid] || (cert.display_status || cert.status) === 'expired'"
           @click="openPreview(cert)"
         >
-          {{ (cert.display_status || cert.status) === "expired" ? "Скачивание недоступно" : downloading[cert.uuid] ? "Загрузка..." : "Предпросмотр и скачать PNG" }}
+          {{ (cert.display_status || cert.status) === "expired" ? "Скачивание недоступно" : downloading[cert.uuid] ? "Загрузка..." : "Предпросмотр и скачать файл" }}
         </button>
       </article>
     </div>
@@ -55,7 +55,7 @@
         <div class="preview-header">
           <div class="preview-title-wrap">
             <h2 class="preview-title">{{ previewCertificate?.course_title || "Сертификат" }}</h2>
-            <p class="preview-subtitle">Предпросмотр PNG</p>
+            <p class="preview-subtitle">Предпросмотр сертификата</p>
           </div>
           <button class="preview-close-btn" type="button" @click="closePreview">Закрыть</button>
         </div>
@@ -76,6 +76,7 @@
 
 <script>
 import { onMounted, onBeforeUnmount, reactive, ref } from "vue";
+import { useRoute } from "vue-router";
 import { Trophy as Trophy } from "lucide-vue-next";
 import { apiClient } from "../services/apiClient";
 import SkeletonCard from "../components/skeleton/SkeletonCard.vue";
@@ -85,6 +86,7 @@ export default {
   name: "CertificatesView",
   components: { SkeletonCard, SkeletonList },
   setup() {
+    const route = useRoute();
     const certificates = ref([]);
     const isLoading = ref(false);
     const errorMessage = ref("");
@@ -110,8 +112,14 @@ export default {
       isLoading.value = true;
       errorMessage.value = "";
       try {
-        const data = await apiClient.getMyCertificates();
-        certificates.value = data.items || [];
+        const uuid = String(route.params.uuid || "").trim();
+        if (uuid) {
+          const cert = await apiClient.getCertificateByUuid(uuid);
+          certificates.value = cert ? [cert] : [];
+        } else {
+          const data = await apiClient.getMyCertificates();
+          certificates.value = data.items || [];
+        }
       } catch (err) {
         console.error("[CertificatesView] ошибка загрузки:", err);
         errorMessage.value = err.message || "Ошибка загрузки";
@@ -152,7 +160,7 @@ export default {
         previewUrl.value = URL.createObjectURL(blob);
         previewFrameSrc.value = `${previewUrl.value}#page=1&zoom=page-fit&toolbar=0&navpanes=0`;
       } catch (err) {
-        console.error("[CertificatesView] ошибка загрузки PNG:", err);
+        console.error("[CertificatesView] ошибка загрузки сертификата:", err);
         previewError.value = err.message || "Не удалось загрузить сертификат";
       } finally {
         previewLoading.value = false;
@@ -166,7 +174,7 @@ export default {
       const url = URL.createObjectURL(previewBlob.value);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `certificate-${previewCertificate.value.uuid}.png`;
+      a.download = `certificate-${previewCertificate.value.uuid}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

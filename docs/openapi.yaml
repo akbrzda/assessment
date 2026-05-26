@@ -271,6 +271,30 @@ paths:
         "200":
           description: Тема отмечена завершённой
 
+  /courses/{courseId}/certificate:
+    post:
+      summary: Выдать сертификат по завершённому курсу
+      tags: [Курсы (MiniApp)]
+      security:
+        - initData: []
+      parameters:
+        - $ref: "#/components/parameters/CourseIdParam"
+      responses:
+        "201":
+          description: Сертификат выдан или уже доступен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Certificate"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Сертификат недоступен для текущего статуса курса
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   # ── Courses: Admin ─────────────────────────
   /admin/courses:
     get:
@@ -415,13 +439,23 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: download
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: При true возвращает файл сертификата вместо JSON
       responses:
         "200":
-          description: Данные сертификата (публично)
+          description: Данные сертификата (публично) или файл сертификата
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Certificate"
+            application/pdf:
+              schema:
+                type: string
+                format: binary
         "404":
           $ref: "#/components/responses/NotFound"
 

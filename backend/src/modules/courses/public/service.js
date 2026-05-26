@@ -4,6 +4,7 @@ const eventsRepo = require("../courseEvents.repository");
 const { listAssignedCourseIds } = require("../courseAssignments.repository");
 const progressRepo = require("../courseProgress.repository");
 const { pool } = require("../../../config/database");
+const certificateService = require("../../../services/certificates/certificateService");
 
 const TOPIC_WORDS_PER_MINUTE = 200;
 const TOPIC_MIN_READING_SECONDS = 5;
@@ -332,6 +333,41 @@ async function completeFinalAttempt({ courseId, attemptId, userId }) {
   };
 }
 
+async function issueCourseCertificate({ courseId, userId, positionId = null, branchId = null, firstName = "", lastName = "" }) {
+  const course = await coursesRepository.getCourseForUser(courseId, userId, { positionId, branchId });
+  if (!course) {
+    const error = new Error("Курс не найден или недоступен");
+    error.status = 404;
+    throw error;
+  }
+
+  if (!course.certificateEnabled) {
+    const error = new Error("Для этого курса выдача сертификата отключена");
+    error.status = 409;
+    throw error;
+  }
+
+  if (course.progress?.status !== "completed") {
+    const error = new Error("Сертификат доступен только после завершения курса");
+    error.status = 409;
+    throw error;
+  }
+
+  const cert = await certificateService.generateCertificate(userId, courseId, null, {
+    firstName,
+    lastName,
+    courseTitle: course.title,
+    scorePercent: null,
+  });
+  if (!cert) {
+    const error = new Error("Не удалось сгенерировать сертификат");
+    error.status = 500;
+    throw error;
+  }
+
+  return cert;
+}
+
 module.exports = {
   listCourses,
   getCourse,
@@ -345,4 +381,5 @@ module.exports = {
   completeModuleAttempt,
   getFinalAssessmentAccess,
   completeFinalAttempt,
+  issueCourseCertificate,
 };

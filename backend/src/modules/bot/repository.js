@@ -44,7 +44,6 @@ async function updateNotificationSettings(userId, { notificationsEnabled, quietS
  * Возвращает краткий статус пользователя для внутреннего проверхи бота.
  */
 async function getUserStatusByTelegramId(telegramId) {
-  console.log("[botRepository.getUserStatusByTelegramId] executing query for telegramId=%s", telegramId);
   const [rows] = await pool.execute(
     `SELECT id, first_name, last_name, notifications_enabled, onboarding_completed_at
      FROM users
@@ -52,16 +51,11 @@ async function getUserStatusByTelegramId(telegramId) {
      LIMIT 1`,
     [telegramId],
   );
-  console.log("[botRepository.getUserStatusByTelegramId] query returned %d rows", rows.length);
-  if (rows.length > 0) {
-    console.log(
-      "[botRepository.getUserStatusByTelegramId] found user: id=%s, first_name=%s, telegram_id will search=%s",
-      rows[0].id,
-      rows[0].first_name,
-      telegramId,
-    );
-  }
   return rows[0] || null;
 }
 
-module.exports = { getNotificationSettings, updateNotificationSettings, getUserStatusByTelegramId };
+async function completeOnboarding(userId) {
+  await pool.execute("UPDATE users SET onboarding_completed_at = COALESCE(onboarding_completed_at, NOW()), updated_at = NOW() WHERE id = ?", [userId]);
+}
+
+module.exports = { getNotificationSettings, updateNotificationSettings, getUserStatusByTelegramId, completeOnboarding };

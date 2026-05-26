@@ -253,4 +253,12 @@ function stopNotificationScheduler() {
   logger.info("Планировщик уведомлений остановлен");
 }
 
-module.exports = { startNotificationScheduler, stopNotificationScheduler };
+module.exports = {
+  startNotificationScheduler,
+  stopNotificationScheduler,
+  processPendingNotifications,
+  retryFailedNotifications,
+  scheduleReminders,
+  deadlineReminders,
+  retryCertificates,
+};

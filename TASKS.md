@@ -1,116 +1,34 @@
-# TASKS
+﻿# TASKS
 
-> Составлен: 25.05.2026
-> Основан на: аудите проекта Assessment (полный обзор кода, архитектуры и безопасности)
-> Приоритеты: Критическое → Архитектура → Качество → Функционал → UX
-
----
-
-## Sprint 1 — Security & Critical Fixes
-
-### Безопасность файловой системы
-
-- [x] Добавить нормализацию и проверку path traversal в `extractFileNameFromUploadsUrl` (запретить `../`, `..\\`)
-- [x] Заменить генерацию имён файлов с `Date.now() + Math.random()` на `crypto.randomUUID()`
-- [x] Добавить явную проверку MIME-типа по содержимому файла (magic bytes) при загрузке медиа
-
-### Безопасность бота
-
-- [x] Добавить timeout (5 сек) на соединение в `backendGet` и `backendPatch` в `bot/src/index.js`
-- [x] Валидировать payload команды `/start` перед использованием в запросах к backend
-- [x] Обернуть все асинхронные обработчики команд бота в `try/catch` с логированием
-
-### Конфигурация
-
-- [x] Добавить проверку `MINI_APP_URL` и `BACKEND_URL` при старте бота (exit с понятной ошибкой)
-- [x] Проверить корректность формата `BOT_TOKEN` перед инициализацией `Telegraf`
-
-### Мелкие исправления
-
-- [x] Исправить опечатку «екорректный идентификатор курса» → «Некорректный идентификатор курса» в `courses/admin/controller.js`
-
----
-
-## Sprint 2 — Backend Architecture
-
-### Разделение слоёв (Controller / Service / Repository)
-
-- [x] Убрать прямые вызовы `pool.query` из `courses/admin/controller.js` — перенести в репозиторий (`resolveManagerBranchIds`)
-- [x] Вынести логику работы с файлами (директории, удаление, генерация пути) из контроллера в отдельный `fileService.js`
-- [x] Заменить синхронные вызовы `fs.existsSync`, `fs.mkdirSync`, `fs.unlinkSync` на асинхронные `fs.promises.*`
-- [x] Убедиться, что ни один контроллер не содержит SQL-запросов напрямую (аудит всех модулей)
-
-### Унификация обработки ошибок
-
-- [x] Изменить формат ответа при ошибках валидации с объединённой строки на массив `[{ field, message }]`
-- [x] Привести все контроллеры к единому формату ошибок через существующий `errorHandler` middleware
-
-### CORS и CSP
-
-- [x] Расширить CSP-директивы в `app.js`: добавить `scriptSrc`, `styleSrc`, `imgSrc`, `mediaSrc` с явными доверенными источниками
-- [x] Убедиться, что в production `allowedOrigins` не пуст (текущая защита уже есть — проверить тесты)
-
----
-
-## Sprint 3 — Certificates Module
-
-- [ ] Проверить наличие миграции для таблицы `certificates` (последняя известная — `040_*`)
-- [ ] Добавить миграцию `041_create_certificates.sql` если таблица не существует
-- [ ] Реализовать генерацию PDF-сертификата через `PDFKit` в `certificates/service.js`
-- [ ] Добавить endpoint `POST /api/courses/:courseId/certificate` для выдачи сертификата по завершению курса
-- [ ] Добавить endpoint `GET /api/certificates/:uuid` для просмотра/скачивания сертификата
-- [ ] Подключить выдачу сертификата к событию завершения курса в `assessmentEvents`
-- [ ] Добавить маршруты сертификатов в `frontend` (страница сертификата)
-
----
-
-## Sprint 4 — Notifications & Bot
-
-### Система уведомлений
-
-- [ ] Добавить миграцию `042_create_bot_notifications.sql` (таблица `bot_notifications`: id, user_id, type, payload, status, sent_at)
-- [ ] Реализовать `notifications/service.js` — создание и отправка уведомлений через бота
-- [ ] Реализовать `notifications/repository.js` — сохранение истории и статусов доставки
-- [ ] Подключить отправку уведомлений к событиям: назначение курса, напоминание о прохождении, выдача сертификата
-
-### Cron-задачи
-
-- [ ] Реализовать cron-службу для фоновых задач (напоминания, просроченные задания)
-- [ ] Использовать BullMQ (уже в зависимостях) для очереди задач генерации сертификатов и уведомлений
-- [ ] Обеспечить идемпотентность cron-задач (блокировка дублирования через статусы в БД)
-
-### Онбординг
-
-- [ ] Унифицировать логику онбординга: единый флаг в БД, используемый и ботом, и MiniApp
-- [ ] Убедиться, что `PATCH /api/public/bot/onboarding/complete` и `completeMiniAppOnboarding` обновляют один и тот же флаг
+> Updated: 26.05.2026
+> Active backlog only
 
 ---
 
 ## Sprint 5 — Frontend Quality
 
-### App.vue рефакторинг
+### App.vue Refactor
 
-- [ ] Вынести логику проверки сети в `composables/useNetworkStatus.js`
-- [ ] Вынести инициализацию Telegram WebApp в `composables/useTelegramInit.js`
-- [ ] Вынести синхронизацию временной зоны в `composables/useTimezone.js`
-- [ ] Очистить `App.vue` от прямой бизнес-логики инициализации
+- [ ] Move network status logic to `composables/useNetworkStatus.js`
+- [ ] Move Telegram WebApp init to `composables/useTelegramInit.js`
+- [ ] Move timezone sync to `composables/useTimezone.js`
+- [ ] Remove direct initialization business logic from `App.vue`
 
 ### Service Worker
 
-- [ ] Добавить обработчик ошибок при регистрации Service Worker в `frontend/src/main.js`
+- [ ] Add Service Worker registration error handling in `frontend/src/main.js`
 
 ### UX
 
-- [ ] Добавить кнопку «Закрыть» для баннера «Нет соединения с интернетом» в `App.vue`
-- [ ] Исправить обработку ошибок валидации на клиенте: поддержать как строку, так и массив `[{ field, message }]`
+- [ ] Add close button for "No internet connection" banner in `App.vue`
+- [ ] Fix client validation error handling: support string and array `[{ field, message }]`
 
 ---
 
 ## Sprint 6 — Testing
 
-- [ ] Добавить unit-тесты для `certificates/service.js`
-- [ ] Добавить unit-тесты для `notifications/service.js`
-- [ ] Добавить интеграционный тест сценария: завершение курса → выдача сертификата
-- [ ] Добавить тест валидации payload бота (команда `/start` с некорректными данными)
-- [ ] Добавить регрессионный тест на path traversal в `extractFileNameFromUploadsUrl`
-- [ ] Запустить `npm audit` по всем модулям и обновить уязвимые зависимости
+- [ ] Add unit tests for `notifications/service.js`
+- [ ] Add integration test: course completion → certificate issuance
+- [ ] Add bot payload validation test (`/start` with invalid payload)
+- [ ] Add path traversal regression test for `extractFileNameFromUploadsUrl`
+- [ ] Run `npm audit` for all modules and update vulnerable dependencies

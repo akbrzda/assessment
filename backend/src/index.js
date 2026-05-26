@@ -9,6 +9,7 @@ const { startAttemptMaintenance } = require("./services/attemptMaintenanceServic
 const { connectRedis } = require("./services/redisService");
 const { startGamificationWorker } = require("./services/gamificationQueueService");
 const { startNotificationScheduler } = require("./services/notifications/notificationScheduler");
+const { startNotificationQueue } = require("./services/notifications/notificationQueueService");
 
 async function bootstrap() {
   try {
@@ -19,7 +20,10 @@ async function bootstrap() {
     startAttemptMaintenance();
     await connectRedis();
     startGamificationWorker();
-    startNotificationScheduler();
+    const queueStarted = await startNotificationQueue();
+    if (!queueStarted) {
+      startNotificationScheduler();
+    }
 
     server.listen(config.port, () => {
       logger.info(`Server listening on port ${config.port}`);

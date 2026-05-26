@@ -183,6 +183,23 @@ async function completeFinalAttempt(req, res, next) {
   }
 }
 
+async function issueCourseCertificate(req, res, next) {
+  try {
+    const courseId = assertCourseId(req.params.courseId);
+    const payload = await coursesService.issueCourseCertificate({
+      courseId,
+      userId: req.currentUser.id,
+      positionId: req.currentUser.positionId,
+      branchId: req.currentUser.branchId,
+      firstName: req.currentUser.firstName,
+      lastName: req.currentUser.lastName,
+    });
+    res.status(201).json(payload);
+  } catch (error) {
+    handleControllerError(error, res, next);
+  }
+}
+
 module.exports = {
   listCourses,
   getCourse,
@@ -196,4 +213,5 @@ module.exports = {
   completeModuleAttempt,
   getFinalAssessmentAccess,
   completeFinalAttempt,
+  issueCourseCertificate,
 };

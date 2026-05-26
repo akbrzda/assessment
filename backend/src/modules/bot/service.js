@@ -128,10 +128,19 @@ async function patchNotificationsByTelegramId(telegramId, notificationsEnabled) 
   await botRepository.updateNotificationSettings(row.id, { notificationsEnabled });
 }
 
+async function completeMiniAppOnboarding(currentUser) {
+  if (!currentUser) {
+    throw buildError("Пользователь не найден", 404);
+  }
+  await botRepository.completeOnboarding(currentUser.id);
+  return { success: true };
+}
+
 module.exports = {
   getNotificationSettings,
   updateNotificationSettings,
   getUserStatusByTelegramId,
   getOnboardingConfig,
   patchNotificationsByTelegramId,
+  completeMiniAppOnboarding,
 };

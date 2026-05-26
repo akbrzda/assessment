@@ -27,7 +27,7 @@ test("generateCertificate: возвращает существующий issued 
     updateStatus: async () => {},
   };
   const generatorMock = {
-    generatePng: async () => {
+    generatePdf: async () => {
       throw new Error("Генератор не должен вызываться");
     },
   };
@@ -36,6 +36,8 @@ test("generateCertificate: возвращает существующий issued 
     "../../modules/certificates/repository": repositoryMock,
     "./pdfGenerator": generatorMock,
     "../../utils/logger": { debug: () => {}, info: () => {}, error: () => {} },
+    "../settingsService": { getSetting: async () => "365" },
+    "../../services/settingsService": { getSetting: async () => "365" },
   });
 
   const result = await certificateService.generateCertificate(10, 20, 30, {
@@ -60,13 +62,15 @@ test("generateCertificate: при успешной генерации сохра
     updateStatus: async (...args) => repositoryCalls.updateStatus.push(args),
   };
   const generatorMock = {
-    generatePng: async () => ({ filePath: "/tmp/cert.png", fileName: "cert.png" }),
+    generatePdf: async () => ({ filePath: "/tmp/cert.pdf", fileName: "cert.pdf" }),
   };
 
   const certificateService = loadWithMocks(path.resolve(__dirname, "../../src/services/certificates/certificateService"), {
     "../../modules/certificates/repository": repositoryMock,
     "./pdfGenerator": generatorMock,
     "../../utils/logger": { debug: () => {}, info: () => {}, error: () => {} },
+    "../settingsService": { getSetting: async () => "365" },
+    "../../services/settingsService": { getSetting: async () => "365" },
   });
 
   const result = await certificateService.generateCertificate(10, 20, null, {
@@ -93,7 +97,7 @@ test("generateCertificate: при ошибке генератора помеча
     updateStatus: async (...args) => repositoryCalls.updateStatus.push(args),
   };
   const generatorMock = {
-    generatePng: async () => {
+    generatePdf: async () => {
       throw new Error("Ошибка рендера");
     },
   };
@@ -102,6 +106,8 @@ test("generateCertificate: при ошибке генератора помеча
     "../../modules/certificates/repository": repositoryMock,
     "./pdfGenerator": generatorMock,
     "../../utils/logger": { debug: () => {}, info: () => {}, error: () => {} },
+    "../settingsService": { getSetting: async () => "365" },
+    "../../services/settingsService": { getSetting: async () => "365" },
   });
 
   const result = await certificateService.generateCertificate(10, 20, null, {
