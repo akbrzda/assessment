@@ -3,11 +3,19 @@ const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const config = require("./config/env");
-const { errorHandler, errorResponseNormalizer, timezone: timezoneMiddleware } = require("./middleware");
+const {
+  errorHandler,
+  errorResponseNormalizer,
+  timezone: timezoneMiddleware,
+} = require("./middleware");
 const correlationId = require("./middleware/correlationId");
 const featureFlagsGate = require("./middleware/featureFlagsGate");
 const verifyJWT = require("./middleware/verifyJWT");
-const { verifyCertificateLimiter, authLimiter, adminGlobalLimiter } = require("./middleware/rateLimit");
+const {
+  verifyCertificateLimiter,
+  authLimiter,
+  adminGlobalLimiter,
+} = require("./middleware/rateLimit");
 const { UPLOADS_ROOT, resolveUploadsPath } = require("./utils/uploads");
 
 const authModule = require("./modules/auth");
@@ -29,7 +37,10 @@ const adminSettingsRoutes = require("./modules/admin/settings");
 const adminProfileRoutes = require("./modules/admin/profile");
 const adminSearchRoutes = require("./modules/admin/search/routes");
 const adminAuditLogsRoutes = require("./modules/admin/audit-logs/routes");
-const { metricsMiddleware, toPrometheusMetrics } = require("./services/metricsService");
+const {
+  metricsMiddleware,
+  toPrometheusMetrics,
+} = require("./services/metricsService");
 const botModule = require("./modules/bot");
 const certificatesModule = require("./modules/certificates");
 const { registerAssessmentEvents } = require("./events/assessmentEvents");
@@ -42,7 +53,9 @@ app.set("trust proxy", 1);
 
 const isProduction = config.nodeEnv === "production";
 if (isProduction && config.allowedOrigins.length === 0) {
-  throw new Error("ALLOWED_ORIGINS is not configured: production startup aborted");
+  throw new Error(
+    "ALLOWED_ORIGINS is not configured: production startup aborted",
+  );
 }
 
 const corsOptions = {
@@ -88,11 +101,22 @@ app.use("/uploads", (req, res, next) => {
 });
 
 // Restrict certificate and course covers to authorized users
-app.use("/uploads/certificates", verifyJWT, express.static(resolveUploadsPath("certificates")));
-app.use("/uploads/courses", verifyJWT, express.static(resolveUploadsPath("courses")));
+app.use(
+  "/uploads/certificates",
+  verifyJWT,
+  express.static(resolveUploadsPath("certificates")),
+);
+app.use(
+  "/uploads/courses",
+  verifyJWT,
+  express.static(resolveUploadsPath("courses")),
+);
 
 // Course media (videos, images) must be public — browsers cannot send Authorization for <video>/<img>
-app.use("/uploads/course-media", express.static(resolveUploadsPath("course-media")));
+app.use(
+  "/uploads/course-media",
+  express.static(resolveUploadsPath("course-media")),
+);
 
 // Public static files (icons, badges, logos)
 app.use("/uploads", express.static(UPLOADS_ROOT));
@@ -126,7 +150,10 @@ apiRouter.use("/admin/analytics", analyticsModule.admin.routes);
 apiRouter.use("/admin/branches", adminBranchRoutes);
 apiRouter.use("/admin/positions", adminPositionRoutes);
 apiRouter.use("/admin/settings", adminSettingsRoutes);
-apiRouter.use("/admin/gamification/rules", gamificationModule.admin.rules.routes);
+apiRouter.use(
+  "/admin/gamification/rules",
+  gamificationModule.admin.rules.routes,
+);
 apiRouter.use("/admin/invitations", invitationModule.admin.routes);
 apiRouter.use("/admin/profile", adminProfileRoutes);
 // Role and granular permissions management is intentionally disabled here.
@@ -142,12 +169,28 @@ apiRouter.use("/gamification", gamificationModule.routes);
 apiRouter.use("/leaderboard", leaderboardRoutes);
 apiRouter.use("/courses", coursesModule.routes);
 apiRouter.use("/bot", botModule.routes);
-apiRouter.use("/verify", verifyCertificateLimiter, certificatesModule.verifyRouter);
+apiRouter.use(
+  "/verify",
+  verifyCertificateLimiter,
+  certificatesModule.verifyRouter,
+);
 apiRouter.use("/certificates", certificatesModule.publicRouter);
 apiRouter.use("/admin/certificates", certificatesModule.adminRouter);
 // Main API is exposed only as v1.
 app.use("/api/v1", apiRouter);
 app.get("/metrics", (req, res) => {
+  const token = config.metricsToken;
+  const provided = req.headers["x-metrics-token"] || req.query.token || "";
+
+  // В production требуется явный токен; в development достаточно localhost
+  const isLocalhost =
+    req.ip === "127.0.0.1" || req.ip === "::1" || req.ip === "::ffff:127.0.0.1";
+  const isTokenValid = token && provided === token;
+
+  if (!isLocalhost && !isTokenValid) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
   res.setHeader("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
   res.send(toPrometheusMetrics());
 });

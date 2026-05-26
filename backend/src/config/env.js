@@ -4,7 +4,12 @@ const dotenv = require("dotenv");
 
 const envDir = path.resolve(__dirname, "../../");
 const currentMode = process.env.NODE_ENV || "development";
-const envFiles = [".env", ".env.local", `.env.${currentMode}`, `.env.${currentMode}.local`];
+const envFiles = [
+  ".env",
+  ".env.local",
+  `.env.${currentMode}`,
+  `.env.${currentMode}.local`,
+];
 
 for (const filename of envFiles) {
   const envPath = path.join(envDir, filename);
@@ -28,12 +33,18 @@ const requiredVars = [
 const missingVars = requiredVars.filter((key) => !process.env[key]);
 
 if (missingVars.length) {
-  console.warn(`[env] Missing variables: ${missingVars.join(", ")}. Check your environment configuration.`);
+  console.warn(
+    `[env] Missing variables: ${missingVars.join(", ")}. Check your environment configuration.`,
+  );
 }
 
-const missingSecurityVars = ["JWT_SECRET", "JWT_REFRESH_SECRET"].filter((key) => !process.env[key]);
+const missingSecurityVars = ["JWT_SECRET", "JWT_REFRESH_SECRET"].filter(
+  (key) => !process.env[key],
+);
 if (missingSecurityVars.length) {
-  throw new Error(`[env] Security variables are required: ${missingSecurityVars.join(", ")}`);
+  throw new Error(
+    `[env] Security variables are required: ${missingSecurityVars.join(", ")}`,
+  );
 }
 
 function parseList(value) {
@@ -67,7 +78,9 @@ module.exports = {
   dbReplica: process.env.DB_REPLICA_HOST
     ? {
         host: process.env.DB_REPLICA_HOST,
-        port: Number(process.env.DB_REPLICA_PORT || process.env.DB_PORT || 3306),
+        port: Number(
+          process.env.DB_REPLICA_PORT || process.env.DB_PORT || 3306,
+        ),
         database: process.env.DB_NAME,
         user: process.env.DB_REPLICA_USER || process.env.DB_USER,
         password: process.env.DB_REPLICA_PASSWORD || process.env.DB_PASSWORD,
@@ -81,6 +94,7 @@ module.exports = {
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
   allowedOrigins: parseList(process.env.ALLOWED_ORIGINS),
   superAdminIds: parseList(process.env.SUPERADMIN_IDS),
+  metricsToken: process.env.METRICS_TOKEN || "",
   redis: {
     url: process.env.REDIS_URL || "",
     host: process.env.REDIS_HOST || "127.0.0.1",
@@ -91,7 +105,11 @@ module.exports = {
   },
 };
 
-if (module.exports.nodeEnv === "production" && module.exports.allowedOrigins.length === 0) {
-  throw new Error("[env] В production переменная ALLOWED_ORIGINS обязательна и не может быть пустой");
+if (
+  module.exports.nodeEnv === "production" &&
+  module.exports.allowedOrigins.length === 0
+) {
+  throw new Error(
+    "[env] В production переменная ALLOWED_ORIGINS обязательна и не может быть пустой",
+  );
 }
-

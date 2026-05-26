@@ -92,8 +92,16 @@ async function findAll() {
   return rows;
 }
 
-async function findByCreator(userId) {
-  const [rows] = await pool.execute(
+async function findByCreator(userId, { page = 1, limit = 50 } = {}) {
+  const offset = (page - 1) * limit;
+
+  const [[countRow]] = await pool.query(
+    "SELECT COUNT(*) AS total FROM invitations WHERE created_by = ?",
+    [userId],
+  );
+  const total = Number(countRow?.total || 0);
+
+  const [rows] = await pool.query(
     `SELECT inv.id, inv.code, inv.first_name, inv.last_name, inv.phone,
             inv.position_id, inv.invited_user_id,
             inv.created_at, inv.used_at,
@@ -110,10 +118,11 @@ async function findByCreator(userId) {
      LEFT JOIN positions p ON p.id = inv.position_id
      LEFT JOIN users used_user ON used_user.id = inv.used_by
      WHERE inv.created_by = ?
-     ORDER BY inv.id ASC`,
-    [userId],
+     ORDER BY inv.id ASC
+     LIMIT ? OFFSET ?`,
+    [userId, limit, offset],
   );
-  return rows;
+  return { items: rows, total, page, limit };
 }
 
 async function findByBranch(branchId) {

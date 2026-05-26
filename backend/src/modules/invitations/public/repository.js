@@ -17,8 +17,8 @@ async function findById(invitationId) {
   return invitationModel.findById(invitationId);
 }
 
-async function listByCreator(userId) {
-  return invitationModel.listInvitationsByCreator(userId);
+async function listByCreator(userId, pagination) {
+  return invitationModel.listInvitationsByCreator(userId, pagination);
 }
 
 async function deleteInvitation(invitationId) {

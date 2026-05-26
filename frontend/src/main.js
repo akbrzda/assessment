@@ -26,8 +26,9 @@ app.mount("#app");
 
 // Регистрируем Service Worker для offline-кэширования и retry queue
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/sw.js").catch(() => {
-    // SW не поддерживается в текущем окружении — продолжаем без него
+  navigator.serviceWorker.register("/sw.js").catch((err) => {
+    // Логируем ошибку регистрации — продолжаем без SW
+    console.error("[SW] Registration failed:", err);
   });
 
   // При восстановлении сети просим SW отправить накопленную очередь

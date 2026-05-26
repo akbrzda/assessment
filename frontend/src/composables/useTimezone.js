@@ -24,11 +24,8 @@ export function useTimezone() {
       timezone.value = currentTimezone;
 
       await apiClient.updateTimezone(currentTimezone);
-
-      console.log("✅ Часовой пояс обновлен:", currentTimezone);
     } catch (err) {
       error.value = err.message;
-      console.error("❌ Ошибка обновления часового пояса:", err);
     } finally {
       isUpdating.value = false;
     }

@@ -2,7 +2,8 @@
 const ExcelJS = require("exceljs");
 const PDFDocument = require("pdfkit");
 
-const ACTIVE_USER_CONDITION = "u.deleted_at IS NULL AND COALESCE(u.is_active, 1) = 1";
+const ACTIVE_USER_CONDITION =
+  "u.deleted_at IS NULL AND COALESCE(u.is_active, 1) = 1";
 
 /**
  * Получить общую статистику
@@ -17,17 +18,23 @@ exports.getOverallStats = async (req, res, next) => {
     const params = [];
 
     if (userRole === "manager") {
-      whereConditions.push("u.branch_id = (SELECT branch_id FROM users WHERE id = ?)");
+      whereConditions.push(
+        "u.branch_id = (SELECT branch_id FROM users WHERE id = ?)",
+      );
       params.push(userId);
     }
 
     if (dateFrom) {
-      whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
+      whereConditions.push(
+        "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?",
+      );
       params.push(dateFrom);
     }
 
     if (dateTo) {
-      whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
+      whereConditions.push(
+        "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?",
+      );
       params.push(dateTo);
     }
 
@@ -41,7 +48,10 @@ exports.getOverallStats = async (req, res, next) => {
       params.push(positionId);
     }
 
-    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
+    const whereClause =
+      whereConditions.length > 0
+        ? `WHERE ${whereConditions.join(" AND ")}`
+        : "";
 
     const [stats] = await (
       await getReadPool()
@@ -64,7 +74,6 @@ exports.getOverallStats = async (req, res, next) => {
 
     res.json({ stats: stats[0] });
   } catch (error) {
-    console.error("Get overall stats error:", error);
     next(error);
   }
 };
@@ -82,16 +91,23 @@ exports.getBranchAnalytics = async (req, res, next) => {
     const attemptParams = [];
 
     if (dateFrom) {
-      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
+      attemptConditions.push(
+        "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?",
+      );
       attemptParams.push(dateFrom);
     }
 
     if (dateTo) {
-      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
+      attemptConditions.push(
+        "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?",
+      );
       attemptParams.push(dateTo);
     }
 
-    const attemptConditionsSql = attemptConditions.length > 0 ? ` AND ${attemptConditions.join(" AND ")}` : "";
+    const attemptConditionsSql =
+      attemptConditions.length > 0
+        ? ` AND ${attemptConditions.join(" AND ")}`
+        : "";
 
     const [branches] = await (
       await getReadPool()
@@ -117,7 +133,6 @@ exports.getBranchAnalytics = async (req, res, next) => {
 
     res.json({ branches });
   } catch (error) {
-    console.error("Get branch analytics error:", error);
     next(error);
   }
 };
@@ -135,16 +150,23 @@ exports.getPositionAnalytics = async (req, res, next) => {
     const attemptParams = [];
 
     if (dateFrom) {
-      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
+      attemptConditions.push(
+        "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?",
+      );
       attemptParams.push(dateFrom);
     }
 
     if (dateTo) {
-      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
+      attemptConditions.push(
+        "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?",
+      );
       attemptParams.push(dateTo);
     }
 
-    const attemptConditionsSql = attemptConditions.length > 0 ? ` AND ${attemptConditions.join(" AND ")}` : "";
+    const attemptConditionsSql =
+      attemptConditions.length > 0
+        ? ` AND ${attemptConditions.join(" AND ")}`
+        : "";
 
     const filters = [];
     const filterParams = [];
@@ -159,7 +181,8 @@ exports.getPositionAnalytics = async (req, res, next) => {
       filterParams.push(branchId);
     }
 
-    const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
+    const whereClause =
+      filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
 
     const [positions] = await (
       await getReadPool()
@@ -186,7 +209,6 @@ exports.getPositionAnalytics = async (req, res, next) => {
 
     res.json({ positions });
   } catch (error) {
-    console.error("Get position analytics error:", error);
     next(error);
   }
 };
@@ -204,17 +226,23 @@ exports.getTopUsers = async (req, res, next) => {
     const params = [];
 
     if (userRole === "manager") {
-      whereConditions.push("u.branch_id = (SELECT branch_id FROM users WHERE id = ?)");
+      whereConditions.push(
+        "u.branch_id = (SELECT branch_id FROM users WHERE id = ?)",
+      );
       params.push(userId);
     }
 
     if (dateFrom) {
-      whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
+      whereConditions.push(
+        "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?",
+      );
       params.push(dateFrom);
     }
 
     if (dateTo) {
-      whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
+      whereConditions.push(
+        "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?",
+      );
       params.push(dateTo);
     }
 
@@ -228,7 +256,10 @@ exports.getTopUsers = async (req, res, next) => {
       params.push(positionId);
     }
 
-    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
+    const whereClause =
+      whereConditions.length > 0
+        ? `WHERE ${whereConditions.join(" AND ")}`
+        : "";
 
     const [users] = await (
       await getReadPool()
@@ -258,7 +289,6 @@ exports.getTopUsers = async (req, res, next) => {
 
     res.json({ users });
   } catch (error) {
-    console.error("Get top users error:", error);
     next(error);
   }
 };
@@ -272,11 +302,16 @@ exports.getAssessmentTrends = async (req, res, next) => {
     const userRole = req.user.role;
     const userId = req.user.id;
 
-    let whereConditions = ["cup.completed_at IS NOT NULL", ACTIVE_USER_CONDITION];
+    let whereConditions = [
+      "cup.completed_at IS NOT NULL",
+      ACTIVE_USER_CONDITION,
+    ];
     const params = [];
 
     if (userRole === "manager") {
-      whereConditions.push("u.branch_id = (SELECT branch_id FROM users WHERE id = ?)");
+      whereConditions.push(
+        "u.branch_id = (SELECT branch_id FROM users WHERE id = ?)",
+      );
       params.push(userId);
     }
 
@@ -295,7 +330,10 @@ exports.getAssessmentTrends = async (req, res, next) => {
       params.push(branchId);
     }
 
-    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
+    const whereClause =
+      whereConditions.length > 0
+        ? `WHERE ${whereConditions.join(" AND ")}`
+        : "";
 
     const [trends] = await (
       await getReadPool()
@@ -323,18 +361,25 @@ exports.getAssessmentTrends = async (req, res, next) => {
 
       const prevScore = trends[index - 1].avg_score;
       const currentScore = item.avg_score;
-      const changePercent = prevScore > 0 ? (((currentScore - prevScore) / prevScore) * 100).toFixed(2) : 0;
+      const changePercent =
+        prevScore > 0
+          ? (((currentScore - prevScore) / prevScore) * 100).toFixed(2)
+          : 0;
 
       return {
         ...item,
         change_percent: parseFloat(changePercent),
-        change_direction: changePercent > 0 ? "positive" : changePercent < 0 ? "negative" : "neutral",
+        change_direction:
+          changePercent > 0
+            ? "positive"
+            : changePercent < 0
+              ? "negative"
+              : "neutral",
       };
     });
 
     res.json({ trends: trendsWithChanges });
   } catch (error) {
-    console.error("Get assessment trends error:", error);
     next(error);
   }
 };
@@ -352,16 +397,23 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
     const attemptParams = [];
 
     if (dateFrom) {
-      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
+      attemptConditions.push(
+        "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?",
+      );
       attemptParams.push(dateFrom);
     }
 
     if (dateTo) {
-      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
+      attemptConditions.push(
+        "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?",
+      );
       attemptParams.push(dateTo);
     }
 
-    const attemptConditionsSql = attemptConditions.length > 0 ? ` AND ${attemptConditions.join(" AND ")}` : "";
+    const attemptConditionsSql =
+      attemptConditions.length > 0
+        ? ` AND ${attemptConditions.join(" AND ")}`
+        : "";
 
     const [branches] = await (
       await getReadPool()
@@ -405,15 +457,29 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
             ORDER BY cup.progress_percent
             LIMIT 1 OFFSET ?
           `,
-            [branch.id, ...(dateFrom ? [dateFrom] : []), ...(dateTo ? [dateTo] : []), Math.floor(branch.total_attempts / 2)],
+            [
+              branch.id,
+              ...(dateFrom ? [dateFrom] : []),
+              ...(dateTo ? [dateTo] : []),
+              Math.floor(branch.total_attempts / 2),
+            ],
           );
 
           return {
             ...branch,
             median_score: medianResult[0]?.progress_percent || 0,
-            excellent_percent: ((branch.excellent_count / branch.total_count) * 100).toFixed(2),
-            good_percent: ((branch.good_count / branch.total_count) * 100).toFixed(2),
-            pass_percent: ((branch.passed_count / branch.total_count) * 100).toFixed(2),
+            excellent_percent: (
+              (branch.excellent_count / branch.total_count) *
+              100
+            ).toFixed(2),
+            good_percent: (
+              (branch.good_count / branch.total_count) *
+              100
+            ).toFixed(2),
+            pass_percent: (
+              (branch.passed_count / branch.total_count) *
+              100
+            ).toFixed(2),
           };
         }
         return branch;
@@ -422,7 +488,6 @@ exports.getDetailedBranchAnalytics = async (req, res, next) => {
 
     res.json({ branches: detailedBranches });
   } catch (error) {
-    console.error("Get detailed branch analytics error:", error);
     next(error);
   }
 };
@@ -440,16 +505,23 @@ exports.getCombinedAnalytics = async (req, res, next) => {
     const attemptParams = [];
 
     if (dateFrom) {
-      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
+      attemptConditions.push(
+        "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?",
+      );
       attemptParams.push(dateFrom);
     }
 
     if (dateTo) {
-      attemptConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
+      attemptConditions.push(
+        "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?",
+      );
       attemptParams.push(dateTo);
     }
 
-    const attemptConditionsSql = attemptConditions.length > 0 ? ` AND ${attemptConditions.join(" AND ")}` : "";
+    const attemptConditionsSql =
+      attemptConditions.length > 0
+        ? ` AND ${attemptConditions.join(" AND ")}`
+        : "";
 
     const filters = [];
     const filterParams = [];
@@ -464,7 +536,8 @@ exports.getCombinedAnalytics = async (req, res, next) => {
       filterParams.push(branchId);
     }
 
-    const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
+    const whereClause =
+      filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
 
     const [combined] = await (
       await getReadPool()
@@ -493,7 +566,6 @@ exports.getCombinedAnalytics = async (req, res, next) => {
 
     res.json({ combined });
   } catch (error) {
-    console.error("Get combined analytics error:", error);
     next(error);
   }
 };
@@ -534,7 +606,9 @@ exports.getAssessmentReport = async (req, res, next) => {
 
     // Проверка прав доступа по филиалу для manager
     if (userRole === "manager") {
-      const [managerRows] = await (await getReadPool()).query("SELECT branch_id FROM users WHERE id = ?", [userId]);
+      const [managerRows] = await (
+        await getReadPool()
+      ).query("SELECT branch_id FROM users WHERE id = ?", [userId]);
       const managerBranchId = managerRows?.[0]?.branch_id;
       const [courseBranches] = await (
         await getReadPool()
@@ -550,7 +624,10 @@ exports.getAssessmentReport = async (req, res, next) => {
       );
 
       const courseBranchId = courseBranches?.[0]?.branch_id || null;
-      if (!managerBranchId || (courseBranchId && Number(managerBranchId) !== Number(courseBranchId))) {
+      if (
+        !managerBranchId ||
+        (courseBranchId && Number(managerBranchId) !== Number(courseBranchId))
+      ) {
         return res.status(403).json({ error: "Нет доступа к этому курсу" });
       }
     }
@@ -596,11 +673,16 @@ exports.getAssessmentReport = async (req, res, next) => {
         avg_score: course.avg_score,
         passed_count: Number(course.completed_count || 0),
         pass_percent:
-          Number(course.total_count || 0) > 0 ? ((Number(course.completed_count || 0) / Number(course.total_count || 0)) * 100).toFixed(2) : 0,
+          Number(course.total_count || 0) > 0
+            ? (
+                (Number(course.completed_count || 0) /
+                  Number(course.total_count || 0)) *
+                100
+              ).toFixed(2)
+            : 0,
       },
     });
   } catch (error) {
-    console.error("Get course report error:", error);
     next(error);
   }
 };
@@ -643,15 +725,21 @@ exports.getUserReport = async (req, res, next) => {
 
     // Проверка прав доступа
     if (userRole === "manager") {
-      const [userBranch] = await (await getReadPool()).query("SELECT branch_id FROM users WHERE id = ?", [userId]);
+      const [userBranch] = await (
+        await getReadPool()
+      ).query("SELECT branch_id FROM users WHERE id = ?", [userId]);
       const managerBranchId = userBranch[0]?.branch_id;
 
       if (!managerBranchId) {
-        return res.status(403).json({ error: "Нет доступа к этому пользователю" });
+        return res
+          .status(403)
+          .json({ error: "Нет доступа к этому пользователю" });
       }
 
       if (managerBranchId !== user.branch_id) {
-        return res.status(403).json({ error: "Нет доступа к этому пользователю" });
+        return res
+          .status(403)
+          .json({ error: "Нет доступа к этому пользователю" });
       }
     }
 
@@ -659,12 +747,14 @@ exports.getUserReport = async (req, res, next) => {
     const params = [targetUserId];
 
     if (dateFrom) {
-      dateCondition += " AND COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?";
+      dateCondition +=
+        " AND COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?";
       params.push(dateFrom);
     }
 
     if (dateTo) {
-      dateCondition += " AND COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?";
+      dateCondition +=
+        " AND COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?";
       params.push(dateTo);
     }
 
@@ -734,7 +824,12 @@ exports.getUserReport = async (req, res, next) => {
       ${dateFrom ? "AND COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?" : ""}
       ${dateTo ? "AND COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?" : ""}
     `,
-      [user.position_id, targetUserId, ...(dateFrom ? [dateFrom] : []), ...(dateTo ? [dateTo] : [])],
+      [
+        user.position_id,
+        targetUserId,
+        ...(dateFrom ? [dateFrom] : []),
+        ...(dateTo ? [dateTo] : []),
+      ],
     );
 
     res.json({
@@ -745,7 +840,6 @@ exports.getUserReport = async (req, res, next) => {
       comparison: comparison[0],
     });
   } catch (error) {
-    console.error("Get user report error:", error);
     next(error);
   }
 };
@@ -771,21 +865,30 @@ exports.exportToExcel = async (req, res, next) => {
       const params = [];
 
       if (userRole === "manager") {
-        whereConditions.push("u.branch_id = (SELECT branch_id FROM users WHERE id = ?)");
+        whereConditions.push(
+          "u.branch_id = (SELECT branch_id FROM users WHERE id = ?)",
+        );
         params.push(userId);
       }
 
       if (dateFrom) {
-        whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
+        whereConditions.push(
+          "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?",
+        );
         params.push(dateFrom);
       }
 
       if (dateTo) {
-        whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
+        whereConditions.push(
+          "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?",
+        );
         params.push(dateTo);
       }
 
-      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
+      const whereClause =
+        whereConditions.length > 0
+          ? `WHERE ${whereConditions.join(" AND ")}`
+          : "";
 
       const [branches] = await (
         await getReadPool()
@@ -807,7 +910,11 @@ exports.exportToExcel = async (req, res, next) => {
         userRole === "manager" ? [userId] : [],
       );
 
-      sheet.columns = Object.keys(branches[0] || {}).map((key) => ({ header: key, key, width: 20 }));
+      sheet.columns = Object.keys(branches[0] || {}).map((key) => ({
+        header: key,
+        key,
+        width: 20,
+      }));
       sheet.addRows(branches);
 
       // Стилизация заголовков
@@ -826,17 +933,23 @@ exports.exportToExcel = async (req, res, next) => {
       const params = [];
 
       if (userRole === "manager") {
-        whereConditions.push("u.branch_id = (SELECT branch_id FROM users WHERE id = ?)");
+        whereConditions.push(
+          "u.branch_id = (SELECT branch_id FROM users WHERE id = ?)",
+        );
         params.push(userId);
       }
 
       if (dateFrom) {
-        whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
+        whereConditions.push(
+          "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?",
+        );
         params.push(dateFrom);
       }
 
       if (dateTo) {
-        whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
+        whereConditions.push(
+          "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?",
+        );
         params.push(dateTo);
       }
 
@@ -850,7 +963,10 @@ exports.exportToExcel = async (req, res, next) => {
         params.push(positionId);
       }
 
-      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
+      const whereClause =
+        whereConditions.length > 0
+          ? `WHERE ${whereConditions.join(" AND ")}`
+          : "";
 
       const [users] = await (
         await getReadPool()
@@ -876,7 +992,11 @@ exports.exportToExcel = async (req, res, next) => {
         params,
       );
 
-      sheet.columns = Object.keys(users[0] || {}).map((key) => ({ header: key, key, width: 20 }));
+      sheet.columns = Object.keys(users[0] || {}).map((key) => ({
+        header: key,
+        key,
+        width: 20,
+      }));
       sheet.addRows(users);
 
       sheet.getRow(1).font = { bold: true };
@@ -888,13 +1008,18 @@ exports.exportToExcel = async (req, res, next) => {
       sheet.getRow(1).font.color = { argb: "FFFFFFFF" };
     }
 
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename=report_${type}_${Date.now()}.xlsx`);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=report_${type}_${Date.now()}.xlsx`,
+    );
 
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
-    console.error("Export to Excel error:", error);
     next(error);
   }
 };
@@ -911,14 +1036,21 @@ exports.exportToPDF = async (req, res, next) => {
     const doc = new PDFDocument({ margin: 50 });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=report_${type}_${Date.now()}.pdf`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=report_${type}_${Date.now()}.pdf`,
+    );
 
     doc.pipe(res);
 
     // Заголовок
     doc.fontSize(20).text("Отчёт по курсам", { align: "center" });
     doc.moveDown();
-    doc.fontSize(12).text(`Дата формирования: ${new Date().toLocaleDateString("ru-RU")}`, { align: "center" });
+    doc
+      .fontSize(12)
+      .text(`Дата формирования: ${new Date().toLocaleDateString("ru-RU")}`, {
+        align: "center",
+      });
     doc.moveDown(2);
 
     if (type === "branches") {
@@ -926,21 +1058,30 @@ exports.exportToPDF = async (req, res, next) => {
       const params = [];
 
       if (userRole === "manager") {
-        whereConditions.push("u.branch_id = (SELECT branch_id FROM users WHERE id = ?)");
+        whereConditions.push(
+          "u.branch_id = (SELECT branch_id FROM users WHERE id = ?)",
+        );
         params.push(userId);
       }
 
       if (dateFrom) {
-        whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
+        whereConditions.push(
+          "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?",
+        );
         params.push(dateFrom);
       }
 
       if (dateTo) {
-        whereConditions.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
+        whereConditions.push(
+          "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?",
+        );
         params.push(dateTo);
       }
 
-      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
+      const whereClause =
+        whereConditions.length > 0
+          ? `WHERE ${whereConditions.join(" AND ")}`
+          : "";
 
       const [branches] = await (
         await getReadPool()
@@ -968,14 +1109,15 @@ exports.exportToPDF = async (req, res, next) => {
         doc.fontSize(12).text(`${index + 1}. ${branch.name}`, { bold: true });
         doc.fontSize(10).text(`   Всего курсов: ${branch.total_attempts}`);
         doc.text(`   Средний прогресс: ${branch.avg_score}%`);
-        doc.text(`   Завершено: ${branch.passed_count} из ${branch.total_count}`);
+        doc.text(
+          `   Завершено: ${branch.passed_count} из ${branch.total_count}`,
+        );
         doc.moveDown();
       });
     }
 
     doc.end();
   } catch (error) {
-    console.error("Export to PDF error:", error);
     next(error);
   }
 };
@@ -993,11 +1135,15 @@ exports.getFailureReasons = async (req, res, next) => {
     const params = [];
 
     if (dateFrom) {
-      where.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?");
+      where.push(
+        "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) >= ?",
+      );
       params.push(dateFrom);
     }
     if (dateTo) {
-      where.push("COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?");
+      where.push(
+        "COALESCE(cup.completed_at, cup.updated_at, cup.created_at) <= ?",
+      );
       params.push(dateTo);
     }
     if (userRole === "manager") {
@@ -1027,7 +1173,8 @@ exports.getFailureReasons = async (req, res, next) => {
     const wrongAnswersCount = Number(rows?.[0]?.wrong_answers_count || 0);
     const totalFailed = Number(rows?.[0]?.total_failed || 0);
 
-    const toPercent = (value) => (totalFailed > 0 ? Number(((value / totalFailed) * 100).toFixed(1)) : 0);
+    const toPercent = (value) =>
+      totalFailed > 0 ? Number(((value / totalFailed) * 100).toFixed(1)) : 0;
 
     res.json({
       totalFailed,
@@ -1060,7 +1207,9 @@ exports.exportToCsv = async (req, res, next) => {
     const params = [];
 
     if (userRole === "manager") {
-      whereConditions.push("u.branch_id = (SELECT branch_id FROM users WHERE id = ?)");
+      whereConditions.push(
+        "u.branch_id = (SELECT branch_id FROM users WHERE id = ?)",
+      );
       params.push(userId);
     }
 
@@ -1122,7 +1271,10 @@ exports.exportToCsv = async (req, res, next) => {
     }
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename=analytics_${type}_${Date.now()}.csv`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=analytics_${type}_${Date.now()}.csv`,
+    );
     res.send(`${lines.join("\n")}\n`);
   } catch (error) {
     next(error);

@@ -5,8 +5,9 @@ info:
     API платформы аттестации сотрудников.
 
     Аутентификация:
-    - **MiniApp** (Telegram Web App): передаётся `initData` в заголовке `X-Init-Data`.
-    - **Admin** (сессия): cookie `accessToken` + `refreshToken`; JWT, выдаваемый при `/api/admin/auth/login`.
+    - **MiniApp** (Telegram Web App): передаётся `initData` в заголовке `X-Telegram-Init-Data` или `X-Max-Init-Data`.
+    - **Admin**: при логине сервер возвращает `accessToken` в теле ответа; токен передаётся в заголовке `Authorization: Bearer <accessToken>`.
+      Refresh-токен хранится в HttpOnly cookie `admin_refresh_token` и используется только для эндпоинта `/api/v1/admin/auth/refresh`.
 
     Все даты — ISO 8601 (UTC).
   version: 1.0.0
@@ -14,8 +15,8 @@ info:
     name: Команда разработки
 
 servers:
-  - url: /api
-    description: Основной сервер
+  - url: /api/v1
+    description: Основной сервер (v1)
 
 tags:
   - name: Аутентификация (MiniApp)
@@ -59,7 +60,7 @@ paths:
       security:
         - initData: []
       responses:
-        "200":
+        "201":
           description: Пользователь создан или уже существует
           content:
             application/json:
@@ -94,10 +95,16 @@ paths:
           application/json:
             schema:
               type: object
+              required: [firstName, lastName]
               properties:
-                name:
+                firstName:
                   type: string
-                  maxLength: 255
+                  minLength: 2
+                  maxLength: 64
+                lastName:
+                  type: string
+                  minLength: 2
+                  maxLength: 64
       responses:
         "200":
           description: Обновлённый профиль
@@ -107,6 +114,8 @@ paths:
                 $ref: "#/components/schemas/UserProfile"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
 
   # ── Auth: Admin ────────────────────────────
   /admin/auth/login:
@@ -595,10 +604,10 @@ components:
       name: X-Init-Data
       description: Telegram initData (подпись WebApp)
     cookieAuth:
-      type: apiKey
-      in: cookie
-      name: accessToken
-      description: JWT access-токен администратора в HttpOnly cookie
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access-токен администратора; передаётся в заголовке Authorization: Bearer <token>
 
   parameters:
     PageParam:

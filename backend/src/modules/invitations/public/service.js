@@ -39,8 +39,8 @@ async function createInvitation(payload, actor) {
   return invitationsRepository.findById(invitationId);
 }
 
-async function listInvitations(actor) {
-  return invitationsRepository.listByCreator(actor.id);
+async function listInvitations(actor, { page = 1, limit = 50 } = {}) {
+  return invitationsRepository.listByCreator(actor.id, { page, limit });
 }
 
 async function extendInvitation() {

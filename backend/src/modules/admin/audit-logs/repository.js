@@ -1,6 +1,15 @@
 const { pool } = require("../../../config/database");
 
-async function findAll({ actorUserId, action, entityType, status, from, to, page, limit }) {
+async function findAll({
+  actorUserId,
+  action,
+  entityType,
+  status,
+  from,
+  to,
+  page,
+  limit,
+}) {
   const offset = (page - 1) * limit;
   const whereParts = ["1=1"];
   const params = [];
@@ -37,7 +46,10 @@ async function findAll({ actorUserId, action, entityType, status, from, to, page
 
   const where = `WHERE ${whereParts.join(" AND ")}`;
 
-  const [[countRow]] = await pool.query(`SELECT COUNT(*) AS total FROM audit_logs ${where}`, params);
+  const [[countRow]] = await pool.query(
+    `SELECT COUNT(*) AS total FROM audit_logs ${where}`,
+    params,
+  );
   const total = Number(countRow?.total || 0);
 
   const [rows] = await pool.query(
@@ -54,7 +66,12 @@ async function findAll({ actorUserId, action, entityType, status, from, to, page
 }
 
 async function findById(id) {
-  const [[row]] = await pool.query("SELECT * FROM audit_logs WHERE id = ?", [id]);
+  const [[row]] = await pool.query(
+    `SELECT id, actor_user_id, actor_role, actor_name, action, scope,
+            entity_type, entity_id, status, metadata_json, ip_address, created_at
+     FROM audit_logs WHERE id = ?`,
+    [id],
+  );
   return row || null;
 }
 

@@ -111,7 +111,7 @@ async function getDisabledModules() {
     }
     return parsed.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean);
   } catch (error) {
-    console.error("Некорректный JSON feature flags:", error);
+    logger.warn("Некорректный JSON feature flags:", { error: error.message });
     return [];
   }
 }

@@ -1,4 +1,5 @@
 const { pool } = require("../config/database");
+const logger = require("../utils/logger");
 
 /**
  * Кэш настроек для быстрого доступа
@@ -29,7 +30,7 @@ async function loadSettings() {
     lastCacheUpdate = now;
     return settingsCache;
   } catch (error) {
-    console.error("Ошибка загрузки настроек:", error);
+    logger.error("Ошибка загрузки настроек:", { error: error.message });
     return {};
   }
 }

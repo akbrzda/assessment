@@ -1,6 +1,10 @@
 import { defineStore } from "pinia";
 import { ref, shallowRef, computed, markRaw } from "vue";
-import { clearTelegramRuntimeState, getClientPlatform, setTelegramRuntimeState } from "../services/telegramRuntimeState";
+import {
+  clearTelegramRuntimeState,
+  getClientPlatform,
+  setTelegramRuntimeState,
+} from "../services/telegramRuntimeState";
 
 const INIT_DATA_MAX_AGE_SECONDS = 24 * 60 * 60;
 
@@ -68,7 +72,11 @@ function parseInviteCodeFromStartParam(value) {
   }
 
   const lower = trimmed.toLowerCase();
-  if (!lower.startsWith("invite_") && !lower.startsWith("invite-") && !lower.startsWith("code-")) {
+  if (
+    !lower.startsWith("invite_") &&
+    !lower.startsWith("invite-") &&
+    !lower.startsWith("code-")
+  ) {
     return null;
   }
 
@@ -100,7 +108,12 @@ function extractWebAppDataFromUrl() {
   }
 
   const params = getLocationParams();
-  const rawValue = params.get("WebAppData") || params.get("webAppData") || params.get("webapp_data") || params.get("initData") || "";
+  const rawValue =
+    params.get("WebAppData") ||
+    params.get("webAppData") ||
+    params.get("webapp_data") ||
+    params.get("initData") ||
+    "";
   if (!rawValue) {
     return "";
   }
@@ -158,7 +171,9 @@ function extractInviteFromUrl() {
   }
 
   const params = getLocationParams();
-  const directInviteCode = parseInviteCodeCandidate(params.get("invite")) || parseInviteCodeCandidate(params.get("code"));
+  const directInviteCode =
+    parseInviteCodeCandidate(params.get("invite")) ||
+    parseInviteCodeCandidate(params.get("code"));
   if (directInviteCode) {
     return directInviteCode;
   }
@@ -260,7 +275,9 @@ export const useTelegramStore = defineStore("telegram", () => {
   const isReady = computed(() => Boolean(tg.value));
   const theme = computed(() => tg.value?.colorScheme || "light");
   const platform = computed(() => tg.value?.platform || "unknown");
-  const hasValidInitData = computed(() => Boolean(initData.value && String(initData.value).trim().length > 0));
+  const hasValidInitData = computed(() =>
+    Boolean(initData.value && String(initData.value).trim().length > 0),
+  );
 
   function parseVersionTuple(version) {
     const source = String(version || "0");
@@ -286,11 +303,15 @@ export const useTelegramStore = defineStore("telegram", () => {
     }
 
     const telegramWebApp = window.Telegram?.WebApp || null;
-    const maxWebApp = window.MAX?.WebApp || window.Max?.WebApp || window.WebApp || null;
+    const maxWebApp =
+      window.MAX?.WebApp || window.Max?.WebApp || window.WebApp || null;
 
     // В MAX окружении иногда присутствует Telegram.WebApp shim без initData.
     // В этом случае выбираем MAX runtime, если в нем есть auth-контекст.
-    if ((hasMaxAuthContext(maxWebApp) || hasMaxUrlInitData()) && !hasTelegramAuthContext(telegramWebApp)) {
+    if (
+      (hasMaxAuthContext(maxWebApp) || hasMaxUrlInitData()) &&
+      !hasTelegramAuthContext(telegramWebApp)
+    ) {
       return { provider: "max", webApp: maxWebApp };
     }
 
@@ -307,7 +328,10 @@ export const useTelegramStore = defineStore("telegram", () => {
     }
 
     if (window.MAX?.WebApp || window.Max?.WebApp) {
-      return { provider: "max", webApp: window.MAX?.WebApp || window.Max?.WebApp };
+      return {
+        provider: "max",
+        webApp: window.MAX?.WebApp || window.Max?.WebApp,
+      };
     }
 
     if (window.Telegram?.WebApp) {
@@ -327,18 +351,34 @@ export const useTelegramStore = defineStore("telegram", () => {
 
     if (!webApp) {
       const urlInitData = extractWebAppDataFromUrl();
-      const hasMaxInitData = Boolean(urlInitData || window?.WebAppData || window?.MAX?.WebAppData || window?.Max?.WebAppData);
+      const hasMaxInitData = Boolean(
+        urlInitData ||
+        window?.WebAppData ||
+        window?.MAX?.WebAppData ||
+        window?.Max?.WebAppData,
+      );
 
       if (hasMaxInitData) {
-        initData.value = urlInitData || String(window.WebAppData || window.MAX?.WebAppData || window.Max?.WebAppData || "");
+        initData.value =
+          urlInitData ||
+          String(
+            window.WebAppData ||
+              window.MAX?.WebAppData ||
+              window.Max?.WebAppData ||
+              "",
+          );
         user.value = extractUserFromInitData(initData.value);
         setTelegramRuntimeState({
           initDataOverride: initData.value,
           clientPlatform: "max",
         });
-        console.warn("WebApp API недоступен, используем initData из URL/global переменных MAX.");
+        console.warn(
+          "WebApp API недоступен, используем initData из URL/global переменных MAX.",
+        );
       } else {
-        console.error("WebApp API недоступен. Откройте мини-приложение внутри Telegram или MAX.");
+        console.error(
+          "WebApp API недоступен. Откройте мини-приложение внутри Telegram или MAX.",
+        );
       }
 
       if (urlInvite) {
@@ -356,39 +396,42 @@ export const useTelegramStore = defineStore("telegram", () => {
     tg.value = markRaw(webApp);
 
     // Восстанавливаем initData из sessionStorage только если он еще актуален
-    let currentInitData = webApp.initData || webApp.InitData || extractWebAppDataFromUrl() || "";
-    let currentInitDataUnsafe = webApp.initDataUnsafe || webApp.InitDataUnsafe || {};
+    let currentInitData =
+      webApp.initData || webApp.InitData || extractWebAppDataFromUrl() || "";
+    let currentInitDataUnsafe =
+      webApp.initDataUnsafe || webApp.InitDataUnsafe || {};
 
     if (!currentInitData) {
       const savedInitData = sessionStorage.getItem("tg_init_data");
       const savedInitDataUnsafe = sessionStorage.getItem("tg_init_data_unsafe");
 
       if (savedInitData && isInitDataFresh(savedInitData)) {
-        console.log("🔄 Восстанавливаем initData из sessionStorage");
         currentInitData = savedInitData;
 
         if (savedInitDataUnsafe) {
           try {
             currentInitDataUnsafe = JSON.parse(savedInitDataUnsafe);
           } catch (e) {
-            console.error("Ошибка при парсинге сохранённого initDataUnsafe:", e);
+            console.error(
+              "Ошибка при парсинге сохранённого initDataUnsafe:",
+              e,
+            );
           }
         }
       } else if (savedInitData) {
-        console.warn("⚠️ Сохраненный initData устарел, очищаем sessionStorage");
         sessionStorage.removeItem("tg_init_data");
         sessionStorage.removeItem("tg_init_data_unsafe");
-      } else {
-        console.warn("⚠️ initData пустой и не найден в sessionStorage. Возможно, приложение открыто некорректно.");
       }
     } else {
       // Сохраняем initData при первом запуске
-      console.log("💾 Сохраняем initData в sessionStorage");
       sessionStorage.setItem("tg_init_data", currentInitData);
 
       const liveInitDataUnsafe = webApp.initDataUnsafe || webApp.InitDataUnsafe;
       if (liveInitDataUnsafe) {
-        sessionStorage.setItem("tg_init_data_unsafe", JSON.stringify(liveInitDataUnsafe));
+        sessionStorage.setItem(
+          "tg_init_data_unsafe",
+          JSON.stringify(liveInitDataUnsafe),
+        );
       }
     }
 
@@ -406,14 +449,6 @@ export const useTelegramStore = defineStore("telegram", () => {
     // Также проверяем tgWebAppStartParam (это специальный параметр для startapp)
     const tgWebAppStartParam = currentInitDataUnsafe?.tgWebAppStartParam;
 
-    console.log("🔍 Проверка параметров приглашения:", {
-      startParam,
-      startApp,
-      tgWebAppStartParam,
-      initDataUnsafe: currentInitDataUnsafe,
-      initDataLength: currentInitData.length,
-    });
-
     inviteCode =
       parseInviteCodeFromStartParam(tgWebAppStartParam) ||
       parseInviteCodeFromStartParam(startApp) ||
@@ -426,7 +461,10 @@ export const useTelegramStore = defineStore("telegram", () => {
 
     // Обработка deep link для открытия курса: startapp=course_[id]
     const rawStartParam = tgWebAppStartParam || startApp || startParam || "";
-    if (typeof rawStartParam === "string" && rawStartParam.startsWith("course_")) {
+    if (
+      typeof rawStartParam === "string" &&
+      rawStartParam.startsWith("course_")
+    ) {
       const parsedCourseId = Number(rawStartParam.replace("course_", ""));
       if (Number.isInteger(parsedCourseId) && parsedCourseId > 0) {
         pendingCourseId.value = parsedCourseId;
@@ -446,8 +484,6 @@ export const useTelegramStore = defineStore("telegram", () => {
         inviteCode,
         clientPlatform: provider,
       });
-
-      console.log("✅ Токен приглашения сохранен:", token);
     } else {
       inviteToken.value = startParam || startApp || tgWebAppStartParam || null;
       setTelegramRuntimeState({
@@ -468,13 +504,20 @@ export const useTelegramStore = defineStore("telegram", () => {
       webApp.expand();
     }
 
-    const canUseAdvancedChromeApi = provider !== "telegram" || isAtLeastVersion(webApp.version, 6, 1);
+    const canUseAdvancedChromeApi =
+      provider !== "telegram" || isAtLeastVersion(webApp.version, 6, 1);
 
-    if (canUseAdvancedChromeApi && typeof webApp.disableVerticalSwipes === "function") {
+    if (
+      canUseAdvancedChromeApi &&
+      typeof webApp.disableVerticalSwipes === "function"
+    ) {
       webApp.disableVerticalSwipes();
     }
 
-    if (canUseAdvancedChromeApi && typeof webApp.disableClosingConfirmation === "function") {
+    if (
+      canUseAdvancedChromeApi &&
+      typeof webApp.disableClosingConfirmation === "function"
+    ) {
       webApp.disableClosingConfirmation();
     }
   }
@@ -485,7 +528,9 @@ export const useTelegramStore = defineStore("telegram", () => {
     }
 
     if (getClientPlatform() === "max") {
-      return window?.WebApp || window?.MAX?.WebApp || window?.Max?.WebApp || null;
+      return (
+        window?.WebApp || window?.MAX?.WebApp || window?.Max?.WebApp || null
+      );
     }
 
     const detected = detectMiniAppRuntime();
@@ -501,12 +546,22 @@ export const useTelegramStore = defineStore("telegram", () => {
 
   async function requestContactPayload() {
     const app = resolveTelegramApp();
-    if (!app || isTelegramShimInMaxMode(app) || typeof app.requestContact !== "function") {
-      throw new Error("Не удалось запросить контакт через MAX SDK. Откройте мини-приложение напрямую в приложении MAX и повторите попытку.");
+    if (
+      !app ||
+      isTelegramShimInMaxMode(app) ||
+      typeof app.requestContact !== "function"
+    ) {
+      throw new Error(
+        "Не удалось запросить контакт через MAX SDK. Откройте мини-приложение напрямую в приложении MAX и повторите попытку.",
+      );
     }
 
-    const source = getClientPlatform() === "max" ? "max_contact" : "telegram_contact";
-    const currentUserId = user.value?.id || app?.initDataUnsafe?.user?.id || app?.InitDataUnsafe?.user?.id;
+    const source =
+      getClientPlatform() === "max" ? "max_contact" : "telegram_contact";
+    const currentUserId =
+      user.value?.id ||
+      app?.initDataUnsafe?.user?.id ||
+      app?.InitDataUnsafe?.user?.id;
     if (!currentUserId) {
       throw new Error("Не удалось определить пользователя платформы");
     }
@@ -598,7 +653,8 @@ export const useTelegramStore = defineStore("telegram", () => {
         if (directResult && typeof directResult.then === "function") {
           directResult
             .then((resolvedPayload) => {
-              const resolvedPhone = extractPhoneFromUnknownPayload(resolvedPayload);
+              const resolvedPhone =
+                extractPhoneFromUnknownPayload(resolvedPayload);
               if (resolvedPhone) {
                 finish(resolvedPhone);
               }
@@ -620,7 +676,9 @@ export const useTelegramStore = defineStore("telegram", () => {
     const phone = phoneFromRequest;
 
     if (!phone) {
-      throw new Error("Платформа не вернула номер телефона. Проверьте доступ к контактам и повторите попытку.");
+      throw new Error(
+        "Платформа не вернула номер телефона. Проверьте доступ к контактам и повторите попытку.",
+      );
     }
 
     return {
@@ -641,9 +699,16 @@ export const useTelegramStore = defineStore("telegram", () => {
       return;
     }
 
-    const canUseNativeAlert = telegramApp && (getClientPlatform() !== "telegram" || isAtLeastVersion(telegramApp.version, 6, 2));
+    const canUseNativeAlert =
+      telegramApp &&
+      (getClientPlatform() !== "telegram" ||
+        isAtLeastVersion(telegramApp.version, 6, 2));
     // Для MAX SDK нативный showAlert ненадёжен (no-op без callback) — используем window.alert напрямую
-    if (canUseNativeAlert && telegramApp?.showAlert && getClientPlatform() !== "max") {
+    if (
+      canUseNativeAlert &&
+      telegramApp?.showAlert &&
+      getClientPlatform() !== "max"
+    ) {
       try {
         telegramApp.showAlert(safeMessage);
         return;
@@ -760,18 +825,27 @@ export const useTelegramStore = defineStore("telegram", () => {
       return false;
     }
     const backButton = telegramApp?.BackButton;
-    const canUseBackButton = telegramApp && (getClientPlatform() !== "telegram" || isAtLeastVersion(telegramApp.version, 6, 1));
+    const canUseBackButton =
+      telegramApp &&
+      (getClientPlatform() !== "telegram" ||
+        isAtLeastVersion(telegramApp.version, 6, 1));
     if (!backButton || !canUseBackButton) {
       return false;
     }
 
-    if (typeof backButton.offClick === "function" && typeof activeBackButtonHandler === "function") {
+    if (
+      typeof backButton.offClick === "function" &&
+      typeof activeBackButtonHandler === "function"
+    ) {
       backButton.offClick(activeBackButtonHandler);
     }
 
     backButton.show();
 
-    if (typeof onClick === "function" && typeof backButton.onClick === "function") {
+    if (
+      typeof onClick === "function" &&
+      typeof backButton.onClick === "function"
+    ) {
       backButton.onClick(onClick);
       activeBackButtonHandler = onClick;
     } else {
@@ -787,17 +861,26 @@ export const useTelegramStore = defineStore("telegram", () => {
       return false;
     }
     const backButton = telegramApp?.BackButton;
-    const canUseBackButton = telegramApp && (getClientPlatform() !== "telegram" || isAtLeastVersion(telegramApp.version, 6, 1));
+    const canUseBackButton =
+      telegramApp &&
+      (getClientPlatform() !== "telegram" ||
+        isAtLeastVersion(telegramApp.version, 6, 1));
     if (!backButton || !canUseBackButton) {
       return false;
     }
 
-    if (typeof onClick === "function" && typeof backButton.offClick === "function") {
+    if (
+      typeof onClick === "function" &&
+      typeof backButton.offClick === "function"
+    ) {
       backButton.offClick(onClick);
       if (activeBackButtonHandler === onClick) {
         activeBackButtonHandler = null;
       }
-    } else if (typeof backButton.offClick === "function" && typeof activeBackButtonHandler === "function") {
+    } else if (
+      typeof backButton.offClick === "function" &&
+      typeof activeBackButtonHandler === "function"
+    ) {
       backButton.offClick(activeBackButtonHandler);
       activeBackButtonHandler = null;
     }
@@ -812,12 +895,23 @@ export const useTelegramStore = defineStore("telegram", () => {
       return false;
     }
     const backButton = telegramApp?.BackButton;
-    const canUseBackButton = telegramApp && (getClientPlatform() !== "telegram" || isAtLeastVersion(telegramApp.version, 6, 1));
-    if (!backButton || !canUseBackButton || typeof onClick !== "function" || typeof backButton.onClick !== "function") {
+    const canUseBackButton =
+      telegramApp &&
+      (getClientPlatform() !== "telegram" ||
+        isAtLeastVersion(telegramApp.version, 6, 1));
+    if (
+      !backButton ||
+      !canUseBackButton ||
+      typeof onClick !== "function" ||
+      typeof backButton.onClick !== "function"
+    ) {
       return false;
     }
 
-    if (typeof backButton.offClick === "function" && typeof activeBackButtonHandler === "function") {
+    if (
+      typeof backButton.offClick === "function" &&
+      typeof activeBackButtonHandler === "function"
+    ) {
       backButton.offClick(activeBackButtonHandler);
     }
 
@@ -850,7 +944,6 @@ export const useTelegramStore = defineStore("telegram", () => {
       sessionStorage.removeItem("tg_init_data");
       sessionStorage.removeItem("tg_init_data_unsafe");
       clearTelegramRuntimeState();
-      console.log("🗑️ Сохранённые initData очищены");
     }
   }
 

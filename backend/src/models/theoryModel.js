@@ -99,7 +99,7 @@ async function getBlocksForVersion(versionId) {
      FROM assessment_theory_blocks
      WHERE version_id = ?
      ORDER BY order_index ASC`,
-    [versionId]
+    [versionId],
   );
   return blockRows.map(mapBlockRow);
 }
@@ -122,7 +122,7 @@ async function getCurrentTheoryMeta(assessmentId) {
      LEFT JOIN assessment_theory_versions v ON v.id = a.current_theory_version_id
      WHERE a.id = ?
      LIMIT 1`,
-    [assessmentId]
+    [assessmentId],
   );
 
   if (!rows.length || !rows[0].version_id) {
@@ -175,7 +175,7 @@ async function getTheoryForUser({ assessmentId, userId }) {
           WHERE aba.assessment_id = a.id AND u.id = ?
         )
       LIMIT 1`,
-    [assessmentId, userId, userId, userId, userId]
+    [assessmentId, userId, userId, userId, userId],
   );
 
   if (!accessRows.length) {
@@ -195,7 +195,7 @@ async function getTheoryForUser({ assessmentId, userId }) {
      LEFT JOIN assessment_theory_versions v ON v.id = a.current_theory_version_id AND v.status = 'published'
      WHERE a.id = ?
      LIMIT 1`,
-    [assessmentId]
+    [assessmentId],
   );
 
   if (!rows.length || !rows[0].version_id) {
@@ -218,8 +218,12 @@ async function getTheoryForUser({ assessmentId, userId }) {
       id: versionId,
       number: Number(rows[0].version_number),
       completionRequired: rows[0].completion_required ? true : false,
-      requiredBlockCount: Number(rows[0].required_block_count || requiredBlocks.length),
-      optionalBlockCount: Number(rows[0].optional_block_count || optionalBlocks.length),
+      requiredBlockCount: Number(
+        rows[0].required_block_count || requiredBlocks.length,
+      ),
+      optionalBlockCount: Number(
+        rows[0].optional_block_count || optionalBlocks.length,
+      ),
       publishedAt: toIsoUtc(rows[0].published_at),
     },
     requiredBlocks,
@@ -234,7 +238,7 @@ async function getCompletionForVersion({ assessmentId, userId, versionId }) {
        FROM assessment_theory_completions
       WHERE assessment_id = ? AND user_id = ? AND version_id = ?
       LIMIT 1`,
-    [assessmentId, userId, versionId]
+    [assessmentId, userId, versionId],
   );
 
   if (!rows.length) {
@@ -249,11 +253,21 @@ async function getCompletionForVersion({ assessmentId, userId, versionId }) {
 }
 
 async function userHasCompletion({ assessmentId, userId, versionId }) {
-  const completion = await getCompletionForVersion({ assessmentId, userId, versionId });
+  const completion = await getCompletionForVersion({
+    assessmentId,
+    userId,
+    versionId,
+  });
   return Boolean(completion);
 }
 
-async function saveCompletion({ assessmentId, versionId, userId, timeSpentSeconds, clientPayload }) {
+async function saveCompletion({
+  assessmentId,
+  versionId,
+  userId,
+  timeSpentSeconds,
+  clientPayload,
+}) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -294,7 +308,7 @@ async function saveCompletion({ assessmentId, versionId, userId, timeSpentSecond
             WHERE aba.assessment_id = a.id AND u.id = ?
           )
         FOR UPDATE`,
-      [assessmentId, userId, userId, userId, userId]
+      [assessmentId, userId, userId, userId, userId],
     );
 
     if (!assessmentRows.length) {
@@ -303,7 +317,9 @@ async function saveCompletion({ assessmentId, versionId, userId, timeSpentSecond
       throw error;
     }
 
-    const currentVersionId = assessmentRows[0].current_theory_version_id ? Number(assessmentRows[0].current_theory_version_id) : null;
+    const currentVersionId = assessmentRows[0].current_theory_version_id
+      ? Number(assessmentRows[0].current_theory_version_id)
+      : null;
     if (!currentVersionId) {
       const error = new Error("Для аттестации не назначена теория");
       error.status = 409;
@@ -312,7 +328,9 @@ async function saveCompletion({ assessmentId, versionId, userId, timeSpentSecond
     }
 
     if (currentVersionId !== Number(versionId)) {
-      const error = new Error("Версия теории устарела. Обновите страницу и изучите материалы заново.");
+      const error = new Error(
+        "Версия теории устарела. Обновите страницу и изучите материалы заново.",
+      );
       error.status = 409;
       error.code = "THEORY_VERSION_MISMATCH";
       throw error;
@@ -323,7 +341,7 @@ async function saveCompletion({ assessmentId, versionId, userId, timeSpentSecond
          FROM assessment_theory_versions
         WHERE id = ? AND status = 'published'
         LIMIT 1`,
-      [currentVersionId]
+      [currentVersionId],
     );
 
     if (!versionRows.length) {
@@ -332,14 +350,18 @@ async function saveCompletion({ assessmentId, versionId, userId, timeSpentSecond
       throw error;
     }
 
-    const payloadValue = clientPayload != null ? JSON.stringify(clientPayload) : null;
-    const timeSpent = Number.isFinite(timeSpentSeconds) && timeSpentSeconds >= 0 ? Number(timeSpentSeconds) : 0;
+    const payloadValue =
+      clientPayload != null ? JSON.stringify(clientPayload) : null;
+    const timeSpent =
+      Number.isFinite(timeSpentSeconds) && timeSpentSeconds >= 0
+        ? Number(timeSpentSeconds)
+        : 0;
 
     await connection.execute(
       `INSERT INTO assessment_theory_completions (assessment_id, user_id, version_id, completed_at, time_spent_seconds, client_payload)
        VALUES (?, ?, ?, UTC_TIMESTAMP(), ?, ?)
        ON DUPLICATE KEY UPDATE completed_at = VALUES(completed_at), time_spent_seconds = VALUES(time_spent_seconds), client_payload = VALUES(client_payload)`,
-      [assessmentId, userId, currentVersionId, timeSpent, payloadValue]
+      [assessmentId, userId, currentVersionId, timeSpent, payloadValue],
     );
 
     const [completionRows] = await connection.execute(
@@ -347,7 +369,7 @@ async function saveCompletion({ assessmentId, versionId, userId, timeSpentSecond
          FROM assessment_theory_completions
         WHERE assessment_id = ? AND user_id = ? AND version_id = ?
         LIMIT 1`,
-      [assessmentId, userId, currentVersionId]
+      [assessmentId, userId, currentVersionId],
     );
 
     await connection.commit();
@@ -374,14 +396,16 @@ async function getTheoryForAdmin(assessmentId) {
        FROM assessments
       WHERE id = ?
       LIMIT 1`,
-    [assessmentId]
+    [assessmentId],
   );
 
   if (!assessmentRows.length) {
     return null;
   }
 
-  const currentVersionId = assessmentRows[0].current_theory_version_id ? Number(assessmentRows[0].current_theory_version_id) : null;
+  const currentVersionId = assessmentRows[0].current_theory_version_id
+    ? Number(assessmentRows[0].current_theory_version_id)
+    : null;
   let currentVersion = null;
   if (currentVersionId) {
     currentVersion = await getVersionDetail(currentVersionId);
@@ -413,7 +437,7 @@ async function getVersionDetail(versionId) {
      FROM assessment_theory_versions
      WHERE id = ?
      LIMIT 1`,
-    [versionId]
+    [versionId],
   );
 
   if (!rows.length) {
@@ -431,14 +455,21 @@ async function getVersionDetail(versionId) {
   };
 }
 
-async function publishTheoryVersion({ assessmentId, mode, requiredBlocks, optionalBlocks, metadata }) {
+async function publishTheoryVersion({
+  assessmentId,
+  mode,
+  requiredBlocks,
+  optionalBlocks,
+  metadata,
+}) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
-    const [assessmentRows] = await connection.execute("SELECT id, current_theory_version_id FROM assessments WHERE id = ? FOR UPDATE", [
-      assessmentId,
-    ]);
+    const [assessmentRows] = await connection.execute(
+      "SELECT id, current_theory_version_id FROM assessments WHERE id = ? FOR UPDATE",
+      [assessmentId],
+    );
 
     if (!assessmentRows.length) {
       const error = new Error("Аттестация не найдена");
@@ -446,22 +477,38 @@ async function publishTheoryVersion({ assessmentId, mode, requiredBlocks, option
       throw error;
     }
 
-    const currentVersionId = assessmentRows[0].current_theory_version_id ? Number(assessmentRows[0].current_theory_version_id) : null;
+    const currentVersionId = assessmentRows[0].current_theory_version_id
+      ? Number(assessmentRows[0].current_theory_version_id)
+      : null;
     let currentVersionRow = null;
     if (currentVersionId) {
-      const [currentRows] = await connection.execute("SELECT * FROM assessment_theory_versions WHERE id = ? AND status = 'published' FOR UPDATE", [
-        currentVersionId,
-      ]);
+      // Запрашиваем минимальный набор полей — запись нужна только для блокировки (FOR UPDATE)
+      const [currentRows] = await connection.execute(
+        "SELECT id FROM assessment_theory_versions WHERE id = ? AND status = 'published' FOR UPDATE",
+        [currentVersionId],
+      );
       if (currentRows.length) {
         currentVersionRow = currentRows[0];
       }
     }
 
-    const safeRequiredBlocks = Array.isArray(requiredBlocks) ? requiredBlocks : [];
-    const safeOptionalBlocks = Array.isArray(optionalBlocks) ? optionalBlocks : [];
+    const safeRequiredBlocks = Array.isArray(requiredBlocks)
+      ? requiredBlocks
+      : [];
+    const safeOptionalBlocks = Array.isArray(optionalBlocks)
+      ? optionalBlocks
+      : [];
     const combinedBlocks = [
-      ...safeRequiredBlocks.map((block, idx) => ({ ...block, orderIndex: idx + 1, isRequired: 1 })),
-      ...safeOptionalBlocks.map((block, idx) => ({ ...block, orderIndex: safeRequiredBlocks.length + idx + 1, isRequired: 0 })),
+      ...safeRequiredBlocks.map((block, idx) => ({
+        ...block,
+        orderIndex: idx + 1,
+        isRequired: 1,
+      })),
+      ...safeOptionalBlocks.map((block, idx) => ({
+        ...block,
+        orderIndex: safeRequiredBlocks.length + idx + 1,
+        isRequired: 0,
+      })),
     ];
 
     const allowOverwriteCurrent = mode === "current" && currentVersionId;
@@ -476,25 +523,44 @@ async function publishTheoryVersion({ assessmentId, mode, requiredBlocks, option
     if (shouldCreateNew) {
       const [maxRows] = await connection.execute(
         "SELECT COALESCE(MAX(version_number), 0) AS max_version FROM assessment_theory_versions WHERE assessment_id = ? FOR UPDATE",
-        [assessmentId]
+        [assessmentId],
       );
       const nextVersion = Number(maxRows[0].max_version || 0) + 1;
       const [insertResult] = await connection.execute(
         `INSERT INTO assessment_theory_versions
            (assessment_id, version_number, status, completion_required, required_block_count, optional_block_count, metadata, published_at, created_at, updated_at)
          VALUES (?, ?, 'published', ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())`,
-        [assessmentId, nextVersion, completionRequired, requiredCount, optionalCount, serializedMetadata]
+        [
+          assessmentId,
+          nextVersion,
+          completionRequired,
+          requiredCount,
+          optionalCount,
+          serializedMetadata,
+        ],
       );
       versionId = Number(insertResult.insertId);
-      await connection.execute("UPDATE assessments SET current_theory_version_id = ? WHERE id = ?", [versionId, assessmentId]);
+      await connection.execute(
+        "UPDATE assessments SET current_theory_version_id = ? WHERE id = ?",
+        [versionId, assessmentId],
+      );
     } else {
       await connection.execute(
         `UPDATE assessment_theory_versions
             SET completion_required = ?, required_block_count = ?, optional_block_count = ?, metadata = ?, updated_at = UTC_TIMESTAMP(), published_at = UTC_TIMESTAMP()
           WHERE id = ?`,
-        [completionRequired, requiredCount, optionalCount, serializedMetadata, currentVersionId]
+        [
+          completionRequired,
+          requiredCount,
+          optionalCount,
+          serializedMetadata,
+          currentVersionId,
+        ],
       );
-      await connection.execute("DELETE FROM assessment_theory_blocks WHERE version_id = ?", [currentVersionId]);
+      await connection.execute(
+        "DELETE FROM assessment_theory_blocks WHERE version_id = ?",
+        [currentVersionId],
+      );
     }
 
     if (combinedBlocks.length) {
@@ -513,7 +579,7 @@ async function publishTheoryVersion({ assessmentId, mode, requiredBlocks, option
         `INSERT INTO assessment_theory_blocks
            (version_id, order_index, title, block_type, content, video_url, external_url, metadata, is_required)
          VALUES ?`,
-        [values]
+        [values],
       );
     }
 

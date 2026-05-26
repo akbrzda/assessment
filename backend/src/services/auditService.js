@@ -64,7 +64,7 @@ async function logAuditEvent(entry) {
     await auditRepository.createLog(entry);
   } catch (error) {
     // Не блокируем бизнес-операции при проблемах аудита.
-    console.error("Не удалось сохранить аудит-событие:", error.message);
+    logger.warn("Не удалось сохранить аудит-событие:", { error: error.message });
   }
   return entry;
 }
@@ -142,3 +142,4 @@ module.exports = {
 };
 
 const auditRepository = require("./auditRepository");
+const logger = require("../utils/logger");

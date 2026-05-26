@@ -54,6 +54,7 @@ jobs:
 
           SUPERADMIN_IDS=${{ secrets.BACKEND_SUPERADMIN_IDS }}
           CERTIFICATES_UPLOAD_DIR=${{ secrets.BACKEND_CERTIFICATES_UPLOAD_DIR }}
+          METRICS_TOKEN=${{ secrets.METRICS_TOKEN }}
 
           REDIS_HOST=${{ secrets.REDIS_HOST }}
           REDIS_URL=${{ secrets.REDIS_URL }}

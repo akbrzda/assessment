@@ -1,5 +1,6 @@
 const settingsService = require("../services/settingsService");
 const { FEATURE_FLAGS_SETTING_KEY, getModuleCodeByPath } = require("../config/featureFlags");
+const logger = require("../utils/logger");
 
 function parseDisabledModules(rawValue) {
   if (!rawValue) {
@@ -14,7 +15,7 @@ function parseDisabledModules(rawValue) {
 
     return new Set(parsed.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean));
   } catch (error) {
-    console.error("Некорректный JSON в FEATURE_DISABLED_MODULES:", error);
+    logger.warn("Некорректный JSON в FEATURE_DISABLED_MODULES:", { error: error.message });
     return new Set();
   }
 }

@@ -36,8 +36,10 @@ async function create(req, res, next) {
 
 async function list(req, res, next) {
   try {
-    const invitations = await invitationsService.listInvitations(req.currentUser);
-    res.json({ invitations });
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+    const result = await invitationsService.listInvitations(req.currentUser, { page, limit });
+    res.json({ invitations: result.items, total: result.total, page: result.page, limit: result.limit });
   } catch (error) {
     next(error);
   }

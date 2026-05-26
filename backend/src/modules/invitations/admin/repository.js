@@ -7,7 +7,9 @@ async function findAll() {
 }
 
 async function findByCreator(userId) {
-  return invitationModel.findByCreator(userId);
+  // Возвращаем только массив элементов — admin-слой не использует пагинацию для этого запроса
+  const result = await invitationModel.findByCreator(userId, { page: 1, limit: 1000 });
+  return result.items;
 }
 
 async function findByBranch(branchId) {

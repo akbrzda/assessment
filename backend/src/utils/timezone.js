@@ -1,4 +1,5 @@
 const moment = require("moment-timezone");
+const logger = require("./logger");
 
 /**
  * Конвертирует дату из UTC в часовой пояс пользователя
@@ -12,7 +13,7 @@ function convertToUserTimezone(utcDate, timezone = "UTC") {
   try {
     return moment.utc(utcDate).tz(timezone).format();
   } catch (error) {
-    console.error("Ошибка конвертации даты:", error);
+    logger.warn("Ошибка конвертации даты:", { error: error.message });
     return utcDate;
   }
 }
@@ -29,7 +30,7 @@ function convertToUTC(localDate, timezone = "UTC") {
   try {
     return moment.tz(localDate, timezone).utc().toDate();
   } catch (error) {
-    console.error("Ошибка конвертации даты в UTC:", error);
+    logger.warn("Ошибка конвертации даты в UTC:", { error: error.message });
     return localDate;
   }
 }
@@ -77,7 +78,10 @@ function getTimezoneOffset(timezone = "UTC") {
   try {
     return moment.tz(timezone).utcOffset();
   } catch (error) {
-    console.error("Ошибка получения смещения часового пояса:", error);
+    logger.warn("Ошибка получения смещения часового пояса:", {
+      timezone,
+      error: error.message,
+    });
     return 0;
   }
 }

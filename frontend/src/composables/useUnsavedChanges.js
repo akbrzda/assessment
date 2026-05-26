@@ -8,7 +8,8 @@ export function useUnsavedChanges(componentId = null) {
   const telegramStore = useTelegramStore();
 
   // Уникальный ID для компонента
-  const id = componentId || `component-${Math.random().toString(36).substr(2, 9)}`;
+  const id =
+    componentId || `component-${Math.random().toString(36).substr(2, 9)}`;
 
   // Локальное состояние unsaved changes для этого компонента
   const hasUnsavedChanges = ref(false);
@@ -39,11 +40,9 @@ export function useUnsavedChanges(componentId = null) {
     if (shouldShowConfirmation && !currentClosingState) {
       telegramStore.enableClosingConfirmation();
       currentClosingState = true;
-      console.log("🔒 Closing confirmation enabled - unsaved changes detected");
     } else if (!shouldShowConfirmation && currentClosingState) {
       telegramStore.disableClosingConfirmation();
       currentClosingState = false;
-      console.log("🔓 Closing confirmation disabled - no unsaved changes");
     }
   };
 

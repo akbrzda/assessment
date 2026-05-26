@@ -1,6 +1,14 @@
 const { pool } = require("../../../config/database");
 
-async function listAssessments({ status, branch, search, userRole, userId, page = 1, limit = 20 }) {
+async function listAssessments({
+  status,
+  branch,
+  search,
+  userRole,
+  userId,
+  page = 1,
+  limit = 20,
+}) {
   const params = [];
   const conditions = [
     `NOT EXISTS (SELECT 1 FROM course_sections cs WHERE cs.assessment_id = a.id)`,
@@ -55,7 +63,8 @@ async function listAssessments({ status, branch, search, userRole, userId, page 
     }
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const whereClause =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   const offset = (Math.max(page, 1) - 1) * Math.max(limit, 1);
 
   const dataQuery = `
@@ -115,7 +124,13 @@ async function listAssessments({ status, branch, search, userRole, userId, page 
 }
 
 async function findAssessmentById(assessmentId) {
-  const [rows] = await pool.query("SELECT * FROM assessments WHERE id = ?", [assessmentId]);
+  const [rows] = await pool.query(
+    `SELECT id, title, description, open_at, close_at, time_limit_minutes,
+            pass_score_percent, max_attempts, created_by, updated_by,
+            created_at, updated_at, current_theory_version_id
+     FROM assessments WHERE id = ?`,
+    [assessmentId],
+  );
   return rows[0] || null;
 }
 
