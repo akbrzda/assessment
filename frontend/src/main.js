@@ -24,13 +24,41 @@ telegramStore.initTelegram();
 
 app.mount("#app");
 
-// Регистрируем Service Worker для offline-кэширования и retry queue
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/sw.js").catch((err) => {
-    // Логируем ошибку регистрации — продолжаем без SW
-    console.error("[SW] Registration failed:", err);
-  });
+function isJavaScriptContentType(contentType) {
+  return (
+    contentType.includes("javascript") ||
+    contentType.includes("ecmascript") ||
+    contentType.includes("text/plain")
+  );
+}
 
+async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator) || typeof fetch !== "function") {
+    return;
+  }
+
+  try {
+    const response = await fetch("/sw.js", {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    const contentType = response.headers.get("content-type") || "";
+
+    if (!response.ok || !isJavaScriptContentType(contentType)) {
+      console.warn("[SW] Registration skipped: service worker script is unavailable.");
+      return;
+    }
+
+    await navigator.serviceWorker.register("/sw.js");
+  } catch (err) {
+    console.error("[SW] Registration failed:", err);
+  }
+}
+
+// Регистрируем Service Worker для offline-кэширования и retry queue
+registerServiceWorker();
+
+if ("serviceWorker" in navigator) {
   // При восстановлении сети просим SW отправить накопленную очередь
   window.addEventListener("online", () => {
     navigator.serviceWorker.ready

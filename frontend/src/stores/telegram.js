@@ -264,6 +264,18 @@ function hasMaxAuthContext(webApp) {
   return Boolean(unsafe.user?.id);
 }
 
+function safelyCallPlatformMethod(callback) {
+  try {
+    const result = callback();
+    if (result && typeof result.then === "function") {
+      result.catch(() => {});
+    }
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
 export const useTelegramStore = defineStore("telegram", () => {
   const tg = shallowRef(null);
   const user = ref(null);
@@ -305,37 +317,20 @@ export const useTelegramStore = defineStore("telegram", () => {
     const telegramWebApp = window.Telegram?.WebApp || null;
     const maxWebApp =
       window.MAX?.WebApp || window.Max?.WebApp || window.WebApp || null;
+    const hasTelegramContext = hasTelegramAuthContext(telegramWebApp);
+    const hasMaxContext = hasMaxAuthContext(maxWebApp) || hasMaxUrlInitData();
 
     // В MAX окружении иногда присутствует Telegram.WebApp shim без initData.
-    // В этом случае выбираем MAX runtime, если в нем есть auth-контекст.
-    if (
-      (hasMaxAuthContext(maxWebApp) || hasMaxUrlInitData()) &&
-      !hasTelegramAuthContext(telegramWebApp)
-    ) {
+    if (hasMaxContext && !hasTelegramContext) {
       return { provider: "max", webApp: maxWebApp };
     }
 
-    if (telegramWebApp) {
+    if (telegramWebApp && hasTelegramContext) {
       return { provider: "telegram", webApp: telegramWebApp };
     }
 
-    if (maxWebApp && typeof maxWebApp === "object") {
+    if (maxWebApp && typeof maxWebApp === "object" && hasMaxContext) {
       return { provider: "max", webApp: maxWebApp };
-    }
-
-    if (window.WebApp && typeof window.WebApp === "object") {
-      return { provider: "max", webApp: window.WebApp };
-    }
-
-    if (window.MAX?.WebApp || window.Max?.WebApp) {
-      return {
-        provider: "max",
-        webApp: window.MAX?.WebApp || window.Max?.WebApp,
-      };
-    }
-
-    if (window.Telegram?.WebApp) {
-      return { provider: "telegram", webApp: window.Telegram.WebApp };
     }
 
     return { provider: "none", webApp: null };
@@ -499,9 +494,9 @@ export const useTelegramStore = defineStore("telegram", () => {
       clientPlatform: provider,
     });
 
-    webApp.ready();
+    safelyCallPlatformMethod(() => webApp.ready());
     if (typeof webApp.expand === "function") {
-      webApp.expand();
+      safelyCallPlatformMethod(() => webApp.expand());
     }
 
     const canUseAdvancedChromeApi =
@@ -511,14 +506,14 @@ export const useTelegramStore = defineStore("telegram", () => {
       canUseAdvancedChromeApi &&
       typeof webApp.disableVerticalSwipes === "function"
     ) {
-      webApp.disableVerticalSwipes();
+      safelyCallPlatformMethod(() => webApp.disableVerticalSwipes());
     }
 
     if (
       canUseAdvancedChromeApi &&
       typeof webApp.disableClosingConfirmation === "function"
     ) {
-      webApp.disableClosingConfirmation();
+      safelyCallPlatformMethod(() => webApp.disableClosingConfirmation());
     }
   }
 
@@ -796,8 +791,7 @@ export const useTelegramStore = defineStore("telegram", () => {
   function enableVerticalSwipes() {
     const telegramApp = resolveTelegramApp();
     if (typeof telegramApp?.enableVerticalSwipes === "function") {
-      telegramApp.enableVerticalSwipes();
-      return true;
+      return safelyCallPlatformMethod(() => telegramApp.enableVerticalSwipes());
     }
     return false;
   }
@@ -805,8 +799,7 @@ export const useTelegramStore = defineStore("telegram", () => {
   function disableVerticalSwipes() {
     const telegramApp = resolveTelegramApp();
     if (typeof telegramApp?.disableVerticalSwipes === "function") {
-      telegramApp.disableVerticalSwipes();
-      return true;
+      return safelyCallPlatformMethod(() => telegramApp.disableVerticalSwipes());
     }
     return false;
   }
@@ -840,7 +833,9 @@ export const useTelegramStore = defineStore("telegram", () => {
       backButton.offClick(activeBackButtonHandler);
     }
 
-    backButton.show();
+    if (!safelyCallPlatformMethod(() => backButton.show())) {
+      return false;
+    }
 
     if (
       typeof onClick === "function" &&
@@ -885,8 +880,7 @@ export const useTelegramStore = defineStore("telegram", () => {
       activeBackButtonHandler = null;
     }
 
-    backButton.hide();
-    return true;
+    return safelyCallPlatformMethod(() => backButton.hide());
   }
 
   function setBackButtonHandler(onClick) {
@@ -923,8 +917,9 @@ export const useTelegramStore = defineStore("telegram", () => {
   function enableClosingConfirmation() {
     const telegramApp = resolveTelegramApp();
     if (typeof telegramApp?.enableClosingConfirmation === "function") {
-      telegramApp.enableClosingConfirmation();
-      return true;
+      return safelyCallPlatformMethod(() =>
+        telegramApp.enableClosingConfirmation(),
+      );
     }
     return false;
   }
@@ -932,8 +927,9 @@ export const useTelegramStore = defineStore("telegram", () => {
   function disableClosingConfirmation() {
     const telegramApp = resolveTelegramApp();
     if (typeof telegramApp?.disableClosingConfirmation === "function") {
-      telegramApp.disableClosingConfirmation();
-      return true;
+      return safelyCallPlatformMethod(() =>
+        telegramApp.disableClosingConfirmation(),
+      );
     }
     return false;
   }

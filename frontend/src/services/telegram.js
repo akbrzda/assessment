@@ -14,6 +14,32 @@ const runtimeBaseUrl = typeof window !== "undefined" && window.location ? window
 const BASE_URL = (envBaseUrl || runtimeBaseUrl || "").replace(/\/$/, "");
 const CLOUD_STORAGE_ENDPOINT = "/cloud-storage";
 
+function hasWebAppAuthContext(webApp) {
+  if (!webApp || typeof webApp !== "object") {
+    return false;
+  }
+
+  const initData = String(webApp.initData || webApp.InitData || "").trim();
+  if (initData) {
+    return true;
+  }
+
+  const unsafe = webApp.initDataUnsafe || webApp.InitDataUnsafe || {};
+  return Boolean(unsafe.query_id || unsafe.user?.id || readWebAppDataFromUrl());
+}
+
+function safelyCallPlatformMethod(callback) {
+  try {
+    const result = callback();
+    if (result && typeof result.then === "function") {
+      result.catch(() => {});
+    }
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
 function readWebAppDataFromUrl() {
   if (typeof window === "undefined") {
     return "";
@@ -45,10 +71,19 @@ function resolveWebApp() {
     return webAppInstance;
   }
   if (typeof window !== "undefined") {
-    if (window.WebApp && typeof window.WebApp === "object") {
-      webAppInstance = window.WebApp;
-    } else if (window.Telegram?.WebApp) {
-      webAppInstance = window.Telegram.WebApp;
+    const candidates = [
+      window.Telegram?.WebApp,
+      window.MAX?.WebApp,
+      window.Max?.WebApp,
+      window.WebApp,
+    ];
+    webAppInstance =
+      candidates.find((candidate) => hasWebAppAuthContext(candidate)) || null;
+    if (!webAppInstance && readWebAppDataFromUrl()) {
+      webAppInstance =
+        candidates.find(
+          (candidate) => candidate && typeof candidate === "object",
+        ) || null;
     }
   }
   return webAppInstance;
@@ -64,8 +99,10 @@ export function ensureReady() {
     console.warn("Telegram WebApp is not available.");
     return null;
   }
-  webApp.ready();
-  webApp.expand();
+  safelyCallPlatformMethod(() => webApp.ready());
+  if (typeof webApp.expand === "function") {
+    safelyCallPlatformMethod(() => webApp.expand());
+  }
   setSwipeBehavior({ allowVertical: false, allowHorizontal: true });
   return webApp;
 }
@@ -297,9 +334,9 @@ export function setMainButton({ text, isVisible = true, color, textColor, onClic
   }
 
   if (isVisible) {
-    webApp.MainButton.show();
+    safelyCallPlatformMethod(() => webApp.MainButton.show());
   } else {
-    webApp.MainButton.hide();
+    safelyCallPlatformMethod(() => webApp.MainButton.hide());
   }
 
   if (onClick) {
@@ -315,7 +352,7 @@ export function setMainButton({ text, isVisible = true, color, textColor, onClic
 export function hideMainButton() {
   const webApp = resolveWebApp();
   if (webApp) {
-    webApp.MainButton.hide();
+    safelyCallPlatformMethod(() => webApp.MainButton.hide());
   }
 }
 
@@ -339,24 +376,24 @@ export function showBackButton(handler) {
     return () => {};
   }
 
-  webApp.BackButton.show();
+  safelyCallPlatformMethod(() => webApp.BackButton.show());
   if (handler) {
     webApp.onEvent("backButtonClicked", handler);
     return () => {
       webApp.offEvent("backButtonClicked", handler);
-      webApp.BackButton.hide();
+      safelyCallPlatformMethod(() => webApp.BackButton.hide());
     };
   }
 
   return () => {
-    webApp.BackButton.hide();
+    safelyCallPlatformMethod(() => webApp.BackButton.hide());
   };
 }
 
 export function hideBackButton() {
   const webApp = resolveWebApp();
   if (webApp) {
-    webApp.BackButton.hide();
+    safelyCallPlatformMethod(() => webApp.BackButton.hide());
   }
 }
 
@@ -370,17 +407,17 @@ export function setSwipeBehavior({ allowVertical = true, allowHorizontal = true 
   const horizontalAllowed = allowHorizontal;
 
   if (typeof webApp.setSwipeBehavior === "function") {
-    webApp.setSwipeBehavior({
+    safelyCallPlatformMethod(() => webApp.setSwipeBehavior({
       allow_vertical: verticalAllowed,
       allow_horizontal: horizontalAllowed,
       allowVertical: verticalAllowed,
       allowHorizontal: horizontalAllowed,
-    });
+    }));
     return;
   }
 
   if (!verticalAllowed && typeof webApp.disableVerticalSwipes === "function") {
-    webApp.disableVerticalSwipes();
+    safelyCallPlatformMethod(() => webApp.disableVerticalSwipes());
   }
 
   // Вертикальные свайпы всегда запрещены, поэтому обратное включение не требуется.
