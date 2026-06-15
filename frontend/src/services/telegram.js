@@ -48,6 +48,8 @@ function readWebAppDataFromUrl() {
   const searchParams = new URLSearchParams(window.location.search);
   const hashParams = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
   const rawValue =
+    searchParams.get("tgWebAppData") ||
+    hashParams.get("tgWebAppData") ||
     searchParams.get("WebAppData") ||
     hashParams.get("WebAppData") ||
     searchParams.get("webAppData") ||
@@ -156,7 +158,23 @@ export function getStartParam() {
   }
 
   const webApp = resolveWebApp();
-  return webApp?.initDataUnsafe?.start_param || webApp?.InitDataUnsafe?.start_param || "";
+  if (webApp?.initDataUnsafe?.start_param || webApp?.InitDataUnsafe?.start_param) {
+    return webApp?.initDataUnsafe?.start_param || webApp?.InitDataUnsafe?.start_param;
+  }
+
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+  return (
+    searchParams.get("tgWebAppStartParam") ||
+    hashParams.get("tgWebAppStartParam") ||
+    searchParams.get("startapp") ||
+    hashParams.get("startapp") ||
+    ""
+  );
 }
 
 export function getInvitationCode() {
@@ -167,8 +185,13 @@ export function getInvitationCode() {
   }
 
   // Проверяем URL параметры (fallback)
-  const urlParams = new URLSearchParams(window.location.search);
-  const code = urlParams.get("invite") || urlParams.get("code");
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+  const code =
+    searchParams.get("invite") ||
+    hashParams.get("invite") ||
+    searchParams.get("code") ||
+    hashParams.get("code");
   if (code) {
     return code;
   }

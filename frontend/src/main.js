@@ -45,7 +45,6 @@ async function registerServiceWorker() {
     const contentType = response.headers.get("content-type") || "";
 
     if (!response.ok || !isJavaScriptContentType(contentType)) {
-      console.warn("[SW] Registration skipped: service worker script is unavailable.");
       return;
     }
 

@@ -109,6 +109,7 @@ function extractWebAppDataFromUrl() {
 
   const params = getLocationParams();
   const rawValue =
+    params.get("tgWebAppData") ||
     params.get("WebAppData") ||
     params.get("webAppData") ||
     params.get("webapp_data") ||
@@ -140,6 +141,15 @@ function hasMaxUrlInitData() {
         "",
     ).trim(),
   );
+}
+
+function hasTelegramUrlInitData() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const params = getLocationParams();
+  return Boolean(String(params.get("tgWebAppData") || "").trim());
 }
 
 function extractUserFromInitData(initDataString) {
@@ -318,7 +328,8 @@ export const useTelegramStore = defineStore("telegram", () => {
     const telegramWebApp = window.Telegram?.WebApp || null;
     const maxWebApp =
       window.MAX?.WebApp || window.Max?.WebApp || window.WebApp || null;
-    const hasTelegramContext = hasTelegramAuthContext(telegramWebApp);
+    const hasTelegramContext =
+      hasTelegramAuthContext(telegramWebApp) || hasTelegramUrlInitData();
     const hasMaxContext = hasMaxAuthContext(maxWebApp) || hasMaxUrlInitData();
 
     // В MAX окружении иногда присутствует Telegram.WebApp shim без initData.
@@ -348,6 +359,7 @@ export const useTelegramStore = defineStore("telegram", () => {
 
     if (!webApp) {
       const urlInitData = extractWebAppDataFromUrl();
+      const hasTelegramInitData = hasTelegramUrlInitData();
       const hasMaxInitData = Boolean(
         urlInitData ||
         window?.WebAppData ||
@@ -355,7 +367,7 @@ export const useTelegramStore = defineStore("telegram", () => {
         window?.Max?.WebAppData,
       );
 
-      if (hasMaxInitData) {
+      if (hasTelegramInitData || hasMaxInitData) {
         initData.value =
           urlInitData ||
           String(
@@ -367,15 +379,8 @@ export const useTelegramStore = defineStore("telegram", () => {
         user.value = extractUserFromInitData(initData.value);
         setTelegramRuntimeState({
           initDataOverride: initData.value,
-          clientPlatform: "max",
+          clientPlatform: hasTelegramInitData ? "telegram" : "max",
         });
-        console.warn(
-          "WebApp API недоступен, используем initData из URL/global переменных MAX.",
-        );
-      } else {
-        console.error(
-          "WebApp API недоступен. Откройте мини-приложение внутри Telegram или MAX.",
-        );
       }
 
       if (urlInvite) {
@@ -384,7 +389,7 @@ export const useTelegramStore = defineStore("telegram", () => {
           initDataOverride: initData.value || "",
           startParam: token,
           inviteCode: urlInvite,
-          clientPlatform: hasMaxInitData ? "max" : "telegram",
+          clientPlatform: hasTelegramInitData || !hasMaxInitData ? "telegram" : "max",
         });
       }
       return;
