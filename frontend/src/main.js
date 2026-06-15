@@ -15,13 +15,13 @@ const app = createApp(App);
 const pinia = createPinia();
 
 app.use(pinia);
-app.use(router);
 
 // Инициализируем Telegram store после создания Pinia
 import { useTelegramStore } from "./stores/telegram.js";
 const telegramStore = useTelegramStore();
 telegramStore.initTelegram();
 
+app.use(router);
 app.mount("#app");
 
 function isJavaScriptContentType(contentType) {

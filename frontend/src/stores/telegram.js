@@ -282,6 +282,7 @@ export const useTelegramStore = defineStore("telegram", () => {
   const initData = ref("");
   const inviteToken = ref(null);
   const pendingCourseId = ref(null);
+  let isRuntimeDetectionCompleted = false;
   let activeBackButtonHandler = null;
 
   const isReady = computed(() => Boolean(tg.value));
@@ -337,10 +338,11 @@ export const useTelegramStore = defineStore("telegram", () => {
   }
 
   function initTelegram() {
-    if (tg.value) {
+    if (tg.value || isRuntimeDetectionCompleted) {
       return;
     }
 
+    isRuntimeDetectionCompleted = true;
     const { provider, webApp } = detectMiniAppRuntime();
     const urlInvite = extractInviteFromUrl();
 

@@ -201,7 +201,9 @@ export const useUserStore = defineStore("user", () => {
       isInitialized.value = true;
       return { success: Boolean(user.value), user: user.value };
     } catch (err) {
-      console.error("Ошибка получения статуса", err);
+      if (err?.code !== "INIT_DATA_MISSING") {
+        console.error("Ошибка получения статуса", err);
+      }
       error.value = err.message;
       throw err;
     } finally {
